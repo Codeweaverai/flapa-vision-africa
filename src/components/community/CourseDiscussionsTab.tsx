@@ -7,9 +7,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { MessageCircle, Share2, Heart, Search, BookOpen, Calendar, Plus, Send, Reply } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { MessageCircle, Share2, Heart, Search, BookOpen, Calendar, Plus, Send, Reply, Users, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
+import { UserFollowButton } from './UserFollowButton';
+import { FollowersList } from './FollowersList';
+import { EnhancedPostCreation } from './EnhancedPostCreation';
+import { ImageGallery } from './ImageGallery';
+import { fetchCommunityPosts } from '@/services/communityService';
+import { getFollowers, getFollowing } from '@/services/communityFollowerService';
+import { formatDistanceToNow } from 'date-fns';
 
 interface Course {
   id: string;
@@ -57,14 +66,18 @@ interface CommunityPost {
     username?: string;
     full_name?: string;
     avatar_url?: string;
+    is_following?: boolean;
+    followers_count?: number;
   };
   comments: Comment[];
   comments_count: number;
   likes_count: number;
   emoji_reactions: Record<string, number>;
+  images?: any[];
 }
 
 const CourseDiscussionsTab = () => {
+  const [activeTab, setActiveTab] = useState('discussions');
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -77,6 +90,8 @@ const CourseDiscussionsTab = () => {
   const [commentDialogs, setCommentDialogs] = useState<Record<string, boolean>>({});
   const [newComment, setNewComment] = useState<Record<string, string>>({});
   const [replyingTo, setReplyingTo] = useState<Record<string, string | null>>({});
+  const [people, setPeople] = useState<any[]>([]);
+  const [showFollowers, setShowFollowers] = useState<{ userId: string; tab: 'followers' | 'following' } | null>(null);
   
   const [formData, setFormData] = useState({
     title: '',
@@ -97,7 +112,8 @@ const CourseDiscussionsTab = () => {
       await Promise.all([
         loadPosts(),
         loadCourses(),
-        loadEvents()
+        loadEvents(),
+        loadPeople()
       ]);
     } catch (error) {
       console.error('Error initializing:', error);
@@ -109,90 +125,69 @@ const CourseDiscussionsTab = () => {
 
   const loadPosts = async () => {
     try {
-      // First, get posts with their user profiles
-      const { data: postsData, error: postsError } = await supabase
-        .from('community_posts')
-        .select(`
-          *,
-          profiles:user_id (
-            id,
-            username,
-            full_name,
-            avatar_url
-          )
-        `)
-        .order('created_at', { ascending: false });
-
-      if (postsError) {
-        console.error('Error loading posts:', postsError);
-        return;
-      }
-
-      if (!postsData) {
-        setPosts([]);
-        return;
-      }
-
-      // Then get comments separately
-      const { data: commentsData, error: commentsError } = await supabase
-        .from('post_comments')
-        .select('*')
-        .order('created_at', { ascending: true });
-
-      if (commentsError) {
-        console.error('Error loading comments:', commentsError);
-      }
-
-      // Get unique user IDs from comments
-      const commentUserIds = [...new Set(commentsData?.map(comment => comment.user_id) || [])];
-      
-      // Fetch profiles for comment users
-      const { data: commentProfiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, username, full_name, avatar_url')
-        .in('id', commentUserIds);
-
-      if (profilesError) {
-        console.error('Error loading comment profiles:', profilesError);
-      }
-
-      // Create a profile map
-      const profileMap = new Map(
-        (commentProfiles || []).map(profile => [profile.id, profile])
-      );
-
-      // Group comments by post and attach profiles
-      const commentsByPost = (commentsData || []).reduce((acc, comment) => {
-        if (!acc[comment.post_id]) {
-          acc[comment.post_id] = [];
-        }
-        acc[comment.post_id].push({
-          ...comment,
-          profiles: profileMap.get(comment.user_id) || {
-            id: comment.user_id,
-            username: 'Unknown User',
-            full_name: 'Unknown User',
-            avatar_url: null
-          },
-          replies: []
-        });
-        return acc;
-      }, {} as Record<string, Comment[]>);
-
-      // Combine posts with comments and ensure proper typing
-      const postsWithComments: CommunityPost[] = postsData.map(post => ({
+      const postsData = await fetchCommunityPosts();
+      // Ensure type compatibility
+      const mappedPosts = postsData.map(post => ({
         ...post,
-        comments: commentsByPost[post.id] || [],
-        comments_count: (commentsByPost[post.id] || []).length,
-        likes_count: 0,
-        emoji_reactions: (post.emoji_reactions && typeof post.emoji_reactions === 'object' && !Array.isArray(post.emoji_reactions)) 
-          ? post.emoji_reactions as Record<string, number>
-          : {}
+        profiles: post.profiles || {
+          id: '',
+          username: 'user',
+          full_name: 'Anonymous',
+          avatar_url: '',
+          is_following: false,
+          followers_count: 0
+        },
+        comments_count: post.comments?.length || 0,
+        likes_count: post.like_count || 0,
+        emoji_reactions: {},
+        comments: post.comments || []
       }));
-
-      setPosts(postsWithComments);
+      setPosts(mappedPosts);
     } catch (error) {
       console.error('Error loading posts:', error);
+    }
+  };
+
+  const loadPeople = async () => {
+    try {
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('id, username, full_name, avatar_url, bio')
+        .neq('id', currentUser?.id)
+        .limit(20);
+
+      if (error) throw error;
+
+      // Get follow status for each person if user is logged in
+      if (currentUser && profiles) {
+        const followPromises = profiles.map(async (profile) => {
+          const { data: followData } = await supabase
+            .from('community_followers')
+            .select('id')
+            .eq('follower_id', currentUser.id)
+            .eq('following_id', profile.id)
+            .single();
+          
+          const [followersResult, followingResult] = await Promise.all([
+            supabase.from('community_followers').select('id').eq('following_id', profile.id),
+            supabase.from('community_followers').select('id').eq('follower_id', profile.id)
+          ]);
+
+          return {
+            ...profile,
+            is_following: !!followData,
+            followers_count: followersResult.data?.length || 0,
+            following_count: followingResult.data?.length || 0
+          };
+        });
+
+        const peopleWithFollowStatus = await Promise.all(followPromises);
+        setPeople(peopleWithFollowStatus);
+      } else {
+        setPeople(profiles || []);
+      }
+    } catch (error) {
+      console.error('Error loading people:', error);
     }
   };
 
@@ -234,108 +229,17 @@ const CourseDiscussionsTab = () => {
     }
   };
 
-  const handleCreatePost = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentUser) {
-      toast.error('Please log in to create a post');
-      return;
-    }
-
-    if (!formData.title.trim() || !formData.content.trim()) {
-      toast.error('Title and content are required');
-      return;
-    }
-
-    try {
-      const postData = {
-        title: formData.title.trim(),
-        content: formData.content.trim(),
-        user_id: currentUser.id,
-        course_id: formData.content_type === 'course' ? formData.content_id : null,
-        event_id: formData.content_type === 'event' ? formData.content_id : null
-      };
-
-      const { error } = await supabase
-        .from('community_posts')
-        .insert(postData);
-
-      if (error) {
-        console.error('Error creating post:', error);
-        toast.error('Failed to create post');
-        return;
-      }
-
-      toast.success('Post created successfully');
-      setDialogOpen(false);
-      setFormData({ title: '', content: '', content_type: 'course', content_id: '' });
-      await loadPosts();
-    } catch (error) {
-      console.error('Error creating post:', error);
-      toast.error('Failed to create post');
-    }
+  const handleFollowChange = (userId: string, isFollowing: boolean) => {
+    setPeople(prev => prev.map(person => 
+      person.id === userId 
+        ? { ...person, is_following: isFollowing, followers_count: (person.followers_count || 0) + (isFollowing ? 1 : -1) }
+        : person
+    ));
   };
 
-  const handleAddComment = async (postId: string, parentId?: string) => {
-    if (!currentUser) {
-      toast.error('Please log in to comment');
-      return;
-    }
-
-    const commentText = newComment[postId]?.trim();
-    if (!commentText) {
-      toast.error('Comment cannot be empty');
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('post_comments')
-        .insert({
-          post_id: postId,
-          user_id: currentUser.id,
-          content: commentText,
-          parent_id: parentId || null
-        });
-
-      if (error) {
-        console.error('Error adding comment:', error);
-        toast.error('Failed to add comment');
-        return;
-      }
-
-      setNewComment(prev => ({ ...prev, [postId]: '' }));
-      setReplyingTo(prev => ({ ...prev, [postId]: null }));
-      toast.success('Comment added successfully');
-      await loadPosts();
-    } catch (error) {
-      console.error('Error adding comment:', error);
-      toast.error('Failed to add comment');
-    }
-  };
-
-  const toggleCommentDialog = (postId: string) => {
-    setCommentDialogs(prev => ({ 
-      ...prev, 
-      [postId]: !prev[postId] 
-    }));
-  };
-
-  const handleShare = async (post: CommunityPost) => {
-    try {
-      await navigator.share({
-        title: post.title,
-        text: post.content,
-        url: window.location.href
-      });
-    } catch (error) {
-      navigator.clipboard.writeText(window.location.href);
-      toast.success('Link copied to clipboard');
-    }
-  };
-
-  const startReply = (postId: string, commentId: string, username: string) => {
-    setReplyingTo(prev => ({ ...prev, [postId]: commentId }));
-    setNewComment(prev => ({ ...prev, [postId]: `@${username} ` }));
+  const handlePostCreated = () => {
+    loadPosts();
+    toast.success('Discussion created successfully!');
   };
 
   const filteredPosts = posts.filter(post => {
@@ -355,7 +259,7 @@ const CourseDiscussionsTab = () => {
     if (post.course_id) {
       const course = courses.find(c => c.id === post.course_id);
       return (
-        <Badge className="bg-gradient-to-r from-blue-100 to-purple-100 text-purple-800 border-purple-200">
+        <Badge className="bg-gradient-to-r from-orange-100 to-purple-100 text-orange-800 border-orange-200">
           <BookOpen className="h-3 w-3 mr-1" />
           {course ? course.title : 'Course'}
         </Badge>
@@ -363,7 +267,7 @@ const CourseDiscussionsTab = () => {
     } else if (post.event_id) {
       const event = events.find(e => e.id === post.event_id);
       return (
-        <Badge className="bg-gradient-to-r from-orange-100 to-purple-100 text-orange-800 border-orange-200">
+        <Badge className="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 border-purple-200">
           <Calendar className="h-3 w-3 mr-1" />
           {event ? event.title : 'Event'}
         </Badge>
@@ -375,309 +279,249 @@ const CourseDiscussionsTab = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gradient-to-r from-orange-500 to-purple-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Search and Filter Section */}
-      <Card className="border border-gray-200">
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row gap-4 items-end">
-            <div className="flex-1">
-              <Label htmlFor="search" className="text-gray-700 font-medium">Search Discussions</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  id="search"
-                  placeholder="Search posts, courses, or events..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 border-gray-200 focus:border-orange-500"
-                />
-              </div>
-            </div>
-            
-            <div>
-              <Label htmlFor="contentType" className="text-gray-700 font-medium">Content Type</Label>
-              <Select value={contentType} onValueChange={(value: any) => setContentType(value)}>
-                <SelectTrigger className="w-40 border-gray-200 focus:border-purple-500">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Content</SelectItem>
-                  <SelectItem value="course">Courses Only</SelectItem>
-                  <SelectItem value="event">Events Only</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+    <div className="bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 min-h-screen">
+      <div className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+            <TabsTrigger 
+              value="discussions" 
+              className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white transition-all duration-300"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Course Discussions
+            </TabsTrigger>
+            <TabsTrigger 
+              value="people" 
+              className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white transition-all duration-300"
+            >
+              <Users className="h-4 w-4" />
+              People
+            </TabsTrigger>
+          </TabsList>
 
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white">
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Discussion
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle className="text-xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
-                    Create New Discussion
-                  </DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleCreatePost} className="space-y-4">
-                  <div>
-                    <Label htmlFor="title" className="text-gray-700 font-medium">Discussion Title *</Label>
-                    <Input
-                      id="title"
-                      value={formData.title}
-                      onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                      placeholder="What would you like to discuss?"
-                      className="border-gray-200 focus:border-orange-500"
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="content_type" className="text-gray-700 font-medium">Discussion Type</Label>
-                      <Select 
-                        value={formData.content_type} 
-                        onValueChange={(value: 'course' | 'event') => 
-                          setFormData(prev => ({ ...prev, content_type: value, content_id: '' }))
-                        }
-                      >
-                        <SelectTrigger className="border-gray-200 focus:border-purple-500">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="course">Course Discussion</SelectItem>
-                          <SelectItem value="event">Event Discussion</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="content_id" className="text-gray-700 font-medium">
-                        Select {formData.content_type === 'course' ? 'Course' : 'Event'}
-                      </Label>
-                      <Select 
-                        value={formData.content_id} 
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, content_id: value }))}
-                      >
-                        <SelectTrigger className="border-gray-200 focus:border-orange-500">
-                          <SelectValue placeholder={`Choose ${formData.content_type}`} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {formData.content_type === 'course' 
-                            ? courses.map((course) => (
-                                <SelectItem key={course.id} value={course.id}>
-                                  {course.title}
-                                </SelectItem>
-                              ))
-                            : events.map((event) => (
-                                <SelectItem key={event.id} value={event.id}>
-                                  {event.title}
-                                </SelectItem>
-                              ))
-                          }
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="content" className="text-gray-700 font-medium">Discussion Content *</Label>
-                    <Textarea
-                      id="content"
-                      value={formData.content}
-                      onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
-                      placeholder="Share your thoughts, questions, or insights..."
-                      className="min-h-24 border-gray-200 focus:border-purple-500"
-                      required
-                    />
-                  </div>
-
-                  <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="border-gray-300 text-gray-700">
-                      Cancel
-                    </Button>
-                    <Button type="submit" className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white">
-                      Create Discussion
-                    </Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Posts List */}
-      <div className="space-y-4">
-        {filteredPosts.length === 0 ? (
-          <Card className="border-dashed border-2 border-gray-200">
-            <CardContent className="pt-8 pb-10 text-center">
-              <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-600 mb-2">No discussions found</h3>
-              <p className="text-gray-500">
-                {searchQuery 
-                  ? `No discussions match "${searchQuery}"`
-                  : 'Be the first to start a discussion!'
-                }
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredPosts.map((post) => (
-            <Card key={post.id} className="border border-gray-200 hover:shadow-lg transition-shadow duration-200">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-3">
-                    {post.profiles?.avatar_url ? (
-                      <img
-                        src={post.profiles.avatar_url}
-                        alt={post.profiles.full_name || post.profiles.username}
-                        className="w-10 h-10 rounded-full object-cover border-2 border-purple-200"
+          <TabsContent value="discussions" className="space-y-6">
+            {/* Search and Filter Section */}
+            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row gap-4 items-end">
+                  <div className="flex-1">
+                    <Label htmlFor="search" className="text-gray-700 font-medium">Search Discussions</Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input
+                        id="search"
+                        placeholder="Search posts, courses, or events..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10 border-gray-200 focus:border-orange-500"
                       />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center text-white font-semibold">
-                        {(post.profiles?.full_name || post.profiles?.username || 'U').charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <div>
-                      <p className="font-medium text-gray-800">
-                        {post.profiles?.full_name || post.profiles?.username || 'Anonymous User'}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {new Date(post.created_at).toLocaleDateString()}
-                      </p>
                     </div>
                   </div>
-                  {getContentBadge(post)}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <h3 className="text-lg font-semibold mb-2 text-gray-800">{post.title}</h3>
-                <p className="text-gray-700 mb-4">{post.content}</p>
-                
-                <div className="flex items-center gap-4 pt-3 border-t border-gray-200">
-                  <Button variant="ghost" size="sm" className="text-gray-600 hover:text-purple-700 hover:bg-purple-50">
-                    <Heart className="h-4 w-4 mr-2" />
-                    {post.likes_count || 0}
-                  </Button>
                   
-                  <Dialog open={commentDialogs[post.id]} onOpenChange={(open) => toggleCommentDialog(post.id)}>
-                    <DialogTrigger asChild>
-                      <Button variant="ghost" size="sm" className="text-gray-600 hover:text-orange-700 hover:bg-orange-50">
-                        <MessageCircle className="h-4 w-4 mr-2" />
-                        {post.comments_count || 0}
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                      <DialogHeader>
-                        <DialogTitle className="text-lg font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
-                          Comments on "{post.title}"
-                        </DialogTitle>
-                      </DialogHeader>
-                      
-                      <div className="space-y-4">
-                        {/* Existing Comments */}
-                        {post.comments?.map((comment) => (
-                          <div key={comment.id} className="space-y-2">
-                            <div className="flex space-x-3 p-3 bg-gray-50 rounded-lg">
-                              {comment.profiles?.avatar_url ? (
-                                <img
-                                  src={comment.profiles.avatar_url}
-                                  alt={comment.profiles.full_name || comment.profiles.username}
-                                  className="w-8 h-8 rounded-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center text-white text-sm font-semibold">
-                                  {(comment.profiles?.full_name || comment.profiles?.username || 'U').charAt(0).toUpperCase()}
-                                </div>
-                              )}
-                              <div className="flex-1">
-                                <div className="flex items-center justify-between">
-                                  <p className="text-sm font-medium text-gray-800">
-                                    {comment.profiles?.full_name || comment.profiles?.username || 'Anonymous User'}
-                                  </p>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => startReply(post.id, comment.id, comment.profiles?.username || 'User')}
-                                    className="text-xs text-gray-500 hover:text-orange-600"
-                                  >
-                                    <Reply className="h-3 w-3 mr-1" />
-                                    Reply
-                                  </Button>
-                                </div>
-                                <p className="text-gray-700 mt-1">{comment.content}</p>
-                                <p className="text-xs text-gray-500 mt-1">
-                                  {new Date(comment.created_at).toLocaleDateString()}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        )) || []}
+                  <div>
+                    <Label htmlFor="contentType" className="text-gray-700 font-medium">Content Type</Label>
+                    <Select value={contentType} onValueChange={(value: any) => setContentType(value)}>
+                      <SelectTrigger className="w-40 border-gray-200 focus:border-purple-500">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Content</SelectItem>
+                        <SelectItem value="course">Courses Only</SelectItem>
+                        <SelectItem value="event">Events Only</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
-                        {/* Add New Comment */}
-                        {currentUser && (
-                          <div className="flex space-x-3 p-4 border-t border-gray-200">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center text-white text-sm font-semibold">
-                              {(currentUser.user_metadata?.full_name || 'U').charAt(0).toUpperCase()}
-                            </div>
-                            <div className="flex-1">
-                              {replyingTo[post.id] && (
-                                <div className="mb-2 text-sm text-gray-600 bg-orange-50 px-2 py-1 rounded">
-                                  <span className="font-medium">Replying to comment</span>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setReplyingTo(prev => ({ ...prev, [post.id]: null }))}
-                                    className="ml-2 h-auto p-0 text-xs text-orange-600"
-                                  >
-                                    Cancel
-                                  </Button>
-                                </div>
-                              )}
-                              <Textarea
-                                placeholder={replyingTo[post.id] ? "Write your reply..." : "Add your comment..."}
-                                value={newComment[post.id] || ''}
-                                onChange={(e) => setNewComment(prev => ({ ...prev, [post.id]: e.target.value }))}
-                                className="mb-2 border-gray-200 focus:border-purple-500"
-                                rows={2}
-                              />
-                              <Button
-                                onClick={() => handleAddComment(post.id, replyingTo[post.id] || undefined)}
-                                size="sm"
-                                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
-                              >
-                                <Send className="h-3 w-3 mr-2" />
-                                {replyingTo[post.id] ? 'Post Reply' : 'Post Comment'}
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                  
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => handleShare(post)}
-                    className="text-gray-600 hover:text-orange-700 hover:bg-orange-50"
-                  >
-                    <Share2 className="h-4 w-4 mr-2" />
-                    Share
-                  </Button>
-                </div>
+                {/* Enhanced Post Creation */}
+                {currentUser && (
+                  <div className="mt-6">
+                    <EnhancedPostCreation
+                      onPostCreated={handlePostCreated}  
+                      courses={courses}
+                      events={events}
+                      className="bg-gradient-to-r from-orange-50 to-purple-50 border border-orange-200"
+                    />
+                  </div>
+                )}
               </CardContent>
             </Card>
-          ))
+
+            {/* Posts List */}
+            <div className="space-y-4">
+              {filteredPosts.map((post) => (
+                <Card key={post.id} className="bg-white/90 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <Avatar className="cursor-pointer" onClick={() => setShowFollowers({ userId: post.user_id, tab: 'followers' })}>
+                          <AvatarImage src={post.profiles?.avatar_url} />
+                          <AvatarFallback className="bg-gradient-to-r from-orange-200 to-purple-200">
+                            {post.profiles?.full_name?.charAt(0) || 'U'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2">
+                            <p className="font-semibold">{post.profiles?.full_name || 'Anonymous'}</p>
+                            {currentUser?.id !== post.user_id && post.profiles && (
+                              <UserFollowButton
+                                userId={post.user_id}
+                                isFollowing={post.profiles.is_following || false}
+                                onFollowChange={(isFollowing) => handleFollowChange(post.user_id, isFollowing)}
+                                size="sm"
+                                showCount={false}
+                              />
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm text-muted-foreground">@{post.profiles?.username || 'user'}</span>
+                            <span className="text-sm text-muted-foreground">•</span>
+                            <span className="text-sm text-muted-foreground">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
+                            {getContentBadge(post)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <CardTitle className="mt-4 text-lg bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                      {post.title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="whitespace-pre-wrap mb-4 text-gray-700">{post.content}</p>
+                    
+                    {/* Image Gallery */}
+                    {post.images && post.images.length > 0 && (
+                      <div className="mb-4">
+                        <ImageGallery images={post.images} />
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-4 border-t border-gradient-to-r from-orange-100 to-purple-100">
+                      <div className="flex items-center space-x-4">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 transition-all text-orange-600"
+                        >
+                          <Heart className="h-4 w-4 mr-2" />
+                          {post.likes_count || 0}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 transition-all text-purple-600"
+                        >
+                          <MessageCircle className="h-4 w-4 mr-2" />
+                          {post.comments_count || 0}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 transition-all text-orange-600"
+                        >
+                          <Share2 className="h-4 w-4 mr-2" />
+                          Share
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+
+              {filteredPosts.length === 0 && (
+                <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+                  <CardContent className="p-8 text-center">
+                    <MessageCircle className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                    <h3 className="text-lg font-semibold mb-2 text-gray-600">No discussions found</h3>
+                    <p className="text-gray-500 mb-4">
+                      {searchQuery ? 'Try adjusting your search terms.' : 'Be the first to start a discussion!'}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="people" className="space-y-6">
+            {/* People Grid */}
+            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+              <CardHeader>
+                <CardTitle className="bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                  Discover People
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {people.map((person) => (
+                    <Card key={person.id} className="bg-gradient-to-br from-orange-50 to-purple-50 border border-orange-200 hover:shadow-lg transition-all duration-300">
+                      <CardContent className="p-4 text-center">
+                        <Avatar className="w-16 h-16 mx-auto mb-3 cursor-pointer" onClick={() => setShowFollowers({ userId: person.id, tab: 'followers' })}>
+                          <AvatarImage src={person.avatar_url} />
+                          <AvatarFallback className="bg-gradient-to-r from-orange-200 to-purple-200 text-orange-700">
+                            {person.full_name?.charAt(0) || 'U'}
+                          </AvatarFallback>
+                        </Avatar>
+                        
+                        <h3 className="font-semibold text-lg mb-1 text-gray-800">{person.full_name || 'Anonymous'}</h3>
+                        <p className="text-sm text-gray-600 mb-2">@{person.username || 'user'}</p>
+                        
+                        {person.bio && (
+                          <p className="text-sm text-gray-600 mb-3 line-clamp-2">{person.bio}</p>
+                        )}
+                        
+                        <div className="flex items-center justify-center space-x-4 mb-3 text-sm text-gray-500">
+                          <button 
+                            onClick={() => setShowFollowers({ userId: person.id, tab: 'followers' })}
+                            className="hover:text-orange-500 transition-colors"
+                          >
+                            <span className="font-medium">{person.followers_count || 0}</span> followers
+                          </button>
+                          <button 
+                            onClick={() => setShowFollowers({ userId: person.id, tab: 'following' })}
+                            className="hover:text-purple-500 transition-colors"
+                          >
+                            <span className="font-medium">{person.following_count || 0}</span> following
+                          </button>
+                        </div>
+                        
+                        <UserFollowButton
+                          userId={person.id}
+                          isFollowing={person.is_following || false}
+                          onFollowChange={(isFollowing) => handleFollowChange(person.id, isFollowing)}
+                          className="w-full"
+                          variant={person.is_following ? "outline" : "default"}
+                        />
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {people.length === 0 && (
+                  <div className="text-center py-8">
+                    <Users className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                    <h3 className="text-lg font-semibold mb-2 text-gray-600">No people found</h3>
+                    <p className="text-gray-500">Check back later for new community members!</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Followers Modal */}
+        {showFollowers && (
+          <FollowersList
+            userId={showFollowers.userId}
+            isOpen={true}
+            onClose={() => setShowFollowers(null)}
+            initialTab={showFollowers.tab}
+          />
         )}
       </div>
     </div>

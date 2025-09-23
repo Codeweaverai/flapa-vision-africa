@@ -9,11 +9,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
-import { MessageCircle, Heart, Share2, Send, Users, Reply, MoreVertical } from 'lucide-react';
+import { MessageCircle, Heart, Share2, Send, Users, Reply, MoreVertical, UserPlus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import EmojiPicker from '@/components/community/EmojiPicker';
 import CourseDiscussionsTab from '@/components/community/CourseDiscussionsTab';
 import NotificationsTab from '@/components/community/NotificationsTab';
+import { EnhancedPostCreation } from '@/components/community/EnhancedPostCreation';
+import { ImageGallery } from '@/components/community/ImageGallery';
+import { UserFollowButton } from '@/components/community/UserFollowButton';
+import { FollowersList } from '@/components/community/FollowersList';
+import { fetchCommunityPosts } from '@/services/communityService';
+import { getImagesForPosts } from '@/services/communityImageService';
+import { getFollowStatusForUsers } from '@/services/communityFollowerService';
 
 interface CommunityPost {
   id: string;
@@ -22,16 +29,27 @@ interface CommunityPost {
   user_id: string;
   created_at: string;
   updated_at: string;
+  course_id?: string;
   emoji_reactions?: any;
   profiles?: {
+    id: string;
     full_name: string;
     username: string;
     avatar_url: string;
+    is_following?: boolean;
+    followers_count?: number;
+    following_count?: number;
   } | null;
   likes_count?: number;
   comments_count?: number;
   user_liked?: boolean;
   user_love?: boolean;
+  images?: {
+    id: string;
+    image_url: string;
+    alt_text?: string;
+    upload_order: number;
+  }[];
 }
 
 interface Comment {
@@ -70,17 +88,20 @@ const CommunityPage = () => {
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
   const [messages, setMessages] = useState<CommunityMessage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newPost, setNewPost] = useState({ title: '', content: '' });
   const [newMessage, setNewMessage] = useState('');
   const [newComment, setNewComment] = useState<Record<string, string>>({});
   const [replyTo, setReplyTo] = useState<Record<string, string>>({});
   const [showComments, setShowComments] = useState<Record<string, boolean>>({});
   const [activeChannel, setActiveChannel] = useState('general');
+  const [showFollowers, setShowFollowers] = useState<{ userId: string; tab: 'followers' | 'following' } | null>(null);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
 
   useEffect(() => {
     if (user) {
-      fetchPosts();
+      fetchPostsEnhanced();
       fetchMessages();
+      loadCoursesAndEvents();
       subscribeToRealtime();
     }
   }, [user, activeChannel]);
@@ -93,7 +114,7 @@ const CommunityPage = () => {
         schema: 'public',
         table: 'community_posts'
       }, () => {
-        fetchPosts();
+        fetchPostsEnhanced();
       })
       .subscribe();
 
@@ -115,7 +136,7 @@ const CommunityPage = () => {
         schema: 'public',
         table: 'post_comments'
       }, () => {
-        fetchPosts();
+        fetchPostsEnhanced();
       })
       .subscribe();
 
@@ -126,52 +147,46 @@ const CommunityPage = () => {
     };
   };
 
-  const fetchPosts = async () => {
+  const fetchPostsEnhanced = async () => {
     try {
-      const { data: postsData, error: postsError } = await supabase
-        .from('community_posts')
-        .select('*')
-        .is('course_id', null)
-        .order('created_at', { ascending: false });
-
-      if (postsError) throw postsError;
-
-      const userIds = postsData?.map(post => post.user_id) || [];
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('id, full_name, username, avatar_url')
-        .in('id', userIds);
-
-      const postsWithProfiles = await Promise.all(
-        (postsData || []).map(async (post) => {
-          const profile = profilesData?.find(p => p.id === post.user_id);
-          
-          // Fetch likes and comments count
-          const [likesResult, lovesResult, commentsResult, userLikeResult, userLoveResult] = await Promise.all([
-            supabase.from('post_likes').select('id').eq('post_id', post.id).eq('like_type', 'like'),
-            supabase.from('post_likes').select('id').eq('post_id', post.id).eq('like_type', 'love'),
-            supabase.from('post_comments').select('id').eq('post_id', post.id),
-            user ? supabase.from('post_likes').select('id').eq('post_id', post.id).eq('user_id', user.id).eq('like_type', 'like').single() : Promise.resolve({ data: null }),
-            user ? supabase.from('post_likes').select('id').eq('post_id', post.id).eq('user_id', user.id).eq('like_type', 'love').single() : Promise.resolve({ data: null })
-          ]);
-
-          return {
-            ...post,
-            profiles: profile,
-            likes_count: (likesResult.data?.length || 0) + (lovesResult.data?.length || 0),
-            comments_count: commentsResult.data?.length || 0,
-            user_liked: !!userLikeResult.data,
-            user_love: !!userLoveResult.data
-          };
-        })
-      );
-
-      setPosts(postsWithProfiles);
+      // Use the enhanced service to get posts with images and follow status
+      const postsData = await fetchCommunityPosts();
+      
+      // Filter out course-specific posts for the main feed  
+      const mainFeedPosts = postsData.filter(post => !post.course_id).map(post => ({
+        ...post,
+        profiles: post.profiles ? {
+          id: post.profiles.id,
+          full_name: post.profiles.full_name || 'Anonymous',
+          username: post.profiles.username || 'user', 
+          avatar_url: post.profiles.avatar_url || '',
+          is_following: post.profiles.is_following,
+          followers_count: post.profiles.followers_count,
+          following_count: post.profiles.following_count
+        } : null,
+        images: post.images || []
+      }));
+      
+      setPosts(mainFeedPosts);
     } catch (error) {
       console.error('Error fetching posts:', error);
       toast.error('Failed to load community posts');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadCoursesAndEvents = async () => {
+    try {
+      const [coursesResult, eventsResult] = await Promise.all([
+        supabase.from('courses').select('id, title, thumbnail_url').eq('is_published', true),
+        supabase.from('events').select('id, title, image_url, start_time').eq('is_published', true)
+      ]);
+
+      if (coursesResult.data) setCourses(coursesResult.data);
+      if (eventsResult.data) setEvents(eventsResult.data);
+    } catch (error) {
+      console.error('Error loading courses and events:', error);
     }
   };
 
@@ -244,27 +259,21 @@ const CommunityPage = () => {
     }
   };
 
-  const createPost = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user || !newPost.title.trim() || !newPost.content.trim()) return;
+  const handlePostCreated = () => {
+    fetchPostsEnhanced();
+    toast.success('Post created successfully!');
+  };
 
-    try {
-      const { error } = await supabase
-        .from('community_posts')
-        .insert({
-          title: newPost.title,
-          content: newPost.content,
-          user_id: user.id
-        });
-
-      if (error) throw error;
-      
-      setNewPost({ title: '', content: '' });
-      toast.success('Post created successfully!');
-    } catch (error) {
-      console.error('Error creating post:', error);
-      toast.error('Failed to create post');
-    }
+  const handleFollowChange = (userId: string, isFollowing: boolean) => {
+    // Update the posts to reflect the new follow status
+    setPosts(prev => prev.map(post => ({
+      ...post,
+      profiles: post.profiles?.id === userId ? {
+        ...post.profiles,
+        is_following: isFollowing,
+        followers_count: (post.profiles.followers_count || 0) + (isFollowing ? 1 : -1)
+      } : post.profiles
+    })));
   };
 
   const toggleLike = async (postId: string, type: 'like' | 'love' = 'like') => {
@@ -292,7 +301,7 @@ const CommunityPage = () => {
           });
       }
 
-      fetchPosts();
+      fetchPostsEnhanced();
     } catch (error) {
       console.error('Error toggling like:', error);
     }
@@ -316,7 +325,7 @@ const CommunityPage = () => {
       setNewComment(prev => ({ ...prev, [postId]: '' }));
       setReplyTo(prev => ({ ...prev, [postId]: '' }));
       fetchComments(postId);
-      fetchPosts();
+      fetchPostsEnhanced();
       toast.success('Comment added!');
     } catch (error) {
       console.error('Error adding comment:', error);
@@ -356,90 +365,115 @@ const CommunityPage = () => {
   const renderFeed = () => (
     <div className="space-y-6">
       {user && (
-        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
-          <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white rounded-t-lg">
-            <CardTitle>Share with the Community</CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            <form onSubmit={createPost} className="space-y-4">
-              <Input
-                placeholder="Post title"
-                value={newPost.title}
-                onChange={(e) => setNewPost(prev => ({ ...prev, title: e.target.value }))}
-                required
-                className="bg-white/50"
-              />
-              <div className="relative">
-                <Textarea
-                  placeholder="What's on your mind?"
-                  value={newPost.content}
-                  onChange={(e) => setNewPost(prev => ({ ...prev, content: e.target.value }))}
-                  rows={4}
-                  required
-                  className="bg-white/50"
-                />
-                <div className="absolute bottom-2 right-2">
-                  <EmojiPicker onEmojiSelect={(emoji) => setNewPost(prev => ({ ...prev, content: prev.content + emoji }))} />
-                </div>
-              </div>
-              <Button type="submit" className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
-                <Share2 className="h-4 w-4 mr-2" />
-                Share Post
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        <EnhancedPostCreation 
+          onPostCreated={handlePostCreated}
+          courses={courses}
+          events={events}
+          className="bg-white/90 backdrop-blur-sm border-0 shadow-xl"
+        />
       )}
 
       <div className="space-y-4">
         {posts.map((post) => (
-          <Card key={post.id} className="bg-white/80 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-shadow">
+          <Card key={post.id} className="bg-white/90 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
             <CardHeader>
-              <div className="flex items-center space-x-3">
-                <Avatar>
-                  <AvatarImage src={post.profiles?.avatar_url} />
-                  <AvatarFallback className="bg-gradient-to-r from-orange-200 to-purple-200">
-                    {post.profiles?.full_name?.charAt(0) || 'U'}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="font-semibold">{post.profiles?.full_name || 'Anonymous'}</p>
-                  <p className="text-sm text-muted-foreground">
-                    @{post.profiles?.username || 'user'} • {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                  </p>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <Avatar className="cursor-pointer" onClick={() => setShowFollowers({ userId: post.user_id, tab: 'followers' })}>
+                    <AvatarImage src={post.profiles?.avatar_url} />
+                    <AvatarFallback className="bg-gradient-to-r from-orange-200 to-purple-200">
+                      {post.profiles?.full_name?.charAt(0) || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                      <p className="font-semibold">{post.profiles?.full_name || 'Anonymous'}</p>
+                      {user?.id !== post.user_id && post.profiles && (
+                        <UserFollowButton
+                          userId={post.user_id}
+                          isFollowing={post.profiles.is_following || false}
+                        onFollowChange={(isFollowing) => handleFollowChange(post.user_id, isFollowing)}
+                          size="sm"
+                          showCount={false}
+                        />
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                      <span>@{post.profiles?.username || 'user'}</span>
+                      <span>•</span>
+                      <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
+                      {post.profiles?.followers_count && (
+                        <>
+                          <span>•</span>
+                          <button 
+                            onClick={() => setShowFollowers({ userId: post.user_id, tab: 'followers' })}
+                            className="hover:text-orange-500 transition-colors"
+                          >
+                            <Users className="h-3 w-3 inline mr-1" />
+                            {post.profiles.followers_count} followers
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
-              <CardTitle className="mt-4">{post.title}</CardTitle>
+              <CardTitle className="mt-4 text-lg">{post.title}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="whitespace-pre-wrap mb-4">{post.content}</p>
-              <div className="flex items-center space-x-4 pt-4 border-t">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => toggleLike(post.id, 'like')}
-                  className={post.user_liked ? 'text-blue-500' : 'text-gray-500'}
-                >
-                  <Heart className={`h-4 w-4 mr-2 ${post.user_liked ? 'fill-current' : ''}`} />
-                  Like
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => toggleLike(post.id, 'love')}
-                  className={post.user_love ? 'text-red-500' : 'text-gray-500'}
-                >
-                  ❤️ Love
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => toggleComments(post.id)}
-                >
-                  <MessageCircle className="h-4 w-4 mr-2" />
-                  {post.comments_count || 0} Comments
-                </Button>
-                <span className="text-sm text-gray-500">{post.likes_count || 0} likes</span>
+              
+              {/* Image Gallery */}
+              {post.images && post.images.length > 0 && (
+                <div className="mb-4">
+                  <ImageGallery images={post.images.map(img => ({
+                    id: img.id,
+                    image_url: img.image_url,
+                    alt_text: img.alt_text,
+                    upload_order: img.upload_order,
+                    post_id: '',
+                    image_path: '',
+                    file_size: 0,
+                    file_type: '',
+                    created_at: '',
+                    updated_at: ''
+                  }))} />
+                </div>
+              )}
+              <div className="flex items-center justify-between pt-4 border-t border-gradient-to-r from-orange-100 to-purple-100">
+                <div className="flex items-center space-x-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleLike(post.id, 'like')}
+                    className={`hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 transition-all ${post.user_liked ? 'text-orange-500' : 'text-gray-500'}`}
+                  >
+                    <Heart className={`h-4 w-4 mr-2 ${post.user_liked ? 'fill-current' : ''}`} />
+                    Like
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleLike(post.id, 'love')}
+                    className={`hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 transition-all ${post.user_love ? 'text-purple-500' : 'text-gray-500'}`}
+                  >
+                    ❤️ Love
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleComments(post.id)}
+                    className="hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 transition-all"
+                  >
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    {post.comments_count || 0} Comments
+                  </Button>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  <span className="bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent font-medium">
+                    {post.likes_count || 0} likes
+                  </span>
+                </div>
               </div>
 
               {showComments[post.id] && (
