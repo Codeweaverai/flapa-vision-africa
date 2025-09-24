@@ -152,8 +152,8 @@ const CommunityPage = () => {
       // Use the enhanced service to get posts with images and follow status
       const postsData = await fetchCommunityPosts();
       
-      // Filter out course-specific posts for the main feed  
-      const mainFeedPosts = postsData.filter(post => !post.course_id).map(post => ({
+      // Use all posts for the main feed  
+      const mainFeedPosts = postsData.map(post => ({
         ...post,
         profiles: post.profiles ? {
           id: post.profiles.id,
@@ -392,7 +392,7 @@ const CommunityPage = () => {
                         <UserFollowButton
                           userId={post.user_id}
                           isFollowing={post.profiles.is_following || false}
-                        onFollowChange={(isFollowing) => handleFollowChange(post.user_id, isFollowing)}
+                        onFollowChange={(userId, isFollowing) => handleFollowChange(userId, isFollowing)}
                           size="sm"
                           showCount={false}
                         />

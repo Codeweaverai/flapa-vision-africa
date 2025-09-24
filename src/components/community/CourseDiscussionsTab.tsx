@@ -373,7 +373,7 @@ const CourseDiscussionsTab = () => {
                               <UserFollowButton
                                 userId={post.user_id}
                                 isFollowing={post.profiles.is_following || false}
-                                onFollowChange={(isFollowing) => handleFollowChange(post.user_id, isFollowing)}
+                                onFollowChange={(userId, isFollowing) => handleFollowChange(userId, isFollowing)}
                                 size="sm"
                                 showCount={false}
                               />
@@ -493,7 +493,7 @@ const CourseDiscussionsTab = () => {
                         <UserFollowButton
                           userId={person.id}
                           isFollowing={person.is_following || false}
-                          onFollowChange={(isFollowing) => handleFollowChange(person.id, isFollowing)}
+                          onFollowChange={(userId, isFollowing) => handleFollowChange(userId, isFollowing)}
                           className="w-full"
                           variant={person.is_following ? "outline" : "default"}
                         />
