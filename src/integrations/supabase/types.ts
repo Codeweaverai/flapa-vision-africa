@@ -590,6 +590,30 @@ export type Database = {
         }
         Relationships: []
       }
+      country_currency_mapping: {
+        Row: {
+          country_code: string
+          country_name: string
+          currency_code: string
+          currency_name: string
+          is_active: boolean | null
+        }
+        Insert: {
+          country_code: string
+          country_name: string
+          currency_code: string
+          currency_name: string
+          is_active?: boolean | null
+        }
+        Update: {
+          country_code?: string
+          country_name?: string
+          currency_code?: string
+          currency_name?: string
+          is_active?: boolean | null
+        }
+        Relationships: []
+      }
       course_comments: {
         Row: {
           content: string
@@ -1502,6 +1526,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      exchange_rates: {
+        Row: {
+          base_currency: string
+          exchange_rate: number
+          id: string
+          last_updated: string | null
+          target_currency: string
+        }
+        Insert: {
+          base_currency?: string
+          exchange_rate: number
+          id?: string
+          last_updated?: string | null
+          target_currency: string
+        }
+        Update: {
+          base_currency?: string
+          exchange_rate?: number
+          id?: string
+          last_updated?: string | null
+          target_currency?: string
+        }
+        Relationships: []
       }
       final_exam_answers: {
         Row: {
@@ -3859,6 +3907,42 @@ export type Database = {
           },
         ]
       }
+      user_currency_preferences: {
+        Row: {
+          country_code: string | null
+          created_at: string | null
+          default_currency: string
+          detected_by_ip: boolean | null
+          device_currency: string | null
+          id: string
+          ip_address: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          country_code?: string | null
+          created_at?: string | null
+          default_currency?: string
+          detected_by_ip?: boolean | null
+          device_currency?: string | null
+          id?: string
+          ip_address?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          country_code?: string | null
+          created_at?: string | null
+          default_currency?: string
+          detected_by_ip?: boolean | null
+          device_currency?: string | null
+          id?: string
+          ip_address?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       user_otp_verifications: {
         Row: {
           attempts: number | null
@@ -4080,6 +4164,10 @@ export type Database = {
         Args: { creator_uuid: string; order_uuid: string }
         Returns: boolean
       }
+      detect_currency_by_country: {
+        Args: { country_code: string }
+        Returns: string
+      }
       generate_booking_code: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -4108,8 +4196,23 @@ export type Database = {
         Args: { ticket_id: string }
         Returns: number
       }
+      get_current_exchange_rates: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          exchange_rate: number
+          target_currency: string
+        }[]
+      }
       get_current_user_email: {
         Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      get_exchange_rate: {
+        Args: { from_currency: string; to_currency: string }
+        Returns: number
+      }
+      get_user_currency: {
+        Args: { user_uuid: string }
         Returns: string
       }
       get_user_emails: {
@@ -4163,6 +4266,14 @@ export type Database = {
       update_ticket_inventory: {
         Args: { p_quantity: number; p_ticket_id: string }
         Returns: boolean
+      }
+      update_user_currency: {
+        Args: {
+          country_code?: string
+          currency_code: string
+          user_uuid: string
+        }
+        Returns: undefined
       }
       user_needs_otp_verification: {
         Args: { user_uuid: string }

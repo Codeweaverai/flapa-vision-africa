@@ -140,7 +140,7 @@ const CourseDiscussionsTab = () => {
         comments_count: post.comments?.length || 0,
         likes_count: post.like_count || 0,
         emoji_reactions: {},
-        comments: post.comments || []
+        comments: (post.comments || []) as Comment[]
       }));
       setPosts(mappedPosts);
     } catch (error) {
