@@ -140,7 +140,15 @@ const CourseDiscussionsTab = () => {
         comments_count: post.comments?.length || 0,
         likes_count: post.like_count || 0,
         emoji_reactions: {},
-        comments: (post.comments || []) as Comment[]
+        comments: (post.comments || []).map(comment => ({
+          ...comment,
+          profiles: comment.profiles || {
+            id: comment.user_id,
+            username: '',
+            full_name: 'Anonymous',
+            avatar_url: ''
+          }
+        })) as Comment[]
       }));
       setPosts(mappedPosts);
     } catch (error) {
