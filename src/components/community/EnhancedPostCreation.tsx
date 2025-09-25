@@ -221,10 +221,10 @@ export const EnhancedPostCreation: React.FC<EnhancedPostCreationProps> = ({
                 <SelectValue placeholder="Select course or event" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="none">None</SelectItem>
                 {courses.length > 0 && (
                   <>
-                    <SelectItem value="" disabled className="font-semibold">
+                    <SelectItem value="courses-header" disabled className="font-semibold">
                       Courses
                     </SelectItem>
                     {courses.map((course) => (
@@ -239,7 +239,7 @@ export const EnhancedPostCreation: React.FC<EnhancedPostCreationProps> = ({
                 )}
                 {events.length > 0 && (
                   <>
-                    <SelectItem value="" disabled className="font-semibold">
+                    <SelectItem value="events-header" disabled className="font-semibold">
                       Events
                     </SelectItem>
                     {events.map((event) => (
