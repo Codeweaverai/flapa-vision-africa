@@ -9,7 +9,9 @@ import { Star, BookOpen, Users, Award, Clock, Play, MessageCircle, Calendar, Map
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import PriceDisplay from '@/components/currency/PriceDisplay';
+import { UserFollowButton } from '@/components/community/UserFollowButton';
+import { FollowersList } from '@/components/community/FollowersList';
+import { getFollowStats } from '@/services/communityFollowerService';
 
 interface CreatorProfile {
   id: string;
@@ -19,6 +21,9 @@ interface CreatorProfile {
   username: string;
   is_creator: boolean;
   role: string;
+  followers_count?: number;
+  following_count?: number;
+  is_following?: boolean;
 }
 
 interface Course {
@@ -47,13 +52,13 @@ interface Event {
 
 const CreatorPublicProfile: React.FC = () => {
   const { creatorId } = useParams<{ creatorId: string }>(); 
-  const { user, userPreferences } = useAuth();
-  const userCurrency = userPreferences?.currency || 'USD'; // Default to USD if no preference
+  const { user } = useAuth();
   const [creator, setCreator] = useState<CreatorProfile | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showFollowers, setShowFollowers] = useState<{ userId: string; tab: 'followers' | 'following' } | null>(null);
 
   useEffect(() => {
     if (!creatorId) {
@@ -90,7 +95,27 @@ const CreatorPublicProfile: React.FC = () => {
         return;
       }
 
-      setCreator(profile);
+      // Get follow stats and status if user is logged in
+      let followStats = { followers_count: 0, following_count: 0 };
+      let isFollowing = false;
+      
+      if (user) {
+        followStats = await getFollowStats(id);
+        const { data: followData } = await supabase
+          .from('community_followers')
+          .select('id')
+          .eq('follower_id', user.id)
+          .eq('following_id', id)
+          .single();
+        isFollowing = !!followData;
+      }
+
+      setCreator({
+        ...profile,
+        followers_count: followStats.followers_count,
+        following_count: followStats.following_count,
+        is_following: isFollowing
+      });
 
       // Fetch courses and events in parallel
       const [coursesResult, eventsResult] = await Promise.all([
@@ -151,6 +176,16 @@ const CreatorPublicProfile: React.FC = () => {
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Failed to send message');
+    }
+  };
+
+  const handleFollowChange = (userId: string, isFollowing: boolean) => {
+    if (creator && creator.id === userId) {
+      setCreator(prev => prev ? {
+        ...prev,
+        is_following: isFollowing,
+        followers_count: (prev.followers_count || 0) + (isFollowing ? 1 : -1)
+      } : null);
     }
   };
 
@@ -266,6 +301,20 @@ const CreatorPublicProfile: React.FC = () => {
                       <Calendar className="w-4 h-4 text-purple-500" />
                       <span>{events.length} Events</span>
                     </div>
+                    <button 
+                      onClick={() => setShowFollowers({ userId: creatorId!, tab: 'followers' })}
+                      className="flex items-center gap-1 hover:text-blue-600 transition-colors"
+                    >
+                      <Users className="w-4 h-4 text-blue-500" />
+                      <span>{creator.followers_count || 0} Followers</span>
+                    </button>
+                    <button 
+                      onClick={() => setShowFollowers({ userId: creatorId!, tab: 'following' })}
+                      className="flex items-center gap-1 hover:text-blue-600 transition-colors"
+                    >
+                      <Users className="w-4 h-4 text-green-500" />
+                      <span>{creator.following_count || 0} Following</span>
+                    </button>
                   </div>
                   
                   {creator.bio && (
@@ -276,13 +325,23 @@ const CreatorPublicProfile: React.FC = () => {
 
                   {user && user.id !== creatorId && (
                     <div className="flex gap-3">
+                      <UserFollowButton
+                        userId={creatorId!}
+                        isFollowing={creator.is_following || false}
+                        onFollowChange={handleFollowChange}
+                        size="lg"
+                        showCount={true}
+                        followersCount={creator.followers_count}
+                        variant="default"
+                      />
                       <Button 
                         onClick={handleSendMessage}
                         size="lg"
-                        className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg"
+                        variant="outline"
+                        className="border-gray-300"
                       >
                         <MessageCircle className="w-5 h-5 mr-2" />
-                        Send Message
+                        Message
                       </Button>
                     </div>
                   )}
@@ -327,9 +386,7 @@ const CreatorPublicProfile: React.FC = () => {
                           {course.title}
                         </h3>
                         <Badge variant={course.is_free ? "secondary" : "default"} className="ml-2">
-                          {course.is_free ? 'Free' : (                           
-                          <PriceDisplay amount={course.price} originalCurrency="USD" />
-                          )}
+                          {course.is_free ? 'Free' : `$${course.price}`}
                         </Badge>
                       </div>
                       
@@ -396,10 +453,7 @@ const CreatorPublicProfile: React.FC = () => {
                           {event.title}
                         </h3>
                         <Badge variant={event.is_free ? "secondary" : "default"} className="ml-2">
-                          {event.is_free ? 'Free' : (
-                            <PriceDisplay amount={event.price} 
-                              originalCurrency="USD" />
-                          )}
+                          {event.is_free ? 'Free' : `$${event.price}`}
                         </Badge>
                       </div>
                       
@@ -432,6 +486,16 @@ const CreatorPublicProfile: React.FC = () => {
               </div>
             )}
           </div>
+          
+          {/* Followers Modal */}
+          {showFollowers && (
+            <FollowersList
+              userId={showFollowers.userId}
+              isOpen={!!showFollowers}
+              onClose={() => setShowFollowers(null)}
+              initialTab={showFollowers.tab}
+            />
+          )}
         </div>
       </div>
     </Layout>

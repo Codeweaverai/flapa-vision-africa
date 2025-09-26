@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
-import { MessageCircle, Heart, Share2, Send, Users, Reply, MoreVertical, UserPlus } from 'lucide-react';
+import { MessageCircle, Heart, Share2, Send, Users, Reply, MoreVertical, UserPlus, BookOpen } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import EmojiPicker from '@/components/community/EmojiPicker';
 import CourseDiscussionsTab from '@/components/community/CourseDiscussionsTab';
@@ -149,10 +149,8 @@ const CommunityPage = () => {
 
   const fetchPostsEnhanced = async () => {
     try {
-      // Use the enhanced service to get posts with images and follow status
       const postsData = await fetchCommunityPosts();
       
-      // Use all posts for the main feed  
       const mainFeedPosts = postsData.map(post => ({
         ...post,
         profiles: post.profiles ? {
@@ -265,7 +263,6 @@ const CommunityPage = () => {
   };
 
   const handleFollowChange = (userId: string, isFollowing: boolean) => {
-    // Update the posts to reflect the new follow status
     setPosts(prev => prev.map(post => ({
       ...post,
       profiles: post.profiles?.id === userId ? {
@@ -363,69 +360,74 @@ const CommunityPage = () => {
   };
 
   const renderFeed = () => (
-    <div className="space-y-6">
+    <div className="space-y-4 p-4">
       {user && (
         <EnhancedPostCreation 
           onPostCreated={handlePostCreated}
           courses={courses}
           events={events}
-          className="bg-white/90 backdrop-blur-sm border-0 shadow-xl"
+          className="bg-white rounded-xl border shadow-sm"
         />
       )}
 
-      <div className="space-y-4">
-        {posts.map((post) => (
-          <Card key={post.id} className="bg-white/90 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <Avatar className="cursor-pointer" onClick={() => setShowFollowers({ userId: post.user_id, tab: 'followers' })}>
-                    <AvatarImage src={post.profiles?.avatar_url} />
-                    <AvatarFallback className="bg-gradient-to-r from-orange-200 to-purple-200">
-                      {post.profiles?.full_name?.charAt(0) || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2">
-                      <p className="font-semibold">{post.profiles?.full_name || 'Anonymous'}</p>
-                      {user?.id !== post.user_id && post.profiles && (
-                        <UserFollowButton
-                          userId={post.user_id}
-                          isFollowing={post.profiles.is_following || false}
+      <div className="space-y-3">
+        {posts
+          .sort((a, b) => (b.profiles?.followers_count || 0) - (a.profiles?.followers_count || 0))
+          .map((post) => (
+          <Card key={post.id} className="bg-white rounded-xl border shadow-sm hover:shadow-md transition-all duration-200">
+            <CardHeader className="pb-3">
+              <div className="flex items-start space-x-3">
+                <Avatar 
+                  className="w-10 h-10 cursor-pointer ring-2 ring-gray-100" 
+                  onClick={() => setShowFollowers({ userId: post.user_id, tab: 'followers' })}
+                >
+                  <AvatarImage src={post.profiles?.avatar_url} />
+                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-sm">
+                    {post.profiles?.full_name?.charAt(0) || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center space-x-2">
+                    <h4 className="font-semibold text-gray-900 truncate">{post.profiles?.full_name || 'Anonymous'}</h4>
+                    {user?.id !== post.user_id && post.profiles && (
+                      <UserFollowButton
+                        userId={post.user_id}
+                        isFollowing={post.profiles.is_following || false}
                         onFollowChange={(userId, isFollowing) => handleFollowChange(userId, isFollowing)}
-                          size="sm"
-                          showCount={false}
-                        />
-                      )}
-                    </div>
-                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                      <span>@{post.profiles?.username || 'user'}</span>
-                      <span>•</span>
-                      <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
-                      {post.profiles?.followers_count && (
-                        <>
-                          <span>•</span>
-                          <button 
-                            onClick={() => setShowFollowers({ userId: post.user_id, tab: 'followers' })}
-                            className="hover:text-orange-500 transition-colors"
-                          >
-                            <Users className="h-3 w-3 inline mr-1" />
-                            {post.profiles.followers_count} followers
-                          </button>
-                        </>
-                      )}
-                    </div>
+                        size="sm"
+                        showCount={false}
+                        variant="outline"
+                      />
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2 text-sm text-gray-500 mt-1">
+                    <span>@{post.profiles?.username || 'user'}</span>
+                    <span>•</span>
+                    <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
+                    {post.profiles?.followers_count && post.profiles.followers_count > 0 && (
+                      <>
+                        <span>•</span>
+                        <button 
+                          onClick={() => setShowFollowers({ userId: post.user_id, tab: 'followers' })}
+                          className="flex items-center space-x-1 text-blue-600 hover:text-blue-700 transition-colors"
+                        >
+                          <Users className="h-3 w-3" />
+                          <span>{post.profiles.followers_count}</span>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
-              <CardTitle className="mt-4 text-lg">{post.title}</CardTitle>
+              {post.title && (
+                <h3 className="text-lg font-semibold text-gray-900 mt-3 leading-tight">{post.title}</h3>
+              )}
             </CardHeader>
-            <CardContent>
-              <p className="whitespace-pre-wrap mb-4">{post.content}</p>
+            <CardContent className="pt-0 pb-3">
+              <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">{post.content}</p>
               
-              {/* Image Gallery */}
               {post.images && post.images.length > 0 && (
-                <div className="mb-4">
+                <div className="mt-3 rounded-lg overflow-hidden">
                   <ImageGallery images={post.images.map(img => ({
                     id: img.id,
                     image_url: img.image_url,
@@ -440,39 +442,39 @@ const CommunityPage = () => {
                   }))} />
                 </div>
               )}
-              <div className="flex items-center justify-between pt-4 border-t border-gradient-to-r from-orange-100 to-purple-100">
-                <div className="flex items-center space-x-4">
+              
+              <div className="flex items-center justify-between pt-3 mt-3 border-t border-gray-100">
+                <div className="flex items-center space-x-1">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => toggleLike(post.id, 'like')}
-                    className={`hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 transition-all ${post.user_liked ? 'text-orange-500' : 'text-gray-500'}`}
+                    className={`px-3 py-1.5 rounded-full text-sm transition-all ${
+                      post.user_liked 
+                        ? 'text-red-600 bg-red-50 hover:bg-red-100' 
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
                   >
-                    <Heart className={`h-4 w-4 mr-2 ${post.user_liked ? 'fill-current' : ''}`} />
-                    Like
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => toggleLike(post.id, 'love')}
-                    className={`hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 transition-all ${post.user_love ? 'text-purple-500' : 'text-gray-500'}`}
-                  >
-                    ❤️ Love
+                    <Heart className={`h-4 w-4 mr-1.5 ${post.user_liked ? 'fill-current' : ''}`} />
+                    {post.likes_count || 0}
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => toggleComments(post.id)}
-                    className="hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 transition-all"
+                    className="px-3 py-1.5 rounded-full text-sm text-gray-600 hover:bg-gray-100 transition-all"
                   >
-                    <MessageCircle className="h-4 w-4 mr-2" />
-                    {post.comments_count || 0} Comments
+                    <MessageCircle className="h-4 w-4 mr-1.5" />
+                    {post.comments_count || 0}
                   </Button>
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  <span className="bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent font-medium">
-                    {post.likes_count || 0} likes
-                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="px-3 py-1.5 rounded-full text-sm text-gray-600 hover:bg-gray-100 transition-all"
+                  >
+                    <Share2 className="h-4 w-4 mr-1.5" />
+                    Share
+                  </Button>
                 </div>
               </div>
 
@@ -488,28 +490,28 @@ const CommunityPage = () => {
                       </Avatar>
                       <div className="flex-1 space-y-2">
                         {replyTo[post.id] && (
-                          <div className="bg-gray-100 p-2 rounded text-sm">
-                            <span className="text-gray-600">Replying to a comment</span>
+                          <div className="text-sm text-muted-foreground">
+                            Replying to comment...
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => setReplyTo(prev => ({ ...prev, [post.id]: '' }))}
-                              className="ml-2 h-6 w-6 p-0"
+                              className="ml-2 h-auto p-0 text-xs"
                             >
-                              ×
+                              Cancel
                             </Button>
                           </div>
                         )}
                         <div className="flex space-x-2">
-                          <Input
+                          <Textarea
                             placeholder="Write a comment..."
                             value={newComment[post.id] || ''}
                             onChange={(e) => setNewComment(prev => ({ ...prev, [post.id]: e.target.value }))}
-                            className="flex-1 bg-white/50"
+                            className="min-h-[60px] resize-none border-gray-200"
                           />
-                          <EmojiPicker onEmojiSelect={(emoji) => setNewComment(prev => ({ ...prev, [post.id]: (prev[post.id] || '') + emoji }))} />
                           <Button
                             onClick={() => addComment(post.id)}
+                            disabled={!newComment[post.id]?.trim()}
                             size="sm"
                             className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
                           >
@@ -520,139 +522,203 @@ const CommunityPage = () => {
                     </div>
                   )}
 
-                  <div className="space-y-3">
-                    {comments[post.id]?.map((comment) => (
-                      <div key={comment.id} className="flex space-x-3 bg-gray-50/80 backdrop-blur-sm p-3 rounded-lg">
-                        <Avatar className="w-6 h-6">
-                          <AvatarImage src={comment.profiles?.avatar_url} />
-                          <AvatarFallback className="bg-gradient-to-r from-orange-200 to-purple-200 text-xs">
-                            {comment.profiles?.full_name?.charAt(0) || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
+                  {comments[post.id]?.map((comment) => (
+                    <div key={comment.id} className="flex space-x-3">
+                      <Avatar className="w-8 h-8">
+                        <AvatarImage src={comment.profiles?.avatar_url} />
+                        <AvatarFallback className="bg-gradient-to-r from-blue-200 to-green-200">
+                          {comment.profiles?.full_name?.charAt(0) || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <div className="bg-gray-50 rounded-lg p-3">
                           <div className="flex items-center space-x-2 mb-1">
-                            <p className="text-sm font-medium">{comment.profiles?.full_name || 'Anonymous'}</p>
-                            <p className="text-xs text-gray-500">
+                            <span className="font-medium text-sm">{comment.profiles?.full_name || 'Anonymous'}</span>
+                            <span className="text-xs text-muted-foreground">
                               {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                            </p>
+                            </span>
                           </div>
                           <p className="text-sm">{comment.content}</p>
-                          <div className="flex items-center space-x-2 mt-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 px-2 text-xs"
-                            >
-                              <Heart className="h-3 w-3 mr-1" />
-                              {comment.likes_count || 0}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setReplyTo(prev => ({ ...prev, [post.id]: comment.id }))}
-                              className="h-6 px-2 text-xs"
-                            >
-                              <Reply className="h-3 w-3 mr-1" />
-                              Reply
-                            </Button>
-                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2 mt-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-auto p-1 text-xs text-muted-foreground hover:text-orange-500"
+                          >
+                            <Heart className="h-3 w-3 mr-1" />
+                            {comment.likes_count || 0}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setReplyTo(prev => ({ ...prev, [post.id]: comment.id }))}
+                            className="h-auto p-1 text-xs text-muted-foreground hover:text-purple-500"
+                          >
+                            <Reply className="h-3 w-3 mr-1" />
+                            Reply
+                          </Button>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>
           </Card>
         ))}
+
+        {posts.length === 0 && !loading && (
+          <Card className="bg-white rounded-xl border shadow-sm">
+            <CardContent className="p-8 text-center">
+              <MessageCircle className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+              <h3 className="text-lg font-semibold mb-2 text-gray-600">No posts yet</h3>
+              <p className="text-gray-500 mb-4">Be the first to share something with the community!</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
 
   const renderChat = () => (
-    <div className="space-y-6">
-      <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Community Chat
-            </CardTitle>
-            <Badge variant="outline" className="bg-white/50">
-              {activeChannel}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="h-96 overflow-y-auto space-y-3 mb-4 p-4 bg-gray-50/80 backdrop-blur-sm rounded-lg">
-            {messages.map((message) => (
-              <div key={message.id} className="flex space-x-3">
-                <Avatar className="w-8 h-8">
-                  <AvatarImage src={message.profiles?.avatar_url} />
-                  <AvatarFallback className="bg-gradient-to-r from-orange-200 to-purple-200">
-                    {message.profiles?.full_name?.charAt(0) || 'U'}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-1">
-                    <p className="text-sm font-medium">{message.profiles?.full_name || 'Anonymous'}</p>
-                    <p className="text-xs text-gray-500">
-                      {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
-                    </p>
-                  </div>
-                  <p className="text-sm bg-white/80 backdrop-blur-sm p-2 rounded">{message.content}</p>
-                </div>
+    <div className="h-[600px] flex flex-col">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((message) => (
+          <div key={message.id} className="flex space-x-3">
+            <Avatar className="w-8 h-8">
+              <AvatarImage src={message.profiles?.avatar_url} />
+              <AvatarFallback className="bg-gradient-to-r from-orange-200 to-purple-200">
+                {message.profiles?.full_name?.charAt(0) || 'U'}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <div className="flex items-center space-x-2 mb-1">
+                <span className="font-medium text-sm">{message.profiles?.full_name || 'Anonymous'}</span>
+                <span className="text-xs text-muted-foreground">
+                  {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
+                </span>
               </div>
-            ))}
+              <div className="bg-gray-100 rounded-lg p-3 max-w-md">
+                <p className="text-sm">{message.content}</p>
+              </div>
+            </div>
           </div>
-          
-          {user && (
-            <form onSubmit={sendMessage} className="flex space-x-2">
-              <Input
-                placeholder="Type your message..."
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                className="flex-1 bg-white/50"
-              />
-              <Button type="submit" className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
-                <Send className="h-4 w-4" />
-              </Button>
-            </form>
-          )}
-        </CardContent>
-      </Card>
+        ))}
+      </div>
+      
+      <form onSubmit={sendMessage} className="p-4 border-t">
+        <div className="flex space-x-2">
+          <Input
+            placeholder="Type your message..."
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            className="flex-1"
+          />
+          <Button type="submit" disabled={!newMessage.trim()}>
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
+      </form>
     </div>
   );
 
+  if (loading) {
+    return (
+      <CommunityLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </CommunityLayout>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
-      <CommunityLayout activeTab={activeTab} onTabChange={setActiveTab}>
+    <CommunityLayout>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-orange-50">
         {!user ? (
-          <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-            <CardContent className="text-center py-12">
-              <h3 className="text-xl font-semibold mb-4">Join the Community</h3>
-              <p className="text-muted-foreground mb-6">
-                Sign in to connect with fellow learners and share your experiences.
-              </p>
-              <Button onClick={() => window.location.href = '/auth'} className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
-                Sign In to Continue
-              </Button>
-            </CardContent>
-          </Card>
-        ) : loading ? (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+          <div className="flex items-center justify-center min-h-screen">
+            <Card className="max-w-md mx-4 bg-white/90 backdrop-blur-sm shadow-2xl border-0">
+              <CardContent className="p-8 text-center">
+                <Users className="h-16 w-16 mx-auto mb-4 text-gradient-to-r from-orange-500 to-purple-600" />
+                <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Join the Community</h2>
+                <p className="text-muted-foreground mb-6">Connect with learners worldwide and share your journey.</p>
+                <Button className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg" onClick={() => window.location.href = '/login'}>
+                  Sign In to Continue
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         ) : (
-          <>
-            {activeTab === 'feed' && renderFeed()}
-            {activeTab === 'chat' && renderChat()}
-            {activeTab === 'courses' && <CourseDiscussionsTab />}
-            {activeTab === 'notifications' && <NotificationsTab />}
-          </>
+          <div className="max-w-4xl mx-auto">
+            {/* Modern Social Media Tabs */}
+            <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-lg border-b border-gray-200 shadow-sm">
+              <div className="px-4 py-3">
+                <div className="flex space-x-1 bg-gray-100 rounded-xl p-1 max-w-fit mx-auto">
+                  {[
+                    { id: 'feed', label: 'Feed', icon: MessageCircle },
+                    { id: 'chat', label: 'Chat', icon: Send },
+                    { id: 'discussions', label: 'Discussions', icon: BookOpen },
+                    { id: 'notifications', label: 'Notifications', icon: Users }
+                  ].map(({ id, label, icon: Icon }) => (
+                    <button
+                      key={id}
+                      onClick={() => setActiveTab(id)}
+                      className={`flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        activeTab === id
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span className="hidden sm:inline">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Tab Content */}
+            <div className="min-h-screen">
+              {activeTab === 'feed' && renderFeed()}
+              {activeTab === 'chat' && (
+                <Card className="m-4 bg-white rounded-xl border shadow-sm">
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Send className="h-5 w-5" />
+                      <span>Live Chat</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {renderChat()}
+                  </CardContent>
+                </Card>
+              )}
+              {activeTab === 'discussions' && (
+                <div className="p-4">
+                  <CourseDiscussionsTab />
+                </div>
+              )}
+              {activeTab === 'notifications' && (
+                <div className="p-4">
+                  <NotificationsTab />
+                </div>
+              )}
+            </div>
+
+            {/* Followers Modal */}
+            {showFollowers && (
+              <FollowersList
+                userId={showFollowers.userId}
+                isOpen={!!showFollowers}
+                onClose={() => setShowFollowers(null)}
+                initialTab={showFollowers.tab}
+              />
+            )}
+          </div>
         )}
-      </CommunityLayout>
-    </div>
+      </div>
+    </CommunityLayout>
   );
 };
 
