@@ -70,8 +70,17 @@ const CommunityLayout = ({ children, activeTab = 'feed', onTabChange }: Communit
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value={activeTab} className="mt-0">
-                  {children}
+                <TabsContent value="feed" className="mt-0">
+                  {activeTab === 'feed' && children}
+                </TabsContent>
+                <TabsContent value="chat" className="mt-0">
+                  {activeTab === 'chat' && children}
+                </TabsContent>
+                <TabsContent value="courses" className="mt-0">
+                  {activeTab === 'courses' && children}
+                </TabsContent>
+                <TabsContent value="notifications" className="mt-0">
+                  {activeTab === 'notifications' && children}
                 </TabsContent>
               </Tabs>
             </div>
