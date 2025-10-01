@@ -360,48 +360,51 @@ const CommunityPage = () => {
   };
 
   const renderFeed = () => (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4">
       {user && (
         <EnhancedPostCreation 
           onPostCreated={handlePostCreated}
           courses={courses}
           events={events}
-          className="bg-white rounded-xl border shadow-sm"
+          className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg hover:shadow-xl transition-all duration-300"
         />
       )}
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         {posts
           .sort((a, b) => (b.profiles?.followers_count || 0) - (a.profiles?.followers_count || 0))
           .map((post) => (
-          <Card key={post.id} className="bg-white rounded-xl border shadow-sm hover:shadow-md transition-all duration-200">
-            <CardHeader className="pb-3">
+          <Card key={post.id} className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group">
+            <CardHeader className="pb-3 border-b border-gray-100">
               <div className="flex items-start space-x-3">
                 <Avatar 
-                  className="w-10 h-10 cursor-pointer ring-2 ring-gray-100" 
+                  className="w-12 h-12 cursor-pointer ring-2 ring-white shadow-md hover:ring-purple-200 transition-all" 
                   onClick={() => setShowFollowers({ userId: post.user_id, tab: 'followers' })}
                 >
                   <AvatarImage src={post.profiles?.avatar_url} />
-                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-sm">
+                  <AvatarFallback className="bg-gradient-to-br from-orange-400 to-purple-600 text-white font-semibold">
                     {post.profiles?.full_name?.charAt(0) || 'U'}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-2">
-                    <h4 className="font-semibold text-gray-900 truncate">{post.profiles?.full_name || 'Anonymous'}</h4>
-                    {user?.id !== post.user_id && post.profiles && (
-                      <UserFollowButton
-                        userId={post.user_id}
-                        isFollowing={post.profiles.is_following || false}
-                        onFollowChange={(userId, isFollowing) => handleFollowChange(userId, isFollowing)}
-                        size="sm"
-                        showCount={false}
-                        variant="outline"
-                      />
-                    )}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <h4 className="font-bold text-gray-900 truncate">{post.profiles?.full_name || 'Anonymous'}</h4>
+                      {user?.id !== post.user_id && post.profiles && (
+                        <UserFollowButton
+                          userId={post.user_id}
+                          isFollowing={post.profiles.is_following || false}
+                          onFollowChange={(userId, isFollowing) => handleFollowChange(userId, isFollowing)}
+                          size="sm"
+                          showCount={false}
+                          variant="ghost"
+                          className="shrink-0"
+                        />
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2 text-sm text-gray-500 mt-1">
-                    <span>@{post.profiles?.username || 'user'}</span>
+                  <div className="flex items-center flex-wrap gap-2 text-xs text-gray-500 mt-1">
+                    <span className="font-medium">@{post.profiles?.username || 'user'}</span>
                     <span>•</span>
                     <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
                     {post.profiles?.followers_count && post.profiles.followers_count > 0 && (
@@ -409,10 +412,10 @@ const CommunityPage = () => {
                         <span>•</span>
                         <button 
                           onClick={() => setShowFollowers({ userId: post.user_id, tab: 'followers' })}
-                          className="flex items-center space-x-1 text-blue-600 hover:text-blue-700 transition-colors"
+                          className="flex items-center gap-1 text-purple-600 hover:text-purple-700 font-semibold transition-colors"
                         >
                           <Users className="h-3 w-3" />
-                          <span>{post.profiles.followers_count}</span>
+                          <span>{post.profiles.followers_count} followers</span>
                         </button>
                       </>
                     )}
@@ -420,14 +423,14 @@ const CommunityPage = () => {
                 </div>
               </div>
               {post.title && (
-                <h3 className="text-lg font-semibold text-gray-900 mt-3 leading-tight">{post.title}</h3>
+                <h3 className="text-xl font-bold text-gray-900 mt-4 leading-tight">{post.title}</h3>
               )}
             </CardHeader>
-            <CardContent className="pt-0 pb-3">
-              <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">{post.content}</p>
+            <CardContent className="pt-4 pb-4">
+              <p className="text-gray-700 text-base leading-relaxed whitespace-pre-wrap mb-3">{post.content}</p>
               
               {post.images && post.images.length > 0 && (
-                <div className="mt-3 rounded-lg overflow-hidden">
+                <div className="mt-4 rounded-xl overflow-hidden">
                   <ImageGallery images={post.images.map(img => ({
                     id: img.id,
                     image_url: img.image_url,
@@ -443,48 +446,48 @@ const CommunityPage = () => {
                 </div>
               )}
               
-              <div className="flex items-center justify-between pt-3 mt-3 border-t border-gray-100">
-                <div className="flex items-center space-x-1">
+              <div className="flex items-center justify-between pt-4 mt-4 border-t border-gray-100">
+                <div className="flex items-center gap-2">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => toggleLike(post.id, 'like')}
-                    className={`px-3 py-1.5 rounded-full text-sm transition-all ${
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                       post.user_liked 
-                        ? 'text-red-600 bg-red-50 hover:bg-red-100' 
-                        : 'text-gray-600 hover:bg-gray-100'
+                        ? 'text-red-600 bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100' 
+                        : 'text-gray-600 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50'
                     }`}
                   >
-                    <Heart className={`h-4 w-4 mr-1.5 ${post.user_liked ? 'fill-current' : ''}`} />
-                    {post.likes_count || 0}
+                    <Heart className={`h-4 w-4 mr-2 ${post.user_liked ? 'fill-current' : ''}`} />
+                    <span>{post.likes_count || 0}</span>
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => toggleComments(post.id)}
-                    className="px-3 py-1.5 rounded-full text-sm text-gray-600 hover:bg-gray-100 transition-all"
+                    className="px-4 py-2 rounded-full text-sm font-medium text-gray-600 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all"
                   >
-                    <MessageCircle className="h-4 w-4 mr-1.5" />
-                    {post.comments_count || 0}
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    <span>{post.comments_count || 0}</span>
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="px-3 py-1.5 rounded-full text-sm text-gray-600 hover:bg-gray-100 transition-all"
+                    className="px-4 py-2 rounded-full text-sm font-medium text-gray-600 hover:bg-gradient-to-r hover:from-green-50 hover:to-teal-50 transition-all"
                   >
-                    <Share2 className="h-4 w-4 mr-1.5" />
-                    Share
+                    <Share2 className="h-4 w-4 mr-2" />
+                    <span className="hidden sm:inline">Share</span>
                   </Button>
                 </div>
               </div>
 
               {showComments[post.id] && (
-                <div className="mt-4 pt-4 border-t space-y-4">
+                <div className="mt-4 pt-4 border-t border-gray-100 space-y-4">
                   {user && (
                     <div className="flex space-x-3">
-                      <Avatar className="w-8 h-8">
+                      <Avatar className="w-9 h-9">
                         <AvatarImage src={user.user_metadata?.avatar_url} />
-                        <AvatarFallback className="bg-gradient-to-r from-orange-200 to-purple-200">
+                        <AvatarFallback className="bg-gradient-to-br from-orange-400 to-purple-600 text-white font-semibold">
                           {user.user_metadata?.full_name?.charAt(0) || 'U'}
                         </AvatarFallback>
                       </Avatar>
