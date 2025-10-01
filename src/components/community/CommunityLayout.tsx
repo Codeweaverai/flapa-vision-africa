@@ -3,6 +3,9 @@ import Layout from '@/components/layout/Layout';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Users, MessageCircle, BookOpen, Bell } from 'lucide-react';
 import { CommunitySidebar } from './CommunitySidebar';
+import CommunityChatPage from '@/pages/CommunityChatPage';
+import CommunityNotificationsPage from '@/pages/CommunityNotificationsPage';
+import CommunityCoursesPage from '@/pages/CommunityCoursesPage';
 
 interface CommunityLayoutProps {
   children: ReactNode;
@@ -38,7 +41,7 @@ const CommunityLayout = ({ children, activeTab = 'feed', onTabChange }: Communit
 
             {/* Main Feed Area - Increased width */}
             <div className="flex-1 min-w-0 lg:max-w-4xl mx-auto lg:mx-0">
-              <Tabs defaultValue={activeTab} onValueChange={handleTabChange}>
+              <Tabs value={activeTab} onValueChange={handleTabChange}>
                 <TabsList className="w-full grid grid-cols-4 bg-white/80 backdrop-blur-sm border-none shadow-lg rounded-full p-1 mb-6">
                   <TabsTrigger 
                     value="feed" 
@@ -71,16 +74,16 @@ const CommunityLayout = ({ children, activeTab = 'feed', onTabChange }: Communit
                 </TabsList>
 
                 <TabsContent value="feed" className="mt-0">
-                  {activeTab === 'feed' && children}
+                  {children}
                 </TabsContent>
                 <TabsContent value="chat" className="mt-0">
-                  {activeTab === 'chat' && children}
+                  <CommunityChatPage />
                 </TabsContent>
                 <TabsContent value="courses" className="mt-0">
-                  {activeTab === 'courses' && children}
+                  <CommunityCoursesPage />
                 </TabsContent>
                 <TabsContent value="notifications" className="mt-0">
-                  {activeTab === 'notifications' && children}
+                  <CommunityNotificationsPage />
                 </TabsContent>
               </Tabs>
             </div>
