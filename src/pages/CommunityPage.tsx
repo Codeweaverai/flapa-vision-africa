@@ -18,6 +18,7 @@ import { EnhancedPostCreation } from '@/components/community/EnhancedPostCreatio
 import { ImageGallery } from '@/components/community/ImageGallery';
 import { UserFollowButton } from '@/components/community/UserFollowButton';
 import { FollowersList } from '@/components/community/FollowersList';
+import { RightSidebar } from '@/components/community/RightSidebar';
 import { fetchCommunityPosts } from '@/services/communityService';
 import { getImagesForPosts } from '@/services/communityImageService';
 import { getFollowStatusForUsers } from '@/services/communityFollowerService';
@@ -361,15 +362,6 @@ const CommunityPage = () => {
 
   const renderFeed = () => (
     <div className="space-y-4">
-      {user && (
-        <EnhancedPostCreation 
-          onPostCreated={handlePostCreated}
-          courses={courses}
-          events={events}
-          className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg hover:shadow-xl transition-all duration-300"
-        />
-      )}
-
       <div className="space-y-4">
         {posts
           .sort((a, b) => (b.profiles?.followers_count || 0) - (a.profiles?.followers_count || 0))
@@ -653,72 +645,70 @@ const CommunityPage = () => {
             </Card>
           </div>
         ) : (
-          <div className="max-w-4xl mx-auto">
-            {/* Modern Social Media Tabs */}
-            <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-lg border-b border-gray-200 shadow-sm">
-              <div className="px-4 py-3">
-                <div className="flex space-x-1 bg-gray-100 rounded-xl p-1 max-w-fit mx-auto">
+          <div className="flex gap-6 max-w-7xl mx-auto px-4">
+            {/* Main Content Area */}
+            <div className="flex-1 min-w-0">
+              {/* Modern Gradient Tabs */}
+              <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-lg rounded-2xl border border-gray-200 shadow-lg mb-6 overflow-hidden">
+                <div className="flex overflow-x-auto hide-scrollbar">
                   {[
                     { id: 'feed', label: 'Feed', icon: MessageCircle },
-                    { id: 'chat', label: 'Chat', icon: Send },
-                    { id: 'discussions', label: 'Discussions', icon: BookOpen },
-                    { id: 'notifications', label: 'Notifications', icon: Users }
+                    { id: 'create', label: 'Create Post', icon: Send },
+                    { id: 'discussions', label: 'Discussions', icon: BookOpen }
                   ].map(({ id, label, icon: Icon }) => (
                     <button
                       key={id}
                       onClick={() => setActiveTab(id)}
-                      className={`flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      className={`flex items-center justify-center space-x-2 px-6 py-4 text-sm font-semibold transition-all duration-300 flex-1 min-w-[120px] ${
                         activeTab === id
-                          ? 'bg-white text-gray-900 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+                          ? 'bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-lg'
+                          : 'text-gray-600 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 hover:text-gray-900'
                       }`}
                     >
-                      <Icon className="h-4 w-4" />
-                      <span className="hidden sm:inline">{label}</span>
+                      <Icon className="h-5 w-5" />
+                      <span>{label}</span>
                     </button>
                   ))}
                 </div>
               </div>
+
+              {/* Tab Content */}
+              <div className="min-h-screen pb-8">
+                {activeTab === 'feed' && renderFeed()}
+                {activeTab === 'create' && user && (
+                  <div className="space-y-4">
+                    <EnhancedPostCreation 
+                      onPostCreated={() => {
+                        handlePostCreated();
+                        setActiveTab('feed');
+                      }}
+                      courses={courses}
+                      events={events}
+                      className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg hover:shadow-xl transition-all duration-300"
+                    />
+                  </div>
+                )}
+                {activeTab === 'discussions' && (
+                  <div>
+                    <CourseDiscussionsTab />
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Tab Content */}
-            <div className="min-h-screen">
-              {activeTab === 'feed' && renderFeed()}
-              {activeTab === 'chat' && (
-                <Card className="m-4 bg-white rounded-xl border shadow-sm">
-                  <CardHeader>
-                    <CardTitle className="flex items-center space-x-2">
-                      <Send className="h-5 w-5" />
-                      <span>Live Chat</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {renderChat()}
-                  </CardContent>
-                </Card>
-              )}
-              {activeTab === 'discussions' && (
-                <div className="p-4">
-                  <CourseDiscussionsTab />
-                </div>
-              )}
-              {activeTab === 'notifications' && (
-                <div className="p-4">
-                  <NotificationsTab />
-                </div>
-              )}
-            </div>
-
-            {/* Followers Modal */}
-            {showFollowers && (
-              <FollowersList
-                userId={showFollowers.userId}
-                isOpen={!!showFollowers}
-                onClose={() => setShowFollowers(null)}
-                initialTab={showFollowers.tab}
-              />
-            )}
+            {/* Right Sidebar */}
+            <RightSidebar />
           </div>
+        )}
+
+        {/* Followers Modal */}
+        {showFollowers && (
+          <FollowersList
+            userId={showFollowers.userId}
+            isOpen={!!showFollowers}
+            onClose={() => setShowFollowers(null)}
+            initialTab={showFollowers.tab}
+          />
         )}
       </div>
     </CommunityLayout>
