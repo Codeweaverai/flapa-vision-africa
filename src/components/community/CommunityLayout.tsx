@@ -1,4 +1,3 @@
-
 import { ReactNode } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -37,8 +36,8 @@ const CommunityLayout = ({ children, activeTab = 'feed', onTabChange }: Communit
               <CommunitySidebar />
             </div>
 
-            {/* Main Feed Area */}
-            <div className="flex-1 min-w-0 max-w-3xl mx-auto lg:mx-0">
+            {/* Main Feed Area - Increased width */}
+            <div className="flex-1 min-w-0 lg:max-w-4xl mx-auto lg:mx-0">
               <Tabs defaultValue={activeTab} onValueChange={handleTabChange}>
                 <TabsList className="w-full grid grid-cols-4 bg-white/80 backdrop-blur-sm border-none shadow-lg rounded-full p-1 mb-6">
                   <TabsTrigger 
