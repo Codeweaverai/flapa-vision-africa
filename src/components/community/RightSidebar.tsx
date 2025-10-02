@@ -155,7 +155,7 @@ export const RightSidebar = () => {
               <div 
                 key={course.id} 
                 className="group cursor-pointer"
-                onClick={() => navigate(`/courses/${course.id}`)}
+                onClick={() => navigate(`/learning/course-detail/${course.id}`)}
               >
                 <div className="flex gap-3 hover:bg-gradient-to-r hover:from-purple-50 hover:to-orange-50 p-2 rounded-lg transition-all duration-300">
                   <div className="relative w-16 h-16 rounded-lg overflow-hidden shrink-0 ring-2 ring-white group-hover:ring-orange-200 transition-all">
