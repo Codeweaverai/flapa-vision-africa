@@ -62,7 +62,7 @@ const CommunityLayout = ({ children, activeTab = 'feed', onTabChange }: Communit
                     className="rounded-full data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-200"
                   >
                     <BookOpen className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Discuss</span>
+                    <span className="hidden sm:inline">Inbox</span>
                   </TabsTrigger>
                   <TabsTrigger 
                     value="notifications" 
