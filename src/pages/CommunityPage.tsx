@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
-import { MessageCircle, Heart, Share2, Send, Users, Reply, MoreVertical, UserPlus, BookOpen, Bell, ArrowLeft, Bot } from 'lucide-react';
+import { MessageCircle, Heart, Share2, Send, Users, Reply, MoreVertical, UserPlus, BookOpen, Bell, ArrowLeft, Bot, MessageSquare } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import EmojiPicker from '@/components/community/EmojiPicker';
 import CourseDiscussionsTab from '@/components/community/CourseDiscussionsTab';
@@ -109,8 +109,10 @@ const CommunityPage = () => {
     { id: 'discussions', label: 'Discussions', icon: BookOpen },
   ];
 
+  // UPDATED: Added third tab "Community Chat" to lower tabs
   const lowerTabs = [
     { id: 'chat', label: 'Ai Chat Support', icon: Bot },
+    { id: 'community-chat', label: 'Community Chat', icon: MessageSquare },
     { id: 'alerts', label: 'Alerts', icon: Bell }
   ];
 
@@ -799,6 +801,61 @@ const CommunityPage = () => {
     <CommunityChatTab />
   );
 
+  const renderCommunityChat = () => (
+    <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg h-[600px] flex flex-col">
+      <CardHeader className="bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-t-2xl">
+        <CardTitle className="flex items-center gap-2">
+          <MessageSquare className="w-5 h-5" />
+          Community Chat
+        </CardTitle>
+      </CardHeader>
+
+      <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {messages.map((message) => (
+            <div key={message.id} className="flex space-x-3">
+              <Avatar className="w-8 h-8">
+                <AvatarImage src={getSafeAvatarUrl(message.profiles?.avatar_url)} />
+                <AvatarFallback className="bg-gradient-to-r from-green-200 to-teal-200">
+                  {getAvatarFallback(message.profiles?.full_name)}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <div className="flex items-center space-x-2 mb-1">
+                  <span className="font-medium text-sm">{message.profiles?.full_name || 'Anonymous'}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
+                  </span>
+                </div>
+                <div className="bg-gray-100 rounded-lg p-3 max-w-md">
+                  <p className="text-sm">{message.content}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        <form onSubmit={sendMessage} className="p-4 border-t bg-white">
+          <div className="flex space-x-2">
+            <Input
+              placeholder="Type your message to the community..."
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              className="flex-1"
+            />
+            <Button 
+              type="submit" 
+              disabled={!newMessage.trim()}
+              className="bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+
   const renderTabContent = () => {
     switch (activeTab) {
       case 'feed':
@@ -821,6 +878,8 @@ const CommunityPage = () => {
         return <CourseDiscussionsTab />;
       case 'chat':
         return renderChat();
+      case 'community-chat': // NEW: Community Chat tab
+        return renderCommunityChat();
       case 'alerts':
         return user ? <NotificationsTab /> : null;
       default:
@@ -878,7 +937,7 @@ const CommunityPage = () => {
                 </div>
               </div>
 
-              {/* Lower Tabs */}
+              {/* Lower Tabs - UPDATED: Now has 3 tabs */}
               <div className="sticky top-20 z-40 bg-white/80 backdrop-blur-lg rounded-xl border border-gray-200 shadow-md mb-6 overflow-hidden">
                 <div className="flex overflow-x-auto hide-scrollbar">
                   {lowerTabs.map(({ id, label, icon: Icon }) => (
