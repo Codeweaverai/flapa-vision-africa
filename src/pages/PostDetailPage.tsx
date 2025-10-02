@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
-import { MessageCircle, Heart, Share2, Send, Reply, ArrowLeft, Image as ImageIcon } from 'lucide-react';
+import { MessageCircle, Heart, Share2, Send, Reply, ArrowLeft, Image as ImageIcon, Users } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { RightSidebar } from '@/components/community/RightSidebar';
 import { UserFollowButton } from '@/components/community/UserFollowButton';
@@ -60,35 +60,71 @@ interface Comment {
   user_liked: boolean;
 }
 
-// Left Sidebar - Discover People Component (from Community page)
+// Left Sidebar - Discover People Component (exact implementation from Community page)
 const DiscoverPeople = () => {
   const { user } = useAuth();
   const [people, setPeople] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showFollowers, setShowFollowers] = useState<{ userId: string; tab: 'followers' | 'following' } | null>(null);
 
   useEffect(() => {
-    fetchPeople();
-  }, []);
+    if (user) {
+      fetchPeople();
+    }
+  }, [user]);
 
   const fetchPeople = async () => {
     try {
       if (!user?.id) return;
 
+      // First, get profiles excluding current user
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('id, full_name, username, avatar_url, bio, followers_count')
+        .select('id, full_name, username, avatar_url, bio, followers_count, following_count')
         .neq('id', user.id)
         .order('followers_count', { ascending: false })
         .limit(8);
 
-      if (!error && profiles) {
-        setPeople(profiles);
+      if (error) throw error;
+
+      if (profiles) {
+        // Check follow status for each profile
+        const profilesWithFollowStatus = await Promise.all(
+          profiles.map(async (profile) => {
+            const { data: followStatus } = await supabase
+              .from('user_followers')
+              .select('id')
+              .eq('follower_id', user.id)
+              .eq('following_id', profile.id)
+              .single();
+
+            return {
+              ...profile,
+              is_following: !!followStatus
+            };
+          })
+        );
+
+        setPeople(profilesWithFollowStatus);
       }
     } catch (error) {
       console.error('Error fetching people:', error);
+      toast.error('Failed to load suggested people');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFollowChange = (userId: string, isFollowing: boolean) => {
+    setPeople(prev => prev.map(person => 
+      person.id === userId 
+        ? { 
+            ...person, 
+            is_following: isFollowing,
+            followers_count: (person.followers_count || 0) + (isFollowing ? 1 : -1)
+          } 
+        : person
+    ));
   };
 
   const getSafeImageUrl = (url: string | null | undefined) => {
@@ -109,16 +145,25 @@ const DiscoverPeople = () => {
 
   if (loading) {
     return (
-      <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg">
-        <CardContent className="p-4">
-          <div className="animate-pulse space-y-3">
+      <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg sticky top-6">
+        <CardHeader className="pb-3 border-b border-gray-100">
+          <div className="flex items-center space-x-2">
+            <Users className="h-5 w-5 text-purple-600" />
+            <span className="font-semibold text-gray-900">Discover People</span>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <div className="animate-pulse space-y-4">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
-                <div className="flex-1 space-y-2">
-                  <div className="h-3 bg-gray-200 rounded"></div>
-                  <div className="h-2 bg-gray-200 rounded w-3/4"></div>
+              <div key={i} className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="h-3 bg-gray-200 rounded w-20 mb-2"></div>
+                    <div className="h-2 bg-gray-200 rounded w-16"></div>
+                  </div>
                 </div>
+                <div className="w-16 h-8 bg-gray-200 rounded-full"></div>
               </div>
             ))}
           </div>
@@ -131,6 +176,7 @@ const DiscoverPeople = () => {
     <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg sticky top-6">
       <CardHeader className="pb-3 border-b border-gray-100">
         <div className="flex items-center space-x-2">
+          <Users className="h-5 w-5 text-purple-600" />
           <span className="font-semibold text-gray-900">Discover People</span>
         </div>
       </CardHeader>
@@ -139,7 +185,7 @@ const DiscoverPeople = () => {
           {people.map((person) => (
             <div key={person.id} className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <Avatar className="w-10 h-10">
+                <Avatar className="w-10 h-10 cursor-pointer">
                   <AvatarImage 
                     src={getSafeImageUrl(person.avatar_url) || ''} 
                     alt={person.full_name}
@@ -153,12 +199,21 @@ const DiscoverPeople = () => {
                     {person.full_name || 'Anonymous'}
                   </p>
                   <p className="text-xs text-gray-500 truncate">@{person.username || 'user'}</p>
+                  {person.followers_count && person.followers_count > 0 && (
+                    <button 
+                      onClick={() => setShowFollowers({ userId: person.id, tab: 'followers' })}
+                      className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-700 font-semibold transition-colors mt-1"
+                    >
+                      <Users className="h-3 w-3" />
+                      <span>{person.followers_count} followers</span>
+                    </button>
+                  )}
                 </div>
               </div>
               <UserFollowButton
                 userId={person.id}
-                isFollowing={false}
-                onFollowChange={() => {}}
+                isFollowing={person.is_following || false}
+                onFollowChange={handleFollowChange}
                 size="sm"
                 showCount={false}
                 variant="outline"
@@ -167,6 +222,13 @@ const DiscoverPeople = () => {
             </div>
           ))}
         </div>
+
+        {people.length === 0 && (
+          <div className="text-center py-4 text-gray-500">
+            <Users className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+            <p className="text-sm">No people to discover yet</p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -562,8 +624,21 @@ const PostDetailPage = () => {
     target.style.display = 'none';
   };
 
+  // Updated PostImageGallery with click handler to route to detail page
   const PostImageGallery = ({ images }: { images: any[] }) => {
     if (!images || images.length === 0) return null;
+
+    const handleImageClick = (image: any, index: number) => {
+      // Since we're already on the post detail page, we can implement:
+      // 1. Image modal for better viewing
+      // 2. Zoom functionality
+      // 3. Image carousel
+      console.log('Image clicked:', image, index);
+      
+      // You can implement modal opening logic here:
+      // setSelectedImage({ image, index });
+      // setShowImageModal(true);
+    };
 
     return (
       <div className="mt-4 space-y-4">
@@ -573,7 +648,11 @@ const PostDetailPage = () => {
           if (!imageUrl) return null;
           
           return (
-            <div key={image.id} className="rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+            <div 
+              key={image.id} 
+              className="rounded-lg overflow-hidden border border-gray-200 bg-gray-50 cursor-pointer transition-transform hover:scale-[1.02] duration-200"
+              onClick={() => handleImageClick(image, index)}
+            >
               <img
                 src={imageUrl}
                 alt={image.alt_text || `Post image ${index + 1}`}
@@ -628,7 +707,7 @@ const PostDetailPage = () => {
           <Button
             variant="ghost"
             onClick={() => navigate('/community')}
-            className="flex items-center gap-2 hover:bg-white/80"
+            className="flex items-center gap-2 hover:bg-white/80 transition-colors duration-200"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Community
@@ -636,7 +715,7 @@ const PostDetailPage = () => {
         </div>
 
         <div className="flex gap-6">
-          {/* Left Sidebar - Discover People */}
+          {/* Left Sidebar - Discover People (exact implementation from Community page) */}
           <div className="w-80 flex-shrink-0">
             <DiscoverPeople />
           </div>
@@ -644,10 +723,10 @@ const PostDetailPage = () => {
           {/* Main Content - Reduced Width */}
           <div className="flex-1 max-w-2xl">
             {/* Post Card */}
-            <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg mb-6">
+            <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg mb-6 hover:shadow-xl transition-all duration-300">
               <CardHeader className="pb-3 border-b border-gray-100">
                 <div className="flex items-start space-x-3">
-                  <Avatar className="w-12 h-12 cursor-pointer ring-2 ring-white shadow-md">
+                  <Avatar className="w-12 h-12 cursor-pointer ring-2 ring-white shadow-md hover:ring-purple-200 transition-all">
                     <AvatarImage 
                       src={getSafeImageUrl(post.profiles?.avatar_url) || ''} 
                       alt={post.profiles?.full_name || 'User'}
@@ -679,7 +758,7 @@ const PostDetailPage = () => {
                   {post.content}
                 </p>
                 
-                {/* Images Section */}
+                {/* Images Section with click handling */}
                 {post.images && post.images.length > 0 ? (
                   <PostImageGallery images={post.images} />
                 ) : (
@@ -696,7 +775,7 @@ const PostDetailPage = () => {
                       size="lg"
                       onClick={toggleLike}
                       disabled={submitting}
-                      className={`px-6 py-3 rounded-full text-base font-medium transition-all ${
+                      className={`px-6 py-3 rounded-full text-base font-medium transition-all duration-200 ${
                         post.user_liked 
                           ? 'text-red-600 bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100' 
                           : 'text-gray-600 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50'
@@ -708,7 +787,7 @@ const PostDetailPage = () => {
                     <Button
                       variant="ghost"
                       size="lg"
-                      className="px-6 py-3 rounded-full text-base font-medium text-gray-600 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all"
+                      className="px-6 py-3 rounded-full text-base font-medium text-gray-600 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200"
                     >
                       <MessageCircle className="h-5 w-5 mr-2" />
                       <span>{post.comments_count} comments</span>
@@ -717,7 +796,7 @@ const PostDetailPage = () => {
                       variant="ghost"
                       size="lg"
                       onClick={handleSharePost}
-                      className="px-6 py-3 rounded-full text-base font-medium text-gray-600 hover:bg-gradient-to-r hover:from-green-50 hover:to-teal-50 transition-all"
+                      className="px-6 py-3 rounded-full text-base font-medium text-gray-600 hover:bg-gradient-to-r hover:from-green-50 hover:to-teal-50 transition-all duration-200"
                     >
                       <Share2 className="h-5 w-5 mr-2" />
                       Share
@@ -728,7 +807,7 @@ const PostDetailPage = () => {
             </Card>
 
             {/* Comments Section */}
-            <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg">
+            <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg hover:shadow-xl transition-all duration-300">
               <CardContent className="p-6">
                 <h3 className="text-xl font-bold text-gray-900 mb-6">
                   Comments ({post.comments_count})
@@ -765,14 +844,14 @@ const PostDetailPage = () => {
                           placeholder="Write a comment..."
                           value={newComment}
                           onChange={(e) => setNewComment(e.target.value)}
-                          className="min-h-[80px] resize-none border-gray-200 text-base"
+                          className="min-h-[80px] resize-none border-gray-200 text-base focus:border-purple-300 transition-colors duration-200"
                           disabled={submitting}
                         />
                         <Button
                           onClick={addComment}
                           disabled={!newComment.trim() || submitting}
                           size="lg"
-                          className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 h-auto px-6"
+                          className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 h-auto px-6 transition-all duration-200"
                         >
                           <Send className="h-5 w-5" />
                         </Button>
@@ -802,7 +881,7 @@ const PostDetailPage = () => {
                                 </AvatarFallback>
                               </Avatar>
                               <div className="flex-1">
-                                <div className="bg-gray-50 rounded-xl p-4">
+                                <div className="bg-gray-50 rounded-xl p-4 hover:bg-gray-100 transition-colors duration-200">
                                   <div className="flex items-center space-x-3 mb-2">
                                     <span className="font-semibold text-gray-900">
                                       {comment.profiles?.full_name || 'Anonymous'}
@@ -818,7 +897,7 @@ const PostDetailPage = () => {
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => toggleCommentLike(comment.id)}
-                                    className={`h-auto p-2 text-sm transition-colors ${
+                                    className={`h-auto p-2 text-sm transition-colors duration-200 ${
                                       comment.user_liked 
                                         ? 'text-red-500 hover:text-red-600' 
                                         : 'text-muted-foreground hover:text-orange-500'
@@ -832,7 +911,7 @@ const PostDetailPage = () => {
                                       variant="ghost"
                                       size="sm"
                                       onClick={() => setReplyTo(comment.id)}
-                                      className="h-auto p-2 text-sm text-muted-foreground hover:text-purple-500"
+                                      className="h-auto p-2 text-sm text-muted-foreground hover:text-purple-500 transition-colors duration-200"
                                     >
                                       <Reply className="h-4 w-4 mr-1" />
                                       Reply
@@ -857,7 +936,7 @@ const PostDetailPage = () => {
                                       </AvatarFallback>
                                     </Avatar>
                                     <div className="flex-1">
-                                      <div className="bg-gradient-to-r from-purple-50 to-orange-50 rounded-lg p-3">
+                                      <div className="bg-gradient-to-r from-purple-50 to-orange-50 rounded-lg p-3 hover:from-purple-100 hover:to-orange-100 transition-all duration-200">
                                         <div className="flex items-center space-x-2 mb-1">
                                           <span className="font-medium text-sm">
                                             {reply.profiles?.full_name || 'Anonymous'}
@@ -873,7 +952,7 @@ const PostDetailPage = () => {
                                           variant="ghost"
                                           size="sm"
                                           onClick={() => toggleCommentLike(reply.id)}
-                                          className={`h-auto p-1 text-xs transition-colors ${
+                                          className={`h-auto p-1 text-xs transition-colors duration-200 ${
                                             reply.user_liked 
                                               ? 'text-red-500 hover:text-red-600' 
                                               : 'text-muted-foreground hover:text-orange-500'
