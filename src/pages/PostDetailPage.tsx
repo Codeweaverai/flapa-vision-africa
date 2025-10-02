@@ -60,12 +60,11 @@ interface Comment {
   user_liked: boolean;
 }
 
-// Left Sidebar - Discover People Component (exact implementation from Community page)
+// Left Sidebar - Discover People Component (fixed with correct table)
 const DiscoverPeople = () => {
   const { user } = useAuth();
   const [people, setPeople] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showFollowers, setShowFollowers] = useState<{ userId: string; tab: 'followers' | 'following' } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -77,22 +76,28 @@ const DiscoverPeople = () => {
     try {
       if (!user?.id) return;
 
-      // First, get profiles excluding current user
+      // Get profiles excluding current user
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('id, full_name, username, avatar_url, bio, followers_count, following_count')
+        .select('id, full_name, username, avatar_url, bio')
         .neq('id', user.id)
-        .order('followers_count', { ascending: false })
         .limit(8);
 
       if (error) throw error;
 
       if (profiles) {
-        // Check follow status for each profile
-        const profilesWithFollowStatus = await Promise.all(
+        // Get follower counts and follow status for each profile using community_followers table
+        const profilesWithDetails = await Promise.all(
           profiles.map(async (profile) => {
+            // Get follower count from community_followers
+            const { count: followersCount } = await supabase
+              .from('community_followers')
+              .select('*', { count: 'exact', head: true })
+              .eq('following_id', profile.id);
+
+            // Check if current user is following this profile using community_followers
             const { data: followStatus } = await supabase
-              .from('user_followers')
+              .from('community_followers')
               .select('id')
               .eq('follower_id', user.id)
               .eq('following_id', profile.id)
@@ -100,12 +105,18 @@ const DiscoverPeople = () => {
 
             return {
               ...profile,
+              followers_count: followersCount || 0,
               is_following: !!followStatus
             };
           })
         );
 
-        setPeople(profilesWithFollowStatus);
+        // Sort by follower count (highest first)
+        const sortedProfiles = profilesWithDetails.sort((a, b) => 
+          (b.followers_count || 0) - (a.followers_count || 0)
+        );
+
+        setPeople(sortedProfiles);
       }
     } catch (error) {
       console.error('Error fetching people:', error);
@@ -115,16 +126,60 @@ const DiscoverPeople = () => {
     }
   };
 
-  const handleFollowChange = (userId: string, isFollowing: boolean) => {
-    setPeople(prev => prev.map(person => 
-      person.id === userId 
-        ? { 
-            ...person, 
-            is_following: isFollowing,
-            followers_count: (person.followers_count || 0) + (isFollowing ? 1 : -1)
-          } 
-        : person
-    ));
+  const handleFollowChange = async (userId: string, isFollowing: boolean) => {
+    if (!user) return;
+
+    try {
+      if (isFollowing) {
+        // Follow user in community_followers table
+        const { error } = await supabase
+          .from('community_followers')
+          .insert({
+            follower_id: user.id,
+            following_id: userId
+          });
+
+        if (error) throw error;
+        
+        // Update local state
+        setPeople(prev => prev.map(person => 
+          person.id === userId 
+            ? { 
+                ...person, 
+                is_following: true,
+                followers_count: (person.followers_count || 0) + 1
+              } 
+            : person
+        ));
+        
+        toast.success('User followed successfully!');
+      } else {
+        // Unfollow user from community_followers table
+        const { error } = await supabase
+          .from('community_followers')
+          .delete()
+          .eq('follower_id', user.id)
+          .eq('following_id', userId);
+
+        if (error) throw error;
+        
+        // Update local state
+        setPeople(prev => prev.map(person => 
+          person.id === userId 
+            ? { 
+                ...person, 
+                is_following: false,
+                followers_count: Math.max(0, (person.followers_count || 0) - 1)
+              } 
+            : person
+        ));
+        
+        toast.success('User unfollowed successfully!');
+      }
+    } catch (error) {
+      console.error('Error updating follow status:', error);
+      toast.error('Failed to update follow status');
+    }
   };
 
   const getSafeImageUrl = (url: string | null | undefined) => {
@@ -199,14 +254,11 @@ const DiscoverPeople = () => {
                     {person.full_name || 'Anonymous'}
                   </p>
                   <p className="text-xs text-gray-500 truncate">@{person.username || 'user'}</p>
-                  {person.followers_count && person.followers_count > 0 && (
-                    <button 
-                      onClick={() => setShowFollowers({ userId: person.id, tab: 'followers' })}
-                      className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-700 font-semibold transition-colors mt-1"
-                    >
+                  {person.followers_count > 0 && (
+                    <div className="flex items-center gap-1 text-xs text-purple-600 font-semibold mt-1">
                       <Users className="h-3 w-3" />
                       <span>{person.followers_count} followers</span>
-                    </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -715,7 +767,7 @@ const PostDetailPage = () => {
         </div>
 
         <div className="flex gap-6">
-          {/* Left Sidebar - Discover People (exact implementation from Community page) */}
+          {/* Left Sidebar - Discover People (fixed implementation) */}
           <div className="w-80 flex-shrink-0">
             <DiscoverPeople />
           </div>
