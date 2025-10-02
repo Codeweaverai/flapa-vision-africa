@@ -48,6 +48,7 @@ import CommunityPage from '@/pages/CommunityPage';
 import CommunityChatPage from '@/pages/CommunityChatPage';
 import CommunityCoursesPage from '@/pages/CommunityCoursesPage';
 import CommunityNotificationsPage from '@/pages/CommunityNotificationsPage';
+import PostDetailPage from '@/pages/PostDetailPage';
 
 // Import learning pages
 import CourseDetailLearningPage from '@/pages/learning/CourseDetailPage';
@@ -256,17 +257,18 @@ function App() {
                   <Route path="/creator/workplaces" element={<ProtectedRoute><CreatorWorkplaces /></ProtectedRoute>} />
                   <Route path="/creator/analytics" element={<ProtectedRoute><CreatorAnalytics /></ProtectedRoute>} />
                   <Route path="/creator/payments" element={<ProtectedRoute><CreatorPayments /></ProtectedRoute>} />
-    <Route path="/creator/promo-codes" element={<ProtectedRoute><CreatorPromoCodes /></ProtectedRoute>} />
-    <Route path="/creator/settings" element={<ProtectedRoute><CreatorSettings /></ProtectedRoute>} />
-    <Route path="/creator/attendees" element={<ProtectedRoute><CreatorAttendeeManagement /></ProtectedRoute>} />
-    <Route path="/creator/activities" element={<ProtectedRoute><CreatorRecentActivities /></ProtectedRoute>} />
+                  <Route path="/creator/promo-codes" element={<ProtectedRoute><CreatorPromoCodes /></ProtectedRoute>} />
+                   <Route path="/creator/settings" element={<ProtectedRoute><CreatorSettings /></ProtectedRoute>} />
+                  <Route path="/creator/attendees" element={<ProtectedRoute><CreatorAttendeeManagement /></ProtectedRoute>} />
+                 <Route path="/creator/activities" element={<ProtectedRoute><CreatorRecentActivities /></ProtectedRoute>} />
 
                   {/* Community Routes */}
                   <Route path="/community" element={<ProtectedRoute><CommunityPage /></ProtectedRoute>} />
                   <Route path="/community/chat" element={<ProtectedRoute><CommunityChatPage /></ProtectedRoute>} />
                   <Route path="/community/courses" element={<ProtectedRoute><CommunityCoursesPage /></ProtectedRoute>} />
                   <Route path="/community/notifications" element={<ProtectedRoute><CommunityNotificationsPage /></ProtectedRoute>} />
-
+                  <Route path="/community/post/:postid" element={<ProtectedRoute><PostDetailPage /></ProtectedRoute>} />
+                 
                   {/* Admin Routes */}
                   <Route path="/admin/login" element={<AdminLogin />} />
                   <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
