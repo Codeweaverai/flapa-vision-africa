@@ -102,15 +102,15 @@ const CommunityPage = () => {
   const [courses, setCourses] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
 
-  // Tab configurations
+  // Tab configurations - UPDATED: Changed "Discussions" to "AI Chat Support" in upper tabs
   const upperTabs = [
     { id: 'feed', label: 'Feed', icon: MessageCircle },
     { id: 'create', label: 'Create Post', icon: Send },
-    { id: 'discussions', label: 'Discussions', icon: BookOpen },
+    { id: 'chat', label: 'AI Chat Support', icon: Bot }, // Changed from "Discussions" to "AI Chat Support"
   ];
 
   const lowerTabs = [
-    { id: 'chat', label: 'Ai Chat Support', icon: Bot },
+    { id: 'discussions', label: 'Discussions', icon: BookOpen }, // Moved discussions to lower tabs
     { id: 'alerts', label: 'Alerts', icon: Bell }
   ];
 
@@ -817,10 +817,10 @@ const CommunityPage = () => {
             />
           </div>
         ) : null;
-      case 'discussions':
-        return <CourseDiscussionsTab />;
-      case 'chat':
+      case 'chat': // Now this is the AI Chat Support tab
         return renderChat();
+      case 'discussions': // Moved to lower tabs
+        return <CourseDiscussionsTab />;
       case 'alerts':
         return user ? <NotificationsTab /> : null;
       default:
@@ -858,7 +858,7 @@ const CommunityPage = () => {
           <div className="flex gap-6 max-w-7xl mx-auto px-4">
             {/* Main Content Area */}
             <div className="flex-1 min-w-0">
-              {/* Upper Tabs - Fixed Navigation */}
+              {/* Upper Tabs - Fixed Navigation - NOW INCLUDES AI CHAT SUPPORT */}
               <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-lg rounded-2xl border border-gray-200 shadow-lg mb-6 overflow-hidden">
                 <div className="flex overflow-x-auto hide-scrollbar">
                   {upperTabs.map(({ id, label, icon: Icon }) => (
@@ -878,7 +878,7 @@ const CommunityPage = () => {
                 </div>
               </div>
 
-              {/* Lower Tabs */}
+              {/* Lower Tabs - NOW INCLUDES DISCUSSIONS */}
               <div className="sticky top-20 z-40 bg-white/80 backdrop-blur-lg rounded-xl border border-gray-200 shadow-md mb-6 overflow-hidden">
                 <div className="flex overflow-x-auto hide-scrollbar">
                   {lowerTabs.map(({ id, label, icon: Icon }) => (
