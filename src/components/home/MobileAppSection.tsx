@@ -5,7 +5,7 @@ import { Smartphone, Download, Star, Users } from 'lucide-react';
 
 const MobileAppSection = () => {
   return (
-    <section className="section-container relative overflow-hidden bg-gradient-to-br from-orange-400/5 to-purple-500/5">
+    <section className="section-container relative overflow-hidden bg-white">
       {/* Content container with relative positioning */}
       <div className="relative z-10 py-16">
         <div className="text-center mb-12">
@@ -29,7 +29,7 @@ const MobileAppSection = () => {
           {/* Left side - App features */}
           <div className="space-y-8">
             <div className="grid sm:grid-cols-2 gap-6">
-              <Card className="border-none shadow-lg bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20">
+              <Card className="border-none shadow-lg bg-gradient-to-br from-orange-50 to-orange-100">
                 <CardContent className="p-6">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="p-2 rounded-lg bg-orange-500/10">
@@ -43,7 +43,7 @@ const MobileAppSection = () => {
                 </CardContent>
               </Card>
 
-              <Card className="border-none shadow-lg bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20">
+              <Card className="border-none shadow-lg bg-gradient-to-br from-purple-50 to-purple-100">
                 <CardContent className="p-6">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="p-2 rounded-lg bg-purple-500/10">
@@ -77,7 +77,7 @@ const MobileAppSection = () => {
 
           {/* Right side - Download buttons */}
           <div className="text-center lg:text-left">
-            <div className="bg-gradient-to-br from-white/80 to-white/40 dark:from-gray-900/80 dark:to-gray-800/40 backdrop-blur-sm rounded-3xl p-8 border border-white/20">
+            <div className="bg-white border border-gray-200 rounded-3xl p-8 shadow-lg">
               <div className="mb-8">
                 <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-orange-500 to-purple-600 mb-4">
                   <Smartphone className="h-10 w-10 text-white" />
@@ -150,7 +150,7 @@ const MobileAppSection = () => {
                 </Button>
               </div>
 
-              <div className="mt-6 pt-6 border-t border-gray-200/50 dark:border-gray-700/50">
+              <div className="mt-6 pt-6 border-t border-gray-200/50">
                 <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <Download className="h-4 w-4" />
