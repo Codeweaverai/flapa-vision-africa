@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
-import { MessageCircle, Heart, Share2, Send, Reply, ArrowLeft, Image as ImageIcon, Users, BookOpen, TrendingUp } from 'lucide-react';
+import { MessageCircle, Heart, Share2, Send, Reply, ArrowLeft, Image as ImageIcon } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { RightSidebar } from '@/components/community/RightSidebar';
+import { UserFollowButton } from '@/components/community/UserFollowButton';
 
 interface PostDetail {
   id: string;
@@ -23,6 +25,9 @@ interface PostDetail {
     full_name: string;
     username: string;
     avatar_url: string;
+    is_following?: boolean;
+    followers_count?: number;
+    following_count?: number;
   } | null;
   likes_count: number;
   comments_count: number;
@@ -55,143 +60,7 @@ interface Comment {
   user_liked: boolean;
 }
 
-// Right Sidebar Component
-const RightSidebar = () => {
-  const [trendingCourses, setTrendingCourses] = useState<any[]>([]);
-  const [mediaPosts, setMediaPosts] = useState<any[]>([]);
-
-  useEffect(() => {
-    fetchTrendingCourses();
-    fetchMediaPosts();
-  }, []);
-
-  const fetchTrendingCourses = async () => {
-    try {
-      const { data: courses, error } = await supabase
-        .from('courses')
-        .select('id, title, thumbnail_url, enrolled_count, rating')
-        .eq('is_published', true)
-        .order('enrolled_count', { ascending: false })
-        .limit(5);
-
-      if (!error && courses) {
-        setTrendingCourses(courses);
-      }
-    } catch (error) {
-      console.error('Error fetching trending courses:', error);
-    }
-  };
-
-  const fetchMediaPosts = async () => {
-    try {
-      const { data: posts, error } = await supabase
-        .from('community_posts')
-        .select(`
-          id,
-          title,
-          content,
-          created_at,
-          profiles:user_id (full_name, username, avatar_url),
-          images:community_post_images(id, image_url, image_path)
-        `)
-        .not('community_post_images', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(6);
-
-      if (!error && posts) {
-        setMediaPosts(posts.filter(post => post.images && post.images.length > 0));
-      }
-    } catch (error) {
-      console.error('Error fetching media posts:', error);
-    }
-  };
-
-  const getSafeImageUrl = (url: string | null | undefined) => {
-    if (!url) return null;
-    if (url.startsWith('http')) return url;
-    
-    const matches = url.match(/asset\/(.+)/) || url.match(/community-posts\/(.+)/);
-    if (matches && matches[1]) {
-      return supabase.storage.from('asset').getPublicUrl(matches[1]).data.publicUrl;
-    }
-    
-    if (!url.includes('/') && url.includes('.')) {
-      return supabase.storage.from('asset').getPublicUrl(url).data.publicUrl;
-    }
-    
-    return url;
-  };
-
-  return (
-    <div className="space-y-6">
-      {/* Trending Courses */}
-      <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg">
-        <CardHeader className="pb-3 border-b border-gray-100">
-          <div className="flex items-center space-x-2">
-            <TrendingUp className="h-5 w-5 text-purple-600" />
-            <h3 className="font-semibold text-gray-900">Trending Courses</h3>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-4">
-          <div className="space-y-3">
-            {trendingCourses.map((course) => (
-              <div key={course.id} className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
-                <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-purple-600 rounded-lg flex items-center justify-center">
-                  <BookOpen className="h-6 w-6 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm text-gray-900 truncate">{course.title}</p>
-                  <div className="flex items-center space-x-2 text-xs text-gray-500">
-                    <span>{course.enrolled_count || 0} enrolled</span>
-                    <span>•</span>
-                    <span>⭐ {course.rating || '4.5'}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Media Posts */}
-      <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg">
-        <CardHeader className="pb-3 border-b border-gray-100">
-          <div className="flex items-center space-x-2">
-            <ImageIcon className="h-5 w-5 text-blue-600" />
-            <h3 className="font-semibold text-gray-900">Media Posts</h3>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-4">
-          <div className="grid grid-cols-2 gap-2">
-            {mediaPosts.map((post) => {
-              const firstImage = post.images?.[0];
-              const imageUrl = firstImage ? 
-                getSafeImageUrl(firstImage.image_url) || getSafeImageUrl(firstImage.image_path) : null;
-              
-              return (
-                <div key={post.id} className="aspect-square rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
-                  {imageUrl ? (
-                    <img
-                      src={imageUrl}
-                      alt="Media post"
-                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300">
-                      <ImageIcon className="h-6 w-6 text-gray-400" />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
-// Left Sidebar - Discover People Component
+// Left Sidebar - Discover People Component (from Community page)
 const DiscoverPeople = () => {
   const { user } = useAuth();
   const [people, setPeople] = useState<any[]>([]);
@@ -262,8 +131,7 @@ const DiscoverPeople = () => {
     <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg sticky top-6">
       <CardHeader className="pb-3 border-b border-gray-100">
         <div className="flex items-center space-x-2">
-          <Users className="h-5 w-5 text-green-600" />
-          <h3 className="font-semibold text-gray-900">Discover People</h3>
+          <span className="font-semibold text-gray-900">Discover People</span>
         </div>
       </CardHeader>
       <CardContent className="pt-4">
@@ -287,13 +155,15 @@ const DiscoverPeople = () => {
                   <p className="text-xs text-gray-500 truncate">@{person.username || 'user'}</p>
                 </div>
               </div>
-              <Button
-                variant="outline"
+              <UserFollowButton
+                userId={person.id}
+                isFollowing={false}
+                onFollowChange={() => {}}
                 size="sm"
+                showCount={false}
+                variant="outline"
                 className="text-xs px-3 py-1 h-auto border-purple-200 text-purple-600 hover:bg-purple-50"
-              >
-                Follow
-              </Button>
+              />
             </div>
           ))}
         </div>
