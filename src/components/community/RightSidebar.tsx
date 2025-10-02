@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +28,7 @@ interface TrendingCourse {
 }
 
 export const RightSidebar = () => {
+  const navigate = useNavigate();
   const [mediaPosts, setMediaPosts] = useState<MediaPost[]>([]);
   const [trendingCourses, setTrendingCourses] = useState<TrendingCourse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -150,7 +152,11 @@ export const RightSidebar = () => {
             </div>
           ) : trendingCourses.length > 0 ? (
             trendingCourses.map((course, index) => (
-              <div key={course.id} className="group cursor-pointer">
+              <div 
+                key={course.id} 
+                className="group cursor-pointer"
+                onClick={() => navigate(`/courses/${course.id}`)}
+              >
                 <div className="flex gap-3 hover:bg-gradient-to-r hover:from-purple-50 hover:to-orange-50 p-2 rounded-lg transition-all duration-300">
                   <div className="relative w-16 h-16 rounded-lg overflow-hidden shrink-0 ring-2 ring-white group-hover:ring-orange-200 transition-all">
                     <img 

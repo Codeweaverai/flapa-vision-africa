@@ -92,6 +92,7 @@ const CommunityPage = () => {
   const [newMessage, setNewMessage] = useState('');
   const [newComment, setNewComment] = useState<Record<string, string>>({});
   const [replyTo, setReplyTo] = useState<Record<string, string>>({});
+  const [commentLikes, setCommentLikes] = useState<Record<string, boolean>>({});
   const [showComments, setShowComments] = useState<Record<string, boolean>>({});
   const [activeChannel, setActiveChannel] = useState('general');
   const [showFollowers, setShowFollowers] = useState<{ userId: string; tab: 'followers' | 'following' } | null>(null);
@@ -360,6 +361,38 @@ const CommunityPage = () => {
     }
   };
 
+  const toggleCommentLike = async (commentId: string, postId: string) => {
+    if (!user) return;
+
+    try {
+      const isLiked = commentLikes[commentId];
+
+      if (isLiked) {
+        await supabase
+          .from('comment_likes')
+          .delete()
+          .eq('comment_id', commentId)
+          .eq('user_id', user.id);
+        
+        setCommentLikes(prev => ({ ...prev, [commentId]: false }));
+      } else {
+        await supabase
+          .from('comment_likes')
+          .insert({
+            comment_id: commentId,
+            user_id: user.id,
+            like_type: 'like'
+          });
+        
+        setCommentLikes(prev => ({ ...prev, [commentId]: true }));
+      }
+
+      fetchComments(postId);
+    } catch (error) {
+      console.error('Error toggling comment like:', error);
+    }
+  };
+
   const renderFeed = () => (
     <div className="space-y-4">
       <div className="space-y-4">
@@ -517,46 +550,101 @@ const CommunityPage = () => {
                     </div>
                   )}
 
-                  {comments[post.id]?.map((comment) => (
-                    <div key={comment.id} className="flex space-x-3">
-                      <Avatar className="w-8 h-8">
-                        <AvatarImage src={comment.profiles?.avatar_url} />
-                        <AvatarFallback className="bg-gradient-to-r from-blue-200 to-green-200">
-                          {comment.profiles?.full_name?.charAt(0) || 'U'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <div className="bg-gray-50 rounded-lg p-3">
-                          <div className="flex items-center space-x-2 mb-1">
-                            <span className="font-medium text-sm">{comment.profiles?.full_name || 'Anonymous'}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                            </span>
+                  {comments[post.id]
+                    ?.filter(comment => !comment.parent_id)
+                    .map((comment) => {
+                      const replies = comments[post.id]?.filter(c => c.parent_id === comment.id) || [];
+                      
+                      return (
+                        <div key={comment.id} className="space-y-3">
+                          <div className="flex space-x-3">
+                            <Avatar className="w-8 h-8">
+                              <AvatarImage src={comment.profiles?.avatar_url} />
+                              <AvatarFallback className="bg-gradient-to-r from-blue-200 to-green-200">
+                                {comment.profiles?.full_name?.charAt(0) || 'U'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <div className="bg-gray-50 rounded-lg p-3">
+                                <div className="flex items-center space-x-2 mb-1">
+                                  <span className="font-medium text-sm">{comment.profiles?.full_name || 'Anonymous'}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                                  </span>
+                                </div>
+                                <p className="text-sm">{comment.content}</p>
+                              </div>
+                              <div className="flex items-center space-x-2 mt-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => toggleCommentLike(comment.id, post.id)}
+                                  className={`h-auto p-1 text-xs transition-colors ${
+                                    commentLikes[comment.id] 
+                                      ? 'text-red-500 hover:text-red-600' 
+                                      : 'text-muted-foreground hover:text-orange-500'
+                                  }`}
+                                >
+                                  <Heart className={`h-3 w-3 mr-1 ${commentLikes[comment.id] ? 'fill-current' : ''}`} />
+                                  {comment.likes_count || 0}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setReplyTo(prev => ({ ...prev, [post.id]: comment.id }))}
+                                  className="h-auto p-1 text-xs text-muted-foreground hover:text-purple-500"
+                                >
+                                  <Reply className="h-3 w-3 mr-1" />
+                                  Reply
+                                </Button>
+                              </div>
+                            </div>
                           </div>
-                          <p className="text-sm">{comment.content}</p>
+
+                          {/* Threaded Replies */}
+                          {replies.length > 0 && (
+                            <div className="ml-12 space-y-3 pl-4 border-l-2 border-gray-200">
+                              {replies.map(reply => (
+                                <div key={reply.id} className="flex space-x-3">
+                                  <Avatar className="w-7 h-7">
+                                    <AvatarImage src={reply.profiles?.avatar_url} />
+                                    <AvatarFallback className="bg-gradient-to-r from-purple-200 to-orange-200 text-xs">
+                                      {reply.profiles?.full_name?.charAt(0) || 'U'}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex-1">
+                                    <div className="bg-gradient-to-r from-purple-50 to-orange-50 rounded-lg p-3">
+                                      <div className="flex items-center space-x-2 mb-1">
+                                        <span className="font-medium text-xs">{reply.profiles?.full_name || 'Anonymous'}</span>
+                                        <span className="text-[10px] text-muted-foreground">
+                                          {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
+                                        </span>
+                                      </div>
+                                      <p className="text-xs">{reply.content}</p>
+                                    </div>
+                                    <div className="flex items-center space-x-2 mt-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => toggleCommentLike(reply.id, post.id)}
+                                        className={`h-auto p-1 text-[10px] transition-colors ${
+                                          commentLikes[reply.id] 
+                                            ? 'text-red-500 hover:text-red-600' 
+                                            : 'text-muted-foreground hover:text-orange-500'
+                                        }`}
+                                      >
+                                        <Heart className={`h-2.5 w-2.5 mr-1 ${commentLikes[reply.id] ? 'fill-current' : ''}`} />
+                                        {reply.likes_count || 0}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                        <div className="flex items-center space-x-2 mt-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-auto p-1 text-xs text-muted-foreground hover:text-orange-500"
-                          >
-                            <Heart className="h-3 w-3 mr-1" />
-                            {comment.likes_count || 0}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setReplyTo(prev => ({ ...prev, [post.id]: comment.id }))}
-                            className="h-auto p-1 text-xs text-muted-foreground hover:text-purple-500"
-                          >
-                            <Reply className="h-3 w-3 mr-1" />
-                            Reply
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                      );
+                    })}
                 </div>
               )}
             </CardContent>
