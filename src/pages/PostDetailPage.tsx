@@ -7,9 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
-import { MessageCircle, Heart, Share2, Send, Reply, ArrowLeft } from 'lucide-react';
+import { MessageCircle, Heart, Share2, Send, Reply, ArrowLeft, Image as ImageIcon } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { ImageGallery } from '@/components/community/ImageGallery';
 
 interface PostDetail {
   id: string;
@@ -31,8 +30,11 @@ interface PostDetail {
   images?: {
     id: string;
     image_url: string;
+    image_path: string;
     alt_text?: string;
     upload_order: number;
+    file_size: number;
+    file_type: string;
   }[];
   comments?: Comment[];
 }
@@ -63,11 +65,7 @@ const PostDetailPage = () => {
   const [replyTo, setReplyTo] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
 
-  console.log('PostDetailPage - postId from useParams:', postId);
-  console.log('PostDetailPage - full URL:', window.location.href);
-
   useEffect(() => {
-    // Extract postId from URL if useParams doesn't work
     const extractPostIdFromUrl = () => {
       const pathSegments = window.location.pathname.split('/');
       const postIdIndex = pathSegments.indexOf('post') + 1;
@@ -76,23 +74,18 @@ const PostDetailPage = () => {
 
     let actualPostId = postId;
     
-    // If postId is undefined, try to extract from URL
     if (!actualPostId || actualPostId === 'undefined') {
       actualPostId = extractPostIdFromUrl();
-      console.log('Extracted postId from URL:', actualPostId);
     }
 
     if (actualPostId && actualPostId !== 'undefined' && isValidUUID(actualPostId)) {
-      console.log('Valid postId found, fetching post:', actualPostId);
       fetchPostDetail(actualPostId);
     } else {
-      console.error('Invalid or missing postId:', actualPostId);
       toast.error('Invalid post URL');
       setLoading(false);
     }
   }, [postId]);
 
-  // Validate UUID format
   const isValidUUID = (uuid: string) => {
     if (!uuid || uuid === 'undefined') return false;
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -104,25 +97,8 @@ const PostDetailPage = () => {
 
     try {
       setLoading(true);
-      console.log('Fetching post details for:', postIdToFetch);
       
-      // First, let's check if the post exists with a simple query
-      const { data: postExists, error: existsError } = await supabase
-        .from('community_posts')
-        .select('id')
-        .eq('id', postIdToFetch)
-        .single();
-
-      if (existsError || !postExists) {
-        console.error('Post not found or error:', existsError);
-        toast.error('Post not found');
-        setLoading(false);
-        return;
-      }
-
-      console.log('Post exists, fetching full details...');
-
-      // Fetch post with profile data using a simpler approach
+      // Fetch post with profile data
       const { data: postData, error: postError } = await supabase
         .from('community_posts')
         .select(`
@@ -143,72 +119,63 @@ const PostDetailPage = () => {
       }
 
       if (!postData) {
-        console.error('No post data returned');
         toast.error('Post not found');
         setLoading(false);
         return;
       }
 
-      console.log('Post data fetched:', postData);
+      // Fetch images from community_post_images table
+      let imagesData = [];
+      try {
+        const { data: images, error: imagesError } = await supabase
+          .from('community_post_images')
+          .select('*')
+          .eq('post_id', postIdToFetch)
+          .order('upload_order', { ascending: true });
 
-      // Fetch images
-      const { data: imagesData, error: imagesError } = await supabase
-        .from('post_images')
-        .select('*')
-        .eq('post_id', postIdToFetch)
-        .order('upload_order', { ascending: true });
-
-      if (imagesError) {
+        if (!imagesError) {
+          imagesData = images || [];
+          console.log('Fetched images from community_post_images:', imagesData);
+        } else {
+          console.error('Error fetching images:', imagesError);
+        }
+      } catch (imagesError) {
         console.error('Error fetching images:', imagesError);
       }
 
-      // Fetch likes count - use count() instead of select()
-      const { count: likesCount, error: likesError } = await supabase
+      // Fetch likes count
+      const { count: likesCount } = await supabase
         .from('post_likes')
         .select('*', { count: 'exact', head: true })
         .eq('post_id', postIdToFetch);
 
-      if (likesError) {
-        console.error('Error fetching likes count:', likesError);
-      }
-
-      // Check if current user liked this post - use a different approach
+      // Check if current user liked this post
       let userLiked = false;
       if (user && user.id) {
-        const { data: userLikeData, error: userLikeError } = await supabase
+        const { data: userLikeData } = await supabase
           .from('post_likes')
           .select('id')
           .eq('post_id', postIdToFetch)
           .eq('user_id', user.id);
-
-        if (!userLikeError && userLikeData && userLikeData.length > 0) {
-          userLiked = true;
-        }
+        userLiked = !!(userLikeData && userLikeData.length > 0);
       }
 
       // Fetch comments count
-      const { count: commentsCount, error: commentsError } = await supabase
+      const { count: commentsCount } = await supabase
         .from('post_comments')
         .select('*', { count: 'exact', head: true })
         .eq('post_id', postIdToFetch);
 
-      if (commentsError) {
-        console.error('Error fetching comments count:', commentsError);
-      }
-
       const initialPost: PostDetail = {
         ...postData,
-        images: imagesData || [],
+        images: imagesData,
         likes_count: likesCount || 0,
         comments_count: commentsCount || 0,
         user_liked: userLiked,
         comments: []
       };
 
-      console.log('Initial post set:', initialPost);
       setPost(initialPost);
-      
-      // Fetch comments
       await fetchComments(postIdToFetch);
 
     } catch (error) {
@@ -223,8 +190,6 @@ const PostDetailPage = () => {
     if (!postIdToFetch) return;
 
     try {
-      console.log('Fetching comments for post:', postIdToFetch);
-      
       const { data: commentsData, error } = await supabase
         .from('post_comments')
         .select('*')
@@ -236,49 +201,31 @@ const PostDetailPage = () => {
         return;
       }
 
-      console.log('Raw comments data:', commentsData);
-
       if (!commentsData || commentsData.length === 0) {
         setPost(prev => prev ? { ...prev, comments: [] } : null);
         return;
       }
 
-      // Get unique user IDs from comments
       const userIds = [...new Set(commentsData.map(comment => comment.user_id).filter(Boolean))];
       
-      console.log('User IDs for comments:', userIds);
-
-      // Fetch user profiles
       let profilesData = [];
       if (userIds.length > 0) {
-        const { data: profiles, error: profilesError } = await supabase
+        const { data: profiles } = await supabase
           .from('profiles')
           .select('id, full_name, username, avatar_url')
           .in('id', userIds);
-
-        if (profilesError) {
-          console.error('Error fetching profiles:', profilesError);
-        } else {
-          profilesData = profiles || [];
-        }
+        profilesData = profiles || [];
       }
 
-      // Fetch comment likes
       const commentsWithDetails = await Promise.all(
         commentsData.map(async (comment) => {
           const profile = profilesData.find(p => p.id === comment.user_id);
           
-          // Get total likes for this comment using count
-          const { count: likesCount, error: likesError } = await supabase
+          const { count: likesCount } = await supabase
             .from('comment_likes')
             .select('*', { count: 'exact', head: true })
             .eq('comment_id', comment.id);
 
-          if (likesError) {
-            console.error('Error fetching comment likes:', likesError);
-          }
-
-          // Check if current user liked this comment
           let userLiked = false;
           if (user) {
             const { data: userLikeData } = await supabase
@@ -286,7 +233,6 @@ const PostDetailPage = () => {
               .select('id')
               .eq('comment_id', comment.id)
               .eq('user_id', user.id);
-
             userLiked = !!(userLikeData && userLikeData.length > 0);
           }
 
@@ -298,8 +244,6 @@ const PostDetailPage = () => {
           };
         })
       );
-
-      console.log('Comments with details:', commentsWithDetails);
 
       setPost(prev => prev ? {
         ...prev,
@@ -318,23 +262,19 @@ const PostDetailPage = () => {
       setSubmitting(true);
 
       if (post.user_liked) {
-        // Unlike the post
-        const { error } = await supabase
+        await supabase
           .from('post_likes')
           .delete()
           .eq('post_id', post.id)
           .eq('user_id', user.id);
 
-        if (error) throw error;
-
         setPost(prev => prev ? {
           ...prev,
-          likes_count: Math.max(0, (prev.likes_count || 0) - 1),
+          likes_count: Math.max(0, prev.likes_count - 1),
           user_liked: false
         } : null);
       } else {
-        // Like the post
-        const { error } = await supabase
+        await supabase
           .from('post_likes')
           .insert({
             post_id: post.id,
@@ -342,11 +282,9 @@ const PostDetailPage = () => {
             like_type: 'like'
           });
 
-        if (error) throw error;
-
         setPost(prev => prev ? {
           ...prev,
-          likes_count: (prev.likes_count || 0) + 1,
+          likes_count: prev.likes_count + 1,
           user_liked: true
         } : null);
       }
@@ -379,7 +317,6 @@ const PostDetailPage = () => {
       setReplyTo('');
       toast.success('Comment added!');
       
-      // Refresh comments and update count
       await fetchComments(post.id);
       await updateCommentsCount();
 
@@ -417,26 +354,22 @@ const PostDetailPage = () => {
       if (!comment) return;
 
       if (comment.user_liked) {
-        // Unlike comment
-        const { error } = await supabase
+        await supabase
           .from('comment_likes')
           .delete()
           .eq('comment_id', commentId)
           .eq('user_id', user.id);
 
-        if (error) throw error;
-
         setPost(prev => prev ? {
           ...prev,
           comments: prev.comments?.map(c => 
             c.id === commentId 
-              ? { ...c, likes_count: Math.max(0, (c.likes_count || 0) - 1), user_liked: false }
+              ? { ...c, likes_count: Math.max(0, c.likes_count - 1), user_liked: false }
               : c
           )
         } : null);
       } else {
-        // Like comment
-        const { error } = await supabase
+        await supabase
           .from('comment_likes')
           .insert({
             comment_id: commentId,
@@ -444,13 +377,11 @@ const PostDetailPage = () => {
             like_type: 'like'
           });
 
-        if (error) throw error;
-
         setPost(prev => prev ? {
           ...prev,
           comments: prev.comments?.map(c => 
             c.id === commentId 
-              ? { ...c, likes_count: (c.likes_count || 0) + 1, user_liked: true }
+              ? { ...c, likes_count: c.likes_count + 1, user_liked: true }
               : c
           )
         } : null);
@@ -477,7 +408,6 @@ const PostDetailPage = () => {
         await navigator.clipboard.writeText(shareUrl);
         toast.success('Link copied to clipboard!');
       } else {
-        // Fallback
         const textArea = document.createElement('textarea');
         textArea.value = shareUrl;
         document.body.appendChild(textArea);
@@ -498,32 +428,83 @@ const PostDetailPage = () => {
     return name ? name.charAt(0).toUpperCase() : 'U';
   };
 
-  const getSafeAvatarUrl = (url: string | null | undefined) => {
-    if (!url) return '';
+  // Fixed image URL handling for the asset bucket
+  const getSafeImageUrl = (url: string | null | undefined) => {
+    if (!url) return null;
     
-    // Fix common image URL issues
+    // If it's already a full URL, return as is
     if (url.startsWith('http')) {
       return url;
     }
     
-    // Handle Supabase storage URLs - fix the URL format
-    if (url.includes('supabase.co')) {
-      // Ensure the URL is properly formatted
-      return url.replace(/\/+$/, ''); // Remove trailing slashes
+    // If it's a storage path, construct the full URL using the asset bucket
+    if (url.startsWith('asset/') || url.includes('community-posts')) {
+      // Extract the file path from the URL
+      const matches = url.match(/asset\/(.+)/) || url.match(/community-posts\/(.+)/);
+      if (matches && matches[1]) {
+        // Use Supabase's getPublicUrl with the asset bucket
+        const publicUrl = supabase.storage.from('asset').getPublicUrl(matches[1]).data.publicUrl;
+        console.log('Generated public URL:', publicUrl);
+        return publicUrl;
+      }
+      return url;
     }
     
-    // If it's a relative path, make it absolute
-    if (url.startsWith('/')) {
-      return `${window.location.origin}${url}`;
+    // If it's just a filename, assume it's in the asset bucket
+    if (!url.includes('/') && url.includes('.')) {
+      const publicUrl = supabase.storage.from('asset').getPublicUrl(url).data.publicUrl;
+      console.log('Generated public URL for filename:', publicUrl);
+      return publicUrl;
     }
     
     return url;
   };
 
-  // Fix for broken images - create a default avatar
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     const target = e.target as HTMLImageElement;
+    console.error('Image failed to load:', target.src);
     target.style.display = 'none';
+  };
+
+  // Simple image gallery component for post detail
+  const PostImageGallery = ({ images }: { images: any[] }) => {
+    if (!images || images.length === 0) return null;
+
+    return (
+      <div className="mt-4 space-y-4">
+        {images.map((image, index) => {
+          // Try image_url first, then image_path as fallback
+          const imageUrl = getSafeImageUrl(image.image_url) || getSafeImageUrl(image.image_path);
+          console.log(`Image ${index}:`, { 
+            image_url: image.image_url, 
+            image_path: image.image_path,
+            processed_url: imageUrl 
+          });
+          
+          if (!imageUrl) {
+            console.warn(`No valid URL found for image ${index}`);
+            return null;
+          }
+          
+          return (
+            <div key={image.id} className="rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+              <img
+                src={imageUrl}
+                alt={image.alt_text || `Post image ${index + 1}`}
+                className="w-full h-auto max-h-96 object-contain"
+                onError={handleImageError}
+                onLoad={() => console.log(`Image ${index} loaded successfully: ${imageUrl}`)}
+              />
+              {image.alt_text && (
+                <div className="p-2 bg-white border-t border-gray-200">
+                  <p className="text-sm text-gray-600 text-center">{image.alt_text}</p>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   if (loading) {
@@ -541,8 +522,6 @@ const PostDetailPage = () => {
           <CardContent className="p-8 text-center">
             <MessageCircle className="h-16 w-16 mx-auto mb-4 text-gray-400" />
             <h2 className="text-2xl font-bold mb-4">Post Not Found</h2>
-            <p className="text-gray-600 mb-2">URL: {window.location.href}</p>
-            <p className="text-gray-600 mb-2">Post ID from params: {postId}</p>
             <p className="text-gray-600 mb-6">The post may have been deleted or the URL is incorrect.</p>
             <Button 
               onClick={() => navigate('/community')}
@@ -575,7 +554,7 @@ const PostDetailPage = () => {
             <div className="flex items-start space-x-3">
               <Avatar className="w-12 h-12 cursor-pointer ring-2 ring-white shadow-md">
                 <AvatarImage 
-                  src={getSafeAvatarUrl(post.profiles?.avatar_url)} 
+                  src={getSafeImageUrl(post.profiles?.avatar_url) || ''} 
                   alt={post.profiles?.full_name || 'User'}
                   onError={handleImageError}
                 />
@@ -605,9 +584,13 @@ const PostDetailPage = () => {
               {post.content}
             </p>
             
-            {post.images && post.images.length > 0 && (
-              <div className="mt-4 rounded-xl overflow-hidden">
-                <ImageGallery images={post.images} />
+            {/* Images Section */}
+            {post.images && post.images.length > 0 ? (
+              <PostImageGallery images={post.images} />
+            ) : (
+              <div className="mt-4 text-center text-gray-500 py-8 border border-dashed border-gray-300 rounded-lg">
+                <ImageIcon className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p>No images in this post</p>
               </div>
             )}
             
@@ -661,7 +644,7 @@ const PostDetailPage = () => {
               <div className="flex space-x-4 mb-8">
                 <Avatar className="w-10 h-10">
                   <AvatarImage 
-                    src={getSafeAvatarUrl(user.user_metadata?.avatar_url)} 
+                    src={getSafeImageUrl(user.user_metadata?.avatar_url) || ''} 
                     onError={handleImageError}
                   />
                   <AvatarFallback className="bg-gradient-to-br from-orange-400 to-purple-600 text-white font-semibold">
@@ -716,7 +699,7 @@ const PostDetailPage = () => {
                         <div className="flex space-x-4">
                           <Avatar className="w-10 h-10">
                             <AvatarImage 
-                              src={getSafeAvatarUrl(comment.profiles?.avatar_url)} 
+                              src={getSafeImageUrl(comment.profiles?.avatar_url) || ''} 
                               onError={handleImageError}
                             />
                             <AvatarFallback className="bg-gradient-to-r from-blue-200 to-green-200">
@@ -771,7 +754,7 @@ const PostDetailPage = () => {
                               <div key={reply.id} className="flex space-x-3">
                                 <Avatar className="w-8 h-8">
                                   <AvatarImage 
-                                    src={getSafeAvatarUrl(reply.profiles?.avatar_url)} 
+                                    src={getSafeImageUrl(reply.profiles?.avatar_url) || ''} 
                                     onError={handleImageError}
                                   />
                                   <AvatarFallback className="bg-gradient-to-r from-purple-200 to-orange-200 text-xs">
