@@ -64,14 +64,29 @@ const PostDetailPage = () => {
   const [submitting, setSubmitting] = useState(false);
 
   console.log('PostDetailPage - postId from useParams:', postId);
+  console.log('PostDetailPage - full URL:', window.location.href);
 
   useEffect(() => {
-    // Check if we have a valid postId from URL
-    if (postId && isValidUUID(postId)) {
-      console.log('Valid postId found, fetching post:', postId);
-      fetchPostDetail();
+    // Extract postId from URL if useParams doesn't work
+    const extractPostIdFromUrl = () => {
+      const pathSegments = window.location.pathname.split('/');
+      const postIdIndex = pathSegments.indexOf('post') + 1;
+      return pathSegments[postIdIndex];
+    };
+
+    let actualPostId = postId;
+    
+    // If postId is undefined, try to extract from URL
+    if (!actualPostId || actualPostId === 'undefined') {
+      actualPostId = extractPostIdFromUrl();
+      console.log('Extracted postId from URL:', actualPostId);
+    }
+
+    if (actualPostId && actualPostId !== 'undefined' && isValidUUID(actualPostId)) {
+      console.log('Valid postId found, fetching post:', actualPostId);
+      fetchPostDetail(actualPostId);
     } else {
-      console.error('Invalid or missing postId:', postId);
+      console.error('Invalid or missing postId:', actualPostId);
       toast.error('Invalid post URL');
       setLoading(false);
     }
@@ -79,18 +94,35 @@ const PostDetailPage = () => {
 
   // Validate UUID format
   const isValidUUID = (uuid: string) => {
+    if (!uuid || uuid === 'undefined') return false;
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     return uuidRegex.test(uuid);
   };
 
-  const fetchPostDetail = async () => {
-    if (!postId) return;
+  const fetchPostDetail = async (postIdToFetch: string) => {
+    if (!postIdToFetch) return;
 
     try {
       setLoading(true);
-      console.log('Fetching post details for:', postId);
+      console.log('Fetching post details for:', postIdToFetch);
       
-      // Fetch post with profile data
+      // First, let's check if the post exists with a simple query
+      const { data: postExists, error: existsError } = await supabase
+        .from('community_posts')
+        .select('id')
+        .eq('id', postIdToFetch)
+        .single();
+
+      if (existsError || !postExists) {
+        console.error('Post not found or error:', existsError);
+        toast.error('Post not found');
+        setLoading(false);
+        return;
+      }
+
+      console.log('Post exists, fetching full details...');
+
+      // Fetch post with profile data using a simpler approach
       const { data: postData, error: postError } = await supabase
         .from('community_posts')
         .select(`
@@ -102,57 +134,67 @@ const PostDetailPage = () => {
             avatar_url
           )
         `)
-        .eq('id', postId)
+        .eq('id', postIdToFetch)
         .single();
 
       if (postError) {
-        console.error('Error fetching post:', postError);
+        console.error('Error fetching post details:', postError);
         throw postError;
       }
 
       if (!postData) {
-        console.error('No post data returned for ID:', postId);
+        console.error('No post data returned');
         toast.error('Post not found');
         setLoading(false);
         return;
       }
 
-      console.log('Post data found:', postData);
+      console.log('Post data fetched:', postData);
 
       // Fetch images
-      const { data: imagesData } = await supabase
+      const { data: imagesData, error: imagesError } = await supabase
         .from('post_images')
         .select('*')
-        .eq('post_id', postId)
+        .eq('post_id', postIdToFetch)
         .order('upload_order', { ascending: true });
 
-      // Fetch likes count using count method (avoids 406 errors)
+      if (imagesError) {
+        console.error('Error fetching images:', imagesError);
+      }
+
+      // Fetch likes count - use count() instead of select()
       const { count: likesCount, error: likesError } = await supabase
         .from('post_likes')
         .select('*', { count: 'exact', head: true })
-        .eq('post_id', postId);
+        .eq('post_id', postIdToFetch);
 
       if (likesError) {
         console.error('Error fetching likes count:', likesError);
       }
 
-      // Check if current user liked this post - use simpler query
+      // Check if current user liked this post - use a different approach
       let userLiked = false;
       if (user && user.id) {
-        const { data: userLikeData } = await supabase
+        const { data: userLikeData, error: userLikeError } = await supabase
           .from('post_likes')
           .select('id')
-          .eq('post_id', postId)
+          .eq('post_id', postIdToFetch)
           .eq('user_id', user.id);
 
-        userLiked = !!(userLikeData && userLikeData.length > 0);
+        if (!userLikeError && userLikeData && userLikeData.length > 0) {
+          userLiked = true;
+        }
       }
 
       // Fetch comments count
-      const { count: commentsCount } = await supabase
+      const { count: commentsCount, error: commentsError } = await supabase
         .from('post_comments')
         .select('*', { count: 'exact', head: true })
-        .eq('post_id', postId);
+        .eq('post_id', postIdToFetch);
+
+      if (commentsError) {
+        console.error('Error fetching comments count:', commentsError);
+      }
 
       const initialPost: PostDetail = {
         ...postData,
@@ -163,33 +205,38 @@ const PostDetailPage = () => {
         comments: []
       };
 
+      console.log('Initial post set:', initialPost);
       setPost(initialPost);
       
       // Fetch comments
-      await fetchComments();
+      await fetchComments(postIdToFetch);
 
     } catch (error) {
       console.error('Error in fetchPostDetail:', error);
-      toast.error('Failed to load post');
+      toast.error('Failed to load post details');
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchComments = async () => {
-    if (!postId) return;
+  const fetchComments = async (postIdToFetch: string) => {
+    if (!postIdToFetch) return;
 
     try {
+      console.log('Fetching comments for post:', postIdToFetch);
+      
       const { data: commentsData, error } = await supabase
         .from('post_comments')
         .select('*')
-        .eq('post_id', postId)
+        .eq('post_id', postIdToFetch)
         .order('created_at', { ascending: true });
 
       if (error) {
         console.error('Error fetching comments:', error);
         return;
       }
+
+      console.log('Raw comments data:', commentsData);
 
       if (!commentsData || commentsData.length === 0) {
         setPost(prev => prev ? { ...prev, comments: [] } : null);
@@ -199,14 +246,21 @@ const PostDetailPage = () => {
       // Get unique user IDs from comments
       const userIds = [...new Set(commentsData.map(comment => comment.user_id).filter(Boolean))];
       
+      console.log('User IDs for comments:', userIds);
+
       // Fetch user profiles
       let profilesData = [];
       if (userIds.length > 0) {
-        const { data: profiles } = await supabase
+        const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
           .select('id, full_name, username, avatar_url')
           .in('id', userIds);
-        profilesData = profiles || [];
+
+        if (profilesError) {
+          console.error('Error fetching profiles:', profilesError);
+        } else {
+          profilesData = profiles || [];
+        }
       }
 
       // Fetch comment likes
@@ -215,14 +269,18 @@ const PostDetailPage = () => {
           const profile = profilesData.find(p => p.id === comment.user_id);
           
           // Get total likes for this comment using count
-          const { count: likesCount } = await supabase
+          const { count: likesCount, error: likesError } = await supabase
             .from('comment_likes')
             .select('*', { count: 'exact', head: true })
             .eq('comment_id', comment.id);
 
+          if (likesError) {
+            console.error('Error fetching comment likes:', likesError);
+          }
+
           // Check if current user liked this comment
           let userLiked = false;
-          if (user && user.id) {
+          if (user) {
             const { data: userLikeData } = await supabase
               .from('comment_likes')
               .select('id')
@@ -240,6 +298,8 @@ const PostDetailPage = () => {
           };
         })
       );
+
+      console.log('Comments with details:', commentsWithDetails);
 
       setPost(prev => prev ? {
         ...prev,
@@ -269,7 +329,7 @@ const PostDetailPage = () => {
 
         setPost(prev => prev ? {
           ...prev,
-          likes_count: Math.max(0, prev.likes_count - 1),
+          likes_count: Math.max(0, (prev.likes_count || 0) - 1),
           user_liked: false
         } : null);
       } else {
@@ -286,7 +346,7 @@ const PostDetailPage = () => {
 
         setPost(prev => prev ? {
           ...prev,
-          likes_count: prev.likes_count + 1,
+          likes_count: (prev.likes_count || 0) + 1,
           user_liked: true
         } : null);
       }
@@ -320,7 +380,7 @@ const PostDetailPage = () => {
       toast.success('Comment added!');
       
       // Refresh comments and update count
-      await fetchComments();
+      await fetchComments(post.id);
       await updateCommentsCount();
 
     } catch (error) {
@@ -332,13 +392,13 @@ const PostDetailPage = () => {
   };
 
   const updateCommentsCount = async () => {
-    if (!postId) return;
+    if (!post) return;
 
     try {
       const { count: commentsCount } = await supabase
         .from('post_comments')
         .select('*', { count: 'exact', head: true })
-        .eq('post_id', postId);
+        .eq('post_id', post.id);
 
       setPost(prev => prev ? {
         ...prev,
@@ -370,7 +430,7 @@ const PostDetailPage = () => {
           ...prev,
           comments: prev.comments?.map(c => 
             c.id === commentId 
-              ? { ...c, likes_count: Math.max(0, c.likes_count - 1), user_liked: false }
+              ? { ...c, likes_count: Math.max(0, (c.likes_count || 0) - 1), user_liked: false }
               : c
           )
         } : null);
@@ -390,7 +450,7 @@ const PostDetailPage = () => {
           ...prev,
           comments: prev.comments?.map(c => 
             c.id === commentId 
-              ? { ...c, likes_count: c.likes_count + 1, user_liked: true }
+              ? { ...c, likes_count: (c.likes_count || 0) + 1, user_liked: true }
               : c
           )
         } : null);
@@ -440,7 +500,30 @@ const PostDetailPage = () => {
 
   const getSafeAvatarUrl = (url: string | null | undefined) => {
     if (!url) return '';
+    
+    // Fix common image URL issues
+    if (url.startsWith('http')) {
+      return url;
+    }
+    
+    // Handle Supabase storage URLs - fix the URL format
+    if (url.includes('supabase.co')) {
+      // Ensure the URL is properly formatted
+      return url.replace(/\/+$/, ''); // Remove trailing slashes
+    }
+    
+    // If it's a relative path, make it absolute
+    if (url.startsWith('/')) {
+      return `${window.location.origin}${url}`;
+    }
+    
     return url;
+  };
+
+  // Fix for broken images - create a default avatar
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    const target = e.target as HTMLImageElement;
+    target.style.display = 'none';
   };
 
   if (loading) {
@@ -458,7 +541,8 @@ const PostDetailPage = () => {
           <CardContent className="p-8 text-center">
             <MessageCircle className="h-16 w-16 mx-auto mb-4 text-gray-400" />
             <h2 className="text-2xl font-bold mb-4">Post Not Found</h2>
-            <p className="text-gray-600 mb-2">Post ID: {postId}</p>
+            <p className="text-gray-600 mb-2">URL: {window.location.href}</p>
+            <p className="text-gray-600 mb-2">Post ID from params: {postId}</p>
             <p className="text-gray-600 mb-6">The post may have been deleted or the URL is incorrect.</p>
             <Button 
               onClick={() => navigate('/community')}
@@ -493,10 +577,7 @@ const PostDetailPage = () => {
                 <AvatarImage 
                   src={getSafeAvatarUrl(post.profiles?.avatar_url)} 
                   alt={post.profiles?.full_name || 'User'}
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                  }}
+                  onError={handleImageError}
                 />
                 <AvatarFallback className="bg-gradient-to-br from-orange-400 to-purple-600 text-white font-semibold">
                   {getAvatarFallback(post.profiles?.full_name)}
@@ -579,7 +660,10 @@ const PostDetailPage = () => {
             {user && (
               <div className="flex space-x-4 mb-8">
                 <Avatar className="w-10 h-10">
-                  <AvatarImage src={getSafeAvatarUrl(user.user_metadata?.avatar_url)} />
+                  <AvatarImage 
+                    src={getSafeAvatarUrl(user.user_metadata?.avatar_url)} 
+                    onError={handleImageError}
+                  />
                   <AvatarFallback className="bg-gradient-to-br from-orange-400 to-purple-600 text-white font-semibold">
                     {getAvatarFallback(user.user_metadata?.full_name)}
                   </AvatarFallback>
@@ -631,7 +715,10 @@ const PostDetailPage = () => {
                       <div key={comment.id} className="space-y-4">
                         <div className="flex space-x-4">
                           <Avatar className="w-10 h-10">
-                            <AvatarImage src={getSafeAvatarUrl(comment.profiles?.avatar_url)} />
+                            <AvatarImage 
+                              src={getSafeAvatarUrl(comment.profiles?.avatar_url)} 
+                              onError={handleImageError}
+                            />
                             <AvatarFallback className="bg-gradient-to-r from-blue-200 to-green-200">
                               {getAvatarFallback(comment.profiles?.full_name)}
                             </AvatarFallback>
@@ -683,7 +770,10 @@ const PostDetailPage = () => {
                             {replies.map(reply => (
                               <div key={reply.id} className="flex space-x-3">
                                 <Avatar className="w-8 h-8">
-                                  <AvatarImage src={getSafeAvatarUrl(reply.profiles?.avatar_url)} />
+                                  <AvatarImage 
+                                    src={getSafeAvatarUrl(reply.profiles?.avatar_url)} 
+                                    onError={handleImageError}
+                                  />
                                   <AvatarFallback className="bg-gradient-to-r from-purple-200 to-orange-200 text-xs">
                                     {getAvatarFallback(reply.profiles?.full_name)}
                                   </AvatarFallback>
