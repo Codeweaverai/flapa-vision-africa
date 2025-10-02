@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
-import { MessageCircle, Heart, Share2, Send, Users, Reply, MoreVertical, UserPlus, BookOpen } from 'lucide-react';
+import { MessageCircle, Heart, Share2, Send, Users, Reply, MoreVertical, UserPlus, BookOpen, Bell } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import EmojiPicker from '@/components/community/EmojiPicker';
 import CourseDiscussionsTab from '@/components/community/CourseDiscussionsTab';
@@ -393,6 +393,28 @@ const CommunityPage = () => {
     }
   };
 
+  const handleSharePost = async (post: CommunityPost) => {
+    try {
+      const shareUrl = `${window.location.origin}/community/post/${post.id}`;
+      const shareText = `Check out this post: ${post.title}`;
+      
+      if (navigator.share) {
+        await navigator.share({
+          title: post.title,
+          text: shareText,
+          url: shareUrl,
+        });
+        toast.success('Post shared successfully!');
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success('Link copied to clipboard!');
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
+      toast.error('Failed to share post');
+    }
+  };
+
   const renderFeed = () => (
     <div className="space-y-4">
       <div className="space-y-4">
@@ -498,6 +520,7 @@ const CommunityPage = () => {
                   <Button
                     variant="ghost"
                     size="sm"
+                    onClick={() => handleSharePost(post)}
                     className="px-4 py-2 rounded-full text-sm font-medium text-gray-600 hover:bg-gradient-to-r hover:from-green-50 hover:to-teal-50 transition-all"
                   >
                     <Share2 className="h-4 w-4 mr-2" />
@@ -742,7 +765,9 @@ const CommunityPage = () => {
                   {[
                     { id: 'feed', label: 'Feed', icon: MessageCircle },
                     { id: 'create', label: 'Create Post', icon: Send },
-                    { id: 'discussions', label: 'Discussions', icon: BookOpen }
+                    { id: 'discussions', label: 'Discussions', icon: BookOpen },
+                    { id: 'chat', label: 'Chat', icon: MessageCircle },
+                    { id: 'alerts', label: 'Alerts', icon: Bell }
                   ].map(({ id, label, icon: Icon }) => (
                     <button
                       key={id}
@@ -779,6 +804,18 @@ const CommunityPage = () => {
                 {activeTab === 'discussions' && (
                   <div>
                     <CourseDiscussionsTab />
+                  </div>
+                )}
+                {activeTab === 'chat' && (
+                  <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg">
+                    <CardContent className="p-0">
+                      {renderChat()}
+                    </CardContent>
+                  </Card>
+                )}
+                {activeTab === 'alerts' && user && (
+                  <div>
+                    <NotificationsTab />
                   </div>
                 )}
               </div>
