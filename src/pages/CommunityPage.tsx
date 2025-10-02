@@ -120,6 +120,8 @@ const CommunityPage = () => {
       loadCoursesAndEvents();
       const unsubscribe = subscribeToRealtime();
       return () => unsubscribe();
+    } else {
+      setLoading(false);
     }
   }, [user, activeChannel]);
 
@@ -146,48 +148,46 @@ const CommunityPage = () => {
       })
       .subscribe();
 
-    const commentsChannel = supabase
-      .channel('post-comments')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'post_comments'
-      }, () => {
-        fetchPostsEnhanced();
-      })
-      .subscribe();
-
-    const likesChannel = supabase
-      .channel('post-likes')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'post_likes'
-      }, () => {
-        fetchPostsEnhanced();
-      })
-      .subscribe();
-
     return () => {
-      supabase.removeChannel(postsChannel);
-      supabase.removeChannel(messagesChannel);
-      supabase.removeChannel(commentsChannel);
-      supabase.removeChannel(likesChannel);
+      postsChannel.unsubscribe();
+      messagesChannel.unsubscribe();
     };
   };
 
   const fetchPostsEnhanced = async () => {
     try {
+      setLoading(true);
       const postsData = await fetchCommunityPosts();
       
       const postsWithDetails = await Promise.all(
         postsData.map(async (post) => {
-          // Fetch likes count and user like status for each post
-          const [likesResult, userLikeResult, commentsResult] = await Promise.all([
-            supabase.from('post_likes').select('id').eq('post_id', post.id),
-            user ? supabase.from('post_likes').select('id').eq('post_id', post.id).eq('user_id', user.id).single() : Promise.resolve({ data: null }),
-            supabase.from('post_comments').select('id').eq('post_id', post.id)
-          ]);
+          // Fetch likes count using count method to avoid 406 errors
+          const { count: likesCount, error: likesError } = await supabase
+            .from('post_likes')
+            .select('*', { count: 'exact', head: true })
+            .eq('post_id', post.id);
+
+          if (likesError) {
+            console.error('Error fetching likes count:', likesError);
+          }
+
+          // Check if current user liked this post
+          let userLiked = false;
+          if (user && user.id) {
+            const { data: userLikeData } = await supabase
+              .from('post_likes')
+              .select('id')
+              .eq('post_id', post.id)
+              .eq('user_id', user.id);
+
+            userLiked = !!(userLikeData && userLikeData.length > 0);
+          }
+
+          // Fetch comments count
+          const { count: commentsCount } = await supabase
+            .from('post_comments')
+            .select('*', { count: 'exact', head: true })
+            .eq('post_id', post.id);
 
           return {
             ...post,
@@ -201,9 +201,9 @@ const CommunityPage = () => {
               following_count: post.profiles.following_count
             } : null,
             images: post.images || [],
-            likes_count: likesResult.data?.length || 0,
-            user_liked: !!userLikeResult.data,
-            comments_count: commentsResult.data?.length || 0
+            likes_count: likesCount || 0,
+            user_liked: userLiked,
+            comments_count: commentsCount || 0
           };
         })
       );
@@ -251,16 +251,29 @@ const CommunityPage = () => {
         (commentsData || []).map(async (comment) => {
           const profile = profilesData?.find(p => p.id === comment.user_id);
           
-          const [likesResult, userLikeResult] = await Promise.all([
-            supabase.from('comment_likes').select('id').eq('comment_id', comment.id),
-            user ? supabase.from('comment_likes').select('id').eq('comment_id', comment.id).eq('user_id', user.id).single() : Promise.resolve({ data: null })
-          ]);
+          // Fetch comment likes using count method
+          const { count: likesCount } = await supabase
+            .from('comment_likes')
+            .select('*', { count: 'exact', head: true })
+            .eq('comment_id', comment.id);
+
+          // Check if current user liked this comment
+          let userLiked = false;
+          if (user && user.id) {
+            const { data: userLikeData } = await supabase
+              .from('comment_likes')
+              .select('id')
+              .eq('comment_id', comment.id)
+              .eq('user_id', user.id);
+
+            userLiked = !!(userLikeData && userLikeData.length > 0);
+          }
 
           return {
             ...comment,
             profiles: profile,
-            likes_count: likesResult.data?.length || 0,
-            user_liked: !!userLikeResult.data
+            likes_count: likesCount || 0,
+            user_liked: userLiked
           };
         })
       );
@@ -334,7 +347,7 @@ const CommunityPage = () => {
       } else {
         await supabase
           .from('post_likes')
-          .upsert({
+          .insert({
             post_id: postId,
             user_id: user.id,
             like_type: type
@@ -459,8 +472,22 @@ const CommunityPage = () => {
     }
   };
 
-  const handlePostClick = (postId: string) => {
+  const handlePostClick = (postId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    console.log('Navigating to post detail:', postId);
+    // Use direct navigation to ensure it works
     navigate(`/community/post/${postId}`);
+  };
+
+  const getAvatarFallback = (name?: string) => {
+    return name ? name.charAt(0).toUpperCase() : 'U';
+  };
+
+  const getSafeAvatarUrl = (url: string | null | undefined) => {
+    if (!url) return '';
+    return url;
   };
 
   const renderFeed = () => (
@@ -472,7 +499,7 @@ const CommunityPage = () => {
           <Card 
             key={post.id} 
             className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group cursor-pointer"
-            onClick={() => handlePostClick(post.id)}
+            onClick={(e) => handlePostClick(post.id, e)}
           >
             <CardHeader className="pb-3 border-b border-gray-100">
               <div className="flex items-start space-x-3">
@@ -483,9 +510,16 @@ const CommunityPage = () => {
                     setShowFollowers({ userId: post.user_id, tab: 'followers' });
                   }}
                 >
-                  <AvatarImage src={post.profiles?.avatar_url} />
+                  <AvatarImage 
+                    src={getSafeAvatarUrl(post.profiles?.avatar_url)} 
+                    alt={post.profiles?.full_name || 'User'}
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
                   <AvatarFallback className="bg-gradient-to-br from-orange-400 to-purple-600 text-white font-semibold">
-                    {post.profiles?.full_name?.charAt(0) || 'U'}
+                    {getAvatarFallback(post.profiles?.full_name)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
@@ -601,9 +635,9 @@ const CommunityPage = () => {
                   {user && (
                     <div className="flex space-x-3">
                       <Avatar className="w-9 h-9">
-                        <AvatarImage src={user.user_metadata?.avatar_url} />
+                        <AvatarImage src={getSafeAvatarUrl(user.user_metadata?.avatar_url)} />
                         <AvatarFallback className="bg-gradient-to-br from-orange-400 to-purple-600 text-white font-semibold">
-                          {user.user_metadata?.full_name?.charAt(0) || 'U'}
+                          {getAvatarFallback(user.user_metadata?.full_name)}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 space-y-2">
@@ -649,9 +683,9 @@ const CommunityPage = () => {
                         <div key={comment.id} className="space-y-3">
                           <div className="flex space-x-3">
                             <Avatar className="w-8 h-8">
-                              <AvatarImage src={comment.profiles?.avatar_url} />
+                              <AvatarImage src={getSafeAvatarUrl(comment.profiles?.avatar_url)} />
                               <AvatarFallback className="bg-gradient-to-r from-blue-200 to-green-200">
-                                {comment.profiles?.full_name?.charAt(0) || 'U'}
+                                {getAvatarFallback(comment.profiles?.full_name)}
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex-1">
@@ -697,9 +731,9 @@ const CommunityPage = () => {
                               {replies.map(reply => (
                                 <div key={reply.id} className="flex space-x-3">
                                   <Avatar className="w-7 h-7">
-                                    <AvatarImage src={reply.profiles?.avatar_url} />
+                                    <AvatarImage src={getSafeAvatarUrl(reply.profiles?.avatar_url)} />
                                     <AvatarFallback className="bg-gradient-to-r from-purple-200 to-orange-200 text-xs">
-                                      {reply.profiles?.full_name?.charAt(0) || 'U'}
+                                      {getAvatarFallback(reply.profiles?.full_name)}
                                     </AvatarFallback>
                                   </Avatar>
                                   <div className="flex-1">
@@ -766,9 +800,9 @@ const CommunityPage = () => {
         {messages.map((message) => (
           <div key={message.id} className="flex space-x-3">
             <Avatar className="w-8 h-8">
-              <AvatarImage src={message.profiles?.avatar_url} />
+              <AvatarImage src={getSafeAvatarUrl(message.profiles?.avatar_url)} />
               <AvatarFallback className="bg-gradient-to-r from-orange-200 to-purple-200">
-                {message.profiles?.full_name?.charAt(0) || 'U'}
+                {getAvatarFallback(message.profiles?.full_name)}
               </AvatarFallback>
             </Avatar>
             <div>
@@ -801,6 +835,41 @@ const CommunityPage = () => {
       </form>
     </div>
   );
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'feed':
+        return renderFeed();
+      case 'create':
+        return user ? (
+          <div className="space-y-4">
+            <EnhancedPostCreation 
+              onPostCreated={() => {
+                handlePostCreated();
+                setActiveTab('feed');
+              }}
+              courses={courses}
+              events={events}
+              className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg hover:shadow-xl transition-all duration-300"
+            />
+          </div>
+        ) : null;
+      case 'discussions':
+        return <CourseDiscussionsTab />;
+      case 'chat':
+        return (
+          <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg">
+            <CardContent className="p-0">
+              {renderChat()}
+            </CardContent>
+          </Card>
+        );
+      case 'alerts':
+        return user ? <NotificationsTab /> : null;
+      default:
+        return renderFeed();
+    }
+  };
 
   if (loading) {
     return (
@@ -874,37 +943,7 @@ const CommunityPage = () => {
 
               {/* Tab Content */}
               <div className="min-h-screen pb-8">
-                {activeTab === 'feed' && renderFeed()}
-                {activeTab === 'create' && user && (
-                  <div className="space-y-4">
-                    <EnhancedPostCreation 
-                      onPostCreated={() => {
-                        handlePostCreated();
-                        setActiveTab('feed');
-                      }}
-                      courses={courses}
-                      events={events}
-                      className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg hover:shadow-xl transition-all duration-300"
-                    />
-                  </div>
-                )}
-                {activeTab === 'discussions' && (
-                  <div>
-                    <CourseDiscussionsTab />
-                  </div>
-                )}
-                {activeTab === 'chat' && (
-                  <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg">
-                    <CardContent className="p-0">
-                      {renderChat()}
-                    </CardContent>
-                  </Card>
-                )}
-                {activeTab === 'alerts' && user && (
-                  <div>
-                    <NotificationsTab />
-                  </div>
-                )}
+                {renderTabContent()}
               </div>
             </div>
 
