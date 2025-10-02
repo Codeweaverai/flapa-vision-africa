@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
-import { MessageCircle, Heart, Share2, Send, Reply, ArrowLeft, Image as ImageIcon } from 'lucide-react';
+import { MessageCircle, Heart, Share2, Send, Reply, ArrowLeft, Image as ImageIcon, Users, BookOpen, TrendingUp } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface PostDetail {
@@ -55,6 +55,253 @@ interface Comment {
   user_liked: boolean;
 }
 
+// Right Sidebar Component
+const RightSidebar = () => {
+  const [trendingCourses, setTrendingCourses] = useState<any[]>([]);
+  const [mediaPosts, setMediaPosts] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchTrendingCourses();
+    fetchMediaPosts();
+  }, []);
+
+  const fetchTrendingCourses = async () => {
+    try {
+      const { data: courses, error } = await supabase
+        .from('courses')
+        .select('id, title, thumbnail_url, enrolled_count, rating')
+        .eq('is_published', true)
+        .order('enrolled_count', { ascending: false })
+        .limit(5);
+
+      if (!error && courses) {
+        setTrendingCourses(courses);
+      }
+    } catch (error) {
+      console.error('Error fetching trending courses:', error);
+    }
+  };
+
+  const fetchMediaPosts = async () => {
+    try {
+      const { data: posts, error } = await supabase
+        .from('community_posts')
+        .select(`
+          id,
+          title,
+          content,
+          created_at,
+          profiles:user_id (full_name, username, avatar_url),
+          images:community_post_images(id, image_url, image_path)
+        `)
+        .not('community_post_images', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(6);
+
+      if (!error && posts) {
+        setMediaPosts(posts.filter(post => post.images && post.images.length > 0));
+      }
+    } catch (error) {
+      console.error('Error fetching media posts:', error);
+    }
+  };
+
+  const getSafeImageUrl = (url: string | null | undefined) => {
+    if (!url) return null;
+    if (url.startsWith('http')) return url;
+    
+    const matches = url.match(/asset\/(.+)/) || url.match(/community-posts\/(.+)/);
+    if (matches && matches[1]) {
+      return supabase.storage.from('asset').getPublicUrl(matches[1]).data.publicUrl;
+    }
+    
+    if (!url.includes('/') && url.includes('.')) {
+      return supabase.storage.from('asset').getPublicUrl(url).data.publicUrl;
+    }
+    
+    return url;
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Trending Courses */}
+      <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg">
+        <CardHeader className="pb-3 border-b border-gray-100">
+          <div className="flex items-center space-x-2">
+            <TrendingUp className="h-5 w-5 text-purple-600" />
+            <h3 className="font-semibold text-gray-900">Trending Courses</h3>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <div className="space-y-3">
+            {trendingCourses.map((course) => (
+              <div key={course.id} className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-purple-600 rounded-lg flex items-center justify-center">
+                  <BookOpen className="h-6 w-6 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm text-gray-900 truncate">{course.title}</p>
+                  <div className="flex items-center space-x-2 text-xs text-gray-500">
+                    <span>{course.enrolled_count || 0} enrolled</span>
+                    <span>•</span>
+                    <span>⭐ {course.rating || '4.5'}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Media Posts */}
+      <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg">
+        <CardHeader className="pb-3 border-b border-gray-100">
+          <div className="flex items-center space-x-2">
+            <ImageIcon className="h-5 w-5 text-blue-600" />
+            <h3 className="font-semibold text-gray-900">Media Posts</h3>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <div className="grid grid-cols-2 gap-2">
+            {mediaPosts.map((post) => {
+              const firstImage = post.images?.[0];
+              const imageUrl = firstImage ? 
+                getSafeImageUrl(firstImage.image_url) || getSafeImageUrl(firstImage.image_path) : null;
+              
+              return (
+                <div key={post.id} className="aspect-square rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
+                  {imageUrl ? (
+                    <img
+                      src={imageUrl}
+                      alt="Media post"
+                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300">
+                      <ImageIcon className="h-6 w-6 text-gray-400" />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+// Left Sidebar - Discover People Component
+const DiscoverPeople = () => {
+  const { user } = useAuth();
+  const [people, setPeople] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchPeople();
+  }, []);
+
+  const fetchPeople = async () => {
+    try {
+      if (!user?.id) return;
+
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, username, avatar_url, bio, followers_count')
+        .neq('id', user.id)
+        .order('followers_count', { ascending: false })
+        .limit(8);
+
+      if (!error && profiles) {
+        setPeople(profiles);
+      }
+    } catch (error) {
+      console.error('Error fetching people:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getSafeImageUrl = (url: string | null | undefined) => {
+    if (!url) return null;
+    if (url.startsWith('http')) return url;
+    
+    const matches = url.match(/asset\/(.+)/) || url.match(/profile_pictures\/(.+)/);
+    if (matches && matches[1]) {
+      return supabase.storage.from('asset').getPublicUrl(matches[1]).data.publicUrl;
+    }
+    
+    return url;
+  };
+
+  const getAvatarFallback = (name?: string) => {
+    return name ? name.charAt(0).toUpperCase() : 'U';
+  };
+
+  if (loading) {
+    return (
+      <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg">
+        <CardContent className="p-4">
+          <div className="animate-pulse space-y-3">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 bg-gray-200 rounded"></div>
+                  <div className="h-2 bg-gray-200 rounded w-3/4"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg sticky top-6">
+      <CardHeader className="pb-3 border-b border-gray-100">
+        <div className="flex items-center space-x-2">
+          <Users className="h-5 w-5 text-green-600" />
+          <h3 className="font-semibold text-gray-900">Discover People</h3>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-4">
+        <div className="space-y-4">
+          {people.map((person) => (
+            <div key={person.id} className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <Avatar className="w-10 h-10">
+                  <AvatarImage 
+                    src={getSafeImageUrl(person.avatar_url) || ''} 
+                    alt={person.full_name}
+                  />
+                  <AvatarFallback className="bg-gradient-to-br from-orange-400 to-purple-600 text-white text-sm">
+                    {getAvatarFallback(person.full_name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm text-gray-900 truncate">
+                    {person.full_name || 'Anonymous'}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">@{person.username || 'user'}</p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs px-3 py-1 h-auto border-purple-200 text-purple-600 hover:bg-purple-50"
+              >
+                Follow
+              </Button>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 const PostDetailPage = () => {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
@@ -98,7 +345,6 @@ const PostDetailPage = () => {
     try {
       setLoading(true);
       
-      // Fetch post with profile data
       const { data: postData, error: postError } = await supabase
         .from('community_posts')
         .select(`
@@ -135,9 +381,6 @@ const PostDetailPage = () => {
 
         if (!imagesError) {
           imagesData = images || [];
-          console.log('Fetched images from community_post_images:', imagesData);
-        } else {
-          console.error('Error fetching images:', imagesError);
         }
       } catch (imagesError) {
         console.error('Error fetching images:', imagesError);
@@ -428,33 +671,17 @@ const PostDetailPage = () => {
     return name ? name.charAt(0).toUpperCase() : 'U';
   };
 
-  // Fixed image URL handling for the asset bucket
   const getSafeImageUrl = (url: string | null | undefined) => {
     if (!url) return null;
+    if (url.startsWith('http')) return url;
     
-    // If it's already a full URL, return as is
-    if (url.startsWith('http')) {
-      return url;
+    const matches = url.match(/asset\/(.+)/) || url.match(/community-posts\/(.+)/);
+    if (matches && matches[1]) {
+      return supabase.storage.from('asset').getPublicUrl(matches[1]).data.publicUrl;
     }
     
-    // If it's a storage path, construct the full URL using the asset bucket
-    if (url.startsWith('asset/') || url.includes('community-posts')) {
-      // Extract the file path from the URL
-      const matches = url.match(/asset\/(.+)/) || url.match(/community-posts\/(.+)/);
-      if (matches && matches[1]) {
-        // Use Supabase's getPublicUrl with the asset bucket
-        const publicUrl = supabase.storage.from('asset').getPublicUrl(matches[1]).data.publicUrl;
-        console.log('Generated public URL:', publicUrl);
-        return publicUrl;
-      }
-      return url;
-    }
-    
-    // If it's just a filename, assume it's in the asset bucket
     if (!url.includes('/') && url.includes('.')) {
-      const publicUrl = supabase.storage.from('asset').getPublicUrl(url).data.publicUrl;
-      console.log('Generated public URL for filename:', publicUrl);
-      return publicUrl;
+      return supabase.storage.from('asset').getPublicUrl(url).data.publicUrl;
     }
     
     return url;
@@ -462,29 +689,18 @@ const PostDetailPage = () => {
 
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     const target = e.target as HTMLImageElement;
-    console.error('Image failed to load:', target.src);
     target.style.display = 'none';
   };
 
-  // Simple image gallery component for post detail
   const PostImageGallery = ({ images }: { images: any[] }) => {
     if (!images || images.length === 0) return null;
 
     return (
       <div className="mt-4 space-y-4">
         {images.map((image, index) => {
-          // Try image_url first, then image_path as fallback
           const imageUrl = getSafeImageUrl(image.image_url) || getSafeImageUrl(image.image_path);
-          console.log(`Image ${index}:`, { 
-            image_url: image.image_url, 
-            image_path: image.image_path,
-            processed_url: imageUrl 
-          });
           
-          if (!imageUrl) {
-            console.warn(`No valid URL found for image ${index}`);
-            return null;
-          }
+          if (!imageUrl) return null;
           
           return (
             <div key={image.id} className="rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
@@ -493,7 +709,6 @@ const PostDetailPage = () => {
                 alt={image.alt_text || `Post image ${index + 1}`}
                 className="w-full h-auto max-h-96 object-contain"
                 onError={handleImageError}
-                onLoad={() => console.log(`Image ${index} loaded successfully: ${imageUrl}`)}
               />
               {image.alt_text && (
                 <div className="p-2 bg-white border-t border-gray-200">
@@ -537,274 +752,291 @@ const PostDetailPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-orange-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
+      <div className="max-w-7xl mx-auto px-4">
         {/* Back Button */}
-        <Button
-          variant="ghost"
-          onClick={() => navigate('/community')}
-          className="mb-6 flex items-center gap-2 hover:bg-white/80"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Community
-        </Button>
+        <div className="mb-6">
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/community')}
+            className="flex items-center gap-2 hover:bg-white/80"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Community
+          </Button>
+        </div>
 
-        {/* Post Card */}
-        <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg mb-6">
-          <CardHeader className="pb-3 border-b border-gray-100">
-            <div className="flex items-start space-x-3">
-              <Avatar className="w-12 h-12 cursor-pointer ring-2 ring-white shadow-md">
-                <AvatarImage 
-                  src={getSafeImageUrl(post.profiles?.avatar_url) || ''} 
-                  alt={post.profiles?.full_name || 'User'}
-                  onError={handleImageError}
-                />
-                <AvatarFallback className="bg-gradient-to-br from-orange-400 to-purple-600 text-white font-semibold">
-                  {getAvatarFallback(post.profiles?.full_name)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 min-w-0">
-                  <h4 className="font-bold text-gray-900 truncate">
-                    {post.profiles?.full_name || 'Anonymous'}
-                  </h4>
-                </div>
-                <div className="flex items-center flex-wrap gap-2 text-xs text-gray-500 mt-1">
-                  <span className="font-medium">@{post.profiles?.username || 'user'}</span>
-                  <span>•</span>
-                  <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
-                </div>
-              </div>
-            </div>
-            {post.title && (
-              <h1 className="text-2xl font-bold text-gray-900 mt-4 leading-tight">{post.title}</h1>
-            )}
-          </CardHeader>
-          <CardContent className="pt-6 pb-6">
-            <p className="text-gray-700 text-lg leading-relaxed whitespace-pre-wrap mb-6">
-              {post.content}
-            </p>
-            
-            {/* Images Section */}
-            {post.images && post.images.length > 0 ? (
-              <PostImageGallery images={post.images} />
-            ) : (
-              <div className="mt-4 text-center text-gray-500 py-8 border border-dashed border-gray-300 rounded-lg">
-                <ImageIcon className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                <p>No images in this post</p>
-              </div>
-            )}
-            
-            <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-100">
-              <div className="flex items-center gap-4">
-                <Button
-                  variant="ghost"
-                  size="lg"
-                  onClick={toggleLike}
-                  disabled={submitting}
-                  className={`px-6 py-3 rounded-full text-base font-medium transition-all ${
-                    post.user_liked 
-                      ? 'text-red-600 bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100' 
-                      : 'text-gray-600 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50'
-                  }`}
-                >
-                  <Heart className={`h-5 w-5 mr-2 ${post.user_liked ? 'fill-current' : ''}`} />
-                  <span>{post.likes_count}</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="lg"
-                  className="px-6 py-3 rounded-full text-base font-medium text-gray-600 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all"
-                >
-                  <MessageCircle className="h-5 w-5 mr-2" />
-                  <span>{post.comments_count} comments</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="lg"
-                  onClick={handleSharePost}
-                  className="px-6 py-3 rounded-full text-base font-medium text-gray-600 hover:bg-gradient-to-r hover:from-green-50 hover:to-teal-50 transition-all"
-                >
-                  <Share2 className="h-5 w-5 mr-2" />
-                  Share
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex gap-6">
+          {/* Left Sidebar - Discover People */}
+          <div className="w-80 flex-shrink-0">
+            <DiscoverPeople />
+          </div>
 
-        {/* Comments Section */}
-        <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg">
-          <CardContent className="p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">
-              Comments ({post.comments_count})
-            </h3>
-            
-            {/* Add Comment */}
-            {user && (
-              <div className="flex space-x-4 mb-8">
-                <Avatar className="w-10 h-10">
-                  <AvatarImage 
-                    src={getSafeImageUrl(user.user_metadata?.avatar_url) || ''} 
-                    onError={handleImageError}
-                  />
-                  <AvatarFallback className="bg-gradient-to-br from-orange-400 to-purple-600 text-white font-semibold">
-                    {getAvatarFallback(user.user_metadata?.full_name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 space-y-3">
-                  {replyTo && (
-                    <div className="text-sm text-muted-foreground bg-blue-50 rounded-lg p-3">
-                      Replying to comment...
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setReplyTo('')}
-                        className="ml-2 h-auto p-0 text-xs"
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  )}
-                  <div className="flex space-x-3">
-                    <Textarea
-                      placeholder="Write a comment..."
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      className="min-h-[80px] resize-none border-gray-200 text-base"
-                      disabled={submitting}
+          {/* Main Content - Reduced Width */}
+          <div className="flex-1 max-w-2xl">
+            {/* Post Card */}
+            <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg mb-6">
+              <CardHeader className="pb-3 border-b border-gray-100">
+                <div className="flex items-start space-x-3">
+                  <Avatar className="w-12 h-12 cursor-pointer ring-2 ring-white shadow-md">
+                    <AvatarImage 
+                      src={getSafeImageUrl(post.profiles?.avatar_url) || ''} 
+                      alt={post.profiles?.full_name || 'User'}
+                      onError={handleImageError}
                     />
+                    <AvatarFallback className="bg-gradient-to-br from-orange-400 to-purple-600 text-white font-semibold">
+                      {getAvatarFallback(post.profiles?.full_name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <h4 className="font-bold text-gray-900 truncate">
+                        {post.profiles?.full_name || 'Anonymous'}
+                      </h4>
+                    </div>
+                    <div className="flex items-center flex-wrap gap-2 text-xs text-gray-500 mt-1">
+                      <span className="font-medium">@{post.profiles?.username || 'user'}</span>
+                      <span>•</span>
+                      <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
+                    </div>
+                  </div>
+                </div>
+                {post.title && (
+                  <h1 className="text-2xl font-bold text-gray-900 mt-4 leading-tight">{post.title}</h1>
+                )}
+              </CardHeader>
+              <CardContent className="pt-6 pb-6">
+                <p className="text-gray-700 text-lg leading-relaxed whitespace-pre-wrap mb-6">
+                  {post.content}
+                </p>
+                
+                {/* Images Section */}
+                {post.images && post.images.length > 0 ? (
+                  <PostImageGallery images={post.images} />
+                ) : (
+                  <div className="mt-4 text-center text-gray-500 py-8 border border-dashed border-gray-300 rounded-lg">
+                    <ImageIcon className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                    <p>No images in this post</p>
+                  </div>
+                )}
+                
+                <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-100">
+                  <div className="flex items-center gap-4">
                     <Button
-                      onClick={addComment}
-                      disabled={!newComment.trim() || submitting}
+                      variant="ghost"
                       size="lg"
-                      className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 h-auto px-6"
+                      onClick={toggleLike}
+                      disabled={submitting}
+                      className={`px-6 py-3 rounded-full text-base font-medium transition-all ${
+                        post.user_liked 
+                          ? 'text-red-600 bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100' 
+                          : 'text-gray-600 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50'
+                      }`}
                     >
-                      <Send className="h-5 w-5" />
+                      <Heart className={`h-5 w-5 mr-2 ${post.user_liked ? 'fill-current' : ''}`} />
+                      <span>{post.likes_count}</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="lg"
+                      className="px-6 py-3 rounded-full text-base font-medium text-gray-600 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all"
+                    >
+                      <MessageCircle className="h-5 w-5 mr-2" />
+                      <span>{post.comments_count} comments</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="lg"
+                      onClick={handleSharePost}
+                      className="px-6 py-3 rounded-full text-base font-medium text-gray-600 hover:bg-gradient-to-r hover:from-green-50 hover:to-teal-50 transition-all"
+                    >
+                      <Share2 className="h-5 w-5 mr-2" />
+                      Share
                     </Button>
                   </div>
                 </div>
-              </div>
-            )}
+              </CardContent>
+            </Card>
 
-            {/* Comments List */}
-            <div className="space-y-6">
-              {post.comments && post.comments.length > 0 ? (
-                post.comments
-                  .filter(comment => !comment.parent_id)
-                  .map((comment) => {
-                    const replies = post.comments?.filter(c => c.parent_id === comment.id) || [];
-                    
-                    return (
-                      <div key={comment.id} className="space-y-4">
-                        <div className="flex space-x-4">
-                          <Avatar className="w-10 h-10">
-                            <AvatarImage 
-                              src={getSafeImageUrl(comment.profiles?.avatar_url) || ''} 
-                              onError={handleImageError}
-                            />
-                            <AvatarFallback className="bg-gradient-to-r from-blue-200 to-green-200">
-                              {getAvatarFallback(comment.profiles?.full_name)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1">
-                            <div className="bg-gray-50 rounded-xl p-4">
-                              <div className="flex items-center space-x-3 mb-2">
-                                <span className="font-semibold text-gray-900">
-                                  {comment.profiles?.full_name || 'Anonymous'}
-                                </span>
-                                <span className="text-sm text-muted-foreground">
-                                  {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                                </span>
-                              </div>
-                              <p className="text-gray-700">{comment.content}</p>
-                            </div>
-                            <div className="flex items-center space-x-4 mt-3">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => toggleCommentLike(comment.id)}
-                                className={`h-auto p-2 text-sm transition-colors ${
-                                  comment.user_liked 
-                                    ? 'text-red-500 hover:text-red-600' 
-                                    : 'text-muted-foreground hover:text-orange-500'
-                                }`}
-                              >
-                                <Heart className={`h-4 w-4 mr-1 ${comment.user_liked ? 'fill-current' : ''}`} />
-                                {comment.likes_count}
-                              </Button>
-                              {user && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setReplyTo(comment.id)}
-                                  className="h-auto p-2 text-sm text-muted-foreground hover:text-purple-500"
-                                >
-                                  <Reply className="h-4 w-4 mr-1" />
-                                  Reply
-                                </Button>
-                              )}
-                            </div>
-                          </div>
+            {/* Comments Section */}
+            <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg">
+              <CardContent className="p-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-6">
+                  Comments ({post.comments_count})
+                </h3>
+                
+                {/* Add Comment */}
+                {user && (
+                  <div className="flex space-x-4 mb-8">
+                    <Avatar className="w-10 h-10">
+                      <AvatarImage 
+                        src={getSafeImageUrl(user.user_metadata?.avatar_url) || ''} 
+                        onError={handleImageError}
+                      />
+                      <AvatarFallback className="bg-gradient-to-br from-orange-400 to-purple-600 text-white font-semibold">
+                        {getAvatarFallback(user.user_metadata?.full_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 space-y-3">
+                      {replyTo && (
+                        <div className="text-sm text-muted-foreground bg-blue-50 rounded-lg p-3">
+                          Replying to comment...
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setReplyTo('')}
+                            className="ml-2 h-auto p-0 text-xs"
+                          >
+                            Cancel
+                          </Button>
                         </div>
+                      )}
+                      <div className="flex space-x-3">
+                        <Textarea
+                          placeholder="Write a comment..."
+                          value={newComment}
+                          onChange={(e) => setNewComment(e.target.value)}
+                          className="min-h-[80px] resize-none border-gray-200 text-base"
+                          disabled={submitting}
+                        />
+                        <Button
+                          onClick={addComment}
+                          disabled={!newComment.trim() || submitting}
+                          size="lg"
+                          className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 h-auto px-6"
+                        >
+                          <Send className="h-5 w-5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-                        {/* Threaded Replies */}
-                        {replies.length > 0 && (
-                          <div className="ml-14 space-y-4 pl-6 border-l-2 border-gray-200">
-                            {replies.map(reply => (
-                              <div key={reply.id} className="flex space-x-3">
-                                <Avatar className="w-8 h-8">
-                                  <AvatarImage 
-                                    src={getSafeImageUrl(reply.profiles?.avatar_url) || ''} 
-                                    onError={handleImageError}
-                                  />
-                                  <AvatarFallback className="bg-gradient-to-r from-purple-200 to-orange-200 text-xs">
-                                    {getAvatarFallback(reply.profiles?.full_name)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1">
-                                  <div className="bg-gradient-to-r from-purple-50 to-orange-50 rounded-lg p-3">
-                                    <div className="flex items-center space-x-2 mb-1">
-                                      <span className="font-medium text-sm">
-                                        {reply.profiles?.full_name || 'Anonymous'}
-                                      </span>
-                                      <span className="text-xs text-muted-foreground">
-                                        {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
-                                      </span>
-                                    </div>
-                                    <p className="text-sm text-gray-700">{reply.content}</p>
+                {/* Comments List */}
+                <div className="space-y-6">
+                  {post.comments && post.comments.length > 0 ? (
+                    post.comments
+                      .filter(comment => !comment.parent_id)
+                      .map((comment) => {
+                        const replies = post.comments?.filter(c => c.parent_id === comment.id) || [];
+                        
+                        return (
+                          <div key={comment.id} className="space-y-4">
+                            <div className="flex space-x-4">
+                              <Avatar className="w-10 h-10">
+                                <AvatarImage 
+                                  src={getSafeImageUrl(comment.profiles?.avatar_url) || ''} 
+                                  onError={handleImageError}
+                                />
+                                <AvatarFallback className="bg-gradient-to-r from-blue-200 to-green-200">
+                                  {getAvatarFallback(comment.profiles?.full_name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1">
+                                <div className="bg-gray-50 rounded-xl p-4">
+                                  <div className="flex items-center space-x-3 mb-2">
+                                    <span className="font-semibold text-gray-900">
+                                      {comment.profiles?.full_name || 'Anonymous'}
+                                    </span>
+                                    <span className="text-sm text-muted-foreground">
+                                      {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                                    </span>
                                   </div>
-                                  <div className="flex items-center space-x-2 mt-2">
+                                  <p className="text-gray-700">{comment.content}</p>
+                                </div>
+                                <div className="flex items-center space-x-4 mt-3">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => toggleCommentLike(comment.id)}
+                                    className={`h-auto p-2 text-sm transition-colors ${
+                                      comment.user_liked 
+                                        ? 'text-red-500 hover:text-red-600' 
+                                        : 'text-muted-foreground hover:text-orange-500'
+                                    }`}
+                                  >
+                                    <Heart className={`h-4 w-4 mr-1 ${comment.user_liked ? 'fill-current' : ''}`} />
+                                    {comment.likes_count}
+                                  </Button>
+                                  {user && (
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      onClick={() => toggleCommentLike(reply.id)}
-                                      className={`h-auto p-1 text-xs transition-colors ${
-                                        reply.user_liked 
-                                          ? 'text-red-500 hover:text-red-600' 
-                                          : 'text-muted-foreground hover:text-orange-500'
-                                      }`}
+                                      onClick={() => setReplyTo(comment.id)}
+                                      className="h-auto p-2 text-sm text-muted-foreground hover:text-purple-500"
                                     >
-                                      <Heart className={`h-3 w-3 mr-1 ${reply.user_liked ? 'fill-current' : ''}`} />
-                                      {reply.likes_count}
+                                      <Reply className="h-4 w-4 mr-1" />
+                                      Reply
                                     </Button>
-                                  </div>
+                                  )}
                                 </div>
                               </div>
-                            ))}
+                            </div>
+
+                            {/* Threaded Replies */}
+                            {replies.length > 0 && (
+                              <div className="ml-14 space-y-4 pl-6 border-l-2 border-gray-200">
+                                {replies.map(reply => (
+                                  <div key={reply.id} className="flex space-x-3">
+                                    <Avatar className="w-8 h-8">
+                                      <AvatarImage 
+                                        src={getSafeImageUrl(reply.profiles?.avatar_url) || ''} 
+                                        onError={handleImageError}
+                                      />
+                                      <AvatarFallback className="bg-gradient-to-r from-purple-200 to-orange-200 text-xs">
+                                        {getAvatarFallback(reply.profiles?.full_name)}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1">
+                                      <div className="bg-gradient-to-r from-purple-50 to-orange-50 rounded-lg p-3">
+                                        <div className="flex items-center space-x-2 mb-1">
+                                          <span className="font-medium text-sm">
+                                            {reply.profiles?.full_name || 'Anonymous'}
+                                          </span>
+                                          <span className="text-xs text-muted-foreground">
+                                            {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
+                                          </span>
+                                        </div>
+                                        <p className="text-sm text-gray-700">{reply.content}</p>
+                                      </div>
+                                      <div className="flex items-center space-x-2 mt-2">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => toggleCommentLike(reply.id)}
+                                          className={`h-auto p-1 text-xs transition-colors ${
+                                            reply.user_liked 
+                                              ? 'text-red-500 hover:text-red-600' 
+                                              : 'text-muted-foreground hover:text-orange-500'
+                                          }`}
+                                        >
+                                          <Heart className={`h-3 w-3 mr-1 ${reply.user_liked ? 'fill-current' : ''}`} />
+                                          {reply.likes_count}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <MessageCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                  <p>No comments yet. Be the first to comment!</p>
+                        );
+                      })
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <MessageCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                      <p>No comments yet. Be the first to comment!</p>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Right Sidebar */}
+          <div className="w-80 flex-shrink-0">
+            <RightSidebar />
+          </div>
+        </div>
       </div>
     </div>
   );
