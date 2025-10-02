@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
-import { MessageCircle, Heart, Share2, Send, Users, Reply, MoreVertical, UserPlus, BookOpen, Bell } from 'lucide-react';
+import { MessageCircle, Heart, Share2, Send, Users, Reply, MoreVertical, UserPlus, BookOpen, Bell, ArrowLeft } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import EmojiPicker from '@/components/community/EmojiPicker';
 import CourseDiscussionsTab from '@/components/community/CourseDiscussionsTab';
@@ -22,6 +22,7 @@ import { RightSidebar } from '@/components/community/RightSidebar';
 import { fetchCommunityPosts } from '@/services/communityService';
 import { getImagesForPosts } from '@/services/communityImageService';
 import { getFollowStatusForUsers } from '@/services/communityFollowerService';
+import { useNavigate } from 'react-router-dom';
 
 interface CommunityPost {
   id: string;
@@ -84,6 +85,7 @@ interface CommunityMessage {
 
 const CommunityPage = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('feed');
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
@@ -99,12 +101,25 @@ const CommunityPage = () => {
   const [courses, setCourses] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
 
+  // Tab configurations
+  const upperTabs = [
+    { id: 'feed', label: 'Feed', icon: MessageCircle },
+    { id: 'create', label: 'Create Post', icon: Send },
+    { id: 'discussions', label: 'Discussions', icon: BookOpen },
+  ];
+
+  const lowerTabs = [
+    { id: 'chat', label: 'Chat', icon: MessageCircle },
+    { id: 'alerts', label: 'Alerts', icon: Bell }
+  ];
+
   useEffect(() => {
     if (user) {
       fetchPostsEnhanced();
       fetchMessages();
       loadCoursesAndEvents();
-      subscribeToRealtime();
+      const unsubscribe = subscribeToRealtime();
+      return () => unsubscribe();
     }
   }, [user, activeChannel]);
 
@@ -142,10 +157,22 @@ const CommunityPage = () => {
       })
       .subscribe();
 
+    const likesChannel = supabase
+      .channel('post-likes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'post_likes'
+      }, () => {
+        fetchPostsEnhanced();
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(postsChannel);
       supabase.removeChannel(messagesChannel);
       supabase.removeChannel(commentsChannel);
+      supabase.removeChannel(likesChannel);
     };
   };
 
@@ -153,21 +180,35 @@ const CommunityPage = () => {
     try {
       const postsData = await fetchCommunityPosts();
       
-      const mainFeedPosts = postsData.map(post => ({
-        ...post,
-        profiles: post.profiles ? {
-          id: post.profiles.id,
-          full_name: post.profiles.full_name || 'Anonymous',
-          username: post.profiles.username || 'user', 
-          avatar_url: post.profiles.avatar_url || '',
-          is_following: post.profiles.is_following,
-          followers_count: post.profiles.followers_count,
-          following_count: post.profiles.following_count
-        } : null,
-        images: post.images || []
-      }));
+      const postsWithDetails = await Promise.all(
+        postsData.map(async (post) => {
+          // Fetch likes count and user like status for each post
+          const [likesResult, userLikeResult, commentsResult] = await Promise.all([
+            supabase.from('post_likes').select('id').eq('post_id', post.id),
+            user ? supabase.from('post_likes').select('id').eq('post_id', post.id).eq('user_id', user.id).single() : Promise.resolve({ data: null }),
+            supabase.from('post_comments').select('id').eq('post_id', post.id)
+          ]);
+
+          return {
+            ...post,
+            profiles: post.profiles ? {
+              id: post.profiles.id,
+              full_name: post.profiles.full_name || 'Anonymous',
+              username: post.profiles.username || 'user', 
+              avatar_url: post.profiles.avatar_url || '',
+              is_following: post.profiles.is_following,
+              followers_count: post.profiles.followers_count,
+              following_count: post.profiles.following_count
+            } : null,
+            images: post.images || [],
+            likes_count: likesResult.data?.length || 0,
+            user_liked: !!userLikeResult.data,
+            comments_count: commentsResult.data?.length || 0
+          };
+        })
+      );
       
-      setPosts(mainFeedPosts);
+      setPosts(postsWithDetails);
     } catch (error) {
       console.error('Error fetching posts:', error);
       toast.error('Failed to load community posts');
@@ -354,7 +395,10 @@ const CommunityPage = () => {
     }
   };
 
-  const toggleComments = (postId: string) => {
+  const toggleComments = (postId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
     setShowComments(prev => ({ ...prev, [postId]: !prev[postId] }));
     if (!comments[postId]) {
       fetchComments(postId);
@@ -415,18 +459,29 @@ const CommunityPage = () => {
     }
   };
 
+  const handlePostClick = (postId: string) => {
+    navigate(`/community/post/${postId}`);
+  };
+
   const renderFeed = () => (
     <div className="space-y-4">
       <div className="space-y-4">
         {posts
           .sort((a, b) => (b.profiles?.followers_count || 0) - (a.profiles?.followers_count || 0))
           .map((post) => (
-          <Card key={post.id} className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group">
+          <Card 
+            key={post.id} 
+            className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group cursor-pointer"
+            onClick={() => handlePostClick(post.id)}
+          >
             <CardHeader className="pb-3 border-b border-gray-100">
               <div className="flex items-start space-x-3">
                 <Avatar 
                   className="w-12 h-12 cursor-pointer ring-2 ring-white shadow-md hover:ring-purple-200 transition-all" 
-                  onClick={() => setShowFollowers({ userId: post.user_id, tab: 'followers' })}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowFollowers({ userId: post.user_id, tab: 'followers' });
+                  }}
                 >
                   <AvatarImage src={post.profiles?.avatar_url} />
                   <AvatarFallback className="bg-gradient-to-br from-orange-400 to-purple-600 text-white font-semibold">
@@ -458,7 +513,10 @@ const CommunityPage = () => {
                       <>
                         <span>•</span>
                         <button 
-                          onClick={() => setShowFollowers({ userId: post.user_id, tab: 'followers' })}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowFollowers({ userId: post.user_id, tab: 'followers' });
+                          }}
                           className="flex items-center gap-1 text-purple-600 hover:text-purple-700 font-semibold transition-colors"
                         >
                           <Users className="h-3 w-3" />
@@ -498,7 +556,10 @@ const CommunityPage = () => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => toggleLike(post.id, 'like')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleLike(post.id, 'like');
+                    }}
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                       post.user_liked 
                         ? 'text-red-600 bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100' 
@@ -511,7 +572,7 @@ const CommunityPage = () => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => toggleComments(post.id)}
+                    onClick={(e) => toggleComments(post.id, e)}
                     className="px-4 py-2 rounded-full text-sm font-medium text-gray-600 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all"
                   >
                     <MessageCircle className="h-4 w-4 mr-2" />
@@ -520,7 +581,10 @@ const CommunityPage = () => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleSharePost(post)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSharePost(post);
+                    }}
                     className="px-4 py-2 rounded-full text-sm font-medium text-gray-600 hover:bg-gradient-to-r hover:from-green-50 hover:to-teal-50 transition-all"
                   >
                     <Share2 className="h-4 w-4 mr-2" />
@@ -530,7 +594,10 @@ const CommunityPage = () => {
               </div>
 
               {showComments[post.id] && (
-                <div className="mt-4 pt-4 border-t border-gray-100 space-y-4">
+                <div 
+                  className="mt-4 pt-4 border-t border-gray-100 space-y-4"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   {user && (
                     <div className="flex space-x-3">
                       <Avatar className="w-9 h-9">
@@ -603,12 +670,12 @@ const CommunityPage = () => {
                                   size="sm"
                                   onClick={() => toggleCommentLike(comment.id, post.id)}
                                   className={`h-auto p-1 text-xs transition-colors ${
-                                    commentLikes[comment.id] 
+                                    comment.user_liked 
                                       ? 'text-red-500 hover:text-red-600' 
                                       : 'text-muted-foreground hover:text-orange-500'
                                   }`}
                                 >
-                                  <Heart className={`h-3 w-3 mr-1 ${commentLikes[comment.id] ? 'fill-current' : ''}`} />
+                                  <Heart className={`h-3 w-3 mr-1 ${comment.user_liked ? 'fill-current' : ''}`} />
                                   {comment.likes_count || 0}
                                 </Button>
                                 <Button
@@ -651,12 +718,12 @@ const CommunityPage = () => {
                                         size="sm"
                                         onClick={() => toggleCommentLike(reply.id, post.id)}
                                         className={`h-auto p-1 text-[10px] transition-colors ${
-                                          commentLikes[reply.id] 
+                                          reply.user_liked 
                                             ? 'text-red-500 hover:text-red-600' 
                                             : 'text-muted-foreground hover:text-orange-500'
                                         }`}
                                       >
-                                        <Heart className={`h-2.5 w-2.5 mr-1 ${commentLikes[reply.id] ? 'fill-current' : ''}`} />
+                                        <Heart className={`h-2.5 w-2.5 mr-1 ${reply.user_liked ? 'fill-current' : ''}`} />
                                         {reply.likes_count || 0}
                                       </Button>
                                     </div>
@@ -680,6 +747,12 @@ const CommunityPage = () => {
               <MessageCircle className="h-16 w-16 mx-auto mb-4 text-gray-400" />
               <h3 className="text-lg font-semibold mb-2 text-gray-600">No posts yet</h3>
               <p className="text-gray-500 mb-4">Be the first to share something with the community!</p>
+              <Button 
+                onClick={() => setActiveTab('create')}
+                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+              >
+                Create First Post
+              </Button>
             </CardContent>
           </Card>
         )}
@@ -759,16 +832,10 @@ const CommunityPage = () => {
           <div className="flex gap-6 max-w-7xl mx-auto px-4">
             {/* Main Content Area */}
             <div className="flex-1 min-w-0">
-              {/* Modern Gradient Tabs */}
+              {/* Upper Tabs - Fixed Navigation */}
               <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-lg rounded-2xl border border-gray-200 shadow-lg mb-6 overflow-hidden">
                 <div className="flex overflow-x-auto hide-scrollbar">
-                  {[
-                    { id: 'feed', label: 'Feed', icon: MessageCircle },
-                    { id: 'create', label: 'Create Post', icon: Send },
-                    { id: 'discussions', label: 'Discussions', icon: BookOpen },
-                    { id: 'chat', label: 'Chat', icon: MessageCircle },
-                    { id: 'alerts', label: 'Alerts', icon: Bell }
-                  ].map(({ id, label, icon: Icon }) => (
+                  {upperTabs.map(({ id, label, icon: Icon }) => (
                     <button
                       key={id}
                       onClick={() => setActiveTab(id)}
@@ -779,6 +846,26 @@ const CommunityPage = () => {
                       }`}
                     >
                       <Icon className="h-5 w-5" />
+                      <span>{label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Lower Tabs */}
+              <div className="sticky top-20 z-40 bg-white/80 backdrop-blur-lg rounded-xl border border-gray-200 shadow-md mb-6 overflow-hidden">
+                <div className="flex overflow-x-auto hide-scrollbar">
+                  {lowerTabs.map(({ id, label, icon: Icon }) => (
+                    <button
+                      key={id}
+                      onClick={() => setActiveTab(id)}
+                      className={`flex items-center justify-center space-x-2 px-6 py-3 text-sm font-medium transition-all duration-300 flex-1 min-w-[100px] ${
+                        activeTab === id
+                          ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white'
+                          : 'text-gray-600 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-gray-900'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
                       <span>{label}</span>
                     </button>
                   ))}
