@@ -63,46 +63,34 @@ const PostDetailPage = () => {
   const [replyTo, setReplyTo] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
 
-  console.log('PostDetailPage - postId:', postId); // Debug log
+  console.log('PostDetailPage - postId from useParams:', postId);
 
   useEffect(() => {
-    if (postId) {
-      console.log('Fetching post detail for:', postId); // Debug log
+    // Check if we have a valid postId from URL
+    if (postId && isValidUUID(postId)) {
+      console.log('Valid postId found, fetching post:', postId);
       fetchPostDetail();
     } else {
-      console.error('No postId found in URL params');
-      toast.error('Post ID is missing');
+      console.error('Invalid or missing postId:', postId);
+      toast.error('Invalid post URL');
       setLoading(false);
     }
   }, [postId]);
 
+  // Validate UUID format
+  const isValidUUID = (uuid: string) => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(uuid);
+  };
+
   const fetchPostDetail = async () => {
-    if (!postId) {
-      console.error('postId is undefined');
-      return;
-    }
+    if (!postId) return;
 
     try {
       setLoading(true);
-      console.log('Starting to fetch post:', postId); // Debug log
+      console.log('Fetching post details for:', postId);
       
-      // First, let's check if the post exists with a simple query
-      const { data: postExists, error: existsError } = await supabase
-        .from('community_posts')
-        .select('id')
-        .eq('id', postId)
-        .single();
-
-      if (existsError || !postExists) {
-        console.error('Post not found or error:', existsError);
-        toast.error('Post not found');
-        setLoading(false);
-        return;
-      }
-
-      console.log('Post exists, fetching full details...'); // Debug log
-
-      // Fetch post with profile data using a simpler approach
+      // Fetch post with profile data
       const { data: postData, error: postError } = await supabase
         .from('community_posts')
         .select(`
@@ -118,31 +106,27 @@ const PostDetailPage = () => {
         .single();
 
       if (postError) {
-        console.error('Error fetching post details:', postError);
+        console.error('Error fetching post:', postError);
         throw postError;
       }
 
       if (!postData) {
-        console.error('No post data returned');
+        console.error('No post data returned for ID:', postId);
         toast.error('Post not found');
         setLoading(false);
         return;
       }
 
-      console.log('Post data fetched:', postData); // Debug log
+      console.log('Post data found:', postData);
 
       // Fetch images
-      const { data: imagesData, error: imagesError } = await supabase
+      const { data: imagesData } = await supabase
         .from('post_images')
         .select('*')
         .eq('post_id', postId)
         .order('upload_order', { ascending: true });
 
-      if (imagesError) {
-        console.error('Error fetching images:', imagesError);
-      }
-
-      // Fetch likes count - use count() instead of select()
+      // Fetch likes count using count method (avoids 406 errors)
       const { count: likesCount, error: likesError } = await supabase
         .from('post_likes')
         .select('*', { count: 'exact', head: true })
@@ -152,29 +136,23 @@ const PostDetailPage = () => {
         console.error('Error fetching likes count:', likesError);
       }
 
-      // Check if current user liked this post - use a different approach
+      // Check if current user liked this post - use simpler query
       let userLiked = false;
-      if (user) {
-        const { data: userLikeData, error: userLikeError } = await supabase
+      if (user && user.id) {
+        const { data: userLikeData } = await supabase
           .from('post_likes')
           .select('id')
           .eq('post_id', postId)
           .eq('user_id', user.id);
 
-        if (!userLikeError && userLikeData && userLikeData.length > 0) {
-          userLiked = true;
-        }
+        userLiked = !!(userLikeData && userLikeData.length > 0);
       }
 
       // Fetch comments count
-      const { count: commentsCount, error: commentsError } = await supabase
+      const { count: commentsCount } = await supabase
         .from('post_comments')
         .select('*', { count: 'exact', head: true })
         .eq('post_id', postId);
-
-      if (commentsError) {
-        console.error('Error fetching comments count:', commentsError);
-      }
 
       const initialPost: PostDetail = {
         ...postData,
@@ -185,7 +163,6 @@ const PostDetailPage = () => {
         comments: []
       };
 
-      console.log('Initial post set:', initialPost); // Debug log
       setPost(initialPost);
       
       // Fetch comments
@@ -193,7 +170,7 @@ const PostDetailPage = () => {
 
     } catch (error) {
       console.error('Error in fetchPostDetail:', error);
-      toast.error('Failed to load post details');
+      toast.error('Failed to load post');
     } finally {
       setLoading(false);
     }
@@ -203,8 +180,6 @@ const PostDetailPage = () => {
     if (!postId) return;
 
     try {
-      console.log('Fetching comments for post:', postId); // Debug log
-      
       const { data: commentsData, error } = await supabase
         .from('post_comments')
         .select('*')
@@ -216,8 +191,6 @@ const PostDetailPage = () => {
         return;
       }
 
-      console.log('Raw comments data:', commentsData); // Debug log
-
       if (!commentsData || commentsData.length === 0) {
         setPost(prev => prev ? { ...prev, comments: [] } : null);
         return;
@@ -226,21 +199,14 @@ const PostDetailPage = () => {
       // Get unique user IDs from comments
       const userIds = [...new Set(commentsData.map(comment => comment.user_id).filter(Boolean))];
       
-      console.log('User IDs for comments:', userIds); // Debug log
-
       // Fetch user profiles
       let profilesData = [];
       if (userIds.length > 0) {
-        const { data: profiles, error: profilesError } = await supabase
+        const { data: profiles } = await supabase
           .from('profiles')
           .select('id, full_name, username, avatar_url')
           .in('id', userIds);
-
-        if (profilesError) {
-          console.error('Error fetching profiles:', profilesError);
-        } else {
-          profilesData = profiles || [];
-        }
+        profilesData = profiles || [];
       }
 
       // Fetch comment likes
@@ -249,18 +215,14 @@ const PostDetailPage = () => {
           const profile = profilesData.find(p => p.id === comment.user_id);
           
           // Get total likes for this comment using count
-          const { count: likesCount, error: likesError } = await supabase
+          const { count: likesCount } = await supabase
             .from('comment_likes')
             .select('*', { count: 'exact', head: true })
             .eq('comment_id', comment.id);
 
-          if (likesError) {
-            console.error('Error fetching comment likes:', likesError);
-          }
-
           // Check if current user liked this comment
           let userLiked = false;
-          if (user) {
+          if (user && user.id) {
             const { data: userLikeData } = await supabase
               .from('comment_likes')
               .select('id')
@@ -278,8 +240,6 @@ const PostDetailPage = () => {
           };
         })
       );
-
-      console.log('Comments with details:', commentsWithDetails); // Debug log
 
       setPost(prev => prev ? {
         ...prev,
@@ -309,7 +269,7 @@ const PostDetailPage = () => {
 
         setPost(prev => prev ? {
           ...prev,
-          likes_count: Math.max(0, (prev.likes_count || 0) - 1),
+          likes_count: Math.max(0, prev.likes_count - 1),
           user_liked: false
         } : null);
       } else {
@@ -326,7 +286,7 @@ const PostDetailPage = () => {
 
         setPost(prev => prev ? {
           ...prev,
-          likes_count: (prev.likes_count || 0) + 1,
+          likes_count: prev.likes_count + 1,
           user_liked: true
         } : null);
       }
@@ -410,7 +370,7 @@ const PostDetailPage = () => {
           ...prev,
           comments: prev.comments?.map(c => 
             c.id === commentId 
-              ? { ...c, likes_count: Math.max(0, (c.likes_count || 0) - 1), user_liked: false }
+              ? { ...c, likes_count: Math.max(0, c.likes_count - 1), user_liked: false }
               : c
           )
         } : null);
@@ -430,7 +390,7 @@ const PostDetailPage = () => {
           ...prev,
           comments: prev.comments?.map(c => 
             c.id === commentId 
-              ? { ...c, likes_count: (c.likes_count || 0) + 1, user_liked: true }
+              ? { ...c, likes_count: c.likes_count + 1, user_liked: true }
               : c
           )
         } : null);
@@ -445,12 +405,11 @@ const PostDetailPage = () => {
 
     try {
       const shareUrl = `${window.location.origin}/community/post/${post.id}`;
-      const shareText = post.title ? `Check out this post: ${post.title}` : 'Check out this post';
       
       if (navigator.share) {
         await navigator.share({
           title: post.title || 'Community Post',
-          text: shareText,
+          text: post.content?.substring(0, 100) || 'Check out this post',
           url: shareUrl,
         });
         toast.success('Post shared successfully!');
@@ -458,7 +417,7 @@ const PostDetailPage = () => {
         await navigator.clipboard.writeText(shareUrl);
         toast.success('Link copied to clipboard!');
       } else {
-        // Fallback for browsers without clipboard API
+        // Fallback
         const textArea = document.createElement('textarea');
         textArea.value = shareUrl;
         document.body.appendChild(textArea);
@@ -481,17 +440,6 @@ const PostDetailPage = () => {
 
   const getSafeAvatarUrl = (url: string | null | undefined) => {
     if (!url) return '';
-    
-    // Fix common image URL issues
-    if (url.startsWith('http')) {
-      return url;
-    }
-    
-    // Handle Supabase storage URLs
-    if (url.includes('supabase.co')) {
-      return url;
-    }
-    
     return url;
   };
 
@@ -510,8 +458,8 @@ const PostDetailPage = () => {
           <CardContent className="p-8 text-center">
             <MessageCircle className="h-16 w-16 mx-auto mb-4 text-gray-400" />
             <h2 className="text-2xl font-bold mb-4">Post Not Found</h2>
-            <p className="text-gray-600 mb-6">Post ID: {postId}</p>
-            <p className="text-gray-600 mb-6">The post you're looking for doesn't exist or has been removed.</p>
+            <p className="text-gray-600 mb-2">Post ID: {postId}</p>
+            <p className="text-gray-600 mb-6">The post may have been deleted or the URL is incorrect.</p>
             <Button 
               onClick={() => navigate('/community')}
               className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
@@ -546,7 +494,6 @@ const PostDetailPage = () => {
                   src={getSafeAvatarUrl(post.profiles?.avatar_url)} 
                   alt={post.profiles?.full_name || 'User'}
                   onError={(e) => {
-                    // Hide broken images
                     const target = e.target as HTMLImageElement;
                     target.style.display = 'none';
                   }}
@@ -556,12 +503,10 @@ const PostDetailPage = () => {
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <h4 className="font-bold text-gray-900 truncate">
-                      {post.profiles?.full_name || 'Anonymous'}
-                    </h4>
-                  </div>
+                <div className="flex items-center gap-2 min-w-0">
+                  <h4 className="font-bold text-gray-900 truncate">
+                    {post.profiles?.full_name || 'Anonymous'}
+                  </h4>
                 </div>
                 <div className="flex items-center flex-wrap gap-2 text-xs text-gray-500 mt-1">
                   <span className="font-medium">@{post.profiles?.username || 'user'}</span>
