@@ -234,7 +234,7 @@ const CommunityPage = () => {
             ...post,
             profiles: post.profiles ? {
               id: post.profiles.id,
-              full_name: post.profiles.full_name || 'Anonymous',
+              full_name: post.profiles.full_name,
               username: post.profiles.username || 'user', 
               avatar_url: post.profiles.avatar_url || '',
               is_following: post.profiles.is_following,
