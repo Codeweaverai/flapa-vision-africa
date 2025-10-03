@@ -142,16 +142,31 @@ export const CommunitySidebar = () => {
         <div className="h-20 bg-gradient-to-r from-orange-400 to-purple-600"></div>
         <CardContent className="p-6 -mt-12">
           <div className="flex flex-col items-center">
-            <Avatar className="w-20 h-20 ring-4 ring-white shadow-lg cursor-pointer" onClick={() => navigate('/profile')}>
-              <AvatarImage src={currentUserProfile?.avatar_url} />
-              <AvatarFallback className="bg-gradient-to-br from-orange-500 to-purple-600 text-white text-xl">
-                {currentUserProfile?.full_name?.charAt(0) || 'U'}
-              </AvatarFallback>
-            </Avatar>
+            {/* ✅ UPDATED: Current user avatar with anchor tag */}
+            <a href={`/creator/profile/${user.id}`} className="cursor-pointer">
+              <Avatar className="w-20 h-20 ring-4 ring-white shadow-lg hover:ring-purple-200 transition-all">
+                <AvatarImage src={currentUserProfile?.avatar_url} />
+                <AvatarFallback className="bg-gradient-to-br from-orange-500 to-purple-600 text-white text-xl">
+                  {currentUserProfile?.full_name?.charAt(0) || 'U'}
+                </AvatarFallback>
+              </Avatar>
+            </a>
             
             <div className="text-center mt-3 space-y-1">
-              <h3 className="font-bold text-gray-900 text-lg">{currentUserProfile?.full_name}</h3>
-              <p className="text-sm text-gray-600">@{currentUserProfile?.username}</p>
+              {/* ✅ UPDATED: Current user name with anchor tag */}
+              <a 
+                href={`/creator/profile/${user.id}`}
+                className="font-bold text-gray-900 text-lg hover:text-purple-600 transition-colors cursor-pointer block"
+              >
+                {currentUserProfile?.full_name}
+              </a>
+              {/* ✅ UPDATED: Current username with anchor tag */}
+              <a 
+                href={`/creator/profile/${user.id}`}
+                className="text-sm text-gray-600 hover:text-purple-600 transition-colors cursor-pointer block"
+              >
+                @{currentUserProfile?.username}
+              </a>
               
               {currentUserProfile && (
                 <Badge 
@@ -211,22 +226,32 @@ export const CommunitySidebar = () => {
                 key={suggestedUser.id} 
                 className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 transition-all duration-200 group"
               >
-                <Avatar 
-                  className="w-10 h-10 cursor-pointer ring-2 ring-transparent group-hover:ring-purple-200 transition-all"
-                  onClick={() => navigate(`/creator/${suggestedUser.id}`)}
-                >
-                  <AvatarImage src={suggestedUser.avatar_url} />
-                  <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-500 text-white text-sm">
-                    {suggestedUser.full_name?.charAt(0) || 'U'}
-                  </AvatarFallback>
-                </Avatar>
+                {/* ✅ UPDATED: Suggested user avatar with anchor tag */}
+                <a href={`/creator/profile/${suggestedUser.id}`} className="cursor-pointer">
+                  <Avatar className="w-10 h-10 ring-2 ring-transparent group-hover:ring-purple-200 transition-all">
+                    <AvatarImage src={suggestedUser.avatar_url} />
+                    <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-500 text-white text-sm">
+                      {suggestedUser.full_name?.charAt(0) || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                </a>
                 
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm text-gray-900 truncate">
+                  {/* ✅ UPDATED: Suggested user name with anchor tag */}
+                  <a 
+                    href={`/creator/profile/${suggestedUser.id}`}
+                    className="font-semibold text-sm text-gray-900 truncate hover:text-purple-600 transition-colors cursor-pointer block"
+                  >
                     {suggestedUser.full_name}
-                  </p>
+                  </a>
                   <div className="flex items-center space-x-2">
-                    <p className="text-xs text-gray-500 truncate">@{suggestedUser.username}</p>
+                    {/* ✅ UPDATED: Suggested username with anchor tag */}
+                    <a 
+                      href={`/creator/profile/${suggestedUser.id}`}
+                      className="text-xs text-gray-500 truncate hover:text-purple-600 transition-colors cursor-pointer"
+                    >
+                      @{suggestedUser.username}
+                    </a>
                     {isCreator(suggestedUser.role) && (
                       <Crown className="w-3 h-3 text-orange-500" />
                     )}
