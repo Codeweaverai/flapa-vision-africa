@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import { MessageCircle, Heart, Share2, Send, Reply, ArrowLeft, Image as ImageIco
 import { formatDistanceToNow } from 'date-fns';
 import { RightSidebar } from '@/components/community/RightSidebar';
 import { UserFollowButton } from '@/components/community/UserFollowButton';
+import Layout from '@/components/layout/Layout';
 
 interface PostDetail {
   id: string;
@@ -60,9 +61,10 @@ interface Comment {
   user_liked: boolean;
 }
 
-// Left Sidebar - Discover People Component (fixed with correct table)
+// Left Sidebar - Discover People Component
 const DiscoverPeople = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [people, setPeople] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -76,7 +78,6 @@ const DiscoverPeople = () => {
     try {
       if (!user?.id) return;
 
-      // Get profiles excluding current user
       const { data: profiles, error } = await supabase
         .from('profiles')
         .select('id, full_name, username, avatar_url, bio')
@@ -86,16 +87,13 @@ const DiscoverPeople = () => {
       if (error) throw error;
 
       if (profiles) {
-        // Get follower counts and follow status for each profile using community_followers table
         const profilesWithDetails = await Promise.all(
           profiles.map(async (profile) => {
-            // Get follower count from community_followers
             const { count: followersCount } = await supabase
               .from('community_followers')
               .select('*', { count: 'exact', head: true })
               .eq('following_id', profile.id);
 
-            // Check if current user is following this profile using community_followers
             const { data: followStatus } = await supabase
               .from('community_followers')
               .select('id')
@@ -111,7 +109,6 @@ const DiscoverPeople = () => {
           })
         );
 
-        // Sort by follower count (highest first)
         const sortedProfiles = profilesWithDetails.sort((a, b) => 
           (b.followers_count || 0) - (a.followers_count || 0)
         );
@@ -131,7 +128,6 @@ const DiscoverPeople = () => {
 
     try {
       if (isFollowing) {
-        // Follow user in community_followers table
         const { error } = await supabase
           .from('community_followers')
           .insert({
@@ -141,7 +137,6 @@ const DiscoverPeople = () => {
 
         if (error) throw error;
         
-        // Update local state
         setPeople(prev => prev.map(person => 
           person.id === userId 
             ? { 
@@ -154,7 +149,6 @@ const DiscoverPeople = () => {
         
         toast.success('User followed successfully!');
       } else {
-        // Unfollow user from community_followers table
         const { error } = await supabase
           .from('community_followers')
           .delete()
@@ -163,7 +157,6 @@ const DiscoverPeople = () => {
 
         if (error) throw error;
         
-        // Update local state
         setPeople(prev => prev.map(person => 
           person.id === userId 
             ? { 
@@ -196,6 +189,10 @@ const DiscoverPeople = () => {
 
   const getAvatarFallback = (name?: string) => {
     return name ? name.charAt(0).toUpperCase() : 'U';
+  };
+
+  const handleUserClick = (userId: string) => {
+    navigate(`/creator/profile/${userId}`);
   };
 
   if (loading) {
@@ -239,8 +236,11 @@ const DiscoverPeople = () => {
         <div className="space-y-4">
           {people.map((person) => (
             <div key={person.id} className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <Avatar className="w-10 h-10 cursor-pointer">
+              <div 
+                className="flex items-center space-x-3 cursor-pointer flex-1 min-w-0"
+                onClick={() => handleUserClick(person.id)}
+              >
+                <Avatar className="w-10 h-10 hover:ring-2 hover:ring-purple-200 transition-all">
                   <AvatarImage 
                     src={getSafeImageUrl(person.avatar_url) || ''} 
                     alt={person.full_name}
@@ -250,7 +250,7 @@ const DiscoverPeople = () => {
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm text-gray-900 truncate">
+                  <p className="font-medium text-sm text-gray-900 truncate hover:text-purple-600 transition-colors mt-2">
                     {person.full_name || 'Anonymous'}
                   </p>
                   <p className="text-xs text-gray-500 truncate">@{person.username || 'user'}</p>
@@ -262,15 +262,22 @@ const DiscoverPeople = () => {
                   )}
                 </div>
               </div>
-              <UserFollowButton
-                userId={person.id}
-                isFollowing={person.is_following || false}
-                onFollowChange={handleFollowChange}
-                size="sm"
-                showCount={false}
-                variant="outline"
-                className="text-xs px-3 py-1 h-auto border-purple-200 text-purple-600 hover:bg-purple-50"
-              />
+              <div className="ml-3 mt-2">
+                <Button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleFollowChange(person.id, !person.is_following);
+                  }}
+                  size="sm"
+                  className={`text-xs px-3 py-1 h-auto transition-all duration-200 ${
+                    person.is_following 
+                      ? 'bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700' 
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  {person.is_following ? 'Following' : 'Follow'}
+                </Button>
+              </div>
             </div>
           ))}
         </div>
@@ -676,6 +683,10 @@ const PostDetailPage = () => {
     target.style.display = 'none';
   };
 
+  const handleUserProfileClick = (userId: string) => {
+    navigate(`/creator/profile/${userId}`);
+  };
+
   // Updated PostImageGallery with click handler to route to detail page
   const PostImageGallery = ({ images }: { images: any[] }) => {
     if (!images || images.length === 0) return null;
@@ -725,321 +736,344 @@ const PostDetailPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-orange-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
+      <Layout>
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-orange-50 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </Layout>
     );
   }
 
   if (!post) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-orange-50 flex items-center justify-center">
-        <Card className="max-w-md mx-4">
-          <CardContent className="p-8 text-center">
-            <MessageCircle className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-            <h2 className="text-2xl font-bold mb-4">Post Not Found</h2>
-            <p className="text-gray-600 mb-6">The post may have been deleted or the URL is incorrect.</p>
-            <Button 
-              onClick={() => navigate('/community')}
-              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-            >
-              Back to Community
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <Layout>
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-orange-50 flex items-center justify-center">
+          <Card className="max-w-md mx-4">
+            <CardContent className="p-8 text-center">
+              <MessageCircle className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+              <h2 className="text-2xl font-bold mb-4">Post Not Found</h2>
+              <p className="text-gray-600 mb-6">The post may have been deleted or the URL is incorrect.</p>
+              <Button 
+                onClick={() => navigate('/community')}
+                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
+              >
+                Back to Community
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-orange-50 py-8">
-      <div className="max-w-7xl mx-auto px-4">
-        {/* Back Button */}
-        <div className="mb-6">
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/community')}
-            className="flex items-center gap-2 hover:bg-white/80 transition-colors duration-200"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Community
-          </Button>
-        </div>
-
-        <div className="flex gap-6">
-          {/* Left Sidebar - Discover People (fixed implementation) */}
-          <div className="w-80 flex-shrink-0">
-            <DiscoverPeople />
+    <Layout>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-orange-50 py-8">
+        <div className="max-w-7xl mx-auto px-4">
+          {/* Back Button - Updated with orange-purple gradient */}
+          <div className="mb-6">
+            <Button
+              onClick={() => navigate('/community')}
+              className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white transition-all duration-200 shadow-md hover:shadow-lg"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Community
+            </Button>
           </div>
 
-          {/* Main Content - Reduced Width */}
-          <div className="flex-1 max-w-2xl">
-            {/* Post Card */}
-            <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg mb-6 hover:shadow-xl transition-all duration-300">
-              <CardHeader className="pb-3 border-b border-gray-100">
-                <div className="flex items-start space-x-3">
-                  <Avatar className="w-12 h-12 cursor-pointer ring-2 ring-white shadow-md hover:ring-purple-200 transition-all">
-                    <AvatarImage 
-                      src={getSafeImageUrl(post.profiles?.avatar_url) || ''} 
-                      alt={post.profiles?.full_name || 'User'}
-                      onError={handleImageError}
-                    />
-                    <AvatarFallback className="bg-gradient-to-br from-orange-400 to-purple-600 text-white font-semibold">
-                      {getAvatarFallback(post.profiles?.full_name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <h4 className="font-bold text-gray-900 truncate">
-                        {post.profiles?.full_name || 'Anonymous'}
-                      </h4>
-                    </div>
-                    <div className="flex items-center flex-wrap gap-2 text-xs text-gray-500 mt-1">
-                      <span className="font-medium">@{post.profiles?.username || 'user'}</span>
-                      <span>•</span>
-                      <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
-                    </div>
-                  </div>
-                </div>
-                {post.title && (
-                  <h1 className="text-2xl font-bold text-gray-900 mt-4 leading-tight">{post.title}</h1>
-                )}
-              </CardHeader>
-              <CardContent className="pt-6 pb-6">
-                <p className="text-gray-700 text-lg leading-relaxed whitespace-pre-wrap mb-6">
-                  {post.content}
-                </p>
-                
-                {/* Images Section with click handling */}
-                {post.images && post.images.length > 0 ? (
-                  <PostImageGallery images={post.images} />
-                ) : (
-                  <div className="mt-4 text-center text-gray-500 py-8 border border-dashed border-gray-300 rounded-lg">
-                    <ImageIcon className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                    <p>No images in this post</p>
-                  </div>
-                )}
-                
-                <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-100">
-                  <div className="flex items-center gap-4">
-                    <Button
-                      variant="ghost"
-                      size="lg"
-                      onClick={toggleLike}
-                      disabled={submitting}
-                      className={`px-6 py-3 rounded-full text-base font-medium transition-all duration-200 ${
-                        post.user_liked 
-                          ? 'text-red-600 bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100' 
-                          : 'text-gray-600 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50'
-                      }`}
-                    >
-                      <Heart className={`h-5 w-5 mr-2 ${post.user_liked ? 'fill-current' : ''}`} />
-                      <span>{post.likes_count}</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="lg"
-                      className="px-6 py-3 rounded-full text-base font-medium text-gray-600 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200"
-                    >
-                      <MessageCircle className="h-5 w-5 mr-2" />
-                      <span>{post.comments_count} comments</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="lg"
-                      onClick={handleSharePost}
-                      className="px-6 py-3 rounded-full text-base font-medium text-gray-600 hover:bg-gradient-to-r hover:from-green-50 hover:to-teal-50 transition-all duration-200"
-                    >
-                      <Share2 className="h-5 w-5 mr-2" />
-                      Share
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          <div className="flex gap-6">
+            {/* Left Sidebar - Discover People */}
+            <div className="w-80 flex-shrink-0">
+              <DiscoverPeople />
+            </div>
 
-            {/* Comments Section */}
-            <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg hover:shadow-xl transition-all duration-300">
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold text-gray-900 mb-6">
-                  Comments ({post.comments_count})
-                </h3>
-                
-                {/* Add Comment */}
-                {user && (
-                  <div className="flex space-x-4 mb-8">
-                    <Avatar className="w-10 h-10">
+            {/* Main Content - Reduced Width */}
+            <div className="flex-1 max-w-2xl">
+              {/* Post Card */}
+              <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg mb-6 hover:shadow-xl transition-all duration-300">
+                <CardHeader className="pb-3 border-b border-gray-100">
+                  <div className="flex items-start space-x-3">
+                    <Avatar 
+                      className="w-12 h-12 cursor-pointer ring-2 ring-white shadow-md hover:ring-purple-200 transition-all"
+                      onClick={() => post.profiles && handleUserProfileClick(post.profiles.id)}
+                    >
                       <AvatarImage 
-                        src={getSafeImageUrl(user.user_metadata?.avatar_url) || ''} 
+                        src={getSafeImageUrl(post.profiles?.avatar_url) || ''} 
+                        alt={post.profiles?.full_name || 'User'}
                         onError={handleImageError}
                       />
                       <AvatarFallback className="bg-gradient-to-br from-orange-400 to-purple-600 text-white font-semibold">
-                        {getAvatarFallback(user.user_metadata?.full_name)}
+                        {getAvatarFallback(post.profiles?.full_name)}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="flex-1 space-y-3">
-                      {replyTo && (
-                        <div className="text-sm text-muted-foreground bg-blue-50 rounded-lg p-3">
-                          Replying to comment...
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setReplyTo('')}
-                            className="ml-2 h-auto p-0 text-xs"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      )}
-                      <div className="flex space-x-3">
-                        <Textarea
-                          placeholder="Write a comment..."
-                          value={newComment}
-                          onChange={(e) => setNewComment(e.target.value)}
-                          className="min-h-[80px] resize-none border-gray-200 text-base focus:border-purple-300 transition-colors duration-200"
-                          disabled={submitting}
-                        />
-                        <Button
-                          onClick={addComment}
-                          disabled={!newComment.trim() || submitting}
-                          size="lg"
-                          className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 h-auto px-6 transition-all duration-200"
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <h4 
+                          className="font-bold text-gray-900 truncate cursor-pointer hover:text-purple-600 transition-colors"
+                          onClick={() => post.profiles && handleUserProfileClick(post.profiles.id)}
                         >
-                          <Send className="h-5 w-5" />
-                        </Button>
+                          {post.profiles?.full_name || 'Anonymous'}
+                        </h4>
+                      </div>
+                      <div className="flex items-center flex-wrap gap-2 text-xs text-gray-500 mt-1">
+                        <span className="font-medium">@{post.profiles?.username || 'user'}</span>
+                        <span>•</span>
+                        <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
                       </div>
                     </div>
                   </div>
-                )}
+                  {post.title && (
+                    <h1 className="text-2xl font-bold text-gray-900 mt-4 leading-tight">{post.title}</h1>
+                  )}
+                </CardHeader>
+                <CardContent className="pt-6 pb-6">
+                  <p className="text-gray-700 text-lg leading-relaxed whitespace-pre-wrap mb-6">
+                    {post.content}
+                  </p>
+                  
+                  {/* Images Section with click handling */}
+                  {post.images && post.images.length > 0 ? (
+                    <PostImageGallery images={post.images} />
+                  ) : (
+                    <div className="mt-4 text-center text-gray-500 py-8 border border-dashed border-gray-300 rounded-lg">
+                      <ImageIcon className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                      <p>No images in this post</p>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-100">
+                    <div className="flex items-center gap-4">
+                      <Button
+                        variant="ghost"
+                        size="lg"
+                        onClick={toggleLike}
+                        disabled={submitting}
+                        className={`px-6 py-3 rounded-full text-base font-medium transition-all duration-200 ${
+                          post.user_liked 
+                            ? 'text-red-600 bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100' 
+                            : 'text-gray-600 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50'
+                        }`}
+                      >
+                        <Heart className={`h-5 w-5 mr-2 ${post.user_liked ? 'fill-current' : ''}`} />
+                        <span>{post.likes_count}</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="lg"
+                        className="px-6 py-3 rounded-full text-base font-medium text-gray-600 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200"
+                      >
+                        <MessageCircle className="h-5 w-5 mr-2" />
+                        <span>{post.comments_count} comments</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="lg"
+                        onClick={handleSharePost}
+                        className="px-6 py-3 rounded-full text-base font-medium text-gray-600 hover:bg-gradient-to-r hover:from-green-50 hover:to-teal-50 transition-all duration-200"
+                      >
+                        <Share2 className="h-5 w-5 mr-2" />
+                        Share
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-                {/* Comments List */}
-                <div className="space-y-6">
-                  {post.comments && post.comments.length > 0 ? (
-                    post.comments
-                      .filter(comment => !comment.parent_id)
-                      .map((comment) => {
-                        const replies = post.comments?.filter(c => c.parent_id === comment.id) || [];
-                        
-                        return (
-                          <div key={comment.id} className="space-y-4">
-                            <div className="flex space-x-4">
-                              <Avatar className="w-10 h-10">
-                                <AvatarImage 
-                                  src={getSafeImageUrl(comment.profiles?.avatar_url) || ''} 
-                                  onError={handleImageError}
-                                />
-                                <AvatarFallback className="bg-gradient-to-r from-blue-200 to-green-200">
-                                  {getAvatarFallback(comment.profiles?.full_name)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="flex-1">
-                                <div className="bg-gray-50 rounded-xl p-4 hover:bg-gray-100 transition-colors duration-200">
-                                  <div className="flex items-center space-x-3 mb-2">
-                                    <span className="font-semibold text-gray-900">
-                                      {comment.profiles?.full_name || 'Anonymous'}
-                                    </span>
-                                    <span className="text-sm text-muted-foreground">
-                                      {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                                    </span>
+              {/* Comments Section */}
+              <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg hover:shadow-xl transition-all duration-300">
+                <CardContent className="p-6">
+                  <h3 className="text-xl font-bold text-gray-900 mb-6">
+                    Comments ({post.comments_count})
+                  </h3>
+                  
+                  {/* Add Comment */}
+                  {user && (
+                    <div className="flex space-x-4 mb-8">
+                      <Avatar className="w-10 h-10">
+                        <AvatarImage 
+                          src={getSafeImageUrl(user.user_metadata?.avatar_url) || ''} 
+                          onError={handleImageError}
+                        />
+                        <AvatarFallback className="bg-gradient-to-br from-orange-400 to-purple-600 text-white font-semibold">
+                          {getAvatarFallback(user.user_metadata?.full_name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 space-y-3">
+                        {replyTo && (
+                          <div className="text-sm text-muted-foreground bg-blue-50 rounded-lg p-3">
+                            Replying to comment...
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setReplyTo('')}
+                              className="ml-2 h-auto p-0 text-xs"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        )}
+                        <div className="flex space-x-3">
+                          <Textarea
+                            placeholder="Write a comment..."
+                            value={newComment}
+                            onChange={(e) => setNewComment(e.target.value)}
+                            className="min-h-[80px] resize-none border-gray-200 text-base focus:border-purple-300 transition-colors duration-200"
+                            disabled={submitting}
+                          />
+                          <Button
+                            onClick={addComment}
+                            disabled={!newComment.trim() || submitting}
+                            size="lg"
+                            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white h-auto px-6 transition-all duration-200"
+                          >
+                            <Send className="h-5 w-5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Comments List */}
+                  <div className="space-y-6">
+                    {post.comments && post.comments.length > 0 ? (
+                      post.comments
+                        .filter(comment => !comment.parent_id)
+                        .map((comment) => {
+                          const replies = post.comments?.filter(c => c.parent_id === comment.id) || [];
+                          
+                          return (
+                            <div key={comment.id} className="space-y-4">
+                              <div className="flex space-x-4">
+                                <Avatar 
+                                  className="w-10 h-10 cursor-pointer"
+                                  onClick={() => comment.profiles && handleUserProfileClick(comment.user_id)}
+                                >
+                                  <AvatarImage 
+                                    src={getSafeImageUrl(comment.profiles?.avatar_url) || ''} 
+                                    onError={handleImageError}
+                                  />
+                                  <AvatarFallback className="bg-gradient-to-r from-blue-200 to-green-200">
+                                    {getAvatarFallback(comment.profiles?.full_name)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1">
+                                  <div className="bg-gray-50 rounded-xl p-4 hover:bg-gray-100 transition-colors duration-200">
+                                    <div className="flex items-center space-x-3 mb-2">
+                                      <span 
+                                        className="font-semibold text-gray-900 cursor-pointer hover:text-purple-600 transition-colors"
+                                        onClick={() => comment.profiles && handleUserProfileClick(comment.user_id)}
+                                      >
+                                        {comment.profiles?.full_name || 'Anonymous'}
+                                      </span>
+                                      <span className="text-sm text-muted-foreground">
+                                        {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                                      </span>
+                                    </div>
+                                    <p className="text-gray-700">{comment.content}</p>
                                   </div>
-                                  <p className="text-gray-700">{comment.content}</p>
-                                </div>
-                                <div className="flex items-center space-x-4 mt-3">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => toggleCommentLike(comment.id)}
-                                    className={`h-auto p-2 text-sm transition-colors duration-200 ${
-                                      comment.user_liked 
-                                        ? 'text-red-500 hover:text-red-600' 
-                                        : 'text-muted-foreground hover:text-orange-500'
-                                    }`}
-                                  >
-                                    <Heart className={`h-4 w-4 mr-1 ${comment.user_liked ? 'fill-current' : ''}`} />
-                                    {comment.likes_count}
-                                  </Button>
-                                  {user && (
+                                  <div className="flex items-center space-x-4 mt-3">
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      onClick={() => setReplyTo(comment.id)}
-                                      className="h-auto p-2 text-sm text-muted-foreground hover:text-purple-500 transition-colors duration-200"
+                                      onClick={() => toggleCommentLike(comment.id)}
+                                      className={`h-auto p-2 text-sm transition-colors duration-200 ${
+                                        comment.user_liked 
+                                          ? 'text-red-500 hover:text-red-600' 
+                                          : 'text-muted-foreground hover:text-orange-500'
+                                      }`}
                                     >
-                                      <Reply className="h-4 w-4 mr-1" />
-                                      Reply
+                                      <Heart className={`h-4 w-4 mr-1 ${comment.user_liked ? 'fill-current' : ''}`} />
+                                      {comment.likes_count}
                                     </Button>
-                                  )}
+                                    {user && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setReplyTo(comment.id)}
+                                        className="h-auto p-2 text-sm text-muted-foreground hover:text-purple-500 transition-colors duration-200"
+                                      >
+                                        <Reply className="h-4 w-4 mr-1" />
+                                        Reply
+                                      </Button>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
 
-                            {/* Threaded Replies */}
-                            {replies.length > 0 && (
-                              <div className="ml-14 space-y-4 pl-6 border-l-2 border-gray-200">
-                                {replies.map(reply => (
-                                  <div key={reply.id} className="flex space-x-3">
-                                    <Avatar className="w-8 h-8">
-                                      <AvatarImage 
-                                        src={getSafeImageUrl(reply.profiles?.avatar_url) || ''} 
-                                        onError={handleImageError}
-                                      />
-                                      <AvatarFallback className="bg-gradient-to-r from-purple-200 to-orange-200 text-xs">
-                                        {getAvatarFallback(reply.profiles?.full_name)}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    <div className="flex-1">
-                                      <div className="bg-gradient-to-r from-purple-50 to-orange-50 rounded-lg p-3 hover:from-purple-100 hover:to-orange-100 transition-all duration-200">
-                                        <div className="flex items-center space-x-2 mb-1">
-                                          <span className="font-medium text-sm">
-                                            {reply.profiles?.full_name || 'Anonymous'}
-                                          </span>
-                                          <span className="text-xs text-muted-foreground">
-                                            {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
-                                          </span>
+                              {/* Threaded Replies */}
+                              {replies.length > 0 && (
+                                <div className="ml-14 space-y-4 pl-6 border-l-2 border-gray-200">
+                                  {replies.map(reply => (
+                                    <div key={reply.id} className="flex space-x-3">
+                                      <Avatar 
+                                        className="w-8 h-8 cursor-pointer"
+                                        onClick={() => reply.profiles && handleUserProfileClick(reply.user_id)}
+                                      >
+                                        <AvatarImage 
+                                          src={getSafeImageUrl(reply.profiles?.avatar_url) || ''} 
+                                          onError={handleImageError}
+                                        />
+                                        <AvatarFallback className="bg-gradient-to-r from-purple-200 to-orange-200 text-xs">
+                                          {getAvatarFallback(reply.profiles?.full_name)}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div className="flex-1">
+                                        <div className="bg-gradient-to-r from-purple-50 to-orange-50 rounded-lg p-3 hover:from-purple-100 hover:to-orange-100 transition-all duration-200">
+                                          <div className="flex items-center space-x-2 mb-1">
+                                            <span 
+                                              className="font-medium text-sm cursor-pointer hover:text-purple-600 transition-colors"
+                                              onClick={() => reply.profiles && handleUserProfileClick(reply.user_id)}
+                                            >
+                                              {reply.profiles?.full_name || 'Anonymous'}
+                                            </span>
+                                            <span className="text-xs text-muted-foreground">
+                                              {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
+                                            </span>
+                                          </div>
+                                          <p className="text-sm text-gray-700">{reply.content}</p>
                                         </div>
-                                        <p className="text-sm text-gray-700">{reply.content}</p>
-                                      </div>
-                                      <div className="flex items-center space-x-2 mt-2">
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => toggleCommentLike(reply.id)}
-                                          className={`h-auto p-1 text-xs transition-colors duration-200 ${
-                                            reply.user_liked 
-                                              ? 'text-red-500 hover:text-red-600' 
-                                              : 'text-muted-foreground hover:text-orange-500'
-                                          }`}
-                                        >
-                                          <Heart className={`h-3 w-3 mr-1 ${reply.user_liked ? 'fill-current' : ''}`} />
-                                          {reply.likes_count}
-                                        </Button>
+                                        <div className="flex items-center space-x-2 mt-2">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => toggleCommentLike(reply.id)}
+                                            className={`h-auto p-1 text-xs transition-colors duration-200 ${
+                                              reply.user_liked 
+                                                ? 'text-red-500 hover:text-red-600' 
+                                                : 'text-muted-foreground hover:text-orange-500'
+                                            }`}
+                                          >
+                                            <Heart className={`h-3 w-3 mr-1 ${reply.user_liked ? 'fill-current' : ''}`} />
+                                            {reply.likes_count}
+                                          </Button>
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <MessageCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                      <p>No comments yet. Be the first to comment!</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <MessageCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                        <p>No comments yet. Be the first to comment!</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
-          {/* Right Sidebar */}
-          <div className="w-80 flex-shrink-0">
-            <RightSidebar />
+            {/* Right Sidebar */}
+            <div className="w-80 flex-shrink-0">
+              <RightSidebar />
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 };
 
