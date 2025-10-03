@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
-import { MessageCircle, Heart, Share2, Send, Users, Reply, MoreVertical, UserPlus, BookOpen, Bell, ArrowLeft, Bot, MessageSquare } from 'lucide-react';
+import { MessageCircle, Heart, Share2, Send, Users, Reply, MoreVertical, UserPlus, BookOpen, Bell, ArrowLeft, Bot, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import EmojiPicker from '@/components/community/EmojiPicker';
 import CourseDiscussionsTab from '@/components/community/CourseDiscussionsTab';
@@ -83,6 +83,44 @@ interface CommunityMessage {
     avatar_url: string;
   } | null;
 }
+
+// NEW: PostContent component with See More functionality
+interface PostContentProps {
+  content: string;
+  maxLength?: number;
+}
+
+const PostContent: React.FC<PostContentProps> = ({ content, maxLength = 150 }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  const shouldTruncate = content.length > maxLength;
+  const displayContent = isExpanded || !shouldTruncate ? content : content.slice(0, maxLength) + '...';
+
+  return (
+    <div className="text-gray-700 text-base leading-relaxed whitespace-pre-wrap mb-3">
+      <p>{displayContent}</p>
+      {shouldTruncate && (
+        <Button
+          variant="link"
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="p-0 h-auto text-blue-600 hover:text-blue-700 font-medium text-sm mt-1"
+        >
+          {isExpanded ? (
+            <>
+              <ChevronUp className="h-4 w-4 mr-1" />
+              See Less
+            </>
+          ) : (
+            <>
+              <ChevronDown className="h-4 w-4 mr-1" />
+              See More
+            </>
+          )}
+        </Button>
+      )}
+    </div>
+  );
+};
 
 const CommunityPage = () => {
   const { user } = useAuth();
@@ -569,7 +607,8 @@ const CommunityPage = () => {
               )}
             </CardHeader>
             <CardContent className="pt-4 pb-4">
-              <p className="text-gray-700 text-base leading-relaxed whitespace-pre-wrap mb-3">{post.content}</p>
+              {/* UPDATED: Replaced plain text with PostContent component */}
+              <PostContent content={post.content} maxLength={150} />
               
               {post.images && post.images.length > 0 && (
                 <div className="mt-4 rounded-xl overflow-hidden">
