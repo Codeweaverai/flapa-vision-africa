@@ -108,7 +108,7 @@ const EnhancedInboxComponent: React.FC = () => {
 
     return () => {
       if (user) {
-        updateOnlineStatus(false);
+        handleUserOffline();
       }
     };
   }, [user]);
@@ -116,36 +116,101 @@ const EnhancedInboxComponent: React.FC = () => {
   const initializeOnlineStatus = async () => {
     if (!user) return;
 
-    // Set current user as online
-    await updateOnlineStatus(true);
+    try {
+      // First, check if the user already has an online status record
+      const { data: existingStatus, error: fetchError } = await supabase
+        .from('user_online_status')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
 
-    // Load initial online status for all users
-    const { data, error } = await supabase
-      .from('user_online_status')
-      .select('*');
+      if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "not found"
+        console.error('Error fetching online status:', fetchError);
+        return;
+      }
 
-    if (!error && data) {
-      const statusMap = new Map<string, UserOnlineStatus>();
-      data.forEach(status => {
-        statusMap.set(status.user_id, status);
-      });
-      setOnlineStatus(statusMap);
+      if (existingStatus) {
+        // Update existing record
+        const { error: updateError } = await supabase
+          .from('user_online_status')
+          .update({
+            is_online: true,
+            last_seen: new Date().toISOString()
+          })
+          .eq('user_id', user.id);
+
+        if (updateError) {
+          console.error('Error updating online status:', updateError);
+        }
+      } else {
+        // Insert new record
+        const { error: insertError } = await supabase
+          .from('user_online_status')
+          .insert({
+            user_id: user.id,
+            is_online: true,
+            last_seen: new Date().toISOString()
+          });
+
+        if (insertError) {
+          console.error('Error inserting online status:', insertError);
+        }
+      }
+
+      // Load initial online status for all users
+      const { data: allStatus, error } = await supabase
+        .from('user_online_status')
+        .select('*');
+
+      if (!error && allStatus) {
+        const statusMap = new Map<string, UserOnlineStatus>();
+        allStatus.forEach(status => {
+          statusMap.set(status.user_id, status);
+        });
+        setOnlineStatus(statusMap);
+      }
+    } catch (error) {
+      console.error('Error in initializeOnlineStatus:', error);
     }
   };
 
   const updateOnlineStatus = async (isOnline: boolean) => {
     if (!user) return;
 
-    const { error } = await supabase
-      .from('user_online_status')
-      .upsert({
-        user_id: user.id,
-        is_online: isOnline,
-        last_seen: new Date().toISOString()
-      });
+    try {
+      const { error } = await supabase
+        .from('user_online_status')
+        .update({
+          is_online: isOnline,
+          last_seen: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
 
-    if (error) {
-      console.error('Error updating online status:', error);
+      if (error) {
+        console.error('Error updating online status:', error);
+      }
+    } catch (error) {
+      console.error('Error in updateOnlineStatus:', error);
+    }
+  };
+
+  const handleUserOffline = async () => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('user_online_status')
+        .update({
+          is_online: false,
+          last_seen: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error setting user offline:', error);
+      }
+    } catch (error) {
+      console.error('Error in handleUserOffline:', error);
     }
   };
 
@@ -197,12 +262,19 @@ const EnhancedInboxComponent: React.FC = () => {
       }
     };
 
+    // Handle beforeunload for when user closes tab/window
+    const handleBeforeUnload = () => {
+      handleUserOffline();
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
       supabase.removeChannel(messagesChannel);
       supabase.removeChannel(statusChannel);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   };
 
@@ -602,7 +674,9 @@ const EnhancedInboxComponent: React.FC = () => {
     const isImage = message.file_type?.startsWith('image/');
     
     return (
-      <div className="mt-2 p-2 bg-white/20 rounded-lg max-w-xs">
+      <div className={`mt-2 p-2 rounded-lg max-w-xs ${
+        message.sender_id === user?.id ? 'bg-orange-100' : 'bg-purple-100'
+      }`}>
         {isImage ? (
           <div className="space-y-2">
             <img 
@@ -610,23 +684,35 @@ const EnhancedInboxComponent: React.FC = () => {
               alt={message.file_name || 'Image'} 
               className="rounded max-w-full h-auto max-h-48 object-cover"
             />
-            <div className="flex items-center gap-2 text-sm text-white/80">
+            <div className={`flex items-center gap-2 text-sm ${
+              message.sender_id === user?.id ? 'text-orange-700' : 'text-purple-700'
+            }`}>
               <Image className="w-4 h-4" />
               <span>{message.file_name}</span>
             </div>
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-white/80" />
+            <FileText className={`w-4 h-4 ${
+              message.sender_id === user?.id ? 'text-orange-600' : 'text-purple-600'
+            }`} />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate text-white">{message.file_name}</p>
-              <p className="text-xs text-white/80">{message.file_type}</p>
+              <p className={`text-sm font-medium truncate ${
+                message.sender_id === user?.id ? 'text-orange-900' : 'text-purple-900'
+              }`}>
+                {message.file_name}
+              </p>
+              <p className={`text-xs ${
+                message.sender_id === user?.id ? 'text-orange-700' : 'text-purple-700'
+              }`}>
+                {message.file_type}
+              </p>
             </div>
             <Button
               size="sm"
               variant="ghost"
               onClick={() => window.open(message.file_url, '_blank')}
-              className="text-white hover:bg-white/20"
+              className={message.sender_id === user?.id ? 'text-orange-600 hover:bg-orange-200' : 'text-purple-600 hover:bg-purple-200'}
             >
               <Download className="w-4 h-4" />
             </Button>
@@ -868,13 +954,13 @@ const EnhancedInboxComponent: React.FC = () => {
                     <div
                       className={`max-w-[70%] p-3 rounded-2xl ${
                         message.sender_id === user?.id
-                          ? 'bg-gradient-to-r from-orange-500 to-purple-600 text-white rounded-br-md'
-                          : 'bg-gradient-to-r from-purple-500 to-orange-500 text-white rounded-bl-md shadow-sm'
+                          ? 'bg-orange-500 text-white rounded-br-md'
+                          : 'bg-purple-500 text-white rounded-bl-md shadow-sm'
                       }`}
                     >
                       <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                       {renderFileAttachment(message)}
-                      <p className={`text-xs mt-1 text-white/80`}>
+                      <p className="text-xs mt-1 text-white/80">
                         {format(new Date(message.created_at), 'HH:mm')}
                       </p>
                     </div>
