@@ -592,7 +592,7 @@ const CommunityPage = () => {
             <CardHeader className="pb-3 border-b border-gray-100">
               <div className="flex items-start space-x-3">
                 <a 
-                  href={`/creator/profile/${post.profiles?.id}`}
+                  href={`/creator/profile/${user.id}`}
                   onClick={(e) => e.stopPropagation()}
                   className="cursor-pointer"
                 >
@@ -615,7 +615,7 @@ const CommunityPage = () => {
                     <div className="flex items-center gap-2 min-w-0">
                       {/* UPDATED: Corrected route with anchor tag */}
                       <a 
-                        href={`/creator/profile/${post.profiles?.id}`}
+                        href={`/creator/profile/${user.id}`}
                         onClick={(e) => e.stopPropagation()}
                         className="font-bold text-gray-900 truncate hover:text-purple-600 transition-colors cursor-pointer"
                       >
@@ -664,7 +664,7 @@ const CommunityPage = () => {
                   <div className="flex items-center flex-wrap gap-2 text-xs text-gray-500 mt-1">
                     {/* UPDATED: Corrected route with anchor tag */}
                     <a 
-                      href={`/creator/profile/${post.profiles?.id}`}
+                      href={`/creator/profile/${user.id}`}
                       onClick={(e) => e.stopPropagation()}
                       className="font-medium hover:text-purple-600 transition-colors cursor-pointer"
                     >
