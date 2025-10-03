@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +21,13 @@ interface Profile {
   avatar_url?: string;
   is_creator?: boolean;
   role?: string;
+}
+
+interface UserOnlineStatus {
+  user_id: string;
+  is_online: boolean;
+  last_seen: string;
+  updated_at: string;
 }
 
 interface Message {
@@ -56,10 +62,14 @@ const EnhancedInboxComponent: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [conversationMessages, setConversationMessages] = useState<Message[]>([]);
+  const [onlineStatus, setOnlineStatus] = useState<Map<string, UserOnlineStatus>>(new Map());
   const [replyContent, setReplyContent] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -74,17 +84,76 @@ const EnhancedInboxComponent: React.FC = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    scrollToBottom();
+  }, [conversationMessages]);
+
+  const scrollToBottom = () => {
+    if (scrollAreaRef.current) {
+      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+    }
+  };
+
+  // Initialize user online status
   useEffect(() => {
     if (user) {
+      initializeOnlineStatus();
       fetchMessages();
-      setupRealtimeSubscription();
+      setupRealtimeSubscriptions();
     }
+
+    return () => {
+      if (user) {
+        updateOnlineStatus(false);
+      }
+    };
   }, [user]);
 
-  const setupRealtimeSubscription = () => {
+  const initializeOnlineStatus = async () => {
     if (!user) return;
 
-    const channel = supabase
+    // Set current user as online
+    await updateOnlineStatus(true);
+
+    // Load initial online status for all users
+    const { data, error } = await supabase
+      .from('user_online_status')
+      .select('*');
+
+    if (!error && data) {
+      const statusMap = new Map<string, UserOnlineStatus>();
+      data.forEach(status => {
+        statusMap.set(status.user_id, status);
+      });
+      setOnlineStatus(statusMap);
+    }
+  };
+
+  const updateOnlineStatus = async (isOnline: boolean) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('user_online_status')
+      .upsert({
+        user_id: user.id,
+        is_online: isOnline,
+        last_seen: new Date().toISOString()
+      });
+
+    if (error) {
+      console.error('Error updating online status:', error);
+    }
+  };
+
+  const setupRealtimeSubscriptions = () => {
+    if (!user) return;
+
+    // Messages subscription
+    const messagesChannel = supabase
       .channel('inbox_messages')
       .on('postgres_changes', {
         event: '*',
@@ -99,8 +168,41 @@ const EnhancedInboxComponent: React.FC = () => {
       })
       .subscribe();
 
+    // Online status subscription
+    const statusChannel = supabase
+      .channel('online_status')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'user_online_status'
+      }, (payload) => {
+        setOnlineStatus(prev => {
+          const newMap = new Map(prev);
+          const status = payload.new as UserOnlineStatus;
+          newMap.set(status.user_id, status);
+          return newMap;
+        });
+
+        // Refresh conversations to update online status
+        fetchMessages();
+      })
+      .subscribe();
+
+    // Handle page visibility for online status
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        updateOnlineStatus(false);
+      } else {
+        updateOnlineStatus(true);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(messagesChannel);
+      supabase.removeChannel(statusChannel);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   };
 
@@ -126,7 +228,6 @@ const EnhancedInboxComponent: React.FC = () => {
         let conversationKey: string;
         let isSpecialType = false;
 
-        // Handle different message types
         if (message.message_type === 'broadcast' || (message.sender_id === null && message.subject?.startsWith('[BROADCAST]'))) {
           conversationKey = 'broadcast_messages';
           isSpecialType = true;
@@ -136,7 +237,7 @@ const EnhancedInboxComponent: React.FC = () => {
         } else if (message.sender_id) {
           conversationKey = message.sender_id;
         } else {
-          continue; // Skip messages without proper sender
+          continue;
         }
 
         if (!conversationMap.has(conversationKey)) {
@@ -150,11 +251,13 @@ const EnhancedInboxComponent: React.FC = () => {
               is_support: conversationKey === 'admin_support'
             });
           } else {
+            const userStatus = onlineStatus.get(conversationKey);
             conversationMap.set(conversationKey, {
               user_id: conversationKey,
               last_message: message.content,
               last_message_time: message.created_at,
-              unread_count: 0
+              unread_count: 0,
+              is_online: userStatus?.is_online || false
             });
           }
         }
@@ -183,6 +286,9 @@ const EnhancedInboxComponent: React.FC = () => {
             const profile = profiles?.find(p => p.id === conv.user_id);
             if (profile) {
               conv.user_profile = profile;
+              // Update online status from the status map
+              const userStatus = onlineStatus.get(conv.user_id);
+              conv.is_online = userStatus?.is_online || false;
             }
           }
         });
@@ -212,13 +318,13 @@ const EnhancedInboxComponent: React.FC = () => {
           .from('inbox_messages')
           .select('*')
           .eq('recipient_id', user.id)
-          .or('message_type.eq.broadcast,subject.ilike.*[BROADCAST]*');
+          .or('message_type.eq.broadcast,subject.ilike.%[BROADCAST]%');
       } else if (conversationId === 'admin_support') {
         query = supabase
           .from('inbox_messages')
           .select('*')
           .eq('recipient_id', user.id)
-          .or('message_type.eq.support,subject.ilike.*Support*');
+          .or('message_type.eq.support,subject.ilike.%Support%');
       } else {
         query = supabase
           .from('inbox_messages')
@@ -476,13 +582,27 @@ const EnhancedInboxComponent: React.FC = () => {
     return null;
   };
 
+  const getOnlineStatusText = (conversation: Conversation) => {
+    if (conversation.is_broadcast || conversation.is_support) {
+      return conversation.is_broadcast ? 'System Messages' : 'Support Chat';
+    }
+    
+    const status = onlineStatus.get(conversation.user_id);
+    if (status?.is_online) {
+      return 'Online';
+    } else if (status?.last_seen) {
+      return `Last seen ${format(new Date(status.last_seen), 'HH:mm')}`;
+    }
+    return 'Offline';
+  };
+
   const renderFileAttachment = (message: Message) => {
     if (!message.file_url) return null;
 
     const isImage = message.file_type?.startsWith('image/');
     
     return (
-      <div className="mt-2 p-2 bg-gray-100 rounded-lg max-w-xs">
+      <div className="mt-2 p-2 bg-white/20 rounded-lg max-w-xs">
         {isImage ? (
           <div className="space-y-2">
             <img 
@@ -490,22 +610,23 @@ const EnhancedInboxComponent: React.FC = () => {
               alt={message.file_name || 'Image'} 
               className="rounded max-w-full h-auto max-h-48 object-cover"
             />
-            <div className="flex items-center gap-2 text-sm text-gray-600">
+            <div className="flex items-center gap-2 text-sm text-white/80">
               <Image className="w-4 h-4" />
               <span>{message.file_name}</span>
             </div>
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-gray-500" />
+            <FileText className="w-4 h-4 text-white/80" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{message.file_name}</p>
-              <p className="text-xs text-gray-500">{message.file_type}</p>
+              <p className="text-sm font-medium truncate text-white">{message.file_name}</p>
+              <p className="text-xs text-white/80">{message.file_type}</p>
             </div>
             <Button
               size="sm"
               variant="ghost"
               onClick={() => window.open(message.file_url, '_blank')}
+              className="text-white hover:bg-white/20"
             >
               <Download className="w-4 h-4" />
             </Button>
@@ -646,6 +767,10 @@ const EnhancedInboxComponent: React.FC = () => {
                       )}
                     </div>
                     
+                    <p className="text-xs text-gray-500 mt-1">
+                      {getOnlineStatusText(conversation)}
+                    </p>
+                    
                     {conversation.user_profile?.is_creator && (
                       <Badge variant="outline" className="text-xs mt-1">
                         Creator
@@ -689,33 +814,39 @@ const EnhancedInboxComponent: React.FC = () => {
                 </Button>
               )}
               
-              <Avatar className="w-10 h-10">
-                {selectedConversation === 'broadcast_messages' || selectedConversation === 'admin_support' ? (
-                  <AvatarFallback className="bg-white/20 text-white">
-                    {selectedConversation === 'broadcast_messages' ? 
-                      <MessageSquare className="w-5 h-5" /> : 
-                      <User className="w-5 h-5" />
-                    }
-                  </AvatarFallback>
-                ) : (
-                  <>
-                    <AvatarImage src={conversations.find(c => c.user_id === selectedConversation)?.user_profile?.avatar_url} />
+              <div className="relative">
+                <Avatar className="w-10 h-10">
+                  {selectedConversation === 'broadcast_messages' || selectedConversation === 'admin_support' ? (
                     <AvatarFallback className="bg-white/20 text-white">
-                      {conversations.find(c => c.user_id === selectedConversation)?.user_profile?.full_name?.[0] || 
-                       conversations.find(c => c.user_id === selectedConversation)?.user_profile?.username?.[0] || 
-                       <User className="w-5 h-5" />}
+                      {selectedConversation === 'broadcast_messages' ? 
+                        <MessageSquare className="w-5 h-5" /> : 
+                        <User className="w-5 h-5" />
+                      }
                     </AvatarFallback>
-                  </>
+                  ) : (
+                    <>
+                      <AvatarImage src={conversations.find(c => c.user_id === selectedConversation)?.user_profile?.avatar_url} />
+                      <AvatarFallback className="bg-white/20 text-white">
+                        {conversations.find(c => c.user_id === selectedConversation)?.user_profile?.full_name?.[0] || 
+                         conversations.find(c => c.user_id === selectedConversation)?.user_profile?.username?.[0] || 
+                         <User className="w-5 h-5" />}
+                      </AvatarFallback>
+                    </>
+                  )}
+                </Avatar>
+                {selectedConversation !== 'broadcast_messages' && 
+                 selectedConversation !== 'admin_support' && 
+                 onlineStatus.get(selectedConversation)?.is_online && (
+                  <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
                 )}
-              </Avatar>
+              </div>
               
               <div className="flex-1">
                 <h3 className="font-medium">
                   {getConversationDisplayName(conversations.find(c => c.user_id === selectedConversation) || {} as Conversation)}
                 </h3>
                 <p className="text-sm text-white/80">
-                  {selectedConversation === 'broadcast_messages' ? 'System Messages' :
-                   selectedConversation === 'admin_support' ? 'Support Chat' : 'Online'}
+                  {getOnlineStatusText(conversations.find(c => c.user_id === selectedConversation) || {} as Conversation)}
                 </p>
               </div>
               
@@ -727,7 +858,7 @@ const EnhancedInboxComponent: React.FC = () => {
             </div>
 
             {/* Messages */}
-            <ScrollArea className="flex-1 p-4 bg-gray-50">
+            <ScrollArea className="flex-1 p-4 bg-gray-50" ref={scrollAreaRef}>
               <div className="space-y-4">
                 {conversationMessages.map((message) => (
                   <div
@@ -738,19 +869,18 @@ const EnhancedInboxComponent: React.FC = () => {
                       className={`max-w-[70%] p-3 rounded-2xl ${
                         message.sender_id === user?.id
                           ? 'bg-gradient-to-r from-orange-500 to-purple-600 text-white rounded-br-md'
-                          : 'bg-white text-gray-900 rounded-bl-md shadow-sm'
+                          : 'bg-gradient-to-r from-purple-500 to-orange-500 text-white rounded-bl-md shadow-sm'
                       }`}
                     >
                       <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                       {renderFileAttachment(message)}
-                      <p className={`text-xs mt-1 ${
-                        message.sender_id === user?.id ? 'text-white/80' : 'text-gray-500'
-                      }`}>
+                      <p className={`text-xs mt-1 text-white/80`}>
                         {format(new Date(message.created_at), 'HH:mm')}
                       </p>
                     </div>
                   </div>
                 ))}
+                <div ref={messagesEndRef} />
               </div>
             </ScrollArea>
 
