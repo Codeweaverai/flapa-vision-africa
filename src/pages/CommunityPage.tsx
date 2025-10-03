@@ -591,41 +591,32 @@ const CommunityPage = () => {
           >
             <CardHeader className="pb-3 border-b border-gray-100">
               <div className="flex items-start space-x-3">
-                <Avatar 
-                  className="w-12 h-12 cursor-pointer ring-2 ring-white shadow-md hover:ring-purple-200 transition-all" 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // UPDATED: Navigate to creator profile
-                    if (post.profiles?.id) {
-                      navigate(`/creator/profile/${post.profiles.id}`);
-                    }
-                  }}
+                <a 
+                  href={`/creator/profile/${post.profiles?.id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="cursor-pointer"
                 >
-                  <AvatarImage 
-                    src={getSafeAvatarUrl(post.profiles?.avatar_url)} 
-                    alt={post.profiles?.full_name || 'User'}
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                    }}
-                  />
-                  <AvatarFallback className="bg-gradient-to-br from-orange-400 to-purple-600 text-white font-semibold">
-                    {getAvatarFallback(post.profiles?.full_name)}
-                  </AvatarFallback>
-                </Avatar>
+                  <Avatar className="w-12 h-12 ring-2 ring-white shadow-md hover:ring-purple-200 transition-all">
+                    <AvatarImage 
+                      src={getSafeAvatarUrl(post.profiles?.avatar_url)} 
+                      alt={post.profiles?.full_name || 'User'}
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                      }}
+                    />
+                    <AvatarFallback className="bg-gradient-to-br from-orange-400 to-purple-600 text-white font-semibold">
+                      {getAvatarFallback(post.profiles?.full_name)}
+                    </AvatarFallback>
+                  </Avatar>
+                </a>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      {/* UPDATED: Make name clickable to navigate to creator profile */}
+                      {/* UPDATED: Corrected route with anchor tag */}
                       <a 
                         href={`/creator/profile/${post.profiles?.id}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          if (post.profiles?.id) {
-                            navigate(`/creator/profile/${post.profiles.id}`);
-                          }
-                        }}
+                        onClick={(e) => e.stopPropagation()}
                         className="font-bold text-gray-900 truncate hover:text-purple-600 transition-colors cursor-pointer"
                       >
                         {post.profiles?.full_name || 'Anonymous'}
@@ -671,16 +662,10 @@ const CommunityPage = () => {
                     )}
                   </div>
                   <div className="flex items-center flex-wrap gap-2 text-xs text-gray-500 mt-1">
-                    {/* UPDATED: Make username clickable to navigate to creator profile */}
+                    {/* UPDATED: Corrected route with anchor tag */}
                     <a 
                       href={`/creator/profile/${post.profiles?.id}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        if (post.profiles?.id) {
-                          navigate(`/creator/profile/${post.profiles.id}`);
-                        }
-                      }}
+                      onClick={(e) => e.stopPropagation()}
                       className="font-medium hover:text-purple-600 transition-colors cursor-pointer"
                     >
                       @{post.profiles?.username || 'user'}
