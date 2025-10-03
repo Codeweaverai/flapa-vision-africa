@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
-import { MessageCircle, Heart, Share2, Send, Users, Reply, MoreVertical, UserPlus, BookOpen, Bell, ArrowLeft, Bot, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
+import { MessageCircle, Heart, Share2, Send, Users, Reply, MoreVertical, UserPlus, BookOpen, Bell, ArrowLeft, Bot, MessageSquare, ChevronDown, ChevronUp, Edit, MoreHorizontal } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import EmojiPicker from '@/components/community/EmojiPicker';
 import CourseDiscussionsTab from '@/components/community/CourseDiscussionsTab';
@@ -24,6 +24,12 @@ import { getImagesForPosts } from '@/services/communityImageService';
 import { getFollowStatusForUsers } from '@/services/communityFollowerService';
 import { useNavigate } from 'react-router-dom';
 import CommunityChatTab from '@/components/community/CommunityChatTab';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface CommunityPost {
   id: string;
@@ -139,6 +145,8 @@ const CommunityPage = () => {
   const [showFollowers, setShowFollowers] = useState<{ userId: string; tab: 'followers' | 'following' } | null>(null);
   const [courses, setCourses] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
+  const [editingPost, setEditingPost] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
 
   // Tab configurations
   const upperTabs = [
@@ -522,6 +530,45 @@ const CommunityPage = () => {
     navigate(`/community/post/${postId}`);
   };
 
+  // NEW: Edit post functionality
+  const startEditingPost = (post: CommunityPost) => {
+    setEditingPost(post.id);
+    setEditContent(post.content);
+  };
+
+  const cancelEditing = () => {
+    setEditingPost(null);
+    setEditContent('');
+  };
+
+  const saveEditedPost = async (postId: string) => {
+    if (!editContent.trim()) {
+      toast.error('Post content cannot be empty');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('community_posts')
+        .update({ 
+          content: editContent,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', postId)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      setEditingPost(null);
+      setEditContent('');
+      fetchPostsEnhanced();
+      toast.success('Post updated successfully!');
+    } catch (error) {
+      console.error('Error updating post:', error);
+      toast.error('Failed to update post');
+    }
+  };
+
   const getAvatarFallback = (name?: string) => {
     return name ? name.charAt(0).toUpperCase() : 'U';
   };
@@ -548,7 +595,10 @@ const CommunityPage = () => {
                   className="w-12 h-12 cursor-pointer ring-2 ring-white shadow-md hover:ring-purple-200 transition-all" 
                   onClick={(e) => {
                     e.stopPropagation();
-                    setShowFollowers({ userId: post.user_id, tab: 'followers' });
+                    // UPDATED: Navigate to creator profile
+                    if (post.profiles?.id) {
+                      navigate(`/creator/profile/${post.profiles.id}`);
+                    }
                   }}
                 >
                   <AvatarImage 
@@ -566,7 +616,20 @@ const CommunityPage = () => {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      <h4 className="font-bold text-gray-900 truncate">{post.profiles?.full_name || 'Anonymous'}</h4>
+                      {/* UPDATED: Make name clickable to navigate to creator profile */}
+                      <a 
+                        href={`/creator/profile/${post.profiles?.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          if (post.profiles?.id) {
+                            navigate(`/creator/profile/${post.profiles.id}`);
+                          }
+                        }}
+                        className="font-bold text-gray-900 truncate hover:text-purple-600 transition-colors cursor-pointer"
+                      >
+                        {post.profiles?.full_name || 'Anonymous'}
+                      </a>
                       {user?.id !== post.user_id && post.profiles && (
                         <UserFollowButton
                           userId={post.user_id}
@@ -579,9 +642,49 @@ const CommunityPage = () => {
                         />
                       )}
                     </div>
+                    {/* NEW: Edit post dropdown menu - only show for post owner */}
+                    {user?.id === post.user_id && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-8 w-8 p-0"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startEditingPost(post);
+                            }}
+                            className="flex items-center gap-2"
+                          >
+                            <Edit className="h-4 w-4" />
+                            Edit Post
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
                   <div className="flex items-center flex-wrap gap-2 text-xs text-gray-500 mt-1">
-                    <span className="font-medium">@{post.profiles?.username || 'user'}</span>
+                    {/* UPDATED: Make username clickable to navigate to creator profile */}
+                    <a 
+                      href={`/creator/profile/${post.profiles?.id}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        if (post.profiles?.id) {
+                          navigate(`/creator/profile/${post.profiles.id}`);
+                        }
+                      }}
+                      className="font-medium hover:text-purple-600 transition-colors cursor-pointer"
+                    >
+                      @{post.profiles?.username || 'user'}
+                    </a>
                     <span>•</span>
                     <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
                     {post.profiles?.followers_count && post.profiles.followers_count > 0 && (
@@ -607,8 +710,33 @@ const CommunityPage = () => {
               )}
             </CardHeader>
             <CardContent className="pt-4 pb-4">
-              {/* UPDATED: Replaced plain text with PostContent component */}
-              <PostContent content={post.content} maxLength={150} />
+              {/* UPDATED: Edit mode for post content */}
+              {editingPost === post.id ? (
+                <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                  <Textarea
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    className="min-h-[100px] resize-none"
+                    placeholder="Edit your post..."
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => saveEditedPost(post.id)}
+                      className="bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700"
+                    >
+                      Save Changes
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={cancelEditing}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <PostContent content={post.content} maxLength={150} />
+              )}
               
               {post.images && post.images.length > 0 && (
                 <div className="mt-4 rounded-xl overflow-hidden">
