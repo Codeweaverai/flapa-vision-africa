@@ -1325,6 +1325,35 @@ export type Database = {
           },
         ]
       }
+      event_favorites: {
+        Row: {
+          added_at: string
+          event_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          added_at?: string
+          event_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          added_at?: string
+          event_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_favorites_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_reminder_logs: {
         Row: {
           created_at: string
@@ -3744,6 +3773,7 @@ export type Database = {
           media_link: string | null
           title: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           appearance_type: string
@@ -3757,6 +3787,7 @@ export type Database = {
           media_link?: string | null
           title: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           appearance_type?: string
@@ -3770,6 +3801,7 @@ export type Database = {
           media_link?: string | null
           title?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -3938,6 +3970,81 @@ export type Database = {
           device_currency?: string | null
           id?: string
           ip_address?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      user_language_preferences: {
+        Row: {
+          created_at: string | null
+          language_code: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          language_code?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          language_code?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_media_preferences: {
+        Row: {
+          auto_download: boolean | null
+          created_at: string | null
+          reduce_data_usage: boolean | null
+          sound_effects: boolean | null
+          updated_at: string | null
+          user_id: string
+          video_quality: string | null
+        }
+        Insert: {
+          auto_download?: boolean | null
+          created_at?: string | null
+          reduce_data_usage?: boolean | null
+          sound_effects?: boolean | null
+          updated_at?: string | null
+          user_id: string
+          video_quality?: string | null
+        }
+        Update: {
+          auto_download?: boolean | null
+          created_at?: string | null
+          reduce_data_usage?: boolean | null
+          sound_effects?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+          video_quality?: string | null
+        }
+        Relationships: []
+      }
+      user_online_status: {
+        Row: {
+          id: string
+          is_online: boolean | null
+          last_seen: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          id?: string
+          is_online?: boolean | null
+          last_seen?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          id?: string
+          is_online?: boolean | null
+          last_seen?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
