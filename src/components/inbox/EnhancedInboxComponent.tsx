@@ -218,18 +218,67 @@ const EnhancedInboxComponent: React.FC = () => {
   const setupRealtimeSubscriptions = () => {
     if (!user) return;
 
-    // Messages subscription
-    const messagesChannel = supabase
-      .channel('inbox_messages')
+    // Messages subscription for received messages
+    const receivedMessagesChannel = supabase
+      .channel('inbox_messages_received')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'inbox_messages',
         filter: `recipient_id=eq.${user.id}`
-      }, () => {
+      }, (payload) => {
+        console.log('Received message update:', payload);
         fetchMessages();
         if (selectedConversation) {
           loadConversationMessages(selectedConversation);
+        }
+      })
+      .subscribe();
+
+    // Messages subscription for sent messages (to update conversations when user sends messages)
+    const sentMessagesChannel = supabase
+      .channel('inbox_messages_sent')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'inbox_messages',
+        filter: `sender_id=eq.${user.id}`
+      }, (payload) => {
+        console.log('Sent message update:', payload);
+        fetchMessages();
+        if (selectedConversation) {
+          loadConversationMessages(selectedConversation);
+        }
+      })
+      .subscribe();
+
+    // General messages subscription for all changes (to catch any updates)
+    const allMessagesChannel = supabase
+      .channel('inbox_messages_all')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'inbox_messages'
+      }, (payload) => {
+        // Check if this message is relevant to the current user
+        const message = payload.new as Message;
+        if (message.recipient_id === user.id || message.sender_id === user.id) {
+          console.log('Relevant message update:', payload);
+          fetchMessages();
+          if (selectedConversation) {
+            // Check if this message belongs to the currently selected conversation
+            const isRelevantToSelected = 
+              selectedConversation === 'broadcast_messages' && 
+                (message.message_type === 'broadcast' || message.subject?.includes('[BROADCAST]')) ||
+              selectedConversation === 'admin_support' && 
+                (message.message_type === 'support' || message.subject?.includes('Support')) ||
+              (message.sender_id === selectedConversation && message.recipient_id === user.id) ||
+              (message.sender_id === user.id && message.recipient_id === selectedConversation);
+            
+            if (isRelevantToSelected) {
+              loadConversationMessages(selectedConversation);
+            }
+          }
         }
       })
       .subscribe();
@@ -272,7 +321,9 @@ const EnhancedInboxComponent: React.FC = () => {
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
-      supabase.removeChannel(messagesChannel);
+      supabase.removeChannel(receivedMessagesChannel);
+      supabase.removeChannel(sentMessagesChannel);
+      supabase.removeChannel(allMessagesChannel);
       supabase.removeChannel(statusChannel);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
@@ -468,6 +519,9 @@ const EnhancedInboxComponent: React.FC = () => {
       console.error('Error loading conversation messages:', error);
     }
   };
+
+  // Rest of the methods remain the same (handleFileUpload, sendMessageWithFile, sendReply, addContact, etc.)
+  // ... [All the other methods stay exactly the same as in your previous code]
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
