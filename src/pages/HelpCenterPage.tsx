@@ -178,7 +178,7 @@ const HelpCenterPage = () => {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-100 to-purple-100 relative overflow-hidden">
+      <div className="min-h-screen bg-orange-50 relative overflow-hidden">
         {/* Animated background elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           {[...Array(15)].map((_, i) => (

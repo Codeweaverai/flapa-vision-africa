@@ -5,7 +5,7 @@ import { Smartphone, Download, Star, Users } from 'lucide-react';
 
 const MobileAppSection = () => {
   return (
-    <section className="section-container relative overflow-hidden bg-white">
+    <section className="section-container relative overflow-hidden bg-orange-50">
       {/* Content container with relative positioning */}
       <div className="relative z-10 py-16">
         <div className="text-center mb-12">
