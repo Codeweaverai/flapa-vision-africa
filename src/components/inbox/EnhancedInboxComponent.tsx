@@ -56,6 +56,7 @@ interface Conversation {
   is_online?: boolean;
   is_broadcast?: boolean;
   is_support?: boolean;
+  is_system?: boolean;
 }
 
 const EnhancedInboxComponent: React.FC = () => {
@@ -77,7 +78,6 @@ const EnhancedInboxComponent: React.FC = () => {
   const [showAddContact, setShowAddContact] = useState(false);
   const [newContactUsername, setNewContactUsername] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -218,67 +218,18 @@ const EnhancedInboxComponent: React.FC = () => {
   const setupRealtimeSubscriptions = () => {
     if (!user) return;
 
-    // Messages subscription for received messages
-    const receivedMessagesChannel = supabase
-      .channel('inbox_messages_received')
+    // Messages subscription
+    const messagesChannel = supabase
+      .channel('inbox_messages')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'inbox_messages',
         filter: `recipient_id=eq.${user.id}`
-      }, (payload) => {
-        console.log('Received message update:', payload);
+      }, () => {
         fetchMessages();
         if (selectedConversation) {
           loadConversationMessages(selectedConversation);
-        }
-      })
-      .subscribe();
-
-    // Messages subscription for sent messages (to update conversations when user sends messages)
-    const sentMessagesChannel = supabase
-      .channel('inbox_messages_sent')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'inbox_messages',
-        filter: `sender_id=eq.${user.id}`
-      }, (payload) => {
-        console.log('Sent message update:', payload);
-        fetchMessages();
-        if (selectedConversation) {
-          loadConversationMessages(selectedConversation);
-        }
-      })
-      .subscribe();
-
-    // General messages subscription for all changes (to catch any updates)
-    const allMessagesChannel = supabase
-      .channel('inbox_messages_all')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'inbox_messages'
-      }, (payload) => {
-        // Check if this message is relevant to the current user
-        const message = payload.new as Message;
-        if (message.recipient_id === user.id || message.sender_id === user.id) {
-          console.log('Relevant message update:', payload);
-          fetchMessages();
-          if (selectedConversation) {
-            // Check if this message belongs to the currently selected conversation
-            const isRelevantToSelected = 
-              selectedConversation === 'broadcast_messages' && 
-                (message.message_type === 'broadcast' || message.subject?.includes('[BROADCAST]')) ||
-              selectedConversation === 'admin_support' && 
-                (message.message_type === 'support' || message.subject?.includes('Support')) ||
-              (message.sender_id === selectedConversation && message.recipient_id === user.id) ||
-              (message.sender_id === user.id && message.recipient_id === selectedConversation);
-            
-            if (isRelevantToSelected) {
-              loadConversationMessages(selectedConversation);
-            }
-          }
         }
       })
       .subscribe();
@@ -321,9 +272,7 @@ const EnhancedInboxComponent: React.FC = () => {
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
-      supabase.removeChannel(receivedMessagesChannel);
-      supabase.removeChannel(sentMessagesChannel);
-      supabase.removeChannel(allMessagesChannel);
+      supabase.removeChannel(messagesChannel);
       supabase.removeChannel(statusChannel);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
@@ -358,6 +307,10 @@ const EnhancedInboxComponent: React.FC = () => {
         } else if (message.message_type === 'support' || message.subject?.includes('Support')) {
           conversationKey = 'admin_support';
           isSpecialType = true;
+        } else if (message.message_type === 'system' || (message.sender_id === null && !message.subject?.startsWith('[BROADCAST]'))) {
+          // System messages from triggers
+          conversationKey = 'system_updates';
+          isSpecialType = true;
         } else if (message.sender_id) {
           conversationKey = message.sender_id;
         } else {
@@ -372,7 +325,8 @@ const EnhancedInboxComponent: React.FC = () => {
               last_message_time: message.created_at,
               unread_count: 0,
               is_broadcast: conversationKey === 'broadcast_messages',
-              is_support: conversationKey === 'admin_support'
+              is_support: conversationKey === 'admin_support',
+              is_system: conversationKey === 'system_updates'
             });
           } else {
             const userStatus = onlineStatus.get(conversationKey);
@@ -394,35 +348,28 @@ const EnhancedInboxComponent: React.FC = () => {
 
       const conversationList = Array.from(conversationMap.values());
       
-      // Load user profiles for ALL regular conversations
+      // Load user profiles for regular conversations
       const userIds = conversationList
         .filter(c => !c.is_broadcast && !c.is_support)
         .map(c => c.user_id);
       
       if (userIds.length > 0) {
-        const { data: profiles, error: profilesError } = await supabase
+        const { data: profiles } = await supabase
           .from('profiles')
           .select('id, username, full_name, avatar_url, is_creator, role')
           .in('id', userIds);
 
-        if (profilesError) {
-          console.error('Error fetching profiles:', profilesError);
-        } else if (profiles) {
-          // Create a map for quick profile lookup
-          const profileMap = new Map(profiles.map(p => [p.id, p]));
-          
-          conversationList.forEach(conv => {
-            if (!conv.is_broadcast && !conv.is_support) {
-              const profile = profileMap.get(conv.user_id);
-              if (profile) {
-                conv.user_profile = profile;
-                // Update online status from the status map
-                const userStatus = onlineStatus.get(conv.user_id);
-                conv.is_online = userStatus?.is_online || false;
-              }
+        conversationList.forEach(conv => {
+          if (!conv.is_broadcast && !conv.is_support) {
+            const profile = profiles?.find(p => p.id === conv.user_id);
+            if (profile) {
+              conv.user_profile = profile;
+              // Update online status from the status map
+              const userStatus = onlineStatus.get(conv.user_id);
+              conv.is_online = userStatus?.is_online || false;
             }
-          });
-        }
+          }
+        });
       }
 
       // Sort by last message time
@@ -456,6 +403,12 @@ const EnhancedInboxComponent: React.FC = () => {
           .select('*')
           .eq('recipient_id', user.id)
           .or('message_type.eq.support,subject.ilike.%Support%');
+      } else if (conversationId === 'system_updates') {
+        query = supabase
+          .from('inbox_messages')
+          .select('*')
+          .eq('recipient_id', user.id)
+          .eq('message_type', 'system');
       } else {
         query = supabase
           .from('inbox_messages')
@@ -470,33 +423,23 @@ const EnhancedInboxComponent: React.FC = () => {
         return;
       }
 
-      // Load sender profiles for all messages
+      // Load sender profiles
       const messagesWithProfiles = await Promise.all(
         (data || []).map(async (message) => {
           if (!message.sender_id) {
             return { ...message, sender_profile: null };
           }
 
-          try {
-            const { data: profile, error: profileError } = await supabase
-              .from('profiles')
-              .select('id, username, full_name, avatar_url, is_creator, role')
-              .eq('id', message.sender_id)
-              .single();
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('id, username, full_name, avatar_url, is_creator, role')
+            .eq('id', message.sender_id)
+            .single();
 
-            if (profileError) {
-              console.error('Error fetching profile for message:', profileError);
-              return { ...message, sender_profile: null };
-            }
-
-            return {
-              ...message,
-              sender_profile: profile
-            };
-          } catch (error) {
-            console.error('Error loading profile:', error);
-            return { ...message, sender_profile: null };
-          }
+          return {
+            ...message,
+            sender_profile: profile
+          };
         })
       );
 
@@ -519,9 +462,6 @@ const EnhancedInboxComponent: React.FC = () => {
       console.error('Error loading conversation messages:', error);
     }
   };
-
-  // Rest of the methods remain the same (handleFileUpload, sendMessageWithFile, sendReply, addContact, etc.)
-  // ... [All the other methods stay exactly the same as in your previous code]
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -659,7 +599,7 @@ const EnhancedInboxComponent: React.FC = () => {
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('id, username, full_name, avatar_url')
+        .select('id, username, full_name')
         .eq('username', newContactUsername.trim())
         .single();
 
@@ -707,13 +647,13 @@ const EnhancedInboxComponent: React.FC = () => {
   };
 
   const getUserDisplayName = (profile?: Profile) => {
-    if (!profile) return 'Unknown User';
-    return profile.full_name || profile.username || 'Unknown User';
+    return profile?.full_name || profile?.username || 'Unknown User';
   };
 
   const getConversationDisplayName = (conversation: Conversation) => {
     if (conversation.is_broadcast) return 'Broadcast Messages';
     if (conversation.is_support) return 'Admin Support';
+    if (conversation.is_system) return 'System Updates';
     return getUserDisplayName(conversation.user_profile);
   };
 
@@ -724,13 +664,16 @@ const EnhancedInboxComponent: React.FC = () => {
     if (conversation.is_support) {
       return <User className="w-6 h-6" />;
     }
+    if (conversation.is_system) {
+      return <MessageSquare className="w-6 h-6" />;
+    }
     return null;
   };
 
   const getOnlineStatusText = (conversation: Conversation) => {
-    if (conversation.is_broadcast || conversation.is_support) {
-      return conversation.is_broadcast ? 'System Messages' : 'Support Chat';
-    }
+    if (conversation.is_broadcast) return 'System Messages';
+    if (conversation.is_support) return 'Support Chat';
+    if (conversation.is_system) return 'Automated Notifications';
     
     const status = onlineStatus.get(conversation.user_id);
     if (status?.is_online) {
@@ -739,33 +682,6 @@ const EnhancedInboxComponent: React.FC = () => {
       return `Last seen ${format(new Date(status.last_seen), 'HH:mm')}`;
     }
     return 'Offline';
-  };
-
-  // Handle image loading errors
-  const handleImageError = (avatarUrl: string) => {
-    setImageErrors(prev => new Set(prev).add(avatarUrl));
-  };
-
-  // Check if image has errored
-  const hasImageError = (avatarUrl?: string) => {
-    return !avatarUrl || imageErrors.has(avatarUrl);
-  };
-
-  // Get proper avatar URL - handle both full URLs and relative paths
-  const getAvatarUrl = (avatarUrl?: string) => {
-    if (!avatarUrl) return null;
-    
-    // If it's already a full URL, return as is
-    if (avatarUrl.startsWith('http')) {
-      return avatarUrl;
-    }
-    
-    // If it's a relative path, construct the full URL
-    // Assuming your Supabase storage bucket is 'avatars' or 'profile_pictures'
-    // Adjust the bucket name as needed
-    const bucketName = 'profile_pictures'; // or 'avatars' depending on your setup
-    const { data } = supabase.storage.from(bucketName).getPublicUrl(avatarUrl);
-    return data.publicUrl;
   };
 
   const renderFileAttachment = (message: Message) => {
@@ -783,10 +699,6 @@ const EnhancedInboxComponent: React.FC = () => {
               src={message.file_url} 
               alt={message.file_name || 'Image'} 
               className="rounded max-w-full h-auto max-h-48 object-cover"
-              onError={(e) => {
-                // Fallback for broken images
-                e.currentTarget.style.display = 'none';
-              }}
             />
             <div className={`flex items-center gap-2 text-sm ${
               message.sender_id === user?.id ? 'text-orange-700' : 'text-purple-700'
@@ -916,16 +828,17 @@ const EnhancedInboxComponent: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <div className="relative">
                     <Avatar className="w-12 h-12">
-                      {conversation.is_broadcast || conversation.is_support ? (
-                        <AvatarFallback className="bg-gradient-to-r from-orange-400 to-purple-500 text-white">
+                      {conversation.is_broadcast || conversation.is_support || conversation.is_system ? (
+                        <AvatarFallback className={`text-white ${
+                          conversation.is_system 
+                            ? 'bg-gradient-to-r from-blue-400 to-indigo-500' 
+                            : 'bg-gradient-to-r from-orange-400 to-purple-500'
+                        }`}>
                           {getConversationAvatar(conversation)}
                         </AvatarFallback>
                       ) : (
                         <>
-                          <AvatarImage 
-                            src={getAvatarUrl(conversation.user_profile?.avatar_url)} 
-                            onError={() => conversation.user_profile?.avatar_url && handleImageError(conversation.user_profile.avatar_url)}
-                          />
+                          <AvatarImage src={conversation.user_profile?.avatar_url} />
                           <AvatarFallback className="bg-gradient-to-r from-orange-400 to-purple-500 text-white">
                             {conversation.user_profile?.full_name?.[0] || 
                              conversation.user_profile?.username?.[0] || 
@@ -934,7 +847,7 @@ const EnhancedInboxComponent: React.FC = () => {
                         </>
                       )}
                     </Avatar>
-                    {conversation.is_online && !conversation.is_broadcast && !conversation.is_support && (
+                    {conversation.is_online && !conversation.is_broadcast && !conversation.is_support && !conversation.is_system && (
                       <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
                     )}
                   </div>
@@ -979,6 +892,11 @@ const EnhancedInboxComponent: React.FC = () => {
                         Support
                       </Badge>
                     )}
+                    {conversation.is_system && (
+                      <Badge variant="outline" className="text-xs mt-1 bg-blue-50 text-blue-700">
+                        System
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1009,22 +927,18 @@ const EnhancedInboxComponent: React.FC = () => {
               
               <div className="relative">
                 <Avatar className="w-10 h-10">
-                  {selectedConversation === 'broadcast_messages' || selectedConversation === 'admin_support' ? (
+                  {selectedConversation === 'broadcast_messages' || selectedConversation === 'admin_support' || selectedConversation === 'system_updates' ? (
                     <AvatarFallback className="bg-white/20 text-white">
                       {selectedConversation === 'broadcast_messages' ? 
                         <MessageSquare className="w-5 h-5" /> : 
+                        selectedConversation === 'system_updates' ?
+                        <MessageSquare className="w-5 h-5" /> :
                         <User className="w-5 h-5" />
                       }
                     </AvatarFallback>
                   ) : (
                     <>
-                      <AvatarImage 
-                        src={getAvatarUrl(conversations.find(c => c.user_id === selectedConversation)?.user_profile?.avatar_url)}
-                        onError={() => {
-                          const avatarUrl = conversations.find(c => c.user_id === selectedConversation)?.user_profile?.avatar_url;
-                          if (avatarUrl) handleImageError(avatarUrl);
-                        }}
-                      />
+                      <AvatarImage src={conversations.find(c => c.user_id === selectedConversation)?.user_profile?.avatar_url} />
                       <AvatarFallback className="bg-white/20 text-white">
                         {conversations.find(c => c.user_id === selectedConversation)?.user_profile?.full_name?.[0] || 
                          conversations.find(c => c.user_id === selectedConversation)?.user_profile?.username?.[0] || 
@@ -1035,6 +949,7 @@ const EnhancedInboxComponent: React.FC = () => {
                 </Avatar>
                 {selectedConversation !== 'broadcast_messages' && 
                  selectedConversation !== 'admin_support' && 
+                 selectedConversation !== 'system_updates' &&
                  onlineStatus.get(selectedConversation)?.is_online && (
                   <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
                 )}
@@ -1068,6 +983,8 @@ const EnhancedInboxComponent: React.FC = () => {
                       className={`max-w-[70%] p-3 rounded-2xl ${
                         message.sender_id === user?.id
                           ? 'bg-orange-500 text-white rounded-br-md'
+                          : message.sender_id === null && message.message_type === 'system'
+                          ? 'bg-blue-500 text-white rounded-bl-md shadow-sm'
                           : 'bg-purple-500 text-white rounded-bl-md shadow-sm'
                       }`}
                     >
@@ -1083,52 +1000,58 @@ const EnhancedInboxComponent: React.FC = () => {
               </div>
             </ScrollArea>
 
-            {/* Message Input */}
-            <div className="p-4 border-t bg-white">
-              <div className="flex items-end gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  hidden
-                  onChange={handleFileUpload}
-                  accept="image/*,.pdf,.doc,.docx,.txt"
-                />
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="text-gray-500"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                >
-                  <Paperclip className="h-4 w-4" />
-                </Button>
-                <div className="flex-1">
-                  <Textarea
-                    placeholder="Type a message..."
-                    value={replyContent}
-                    onChange={(e) => setReplyContent(e.target.value)}
-                    rows={1}
-                    className="resize-none border-0 bg-gray-100 rounded-full px-4 py-2 focus:ring-2 focus:ring-orange-500"
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        sendReply();
-                      }
-                    }}
+            {/* Message Input - Disabled for system updates */}
+            {selectedConversation !== 'system_updates' ? (
+              <div className="p-4 border-t bg-white">
+                <div className="flex items-end gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    hidden
+                    onChange={handleFileUpload}
+                    accept="image/*,.pdf,.doc,.docx,.txt"
                   />
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-gray-500"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                  >
+                    <Paperclip className="h-4 w-4" />
+                  </Button>
+                  <div className="flex-1">
+                    <Textarea
+                      placeholder="Type a message..."
+                      value={replyContent}
+                      onChange={(e) => setReplyContent(e.target.value)}
+                      rows={1}
+                      className="resize-none border-0 bg-gray-100 rounded-full px-4 py-2 focus:ring-2 focus:ring-orange-500"
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          sendReply();
+                        }
+                      }}
+                    />
+                  </div>
+                  <Button variant="ghost" size="sm" className="text-gray-500">
+                    <Smile className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    onClick={sendReply}
+                    disabled={loading || !replyContent.trim()}
+                    className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 rounded-full w-10 h-10 p-0"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
                 </div>
-                <Button variant="ghost" size="sm" className="text-gray-500">
-                  <Smile className="h-4 w-4" />
-                </Button>
-                <Button
-                  onClick={sendReply}
-                  disabled={loading || !replyContent.trim()}
-                  className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 rounded-full w-10 h-10 p-0"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
               </div>
-            </div>
+            ) : (
+              <div className="p-4 border-t bg-gray-50 text-center text-sm text-muted-foreground">
+                System updates are read-only automated notifications
+              </div>
+            )}
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center bg-gray-50">
