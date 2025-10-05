@@ -36,7 +36,7 @@ const sidebarItems = [
   { name: 'Media', href: '/admin/media', icon: PlayCircle },
   { name: 'Newsletters', href: '/admin/newsletters', icon: Mail },
   { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
-  { name: 'Contact', href: '/admin/contact-submissions', icon: MessageSquare },
+  { name: 'Contact', href: '/admin/contact', icon: MessageSquare },
   { name: 'Consultations', href: '/admin/consultations', icon: Phone },
   { name: 'Speaking', href: '/admin/speaking', icon: Mic },
   { name: 'Careers', href: '/admin/careers', icon: Briefcase },
