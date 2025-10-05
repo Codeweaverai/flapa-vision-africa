@@ -78,6 +78,8 @@ const EnhancedInboxComponent: React.FC = () => {
   const [showAddContact, setShowAddContact] = useState(false);
   const [newContactUsername, setNewContactUsername] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [loadingMessages, setLoadingMessages] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -283,6 +285,20 @@ const EnhancedInboxComponent: React.FC = () => {
     if (!user) return;
 
     try {
+      setLoadingMessages(true);
+      setLoadingProgress(0);
+      
+      // Simulate loading progress
+      const progressInterval = setInterval(() => {
+        setLoadingProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return prev;
+          }
+          return prev + 10;
+        });
+      }, 100);
+
       const { data, error } = await supabase
         .from('inbox_messages')
         .select('*')
@@ -291,8 +307,12 @@ const EnhancedInboxComponent: React.FC = () => {
 
       if (error) {
         console.error('Error fetching messages:', error);
+        clearInterval(progressInterval);
+        setLoadingMessages(false);
         return;
       }
+
+      setLoadingProgress(95);
 
       // Group messages into conversations
       const conversationMap = new Map<string, Conversation>();
@@ -350,7 +370,7 @@ const EnhancedInboxComponent: React.FC = () => {
       
       // Load user profiles for regular conversations
       const userIds = conversationList
-        .filter(c => !c.is_broadcast && !c.is_support)
+        .filter(c => !c.is_broadcast && !c.is_support && !c.is_system)
         .map(c => c.user_id);
       
       if (userIds.length > 0) {
@@ -360,7 +380,7 @@ const EnhancedInboxComponent: React.FC = () => {
           .in('id', userIds);
 
         conversationList.forEach(conv => {
-          if (!conv.is_broadcast && !conv.is_support) {
+          if (!conv.is_broadcast && !conv.is_support && !conv.is_system) {
             const profile = profiles?.find(p => p.id === conv.user_id);
             if (profile) {
               conv.user_profile = profile;
@@ -372,6 +392,8 @@ const EnhancedInboxComponent: React.FC = () => {
         });
       }
 
+      setLoadingProgress(100);
+
       // Sort by last message time
       conversationList.sort((a, b) => 
         new Date(b.last_message_time).getTime() - new Date(a.last_message_time).getTime()
@@ -379,9 +401,15 @@ const EnhancedInboxComponent: React.FC = () => {
 
       setConversations(conversationList);
       setMessages(data || []);
+      
+      // Complete loading after a short delay
+      setTimeout(() => {
+        setLoadingMessages(false);
+      }, 300);
     } catch (error) {
       console.error('Error in fetchMessages:', error);
       toast.error('Failed to load messages');
+      setLoadingMessages(false);
     }
   };
 
@@ -647,7 +675,10 @@ const EnhancedInboxComponent: React.FC = () => {
   };
 
   const getUserDisplayName = (profile?: Profile) => {
-    return profile?.full_name || profile?.username || 'Unknown User';
+    if (!profile) return 'Unknown User';
+    if (profile.full_name && profile.full_name.trim()) return profile.full_name;
+    if (profile.username && profile.username.trim()) return profile.username;
+    return 'User';
   };
 
   const getConversationDisplayName = (conversation: Conversation) => {
@@ -668,6 +699,22 @@ const EnhancedInboxComponent: React.FC = () => {
       return <MessageSquare className="w-6 h-6" />;
     }
     return null;
+  };
+
+  const getAvatarUrl = (avatarUrl?: string) => {
+    if (!avatarUrl) return undefined;
+    
+    // If it's already a full URL, return it
+    if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) {
+      return avatarUrl;
+    }
+    
+    // If it's a storage path, construct the public URL
+    const { data } = supabase.storage
+      .from('profile-pictures')
+      .getPublicUrl(avatarUrl);
+    
+    return data.publicUrl;
   };
 
   const getOnlineStatusText = (conversation: Conversation) => {
@@ -750,6 +797,25 @@ const EnhancedInboxComponent: React.FC = () => {
           <p>Please sign in to view your messages.</p>
         </CardContent>
       </Card>
+    );
+  }
+
+  // Loading screen
+  if (loadingMessages) {
+    return (
+      <div className="flex h-[600px] bg-white rounded-lg shadow-lg overflow-hidden items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="relative w-64 h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div 
+              className="absolute top-0 left-0 h-full bg-gradient-to-r from-orange-500 to-purple-600 transition-all duration-300 ease-out animate-pulse"
+              style={{ width: `${loadingProgress}%` }}
+            />
+          </div>
+          <p className="text-sm font-medium bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent animate-pulse">
+            Loading Messages... {loadingProgress}%
+          </p>
+        </div>
+      </div>
     );
   }
 
@@ -836,13 +902,16 @@ const EnhancedInboxComponent: React.FC = () => {
                         }`}>
                           {getConversationAvatar(conversation)}
                         </AvatarFallback>
-                      ) : (
+                       ) : (
                         <>
-                          <AvatarImage src={conversation.user_profile?.avatar_url} />
-                          <AvatarFallback className="bg-gradient-to-r from-orange-400 to-purple-500 text-white">
-                            {conversation.user_profile?.full_name?.[0] || 
+                          <AvatarImage 
+                            src={getAvatarUrl(conversation.user_profile?.avatar_url)} 
+                            alt={getUserDisplayName(conversation.user_profile)}
+                          />
+                          <AvatarFallback className="bg-gradient-to-r from-orange-400 to-purple-500 text-white font-semibold">
+                            {(conversation.user_profile?.full_name?.[0] || 
                              conversation.user_profile?.username?.[0] || 
-                             <User className="w-6 h-6" />}
+                             'U').toUpperCase()}
                           </AvatarFallback>
                         </>
                       )}
@@ -936,13 +1005,16 @@ const EnhancedInboxComponent: React.FC = () => {
                         <User className="w-5 h-5" />
                       }
                     </AvatarFallback>
-                  ) : (
+                   ) : (
                     <>
-                      <AvatarImage src={conversations.find(c => c.user_id === selectedConversation)?.user_profile?.avatar_url} />
-                      <AvatarFallback className="bg-white/20 text-white">
-                        {conversations.find(c => c.user_id === selectedConversation)?.user_profile?.full_name?.[0] || 
+                      <AvatarImage 
+                        src={getAvatarUrl(conversations.find(c => c.user_id === selectedConversation)?.user_profile?.avatar_url)}
+                        alt={getUserDisplayName(conversations.find(c => c.user_id === selectedConversation)?.user_profile)}
+                      />
+                      <AvatarFallback className="bg-white/20 text-white font-semibold">
+                        {(conversations.find(c => c.user_id === selectedConversation)?.user_profile?.full_name?.[0] || 
                          conversations.find(c => c.user_id === selectedConversation)?.user_profile?.username?.[0] || 
-                         <User className="w-5 h-5" />}
+                         'U').toUpperCase()}
                       </AvatarFallback>
                     </>
                   )}
@@ -977,22 +1049,57 @@ const EnhancedInboxComponent: React.FC = () => {
                 {conversationMessages.map((message) => (
                   <div
                     key={message.id}
-                    className={`flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
+                    className={`flex gap-2 ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
                   >
-                    <div
-                      className={`max-w-[70%] p-3 rounded-2xl ${
-                        message.sender_id === user?.id
-                          ? 'bg-orange-500 text-white rounded-br-md'
-                          : message.sender_id === null && message.message_type === 'system'
-                          ? 'bg-blue-500 text-white rounded-bl-md shadow-sm'
-                          : 'bg-purple-500 text-white rounded-bl-md shadow-sm'
-                      }`}
-                    >
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                      {renderFileAttachment(message)}
-                      <p className="text-xs mt-1 text-white/80">
-                        {format(new Date(message.created_at), 'HH:mm')}
-                      </p>
+                    {/* Show avatar for incoming messages */}
+                    {message.sender_id !== user?.id && message.sender_id !== null && (
+                      <Avatar className="w-8 h-8 mt-1">
+                        <AvatarImage 
+                          src={getAvatarUrl(message.sender_profile?.avatar_url)}
+                          alt={getUserDisplayName(message.sender_profile || undefined)}
+                        />
+                        <AvatarFallback className="bg-gradient-to-r from-purple-400 to-indigo-500 text-white text-xs font-semibold">
+                          {(message.sender_profile?.full_name?.[0] || 
+                           message.sender_profile?.username?.[0] || 
+                           'U').toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
+                    
+                    {/* System message indicator */}
+                    {message.sender_id === null && (
+                      <Avatar className="w-8 h-8 mt-1">
+                        <AvatarFallback className="bg-gradient-to-r from-blue-400 to-indigo-500 text-white">
+                          <MessageSquare className="w-4 h-4" />
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
+                    
+                    <div className="flex flex-col gap-1">
+                      {/* Show sender name for incoming messages */}
+                      {message.sender_id !== user?.id && (
+                        <span className="text-xs font-medium text-muted-foreground px-2">
+                          {message.sender_id === null 
+                            ? 'System' 
+                            : getUserDisplayName(message.sender_profile || undefined)}
+                        </span>
+                      )}
+                      
+                      <div
+                        className={`max-w-[70%] p-3 rounded-2xl ${
+                          message.sender_id === user?.id
+                            ? 'bg-orange-500 text-white rounded-br-md'
+                            : message.sender_id === null && message.message_type === 'system'
+                            ? 'bg-blue-500 text-white rounded-bl-md shadow-sm'
+                            : 'bg-purple-500 text-white rounded-bl-md shadow-sm'
+                        }`}
+                      >
+                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        {renderFileAttachment(message)}
+                        <p className="text-xs mt-1 text-white/80">
+                          {format(new Date(message.created_at), 'HH:mm')}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 ))}
