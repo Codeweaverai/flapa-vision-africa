@@ -227,21 +227,21 @@ const Navbar = () => {
               <Link
                 key={link.name}
                 to={link.path}
-                className={`${isActive(link.path)} font-medium hover:text-primary transition-colors text-sm`} // Added text-sm for smaller font
+                className={`${isActive(link.path)} font-medium hover:text-primary transition-colors`}
               >
                 {link.name}
               </Link>
             ))}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center gap-1 text-sm"> {/* Added text-sm for smaller font */}
+                <Button variant="ghost" className="flex items-center gap-1">
                   <Compass className="h-4 w-4 mr-1" />
                   Explore
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="text-sm"> {/* Added text-sm for smaller font */}
+              <DropdownMenuContent align="start">
                 {exploreLinks.map((link) => (
-                  <DropdownMenuItem key={link.name} asChild className="text-sm"> {/* Added text-sm for smaller font */}
+                  <DropdownMenuItem key={link.name} asChild>
                     <Link to={link.path}>{link.name}</Link>
                   </DropdownMenuItem>
                 ))}
@@ -284,36 +284,36 @@ const Navbar = () => {
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="text-sm"> {/* Added text-sm for smaller font */}
-                  <DropdownMenuItem onClick={() => navigate('/account')} className="text-sm"> {/* Added text-sm for smaller font */}
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => navigate('/account')}>
                     My Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/my-orders')} className="text-sm"> {/* Added text-sm for smaller font */}
+                  <DropdownMenuItem onClick={() => navigate('/my-orders')}>
                     My Orders
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/my-courses')} className="text-sm"> {/* Added text-sm for smaller font */}
+                  <DropdownMenuItem onClick={() => navigate('/my-courses')}>
                     My Learning
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/wishlist')} className="text-sm"> {/* Added text-sm for smaller font */}
+                  <DropdownMenuItem onClick={() => navigate('/wishlist')}>
                     My Wishlist
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/gift-cards')} className="text-sm"> {/* Added text-sm for smaller font */}
+                  <DropdownMenuItem onClick={() => navigate('/gift-cards')}>
                    Buy Gift Cards
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate('/explore-courses')} className="text-sm"> {/* Added text-sm for smaller font */}
+                  <DropdownMenuItem onClick={() => navigate('/explore-courses')}>
                     Explore Courses
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/explore-events')} className="text-sm"> {/* Added text-sm for smaller font */}
+                  <DropdownMenuItem onClick={() => navigate('/explore-events')}>
                     Explore Events
                   </DropdownMenuItem>
                   {user.user_metadata?.is_creator || user.user_metadata?.role === 'creator' ? (
                     <>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => navigate('/creator/dashboard')} className="text-sm"> {/* Added text-sm for smaller font */}
+                      <DropdownMenuItem onClick={() => navigate('/creator/dashboard')}>
                         Creator Dashboard
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate('/creator/payments')} className="text-sm"> {/* Added text-sm for smaller font */}
+                      <DropdownMenuItem onClick={() => navigate('/creator/payments')}>
                         Payments & Payouts
                       </DropdownMenuItem>
                     </>
@@ -321,13 +321,13 @@ const Navbar = () => {
                   {user.user_metadata?.role === 'admin' ? (
                     <>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => navigate('/admin')} className="text-sm"> {/* Added text-sm for smaller font */}
+                      <DropdownMenuItem onClick={() => navigate('/admin')}>
                         Admin Dashboard
                       </DropdownMenuItem>
                     </>
                   ) : null}
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut} className="text-sm"> {/* Added text-sm for smaller font */}
+                  <DropdownMenuItem onClick={handleSignOut}>
                     Sign Out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -340,7 +340,7 @@ const Navbar = () => {
               <Button asChild className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 shadow hover:shadow-md">
                <Link 
                 to="/auth"
-                 className="flex items-center justify-center w-full h-full px-4 py-2 text-sm" // Added text-sm for smaller font
+                 className="flex items-center justify-center w-full h-full px-4 py-2"
                 >
                 Sign In
                 </Link>
@@ -369,7 +369,7 @@ const Navbar = () => {
                   <Link
                     key={link.name}
                     to={link.path}
-                    className={`${isActive(link.path)} font-medium text-base py-2`} // Changed from text-lg to text-base
+                    className={`${isActive(link.path)} font-medium text-lg py-2`}
                     onClick={() => setIsMenuOpen(false)}
                   >
                     {link.name}
@@ -381,7 +381,7 @@ const Navbar = () => {
                     <Link
                       key={link.name}
                       to={link.path}
-                      className={`${isActive(link.path)} font-medium text-base py-2 block`} // Changed from text-lg to text-base
+                      className={`${isActive(link.path)} font-medium text-lg py-2 block`}
                       onClick={() => setIsMenuOpen(false)}
                     >
                       {link.name}
@@ -394,7 +394,7 @@ const Navbar = () => {
   <Link 
     to="/auth" 
     onClick={() => setIsMenuOpen(false)}
-    className="flex items-center justify-center w-full h-full px-4 py-2 text-sm" // Added text-sm for smaller font
+    className="flex items-center justify-center w-full h-full px-4 py-2"
   >
     Sign In
   </Link>
