@@ -1,6 +1,10 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "npm:resend@2.0.0";
+import React from 'npm:react@18.3.1';
+import { renderAsync } from 'npm:@react-email/components@0.0.22';
+import { EventReminderEmail } from './_templates/event-reminder.tsx';
+import { EventLiveEmail } from './_templates/event-live.tsx';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,7 +14,7 @@ const corsHeaders = {
 interface EventReminderRequest {
   eventId: string;
   userId: string;
-  reminderType: '24h' | '2h' | '15min';
+  reminderType: 'day_before' | 'hour_before' | '30_minutes_before' | 'event_live';
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -54,7 +58,7 @@ const handler = async (req: Request): Promise<Response> => {
       .eq('user_id', userId)
       .single();
 
-    if (!preferences?.event_reminders_enabled) {
+    if (!preferences || !preferences.event_reminders) {
       await supabase.from('event_reminder_logs').insert({
         event_id: eventId,
         user_id: userId,
@@ -69,69 +73,127 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // Get event and user details
-    const { data: eventData } = await supabase
+    // Get event details with creator info
+    const { data: event } = await supabase
       .from('events')
       .select(`
         *,
-        profiles:creator_id (full_name, email)
+        creator:creator_id (full_name)
       `)
       .eq('id', eventId)
       .single();
 
-    const { data: userData } = await supabase
+    // Get user details
+    const { data: user } = await supabase
       .from('profiles')
-      .select('full_name, email')
+      .select('full_name')
       .eq('id', userId)
       .single();
 
-    const { data: userEmail } = await supabase.auth.admin.getUserById(userId);
+    const { data: authUser } = await supabase.auth.admin.getUserById(userId);
+    const userEmail = authUser.user?.email;
 
-    if (!eventData || !userData || !userEmail.user?.email) {
+    if (!event || !user || !userEmail) {
       throw new Error('Failed to fetch event or user data');
     }
 
-    // Create in-app notification
-    await supabase.from('notifications').insert({
-      user_id: userId,
-      content: `Event reminder: "${eventData.title}" starts ${reminderType === '24h' ? 'tomorrow' : reminderType === '2h' ? 'in 2 hours' : 'in 15 minutes'}`,
-      type: 'event_reminder',
-      related_id: eventId
-    });
+    const creator = Array.isArray(event.creator) ? event.creator[0] : event.creator;
 
-    // Create inbox message
-    await supabase.from('inbox_messages').insert({
-      recipient_id: userId,
-      subject: `Event Reminder: ${eventData.title}`,
-      content: `This is a friendly reminder that your event "${eventData.title}" is coming up ${reminderType === '24h' ? 'tomorrow' : reminderType === '2h' ? 'in 2 hours' : 'in 15 minutes'}.\n\nEvent Details:\n- Date: ${new Date(eventData.start_time).toLocaleDateString()}\n- Time: ${new Date(eventData.start_time).toLocaleTimeString()}\n- Location: ${eventData.location || 'Online'}\n\nWe look forward to seeing you there!`,
-      message_type: 'event_reminder',
-      related_id: eventId
-    });
+    // Render email template based on reminder type
+    const emailComponent = reminderType === 'event_live' 
+      ? React.createElement(EventLiveEmail, {
+          attendeeName: user.full_name || 'Guest',
+          eventTitle: event.title,
+          eventDate: event.start_time,
+          eventTime: new Date(event.start_time).toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          location: event.location || 'TBA',
+          organizerName: creator?.full_name || 'Event Host',
+          eventUrl: `https://skillpulse.cloud/events/${eventId}`,
+          onlineMeetingLink: event.online_meeting_link
+        })
+      : React.createElement(EventReminderEmail, {
+          attendeeName: user.full_name || 'Guest',
+          eventTitle: event.title,
+          eventDate: event.start_time,
+          eventTime: new Date(event.start_time).toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          location: event.location || 'TBA',
+          organizerName: creator?.full_name || 'Event Host',
+          eventUrl: `https://skillpulse.cloud/events/${eventId}`,
+          reminderType
+        });
 
-    // Send email if enabled
-    if (preferences.email_notifications_enabled && userEmail.user.email) {
-      const reminderText = reminderType === '24h' ? '24 hours' : reminderType === '2h' ? '2 hours' : '15 minutes';
-      
-      await resend.emails.send({
-        from: 'Events <events@resend.dev>',
-        to: [userEmail.user.email],
-        subject: `Event Reminder: ${eventData.title} in ${reminderText}`,
-        html: `
-          <h2>Event Reminder</h2>
-          <p>Hi ${userData.full_name},</p>
-          <p>This is a friendly reminder that your event is coming up in ${reminderText}!</p>
-          
-          <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h3>${eventData.title}</h3>
-            <p><strong>Date:</strong> ${new Date(eventData.start_time).toLocaleDateString()}</p>
-            <p><strong>Time:</strong> ${new Date(eventData.start_time).toLocaleTimeString()}</p>
-            <p><strong>Location:</strong> ${eventData.location || 'Online'}</p>
-          </div>
-          
-          <p>We look forward to seeing you there!</p>
-          <p>Best regards,<br>The Events Team</p>
-        `
+    const html = await renderAsync(emailComponent);
+
+    // Create inbox message with appropriate content based on reminder type
+    const inboxSubject = reminderType === 'event_live'
+      ? `🔴 LIVE NOW: ${event.title} Has Started!`
+      : reminderType === 'day_before' 
+      ? `📅 Reminder: ${event.title} is Tomorrow`
+      : reminderType === 'hour_before'
+      ? `⏰ Starting Soon: ${event.title} in 1 Hour`
+      : `🚀 Final Call: ${event.title} Starts in 30 Minutes`;
+    
+    const inboxContent = reminderType === 'event_live'
+      ? `🔴 LIVE NOW! Your event "${event.title}" has started. Join now!\n\n` +
+        (event.online_meeting_link 
+          ? `🎥 Join Online: ${event.online_meeting_link}\n\n`
+          : `📍 Location: ${event.location || 'TBA'}\n\n`) +
+        `⚡ Quick Tips:\n` +
+        `• Have your ticket/QR code ready\n` +
+        `• Check in at registration\n` +
+        `• Network with attendees\n` +
+        `• Share on social media!\n\n` +
+        `Don't miss out - the event is happening now!`
+      : reminderType === 'day_before'
+      ? `Your event "${event.title}" is tomorrow! Get ready for an amazing experience.\n\n` +
+        `📍 Location: ${event.location || 'TBA'}\n` +
+        `⏰ Time: ${new Date(event.start_time).toLocaleString()}\n\n` +
+        `See you there!`
+      : reminderType === 'hour_before'
+      ? `Your event "${event.title}" starts in 1 hour. Don't forget to join!\n\n` +
+        `📍 Location: ${event.location || 'TBA'}\n` +
+        `⏰ Time: ${new Date(event.start_time).toLocaleString()}\n\n` +
+        `Get ready!`
+      : `Your event "${event.title}" is starting in 30 minutes. Join now!\n\n` +
+        `📍 Location: ${event.location || 'TBA'}\n` +
+        `⏰ Time: ${new Date(event.start_time).toLocaleString()}\n\n` +
+        `See you soon!`;
+    
+    await supabase
+      .from('inbox_messages')
+      .insert({
+        sender_id: null,
+        recipient_id: userId,
+        subject: inboxSubject,
+        content: inboxContent,
+        message_type: 'system',
+        related_id: eventId
       });
+
+    // Send email if user has email notifications enabled
+    if (preferences.email_notifications) {
+      const emailSubject = reminderType === 'event_live'
+        ? `🔴 LIVE NOW: ${event.title} Has Started!`
+        : reminderType === 'day_before'
+        ? `Tomorrow: ${event.title}`
+        : reminderType === 'hour_before'
+        ? `Starting in 1 Hour: ${event.title}`
+        : `Starting in 30 Minutes: ${event.title}`;
+
+      await resend.emails.send({
+        from: 'SkillPulse Events <events@skillpulse.cloud>',
+        to: [userEmail],
+        subject: emailSubject,
+        html
+      });
+
+      console.log(`Email reminder sent to ${userEmail} for ${reminderType}`);
     }
 
     // Log the reminder

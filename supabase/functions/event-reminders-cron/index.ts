@@ -19,116 +19,153 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Starting event reminders cron job...');
 
+    // Find events happening in the next 24 hours, 2 hours, 15 minutes, and events that just started
     const now = new Date();
     const twentyFourHoursFromNow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
     const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
     const fifteenMinutesFromNow = new Date(now.getTime() + 15 * 60 * 1000);
+    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000); // For events that started in last 5 min
 
-    // Get upcoming events with their bookings
     const { data: upcomingEvents, error: eventsError } = await supabase
       .from('events')
       .select(`
         id,
         title,
         start_time,
-        event_bookings!inner (
+        location,
+        online_meeting_link,
+        event_bookings!inner(
+          id,
           user_id,
-          status
-        ),
-        notification_preferences (
-          user_id,
-          event_reminders_enabled,
-          reminder_timing_hours
+          status,
+          profiles!inner(
+            id,
+            notification_preferences(*)
+          )
         )
       `)
-      .gte('start_time', now.toISOString())
-      .lte('start_time', twentyFourHoursFromNow.toISOString())
-      .eq('event_bookings.status', 'confirmed');
+      .eq('event_bookings.status', 'confirmed')
+      .or(`and(start_time.gte.${now.toISOString()},start_time.lte.${twentyFourHoursFromNow.toISOString()}),and(start_time.gte.${fiveMinutesAgo.toISOString()},start_time.lte.${now.toISOString()})`);
 
     if (eventsError) {
       throw new Error(`Failed to fetch events: ${eventsError.message}`);
     }
 
-    console.log(`Found ${upcomingEvents?.length || 0} upcoming events`);
+    console.log(`Found ${upcomingEvents?.length || 0} upcoming events with bookings`);
 
     let remindersSent = 0;
     let remindersSkipped = 0;
     let remindersFailed = 0;
 
+    const remindersToSend: Array<{
+      eventId: string;
+      userId: string;
+      reminderType: 'day_before' | 'hour_before' | '30_minutes_before' | 'event_live';
+    }> = [];
+
     for (const event of upcomingEvents || []) {
-      const eventStartTime = new Date(event.start_time);
-      
-      // Process each booking for this event
       for (const booking of event.event_bookings) {
-        try {
-          // Check user preferences
-          const userPrefs = event.notification_preferences?.find(p => p.user_id === booking.user_id);
-          if (!userPrefs?.event_reminders_enabled) {
-            remindersSkipped++;
-            continue;
-          }
-
-          const customTiming = userPrefs.reminder_timing_hours || 24;
-          const customReminderTime = new Date(eventStartTime.getTime() - customTiming * 60 * 60 * 1000);
-
-          // Determine which reminders to send
-          const remindersToSend: Array<{ type: '24h' | '2h' | '15min', targetTime: Date }> = [];
-
-          // 24-hour reminder (or custom timing)
-          if (customTiming >= 24 && now >= customReminderTime && now < new Date(customReminderTime.getTime() + 30 * 60 * 1000)) {
-            remindersToSend.push({ type: '24h', targetTime: customReminderTime });
-          }
-
-          // 2-hour reminder
-          if (now >= new Date(eventStartTime.getTime() - 2 * 60 * 60 * 1000) && 
-              now < new Date(eventStartTime.getTime() - 2 * 60 * 60 * 1000 + 30 * 60 * 1000)) {
-            remindersToSend.push({ type: '2h', targetTime: twoHoursFromNow });
-          }
-
-          // 15-minute reminder
-          if (now >= new Date(eventStartTime.getTime() - 15 * 60 * 1000) && 
-              now < new Date(eventStartTime.getTime() - 15 * 60 * 1000 + 5 * 60 * 1000)) {
-            remindersToSend.push({ type: '15min', targetTime: fifteenMinutesFromNow });
-          }
-
-          // Send reminders
-          for (const reminder of remindersToSend) {
-            // Check if reminder already sent
-            const { data: existingReminder } = await supabase
-              .from('event_reminder_logs')
-              .select('id')
-              .eq('event_id', event.id)
-              .eq('user_id', booking.user_id)
-              .eq('reminder_type', reminder.type)
-              .single();
-
-            if (existingReminder) {
-              console.log(`Reminder ${reminder.type} already sent for user ${booking.user_id}, event ${event.id}`);
-              continue;
-            }
-
-            // Call the send-event-reminder function
-            const reminderResponse = await supabase.functions.invoke('send-event-reminder', {
-              body: {
-                eventId: event.id,
-                userId: booking.user_id,
-                reminderType: reminder.type
-              }
-            });
-
-            if (reminderResponse.error) {
-              console.error(`Failed to send ${reminder.type} reminder:`, reminderResponse.error);
-              remindersFailed++;
-            } else {
-              console.log(`Sent ${reminder.type} reminder for user ${booking.user_id}, event ${event.id}`);
-              remindersSent++;
-            }
-          }
-
-        } catch (error) {
-          console.error(`Error processing reminder for user ${booking.user_id}, event ${event.id}:`, error);
-          remindersFailed++;
+        const preferences = booking.profiles?.notification_preferences?.[0];
+        
+        if (!preferences || !preferences.event_reminders) {
+          remindersSkipped++;
+          continue;
         }
+
+        let shouldSend24h = false;
+        let shouldSend2h = false;
+        let shouldSend15min = false;
+        let shouldSendLive = false;
+
+        // Determine which reminders to send based on event time
+        const eventTime = new Date(event.start_time);
+        const timeDiff = eventTime.getTime() - now.getTime();
+        const hoursDiff = timeDiff / (1000 * 60 * 60);
+        const minutesDiff = timeDiff / (1000 * 60);
+        
+        // Send live event notification (event started in last 5 minutes)
+        if (timeDiff <= 0 && timeDiff > -5 * 60 * 1000) {
+          shouldSendLive = true;
+        }
+        
+        // Send 24 hour reminder
+        if (hoursDiff <= 24 && hoursDiff > 23 && preferences.reminder_24h) {
+          shouldSend24h = true;
+        }
+        
+        // Send 2 hour reminder  
+        if (hoursDiff <= 2 && hoursDiff > 1.75 && preferences.reminder_2h) {
+          shouldSend2h = true;
+        }
+        
+        // Send 15 minute reminder
+        if (minutesDiff <= 15 && minutesDiff > 10 && preferences.reminder_15min) {
+          shouldSend15min = true;
+        }
+
+        // Check if reminders were already sent
+        const { data: reminderLogs } = await supabase
+          .from('event_reminder_logs')
+          .select('reminder_type')
+          .eq('event_id', event.id)
+          .eq('user_id', booking.user_id);
+        
+        const sentTypes = new Set((reminderLogs || []).map(log => log.reminder_type));
+        
+        // Send reminders that haven't been sent yet
+        if (shouldSendLive && !sentTypes.has('event_live')) {
+          remindersToSend.push({
+            eventId: event.id,
+            userId: booking.user_id,
+            reminderType: 'event_live'
+          });
+        }
+        
+        if (shouldSend24h && !sentTypes.has('day_before')) {
+          remindersToSend.push({
+            eventId: event.id,
+            userId: booking.user_id,
+            reminderType: 'day_before'
+          });
+        }
+        
+        if (shouldSend2h && !sentTypes.has('hour_before')) {
+          remindersToSend.push({
+            eventId: event.id,
+            userId: booking.user_id,
+            reminderType: 'hour_before'
+          });
+        }
+        
+        if (shouldSend15min && !sentTypes.has('30_minutes_before')) {
+          remindersToSend.push({
+            eventId: event.id,
+            userId: booking.user_id,
+            reminderType: '30_minutes_before'
+          });
+        }
+      }
+    }
+
+    // Send all reminders
+    console.log(`Sending ${remindersToSend.length} reminders...`);
+    
+    for (const reminder of remindersToSend) {
+      try {
+        const response = await supabase.functions.invoke('send-event-reminder', {
+          body: reminder
+        });
+
+        if (response.error) {
+          console.error(`Failed to send reminder:`, response.error);
+          remindersFailed++;
+        } else {
+          console.log(`Sent ${reminder.reminderType} reminder for event ${reminder.eventId}, user ${reminder.userId}`);
+          remindersSent++;
+        }
+      } catch (error) {
+        console.error(`Error sending reminder:`, error);
+        remindersFailed++;
       }
     }
 
@@ -140,7 +177,8 @@ const handler = async (req: Request): Promise<Response> => {
         sent: remindersSent,
         skipped: remindersSkipped,
         failed: remindersFailed,
-        eventsProcessed: upcomingEvents?.length || 0
+        eventsProcessed: upcomingEvents?.length || 0,
+        totalRemindersQueued: remindersToSend.length
       }
     }), {
       status: 200,
