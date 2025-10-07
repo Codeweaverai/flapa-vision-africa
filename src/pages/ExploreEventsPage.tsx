@@ -213,6 +213,32 @@ const ExploreEventsPage = () => {
     }
   };
 
+  const renderStarRating = (rating: number) => {
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
+    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+
+    return (
+      <div className="flex items-center gap-1">
+        {[...Array(fullStars)].map((_, i) => (
+          <Star key={`full-${i}`} className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+        ))}
+        {hasHalfStar && (
+          <div className="relative">
+            <Star className="h-3 w-3 text-gray-300" />
+            <div className="absolute top-0 left-0 w-1/2 overflow-hidden">
+              <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+            </div>
+          </div>
+        )}
+        {[...Array(emptyStars)].map((_, i) => (
+          <Star key={`empty-${i}`} className="h-3 w-3 text-gray-300" />
+        ))}
+        <span className="text-xs text-gray-600 ml-1">({rating.toFixed(1)})</span>
+      </div>
+    );
+  };
+
   const loadMore = () => {
     setDisplayCount(prev => prev + EVENTS_PER_PAGE);
   };
@@ -398,6 +424,16 @@ const ExploreEventsPage = () => {
                         </CardHeader>
 
                         <CardContent className="space-y-4">
+                          {/* Event Reviews */}
+                          {event.reviews.total_reviews > 0 && (
+                            <div className="flex items-center justify-between">
+                              {renderStarRating(event.reviews.avg_rating)}
+                              <span className="text-xs text-gray-500">
+                                {event.reviews.total_reviews} review{event.reviews.total_reviews !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          )}
+
                           {/* Event Details */}
                           {event.location && (
                             <div className="flex items-center text-sm text-gray-600">
