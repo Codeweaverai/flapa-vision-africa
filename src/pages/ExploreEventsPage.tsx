@@ -192,11 +192,11 @@ const ExploreEventsPage = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'upcoming':
-        return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Upcoming</Badge>;
+        return <Badge className="bg-green-600 text-white border-0">Upcoming</Badge>;
       case 'ongoing':
-        return <Badge className="bg-green-100 text-green-800 border-green-200">Live Now</Badge>;
+        return <Badge className="bg-red-600 text-white border-0">Live</Badge>;
       case 'completed':
-        return <Badge className="bg-gray-100 text-gray-800 border-gray-200">Completed</Badge>;
+        return <Badge className="bg-orange-600 text-white border-0">Completed</Badge>;
       default:
         return null;
     }
@@ -347,18 +347,18 @@ const ExploreEventsPage = () => {
                             {formatDate(event.start_time)}
                           </div>
                         </div>
-                      </div>
 
-                      {/* Wishlist Button - Separate from card click */}
-                      <div className="absolute top-3 right-3 z-10">
-                        <WishlistButton 
-                          itemId={event.id}
-                          itemType="event"
-                          variant="ghost"
-                          size="icon"
-                          iconOnly
-                          className="bg-white/90 hover:bg-white rounded-full p-2 shadow-md hover:shadow-lg transition-all hover:scale-110 border-0"
-                        />
+                        {/* Wishlist Button - Middle Right of Image */}
+                        <div className="absolute top-1/2 right-4 z-20 transform -translate-y-1/2">
+                          <WishlistButton 
+                            itemId={event.id}
+                            itemType="event"
+                            variant="ghost"
+                            size="icon"
+                            iconOnly
+                            className="bg-white/90 hover:bg-white rounded-full p-2 shadow-md hover:shadow-lg transition-all hover:scale-110 border-0"
+                          />
+                        </div>
                       </div>
 
                       {/* Card Content with Click Handler */}
