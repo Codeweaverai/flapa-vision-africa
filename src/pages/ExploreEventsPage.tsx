@@ -350,7 +350,7 @@ const ExploreEventsPage = () => {
                       </div>
 
                       {/* Wishlist Button - Separate from card click */}
-                      <div className="absolute top-4 right-4 z-20">
+                      <div className="absolute bottom-4 right-4 z-20">
                         <WishlistButton 
                           itemId={event.id}
                           itemType="event"
