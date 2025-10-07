@@ -5,9 +5,16 @@ import { Smartphone, Download, Star, Users } from 'lucide-react';
 
 const MobileAppSection = () => {
   return (
-    <section className="section-container relative overflow-hidden bg-orange-50">
+    <section className="relative overflow-hidden bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+      {/* Decorative background elements matching BecomeCreatorPage */}
+      <div className="absolute inset-0">
+        <div className="absolute top-20 left-10 w-32 h-32 bg-gradient-to-r from-orange-300/30 to-purple-400/30 rounded-full blur-3xl"></div>
+        <div className="absolute top-40 right-20 w-40 h-40 bg-gradient-to-r from-purple-300/20 to-pink-400/20 rounded-full blur-2xl"></div>
+        <div className="absolute bottom-20 left-1/4 w-28 h-28 bg-gradient-to-r from-orange-400/25 to-purple-500/25 rounded-full blur-xl"></div>
+      </div>
+
       {/* Content container with relative positioning */}
-      <div className="relative z-10 py-16">
+      <div className="container mx-auto px-4 relative z-10 py-16">
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 mb-4">
             <Smartphone className="h-8 w-8 text-orange-500" />
@@ -15,9 +22,9 @@ const MobileAppSection = () => {
               Download Our App
             </span>
           </div>
-          <h2 className="heading-lg mb-4">
+          <h2 className="text-4xl md:text-5xl font-bold mb-4">
             Learn Anywhere, Anytime with Our 
-            <span className="text-gradient ml-2">Mobile App</span>
+            <span className="bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent ml-2">Mobile App</span>
           </h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
             Get the full SkillPulse experience on your mobile device. Access courses, 
@@ -29,11 +36,11 @@ const MobileAppSection = () => {
           {/* Left side - App features */}
           <div className="space-y-8">
             <div className="grid sm:grid-cols-2 gap-6">
-              <Card className="border-none shadow-lg bg-gradient-to-br from-orange-50 to-orange-100">
+              <Card className="border-none shadow-lg bg-white/90 backdrop-blur-sm">
                 <CardContent className="p-6">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-lg bg-orange-500/10">
-                      <Download className="h-5 w-5 text-orange-600" />
+                    <div className="p-2 rounded-lg bg-gradient-to-r from-orange-500 to-purple-600 text-white">
+                      <Download className="h-5 w-5" />
                     </div>
                     <h3 className="font-semibold">Offline Learning</h3>
                   </div>
@@ -43,11 +50,11 @@ const MobileAppSection = () => {
                 </CardContent>
               </Card>
 
-              <Card className="border-none shadow-lg bg-gradient-to-br from-purple-50 to-purple-100">
+              <Card className="border-none shadow-lg bg-white/90 backdrop-blur-sm">
                 <CardContent className="p-6">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-lg bg-purple-500/10">
-                      <Users className="h-5 w-5 text-purple-600" />
+                    <div className="p-2 rounded-lg bg-gradient-to-r from-purple-500 to-orange-600 text-white">
+                      <Users className="h-5 w-5" />
                     </div>
                     <h3 className="font-semibold">Community</h3>
                   </div>
@@ -58,7 +65,7 @@ const MobileAppSection = () => {
               </Card>
             </div>
 
-            <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-6 rounded-2xl text-white">
+            <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-6 rounded-2xl text-white shadow-xl">
               <div className="flex items-center gap-4 mb-4">
                 <div className="flex items-center gap-1">
                   {[...Array(5)].map((_, i) => (
@@ -77,9 +84,9 @@ const MobileAppSection = () => {
 
           {/* Right side - Download buttons */}
           <div className="text-center lg:text-left">
-            <div className="bg-white border border-gray-200 rounded-3xl p-8 shadow-lg">
+            <div className="bg-white/95 backdrop-blur-sm border-0 rounded-3xl p-8 shadow-xl">
               <div className="mb-8">
-                <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-orange-500 to-purple-600 mb-4">
+                <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-orange-500 to-purple-600 mb-4 shadow-lg">
                   <Smartphone className="h-10 w-10 text-white" />
                 </div>
                 <h3 className="text-2xl font-bold mb-2">Download SkillPulse</h3>
@@ -90,7 +97,7 @@ const MobileAppSection = () => {
                 {/* Google Play Store Button */}
                 <Button 
                   asChild
-                  className="w-full h-14 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white border-none"
+                  className="w-full h-14 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white border-none shadow-lg hover:shadow-xl transition-all duration-200"
                 >
                   <a 
                     href="#" 
@@ -127,7 +134,7 @@ const MobileAppSection = () => {
                 {/* App Store Button */}
                 <Button 
                   asChild
-                  className="w-full h-14 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-none"
+                  className="w-full h-14 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-none shadow-lg hover:shadow-xl transition-all duration-200"
                 >
                   <a 
                     href="#" 
