@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,25 +21,43 @@ export const useWishlist = () => {
     
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      // Fetch course favorites
+      const { data: courseFavorites, error: courseError } = await supabase
         .from('course_favorites')
         .select('*')
         .eq('user_id', user.id);
 
-      if (error) throw error;
-      
-      // Type assertion to ensure compatibility
-      const typedData: WishlistItem[] = (data || []).map(item => ({
+      if (courseError) throw courseError;
+
+      // Fetch event favorites
+      const { data: eventFavorites, error: eventError } = await supabase
+        .from('event_favorites')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (eventError) throw eventError;
+
+      // Combine and transform the data
+      const courseItems: WishlistItem[] = (courseFavorites || []).map(item => ({
         id: item.id,
         user_id: item.user_id,
         item_id: item.course_id,
         item_type: 'course' as const,
         added_at: item.added_at
       }));
-      
-      setWishlistItems(typedData);
+
+      const eventItems: WishlistItem[] = (eventFavorites || []).map(item => ({
+        id: item.id,
+        user_id: item.user_id,
+        item_id: item.event_id,
+        item_type: 'event' as const,
+        added_at: item.added_at
+      }));
+
+      setWishlistItems([...courseItems, ...eventItems]);
     } catch (error) {
       console.error('Error fetching wishlist:', error);
+      toast.error('Failed to load wishlist');
     } finally {
       setIsLoading(false);
     }
@@ -73,10 +90,36 @@ export const useWishlist = () => {
           setWishlistItems(prev => [...prev, newItem]);
           toast.success('Added to wishlist');
         }
+      } else if (itemType === 'event') {
+        const { data, error } = await supabase
+          .from('event_favorites')
+          .insert({ user_id: user.id, event_id: itemId })
+          .select();
+
+        if (error) throw error;
+
+        if (data && data[0]) {
+          const newItem: WishlistItem = {
+            id: data[0].id,
+            user_id: data[0].user_id,
+            item_id: data[0].event_id,
+            item_type: 'event',
+            added_at: data[0].added_at
+          };
+
+          setWishlistItems(prev => [...prev, newItem]);
+          toast.success('Added to wishlist');
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding to wishlist:', error);
-      toast.error('Failed to add to wishlist');
+      
+      // Handle unique constraint violation
+      if (error.code === '23505') {
+        toast.error('Item is already in your wishlist');
+      } else {
+        toast.error('Failed to add to wishlist');
+      }
     }
   };
 
@@ -95,10 +138,29 @@ export const useWishlist = () => {
 
         setWishlistItems(prev => prev.filter(item => !(item.item_id === itemId && item.item_type === itemType)));
         toast.success('Removed from wishlist');
+      } else if (itemType === 'event') {
+        const { error } = await supabase
+          .from('event_favorites')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('event_id', itemId);
+
+        if (error) throw error;
+
+        setWishlistItems(prev => prev.filter(item => !(item.item_id === itemId && item.item_type === itemType)));
+        toast.success('Removed from wishlist');
       }
     } catch (error) {
       console.error('Error removing from wishlist:', error);
       toast.error('Failed to remove from wishlist');
+    }
+  };
+
+  const toggleWishlist = async (itemId: string, itemType: 'course' | 'event') => {
+    if (isInWishlist(itemId, itemType)) {
+      await removeFromWishlist(itemId, itemType);
+    } else {
+      await addToWishlist(itemId, itemType);
     }
   };
 
@@ -110,12 +172,24 @@ export const useWishlist = () => {
     return wishlistItems.some(item => item.item_id === itemId && item.item_type === itemType);
   };
 
+  // Helper methods to get specific types of wishlist items
+  const getCourseWishlistItems = () => {
+    return wishlistItems.filter(item => item.item_type === 'course');
+  };
+
+  const getEventWishlistItems = () => {
+    return wishlistItems.filter(item => item.item_type === 'event');
+  };
+
   return {
     wishlistItems,
     isLoading,
     addToWishlist,
     removeFromWishlist,
+    toggleWishlist,
     isInWishlist,
-    fetchWishlist
+    fetchWishlist,
+    getCourseWishlistItems,
+    getEventWishlistItems
   };
 };
