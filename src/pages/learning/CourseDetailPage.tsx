@@ -510,14 +510,23 @@ const CourseDetailPage = () => {
     }
   };
 
+  // Gradient Icon Component
+  const GradientIcon = ({ children }: { children: React.ReactNode }) => (
+    <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-1 rounded-lg text-white">
+      {children}
+    </div>
+  );
+
   if (loading) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 py-8">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 w-3/4 rounded bg-gradient-to-r from-orange-500 to-purple-600 opacity-30"></div>
-            <div className="h-4 w-1/2 rounded bg-gradient-to-r from-orange-500 to-purple-600 opacity-20"></div>
-            <div className="h-64 w-full rounded bg-gradient-to-r from-orange-500 to-purple-600 opacity-30"></div>
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 relative overflow-hidden">
+          <div className="container mx-auto px-4 py-8">
+            <div className="animate-pulse space-y-4">
+              <div className="h-8 w-3/4 rounded bg-gradient-to-r from-orange-500 to-purple-600 opacity-30"></div>
+              <div className="h-4 w-1/2 rounded bg-gradient-to-r from-orange-500 to-purple-600 opacity-20"></div>
+              <div className="h-64 w-full rounded bg-gradient-to-r from-orange-500 to-purple-600 opacity-30"></div>
+            </div>
           </div>
         </div>
       </Layout>
@@ -527,12 +536,17 @@ const CourseDetailPage = () => {
   if (!course) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 py-8 text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Course not found</h1>
-          <p className="text-gray-600 mt-2">The course you're looking for doesn't exist or has been removed.</p>
-          <Button onClick={() => navigate('/courses')} className="mt-4">
-            Browse Courses
-          </Button>
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 relative overflow-hidden">
+          <div className="container mx-auto px-4 py-8 text-center">
+            <h1 className="text-2xl font-bold text-gray-900">Course not found</h1>
+            <p className="text-gray-600 mt-2">The course you're looking for doesn't exist or has been removed.</p>
+            <Button 
+              onClick={() => navigate('/courses')} 
+              className="mt-4 bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700"
+            >
+              Browse Courses
+            </Button>
+          </div>
         </div>
       </Layout>
     );
@@ -546,18 +560,29 @@ const CourseDetailPage = () => {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-purple-100">
-        <div className="container mx-auto px-4 py-8">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 relative overflow-hidden">
+        {/* Background Elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-20 left-10 w-32 h-32 bg-gradient-to-r from-orange-300/30 to-purple-400/30 rounded-full blur-3xl"></div>
+          <div className="absolute top-40 right-20 w-40 h-40 bg-gradient-to-r from-purple-300/20 to-pink-400/20 rounded-full blur-2xl"></div>
+          <div className="absolute bottom-20 left-1/4 w-28 h-28 bg-gradient-to-r from-orange-400/25 to-purple-500/25 rounded-full blur-xl"></div>
+        </div>
+
+        <div className="container mx-auto px-4 py-8 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-8">
-              {/* Course Header - Removed thumbnail image */}
-              <Card>
+              {/* Course Header */}
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
                 <CardContent className="p-6">
                   <div className="mb-6">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge variant="secondary">{course.category}</Badge>
-                      <Badge variant="outline">{course.difficulty_level}</Badge>
+                    <div className="flex items-center gap-2 mb-4">
+                      <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0">
+                        {course.category}
+                      </Badge>
+                      <Badge variant="outline" className="border-orange-300 text-orange-700">
+                        {course.difficulty_level}
+                      </Badge>
                       {course.certificate_enabled && (
                         <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
                           <Award className="w-3 h-3 mr-1" />
@@ -565,26 +590,34 @@ const CourseDetailPage = () => {
                         </Badge>
                       )}
                     </div>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">{course.title}</h1>
-                    <p className="text-gray-600 mb-4">{course.summary}</p>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">{course.title}</h1>
+                    <p className="text-gray-600 text-lg mb-6">{course.summary}</p>
                     
                     {/* Course Stats */}
                     <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-sm text-gray-600">
-                      <div className="flex items-center gap-1">
-                        <Star className="w-4 h-4 text-yellow-500" />
+                      <div className="flex items-center gap-2">
+                        <GradientIcon>
+                          <Star className="w-4 h-4" />
+                        </GradientIcon>
                         <span>{averageRating.toFixed(1)}</span>
                         <span>({course.course_reviews.length} reviews)</span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Users className="w-4 h-4" />
+                      <div className="flex items-center gap-2">
+                        <GradientIcon>
+                          <Users className="w-4 h-4" />
+                        </GradientIcon>
                         <span>{course.course_enrollments.length} students</span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
+                      <div className="flex items-center gap-2">
+                        <GradientIcon>
+                          <Clock className="w-4 h-4" />
+                        </GradientIcon>
                         <span>{Math.floor(course.duration_minutes / 60)}h {course.duration_minutes % 60}m</span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <BookOpen className="w-4 h-4" />
+                      <div className="flex items-center gap-2">
+                        <GradientIcon>
+                          <BookOpen className="w-4 h-4" />
+                        </GradientIcon>
                         <span>{totalLessons} lessons</span>
                       </div>
                     </div>
@@ -594,7 +627,7 @@ const CourseDetailPage = () => {
                   {course.course_preview?.preview_video_url && (
                     <div className="mb-6">
                       <h3 className="text-lg font-semibold mb-3">Course Preview</h3>
-                      <div className="aspect-video rounded-lg overflow-hidden bg-gradient-to-r from-orange-500 to-purple-600">
+                      <div className="aspect-video rounded-xl overflow-hidden bg-gradient-to-r from-orange-500 to-purple-600 p-1">
                         <ReactPlayer
                           url={course.course_preview.preview_video_url}
                           controls={true}
@@ -618,16 +651,16 @@ const CourseDetailPage = () => {
                   )}
 
                   {/* Instructor */}
-                  <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
-                    <Avatar>
+                  <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg border border-orange-200">
+                    <Avatar className="w-12 h-12 border-2 border-orange-300">
                       <AvatarImage src={course.profiles?.avatar_url} />
-                      <AvatarFallback>
+                      <AvatarFallback className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
                         {course.profiles?.full_name?.charAt(0) || 'I'}
                       </AvatarFallback>
                     </Avatar>
                     <div>
                       <p className="text-sm text-gray-600">Instructor</p>
-                      <p className="font-semibold">{course.profiles?.full_name || 'Unknown'}</p>
+                      <p className="font-semibold text-gray-900">{course.profiles?.full_name || 'Unknown'}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -635,32 +668,44 @@ const CourseDetailPage = () => {
 
               {/* Course Tabs */}
               <Tabs defaultValue="overview" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="overview">Overview</TabsTrigger>
-                  <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
-                  <TabsTrigger value="reviews">Reviews</TabsTrigger>
-                  <TabsTrigger value="instructor">Instructor</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-4 bg-white/80 backdrop-blur-sm border border-gray-200">
+                  <TabsTrigger value="overview" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">
+                    Overview
+                  </TabsTrigger>
+                  <TabsTrigger value="curriculum" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">
+                    Curriculum
+                  </TabsTrigger>
+                  <TabsTrigger value="reviews" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">
+                    Reviews
+                  </TabsTrigger>
+                  <TabsTrigger value="instructor" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">
+                    Instructor
+                  </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="overview" className="space-y-6">
-                  <Card>
+                  <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
                     <CardContent className="p-6">
-                      <h3 className="text-xl font-semibold mb-4">About this course</h3>
+                      <h3 className="text-xl font-semibold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                        About this course
+                      </h3>
                       <div className="prose max-w-none">
-                        <p className="text-gray-700 leading-relaxed">{course.description}</p>
+                        <p className="text-gray-700 leading-relaxed text-lg">{course.description}</p>
                       </div>
                     </CardContent>
                   </Card>
 
                   {course.course_learning_outcomes.length > 0 && (
-                    <Card>
+                    <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
                       <CardContent className="p-6">
-                        <h3 className="text-xl font-semibold mb-4">What you'll learn</h3>
+                        <h3 className="text-xl font-semibold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                          What you'll learn
+                        </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {course.course_learning_outcomes
                             .sort((a, b) => a.order_index - b.order_index)
                             .map((outcome) => (
-                              <div key={outcome.id} className="flex items-start gap-2">
+                              <div key={outcome.id} className="flex items-start gap-3 p-3 rounded-lg bg-gradient-to-r from-orange-50 to-purple-50">
                                 <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
                                 <span className="text-gray-700">{outcome.outcome}</span>
                               </div>
@@ -672,15 +717,17 @@ const CourseDetailPage = () => {
                 </TabsContent>
 
                 <TabsContent value="curriculum">
-                  <Card>
+                  <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
                     <CardContent className="p-6">
-                      <h3 className="text-xl font-semibold mb-4">Course curriculum</h3>
+                      <h3 className="text-xl font-semibold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                        Course curriculum
+                      </h3>
                       <div className="space-y-4">
                         {course.course_modules
                           .sort((a, b) => a.order_index - b.order_index)
                           .map((module, moduleIndex) => (
-                            <div key={module.id} className="border rounded-lg p-4">
-                              <h4 className="font-semibold text-lg mb-2">
+                            <div key={module.id} className="border border-gray-200 rounded-lg p-4 bg-white/80 backdrop-blur-sm">
+                              <h4 className="font-semibold text-lg mb-2 text-gray-900">
                                 Module {moduleIndex + 1}: {module.title}
                               </h4>
                               {module.description && (
@@ -690,13 +737,13 @@ const CourseDetailPage = () => {
                                 {module.lessons
                                   .sort((a, b) => a.order_index - b.order_index)
                                   .map((lesson, lessonIndex) => (
-                                    <div key={lesson.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded">
+                                    <div key={lesson.id} className="flex items-center gap-3 p-3 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 rounded-lg transition-all duration-200">
                                       <Play className="w-4 h-4 text-blue-500" />
-                                      <span className="text-sm">
+                                      <span className="text-sm text-gray-700">
                                         {moduleIndex + 1}.{lessonIndex + 1} {lesson.title}
                                       </span>
                                       {lesson.content_type === 'video' && (
-                                        <Badge variant="outline" className="text-xs">Video</Badge>
+                                        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">Video</Badge>
                                       )}
                                     </div>
                                   ))}
@@ -713,17 +760,17 @@ const CourseDetailPage = () => {
                 </TabsContent>
 
                 <TabsContent value="instructor">
-                  <Card>
+                  <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
                     <CardContent className="p-6">
                       <div className="flex items-center gap-4 mb-6">
-                        <Avatar className="w-16 h-16">
+                        <Avatar className="w-16 h-16 border-2 border-orange-300">
                           <AvatarImage src={course.profiles?.avatar_url} />
-                          <AvatarFallback className="text-lg">
+                          <AvatarFallback className="bg-gradient-to-r from-orange-500 to-purple-600 text-white text-lg">
                             {course.profiles?.full_name?.charAt(0) || 'I'}
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <h3 className="text-xl font-semibold">{course.profiles?.full_name || 'Unknown'}</h3>
+                          <h3 className="text-xl font-semibold text-gray-900">{course.profiles?.full_name || 'Unknown'}</h3>
                           <p className="text-gray-600">Course Instructor</p>
                         </div>
                       </div>
@@ -736,10 +783,10 @@ const CourseDetailPage = () => {
               </Tabs>
             </div>
 
-            {/* Sidebar - Made creator card static instead of sticky */}
+            {/* Sidebar */}
             <div className="space-y-6">
               {/* Price and Enrollment Card */}
-              <Card className="lg:sticky lg:top-6">
+              <Card className="lg:sticky lg:top-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
                 <CardContent className="p-6">
                   <div className="text-center mb-6">
                     {course.is_free ? (
@@ -753,7 +800,7 @@ const CourseDetailPage = () => {
 
                   {isEnrolled ? (
                     <Button 
-                      className="w-full mb-4" 
+                      className="w-full mb-4 bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700"
                       onClick={() => navigate(`/learning/course/${course.id}`)}
                     >
                       <BookOpen className="w-4 h-4 mr-2" />
@@ -762,7 +809,7 @@ const CourseDetailPage = () => {
                   ) : (
                     <div className="space-y-3">
                       <Button 
-                        className="w-full" 
+                        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 font-semibold py-3"
                         onClick={handleEnrollNow}
                         disabled={enrollmentLoading}
                       >
@@ -776,7 +823,7 @@ const CourseDetailPage = () => {
                       </Button>
                       {!course.is_free && (
                         <Button 
-                          className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90"
+                          className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 font-semibold py-3"
                           onClick={handleAddToCart}
                           disabled={loading}
                         >
@@ -787,14 +834,20 @@ const CourseDetailPage = () => {
                     </div>
                   )}
 
-                  <div className="text-center text-sm text-gray-600 mt-4">
-                    <p>30-day money-back guarantee</p>
-                    <p>Full lifetime access</p>
+                  <div className="text-center text-sm text-gray-600 mt-6 space-y-2">
+                    <div className="flex items-center justify-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <p>30-day money-back guarantee</p>
+                    </div>
+                    <div className="flex items-center justify-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <p>Full lifetime access</p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Creator Card - Removed sticky positioning */}
+              {/* Creator Card */}
               {creatorProfile && (
                 <div className="lg:block">
                   <CreatorCard creator={creatorProfile} />
@@ -802,37 +855,45 @@ const CourseDetailPage = () => {
               )}
 
               {/* Course Features */}
-              <Card>
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
                 <CardContent className="p-6">
-                  <h3 className="font-semibold mb-4">This course includes:</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Clock className="w-4 h-4 text-gray-500" />
-                      <span>{Math.floor(course.duration_minutes / 60)} hours on-demand video</span>
+                  <h3 className="font-semibold mb-4 text-gray-900">This course includes:</h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <GradientIcon>
+                        <Clock className="w-4 h-4" />
+                      </GradientIcon>
+                      <span className="text-sm text-gray-700">{Math.floor(course.duration_minutes / 60)} hours on-demand video</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <BookOpen className="w-4 h-4 text-gray-500" />
-                      <span>{totalLessons} lessons</span>
+                    <div className="flex items-center gap-3">
+                      <GradientIcon>
+                        <BookOpen className="w-4 h-4" />
+                      </GradientIcon>
+                      <span className="text-sm text-gray-700">{totalLessons} lessons</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Users className="w-4 h-4 text-gray-500" />
-                      <span>Access on mobile and desktop</span>
+                    <div className="flex items-center gap-3">
+                      <GradientIcon>
+                        <Users className="w-4 h-4" />
+                      </GradientIcon>
+                      <span className="text-sm text-gray-700">Access on mobile and desktop</span>
                     </div>
                     {course.certificate_enabled && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Award className="w-4 h-4 text-gray-500" />
-                        <span>Certificate of completion</span>
+                      <div className="flex items-center gap-3">
+                        <GradientIcon>
+                          <Award className="w-4 h-4" />
+                        </GradientIcon>
+                        <span className="text-sm text-gray-700">Certificate of completion</span>
                       </div>
                     )}
                   </div>
                   
                   {/* Wishlist Button - Only show if not enrolled */}
                   {!isEnrolled && (
-                    <div className="mt-6 pt-4 border-t border-gray-200 space-y-3">
+                    <div className="mt-6 pt-6 border-t border-gray-200 space-y-3">
                       <WishlistButton
                         itemId={course.id}
                         itemType="course"
-                        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-medium py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
                       >
                         <Heart className="w-4 h-4 mr-2" />
                         Add to Wishlist
@@ -853,12 +914,16 @@ const CourseDetailPage = () => {
 
               {/* Tags */}
               {course.tags && course.tags.length > 0 && (
-                <Card>
+                <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
                   <CardContent className="p-6">
-                    <h3 className="font-semibold mb-4">Tags</h3>
+                    <h3 className="font-semibold mb-4 text-gray-900">Tags</h3>
                     <div className="flex flex-wrap gap-2">
                       {course.tags.map((tag, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
+                        <Badge 
+                          key={index} 
+                          variant="outline" 
+                          className="text-xs bg-gradient-to-r from-orange-50 to-purple-50 border-orange-200 text-orange-700"
+                        >
                           {tag}
                         </Badge>
                       ))}
