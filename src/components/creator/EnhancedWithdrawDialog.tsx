@@ -54,12 +54,20 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   const { user } = useAuth();
   const { convertPrice, currentCurrency, formatPrice } = useCurrency();
 
-  // Helper function to remove + prefix from mobile numbers
+  // Helper function to format phone number for display (remove + prefix)
   const formatDisplayNumber = (phoneNumber: string | undefined) => {
     if (!phoneNumber) return '';
     
     // Remove any + prefix and trim whitespace
     return phoneNumber.replace(/^\+/, '').trim();
+  };
+
+  // Helper function to format phone number for PawaPay API (digits only)
+  const formatPhoneNumberForAPI = (phoneNumber: string | undefined) => {
+    if (!phoneNumber) return '';
+    
+    // Remove ALL non-digit characters: +, spaces, dashes, etc.
+    return phoneNumber.replace(/\D/g, '');
   };
 
   useEffect(() => {
@@ -248,12 +256,17 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         // Calculate the USD equivalent to deduct from balance
         const usdAmountToDeduct = withdrawAmount / exchangeRate;
 
+        // Format phone number for PawaPay API - DIGITS ONLY
+        const formattedPhoneNumber = formatPhoneNumberForAPI(profileData.mobile_money_number);
+
         console.log('Mobile Money Withdrawal:', {
           withdrawAmount: withdrawAmount, // Local currency amount
           localCurrency,
           exchangeRate,
           usdAmountToDeduct, // USD amount to deduct from balance
-          availableBalance
+          availableBalance,
+          originalPhoneNumber: profileData.mobile_money_number,
+          formattedPhoneNumber: formattedPhoneNumber
         });
 
         const { data, error } = await supabase.functions.invoke('pawapay-payout', {
@@ -261,7 +274,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
             amount: usdAmountToDeduct,          // USD amount to deduct from creator balance
             targetAmount: withdrawAmount,       // Local currency amount to send to user
             targetCurrency: localCurrency,      // Local currency code (e.g., ZMW, KES)
-            phone_number: profileData.mobile_money_number,
+            phone_number: formattedPhoneNumber, // Use formatted digits-only number
             operator: profileData.mobile_money_operator,
             country: countryCode,
             creator_id: user.id
