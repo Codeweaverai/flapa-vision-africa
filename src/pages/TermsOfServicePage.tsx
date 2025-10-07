@@ -1,19 +1,27 @@
-
 import React from 'react';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const TermsOfServicePage = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 relative overflow-hidden">
+      {/* Decorative background elements matching other pages */}
+      <div className="absolute inset-0">
+        <div className="absolute top-20 left-10 w-32 h-32 bg-gradient-to-r from-orange-300/30 to-purple-400/30 rounded-full blur-3xl"></div>
+        <div className="absolute top-40 right-20 w-40 h-40 bg-gradient-to-r from-purple-300/20 to-pink-400/20 rounded-full blur-2xl"></div>
+        <div className="absolute bottom-20 left-1/4 w-28 h-28 bg-gradient-to-r from-orange-400/25 to-purple-500/25 rounded-full blur-xl"></div>
+      </div>
+      
       <Layout>
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 py-8 relative z-10">
           <div className="max-w-4xl mx-auto">
-            <h1 className="text-4xl font-bold text-center mb-8">Terms of Service</h1>
+            <h1 className="text-4xl font-bold text-center mb-8 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+              Terms of Service
+            </h1>
             
-            <Card className="mb-6">
+            <Card className="mb-6 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
               <CardHeader>
-                <CardTitle>Last Updated: {new Date().toLocaleDateString()}</CardTitle>
+                <CardTitle className="text-xl">Last Updated: {new Date().toLocaleDateString()}</CardTitle>
               </CardHeader>
               <CardContent className="prose max-w-none">
                 <p className="text-muted-foreground mb-6">
@@ -22,7 +30,9 @@ const TermsOfServicePage = () => {
                 </p>
 
                 <section className="mb-8">
-                  <h2 className="text-2xl font-semibold mb-4">1. Acceptance of Terms</h2>
+                  <h2 className="text-2xl font-semibold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    1. Acceptance of Terms
+                  </h2>
                   <p className="mb-4">
                     By creating an account or using our services, you agree to these Terms and our Privacy Policy.
                     If you do not agree with these terms, please do not use our platform.
@@ -30,7 +40,9 @@ const TermsOfServicePage = () => {
                 </section>
 
                 <section className="mb-8">
-                  <h2 className="text-2xl font-semibold mb-4">2. Description of Service</h2>
+                  <h2 className="text-2xl font-semibold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    2. Description of Service
+                  </h2>
                   <p className="mb-4">
                     SkillPulse is an online learning platform that connects students with instructors and provides
                     access to courses, events, and educational content. We offer both free and paid content.
@@ -38,7 +50,9 @@ const TermsOfServicePage = () => {
                 </section>
 
                 <section className="mb-8">
-                  <h2 className="text-2xl font-semibold mb-4">3. User Accounts</h2>
+                  <h2 className="text-2xl font-semibold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    3. User Accounts
+                  </h2>
                   <h3 className="text-xl font-medium mb-2">Account Creation</h3>
                   <ul className="list-disc pl-6 mb-4">
                     <li>You must provide accurate and complete information when creating an account</li>
@@ -56,7 +70,9 @@ const TermsOfServicePage = () => {
                 </section>
 
                 <section className="mb-8">
-                  <h2 className="text-2xl font-semibold mb-4">4. Content and Intellectual Property</h2>
+                  <h2 className="text-2xl font-semibold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    4. Content and Intellectual Property
+                  </h2>
                   <h3 className="text-xl font-medium mb-2">Our Content</h3>
                   <p className="mb-4">
                     All content on SkillPulse, including but not limited to text, graphics, logos, videos, and software,
@@ -73,7 +89,9 @@ const TermsOfServicePage = () => {
                 </section>
 
                 <section className="mb-8">
-                  <h2 className="text-2xl font-semibold mb-4">5. Prohibited Uses</h2>
+                  <h2 className="text-2xl font-semibold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    5. Prohibited Uses
+                  </h2>
                   <p className="mb-4">You may not use our platform to:</p>
                   <ul className="list-disc pl-6 mb-4">
                     <li>Violate any applicable laws or regulations</li>
@@ -87,7 +105,9 @@ const TermsOfServicePage = () => {
                 </section>
 
                 <section className="mb-8">
-                  <h2 className="text-2xl font-semibold mb-4">6. Payments and Refunds</h2>
+                  <h2 className="text-2xl font-semibold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    6. Payments and Refunds
+                  </h2>
                   <h3 className="text-xl font-medium mb-2">Payments</h3>
                   <ul className="list-disc pl-6 mb-4">
                     <li>Payment is required for premium courses and events</li>
@@ -106,7 +126,9 @@ const TermsOfServicePage = () => {
                 </section>
 
                 <section className="mb-8">
-                  <h2 className="text-2xl font-semibold mb-4">7. Creator Terms</h2>
+                  <h2 className="text-2xl font-semibold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    7. Creator Terms
+                  </h2>
                   <h3 className="text-xl font-medium mb-2">Content Creation</h3>
                   <ul className="list-disc pl-6 mb-4">
                     <li>Creators must provide high-quality, original content</li>
@@ -125,7 +147,9 @@ const TermsOfServicePage = () => {
                 </section>
 
                 <section className="mb-8">
-                  <h2 className="text-2xl font-semibold mb-4">8. Privacy and Data Protection</h2>
+                  <h2 className="text-2xl font-semibold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    8. Privacy and Data Protection
+                  </h2>
                   <p className="mb-4">
                     Your privacy is important to us. Please review our Privacy Policy to understand how we
                     collect, use, and protect your personal information.
@@ -133,7 +157,9 @@ const TermsOfServicePage = () => {
                 </section>
 
                 <section className="mb-8">
-                  <h2 className="text-2xl font-semibold mb-4">9. Disclaimers and Limitations</h2>
+                  <h2 className="text-2xl font-semibold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    9. Disclaimers and Limitations
+                  </h2>
                   <h3 className="text-xl font-medium mb-2">Service Availability</h3>
                   <ul className="list-disc pl-6 mb-4">
                     <li>We strive for 99.9% uptime but cannot guarantee uninterrupted service</li>
@@ -150,7 +176,9 @@ const TermsOfServicePage = () => {
                 </section>
 
                 <section className="mb-8">
-                  <h2 className="text-2xl font-semibold mb-4">10. Termination</h2>
+                  <h2 className="text-2xl font-semibold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    10. Termination
+                  </h2>
                   <p className="mb-4">
                     We may terminate or suspend your account at any time for violations of these Terms.
                     You may also delete your account at any time through your account settings.
@@ -158,7 +186,9 @@ const TermsOfServicePage = () => {
                 </section>
 
                 <section className="mb-8">
-                  <h2 className="text-2xl font-semibold mb-4">11. Changes to Terms</h2>
+                  <h2 className="text-2xl font-semibold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    11. Changes to Terms
+                  </h2>
                   <p className="mb-4">
                     We may update these Terms from time to time. We will notify users of significant changes
                     and obtain consent where required by law.
@@ -166,7 +196,9 @@ const TermsOfServicePage = () => {
                 </section>
 
                 <section className="mb-8">
-                  <h2 className="text-2xl font-semibold mb-4">12. Governing Law</h2>
+                  <h2 className="text-2xl font-semibold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    12. Governing Law
+                  </h2>
                   <p className="mb-4">
                     These Terms are governed by the laws of the jurisdiction where SkillPulse is incorporated.
                     Any disputes will be resolved through binding arbitration.
@@ -174,11 +206,13 @@ const TermsOfServicePage = () => {
                 </section>
 
                 <section className="mb-8">
-                  <h2 className="text-2xl font-semibold mb-4">13. Contact Information</h2>
+                  <h2 className="text-2xl font-semibold mb-4 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    13. Contact Information
+                  </h2>
                   <p className="mb-4">
                     If you have questions about these Terms of Service, please contact us:
                   </p>
-                  <div className="bg-muted p-4 rounded-lg">
+                  <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg border border-orange-200">
                     <p><strong>Email:</strong> help@skillpulse.com</p>
                     <p><strong>Subject:</strong> Terms of Service Inquiry</p>
                   </div>
