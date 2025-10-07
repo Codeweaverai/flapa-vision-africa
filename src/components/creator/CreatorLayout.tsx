@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from 'react';
+import React, { ReactNode, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -44,67 +44,67 @@ const CreatorLayout = ({ children, title }: CreatorLayoutProps) => {
     {
       label: 'Dashboard',
       href: '/creator/dashboard',
-      icon: <Rocket className="h-5 w-5 mr-2" />
+      icon: <Rocket className="h-5 w-5" />
     },
     {
       label: 'Courses',
       href: '/creator/courses',
-      icon: <BookOpen className="h-5 w-5 mr-2" />
+      icon: <BookOpen className="h-5 w-5" />
     },
     {
       label: 'Events',
       href: '/creator/events',
-      icon: <Calendar className="h-5 w-5 mr-2" />
+      icon: <Calendar className="h-5 w-5" />
     },
     {
       label: 'Workplaces',
       href: '/creator/workplaces',
-      icon: <Building2 className="h-5 w-5 mr-2" />
+      icon: <Building2 className="h-5 w-5" />
     },
     {
       label: 'Recent Activities',
       href: '/creator/activities',
-      icon: <Activity className="h-5 w-5 mr-2" />
+      icon: <Activity className="h-5 w-5" />
     },
     {
       label: 'inbox',
       href: '/inbox',
-      icon: <BookOpen className="h-5 w-5 mr-2" />
+      icon: <BookOpen className="h-5 w-5" />
     },
     {
       label: 'Students',
       href: '/creator/students',
-      icon: <Users className="h-5 w-5 mr-2" />
+      icon: <Users className="h-5 w-5" />
     },
     {
       label: 'Payments',
       href: '/creator/payments',
-      icon: <DollarSign className="h-5 w-5 mr-2" />
+      icon: <DollarSign className="h-5 w-5" />
     },
     {
       label: 'Analytics',
       href: '/creator/analytics',
-      icon: <BarChart className="h-5 w-5 mr-2" />
+      icon: <BarChart className="h-5 w-5" />
     },
     {
       label: 'Attendee Management',
       href: '/creator/attendees',
-      icon: <Calendar className="h-5 w-5 mr-2" />
+      icon: <Calendar className="h-5 w-5" />
     },
     {
       label: 'Ticket Verification',
       href: '/ticket-verification',
-      icon: <Calendar className="h-5 w-5 mr-2" />
+      icon: <Calendar className="h-5 w-5" />
     },
     {
       label: 'Settings',
       href: '/creator/settings',
-      icon: <Settings className="h-5 w-5 mr-2" />
+      icon: <Settings className="h-5 w-5" />
     }
   ];
   
   // Gradient icon component
-  const GradientIcon = ({ children, isActive }: { children: ReactNode; isActive: boolean }) => (
+  const GradientIcon = ({ children, isActive }: { children: React.ReactNode; isActive: boolean }) => (
     <div className={cn(
       "mr-2 p-1 rounded-lg bg-gradient-to-r from-orange-500 to-purple-600 text-white",
       isActive ? "opacity-100" : "opacity-70"
