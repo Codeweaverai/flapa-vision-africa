@@ -4,7 +4,7 @@ import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Users, Award, Globe, Zap, Heart, Target, CheckCircle, ArrowRight, Linkedin, Twitter, Mail, Play } from 'lucide-react';
+import { Users, Award, Globe, Zap, Heart, Target, CheckCircle, ArrowRight, Linkedin, Twitter, Mail, Play, Star, TrendingUp, BookOpen, Shield } from 'lucide-react';
 import YouTubeModal from '@/components/video/YouTubeModal';
 
 const AboutPage = () => {
@@ -15,46 +15,46 @@ const AboutPage = () => {
     {
       icon: Users,
       title: "Community First",
-      description: "We believe in the power of community and collaboration to drive learning and growth."
+      description: "Building collaborative learning ecosystems where knowledge flows freely and connections thrive."
     },
     {
       icon: Award,
       title: "Excellence",
-      description: "We strive for excellence in everything we do, from course quality to user experience."
+      description: "Setting the highest standards in content quality, platform performance, and user experience."
     },
     {
       icon: Globe,
       title: "Global Access",
-      description: "Making quality education accessible to learners worldwide, regardless of location or background."
+      description: "Breaking geographical barriers to make world-class education accessible to everyone, everywhere."
     },
     {
       icon: Zap,
       title: "Innovation",
-      description: "Continuously innovating to improve the learning experience through technology."
+      description: "Leveraging cutting-edge technology to create immersive and effective learning experiences."
     }
   ];
 
   const stats = [
-    { number: "10,000+", label: "Active Learners" },
-    { number: "500+", label: "Expert Instructors" },
-    { number: "1,000+", label: "Courses Available" },
-    { number: "50+", label: "Countries Reached" }
+    { number: "10,000+", label: "Active Learners", icon: Users },
+    { number: "500+", label: "Expert Instructors", icon: Award },
+    { number: "1,000+", label: "Courses Available", icon: BookOpen },
+    { number: "50+", label: "Countries Reached", icon: Globe }
   ];
 
   const features = [
-    "Interactive video learning",
-    "Real-time discussions",
-    "Mobile-friendly platform",
-    "Certificate programs",
-    "Progress tracking",
-    "Community support"
+    "Interactive video learning with AI-powered insights",
+    "Real-time collaborative discussions",
+    "Mobile-optimized seamless experience",
+    "Industry-recognized certificate programs",
+    "Advanced progress tracking & analytics",
+    "24/7 community support network"
   ];
 
   const teamMembers = [
     {
       name: "Mbolela Pule",
       role: "CEO & Founder",
-      bio: "Driven by a passion to democratize education across Africa through innovative technology. With over 7 years of experience in EdTech and Travel Tech, he is committed to building accessible, impactful learning and event platforms that empower individuals and creators alike..",
+      bio: "Driven by a passion to democratize education across Africa through innovative technology. With over 7 years of experience in EdTech and Travel Tech, he is committed to building accessible, impactful learning and event platforms that empower individuals and creators alike.",
       image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//profile.jpeg?w=400&h=400&fit=crop&crop=face",
       linkedin: "#",
       twitter: "#",
@@ -72,7 +72,7 @@ const AboutPage = () => {
     {
       name: "Nakolo Pule",
       role: "Head of Content",
-      bio: " Specializing in content creation and finance, where she leads the development of engaging, high-quality educational material tailored to empower learners and creators alike.",
+      bio: "Specializing in content creation and finance, where she leads the development of engaging, high-quality educational material tailored to empower learners and creators alike.",
       image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//WhatsApp_Image_2025-06-12_at_17.40.14_5fcc6eb5-removebg-preview.png?w=400&h=400&fit=crop&crop=face",
       linkedin: "#",
       twitter: "#",
@@ -81,7 +81,7 @@ const AboutPage = () => {
     {
       name: "Chishala Kapobe",
       role: "Director Learning & Events Operations",
-      bio: "Director of Learning & Events Operations with a focus on crafting intuitive, accessible digital learning experiences and managing impactful events for creators across Africa..",
+      bio: "Director of Learning & Events Operations with a focus on crafting intuitive, accessible digital learning experiences and managing impactful events for creators across Africa.",
       image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//WhatsApp_Image_2025-07-02_at_10.54.42_bec1ba2c-removebg-preview%20(1).png?w=400&h=400&fit=crop&crop=face",
       linkedin: "#",
       twitter: "#",
@@ -89,169 +89,260 @@ const AboutPage = () => {
     }
   ];
 
+  const achievements = [
+    {
+      icon: Award,
+      title: "Best EdTech Platform 2024",
+      description: "Recognized for innovation in online education"
+    },
+    {
+      icon: Users,
+      title: "10K+ Community",
+      description: "Active learners across 50+ countries"
+    },
+    {
+      icon: TrendingUp,
+      title: "95% Success Rate",
+      description: "Learners achieving their goals"
+    },
+    {
+      icon: Shield,
+      title: "Secure & Reliable",
+      description: "Enterprise-grade security standards"
+    }
+  ];
+
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-orange-50">
-        {/* Hero Section with Image Background */}
-        <section className="relative h-[70vh] min-h-[550px] w-full overflow-hidden">
-          <div className="absolute inset-0">
-            <img
-              src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/female-pupil-reviewing-educational-research-collection-library.jpg"
-              alt="Students learning together"
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-orange-600/80 to-purple-700/80" />
-          </div>
-          
-          <div className="relative z-10 h-full flex items-center">
-            <div className="container mx-auto px-4 text-center text-white">
-              <Badge className="mb-6 bg-white/20 backdrop-blur-sm text-white hover:bg-white/30">
-                Our Story
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 relative overflow-hidden">
+        {/* Background Elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-20 left-10 w-32 h-32 bg-gradient-to-r from-orange-300/30 to-purple-400/30 rounded-full blur-3xl"></div>
+          <div className="absolute top-40 right-20 w-40 h-40 bg-gradient-to-r from-purple-300/20 to-pink-400/20 rounded-full blur-2xl"></div>
+          <div className="absolute bottom-20 left-1/4 w-28 h-28 bg-gradient-to-r from-orange-400/25 to-purple-500/25 rounded-full blur-xl"></div>
+        </div>
+
+        {/* Hero Section */}
+        <section className="relative min-h-[80vh] flex items-center justify-center pt-20 pb-16">
+          <div className="container mx-auto px-4 relative z-10">
+            <div className="text-center max-w-6xl mx-auto">
+              <Badge className="mb-6 bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 px-6 py-2 text-lg font-semibold">
+                <Star className="h-4 w-4 mr-2" />
+                Transforming Education
               </Badge>
-              <h1 className="text-5xl md:text-6xl font-bold mb-6">
-                About <span className="text-white">SkillPulse</span>
+              
+              <h1 className="text-5xl md:text-7xl font-bold mb-8 leading-tight">
+                Empowering The
+                <span className="block bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                  Skill-Driven Generation
+                </span>
               </h1>
-              <div className="max-w-4xl mx-auto mb-8">
-                <p className="text-3xl md:text-4xl font-bold mb-4 leading-tight">
-                  Built for the Skill-Driven Generation
-                </p>
-                <p className="text-xl md:text-2xl opacity-90 leading-relaxed">
-                  "Democratizing skill development and event hosting to empower creators worldwide."
-                </p>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link to="/auth">
-                  <Button size="lg" className="text-lg px-8 py-6 bg-white text-purple-700 hover:bg-white/90">
-                    Get Started <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
-                </Link>
-                <Link to="/become-creator">
-                  <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-white text-purple-700 hover:bg-white/10">
-                    Learn More
-                  </Button>
-                </Link>
+              
+              <p className="text-xl md:text-2xl text-gray-700 mb-12 max-w-4xl mx-auto leading-relaxed">
+                "Democratizing skill development and event hosting to empower creators worldwide 
+                through innovative technology and accessible learning experiences."
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-6 justify-center mb-16">
+                <Button asChild size="lg" className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-semibold px-8 py-4 rounded-xl shadow-lg text-lg transition-all duration-300 hover:scale-105">
+                  <Link to="/auth">
+                    Start Learning Journey <ArrowRight className="ml-2 h-5 w-5" />
+                  </Link>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  onClick={() => setShowVideo(true)}
+                  className="border-2 border-orange-300 text-orange-600 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 font-semibold px-8 py-4 rounded-xl text-lg transition-all duration-300"
+                >
+                  <Play className="h-5 w-5 mr-2" />
+                  Watch Our Story
+                </Button>
               </div>
             </div>
           </div>
         </section>
 
         {/* Stats Section */}
-        <section className="py-16 px-4 bg-white">
-          <div className="container mx-auto max-w-6xl">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-              {stats.map((stat, index) => (
-                <div key={index} className="text-center">
-                  <div className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent mb-2">
-                    {stat.number}
-                  </div>
-                  <div className="text-muted-foreground">{stat.label}</div>
-                </div>
-              ))}
+        <section className="py-16 relative z-10">
+          <div className="container mx-auto px-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
+              {stats.map((stat, index) => {
+                const IconComponent = stat.icon;
+                return (
+                  <Card key={index} className="bg-white/90 backdrop-blur-sm border-0 shadow-xl text-center p-6 hover:shadow-2xl transition-all duration-300 group">
+                    <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-3 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300">
+                      <IconComponent className="h-8 w-8" />
+                    </div>
+                    <div className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent mb-2">
+                      {stat.number}
+                    </div>
+                    <div className="text-gray-600 font-medium">{stat.label}</div>
+                  </Card>
+                );
+              })}
             </div>
           </div>
         </section>
 
-        {/* Mission Section */}
-        <section className="py-20 px-4">
-          <div className="container mx-auto max-w-6xl">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-              <div>
-                <h2 className="text-4xl font-bold mb-6">
-                  Our Mission
-                </h2>
-                <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
-                  At SkillPulse, we believe that education should be accessible, engaging, and 
-                  transformative. We're building a platform where knowledge flows freely, 
-                  creators are empowered, and learners can achieve their dreams.
-                </p>
-                <div className="space-y-4">
-                  {features.map((feature, index) => (
-                    <div key={index} className="flex items-center gap-3">
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                      <span className="text-lg">{feature}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="relative">
-                <img
-                  src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//study-group-african-people.jpg?w=600&h=400&fit=crop"
-                  alt="Learning together"
-                  className="rounded-2xl shadow-2xl w-full"
-                />
-                <div className="absolute -bottom-6 -right-6 bg-gradient-to-r from-orange-500 to-purple-600 text-white p-6 rounded-2xl shadow-xl">
-                  <Heart className="h-8 w-8 mb-2" />
-                  <div className="font-bold">Passionate</div>
-                  <div className="text-sm opacity-90">Learning Community</div>
-                </div>
-              </div>
+        {/* Mission & Vision Section */}
+        <section className="py-20 relative z-10">
+          <div className="container mx-auto px-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-6xl mx-auto">
+              {/* Mission Card */}
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl p-8">
+                <CardHeader className="text-center pb-6">
+                  <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-4 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center text-white">
+                    <Target className="h-8 w-8" />
+                  </div>
+                  <CardTitle className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    Our Mission
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-lg text-gray-700 mb-8 leading-relaxed text-center">
+                    To create an inclusive platform where knowledge knows no boundaries, 
+                    empowering both learners and creators to achieve their full potential 
+                    through accessible, high-quality education and event experiences.
+                  </p>
+                  <div className="space-y-4">
+                    {features.map((feature, index) => (
+                      <div key={index} className="flex items-center gap-4 p-3 rounded-lg bg-gradient-to-r from-orange-50 to-purple-50">
+                        <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
+                        <span className="text-gray-700">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Vision Card */}
+              <Card className="bg-gradient-to-r from-purple-600 to-orange-500 text-white shadow-2xl p-8">
+                <CardHeader className="text-center pb-6">
+                  <div className="bg-white/20 p-4 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center backdrop-blur-sm">
+                    <Globe className="h-8 w-8" />
+                  </div>
+                  <CardTitle className="text-3xl font-bold">
+                    Our Vision
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-lg mb-8 leading-relaxed text-center opacity-95">
+                    We envision a world where geographical boundaries don't limit educational 
+                    opportunities, and where every individual has the tools to become both 
+                    a lifelong learner and an impactful teacher.
+                  </p>
+                  <div className="text-center">
+                    <Button
+                      size="lg"
+                      className="bg-white text-purple-600 hover:bg-white/90 font-semibold px-8 py-4 rounded-xl text-lg transition-all duration-300 hover:scale-105"
+                    >
+                      Join Our Movement
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </section>
 
         {/* Values Section */}
-<section className="py-20 px-4 bg-white/50">
-  <div className="container mx-auto max-w-6xl">
-    <div className="text-center mb-16">
-      <h2 className="text-4xl font-bold mb-4">Our Values</h2>
-      <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-        These core values guide everything we do and shape the culture of our platform.
-      </p>
-    </div>
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-      {values.map((value, index) => (
-        <Card key={index} className="text-center hover:shadow-lg transition-shadow border-purple-100 hover:border-purple-200">
-          <CardHeader>
-            <div className="mb-4 flex justify-center">
-              <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-3 rounded-full">
-                <value.icon className="h-8 w-8 text-white" />
-              </div>
-            </div>
-            <CardTitle className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
-              {value.title}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <CardDescription className="text-base">{value.description}</CardDescription>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  </div>
-   </section>
-
-        {/* Meet Our Team Section */}
-        <section className="py-20 px-4 bg-white">
-          <div className="container mx-auto max-w-6xl">
+        <section className="py-20 bg-white/50 backdrop-blur-sm relative z-10">
+          <div className="container mx-auto px-4">
             <div className="text-center mb-16">
-              <h2 className="text-4xl font-bold mb-4">Meet Our Team</h2>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                The passionate individuals behind SkillPulse, working tirelessly to transform education through technology.
+              <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                Our Core Values
+              </h2>
+              <p className="text-xl text-gray-700 max-w-2xl mx-auto">
+                The principles that guide our decisions, shape our culture, and drive our mission forward.
               </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-              {teamMembers.map((member, index) => (
-                <Card key={index} className="text-center hover:shadow-lg transition-shadow border-purple-100 hover:border-purple-200">
-                  <CardContent className="p-6">
-                    <div className="mb-4">
-                      <img 
-                        src={member.image} 
-                        alt={member.name}
-                        className="w-24 h-24 rounded-full mx-auto mb-4 object-cover border-4 border-purple-100"
-                      />
-                      <h3 className="text-xl font-bold text-purple-800">{member.name}</h3>
-                      <p className="text-orange-600 font-medium">{member.role}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
+              {values.map((value, index) => {
+                const IconComponent = value.icon;
+                return (
+                  <Card key={index} className="bg-white/90 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300 group text-center">
+                    <CardHeader className="pb-4">
+                      <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-4 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300">
+                        <IconComponent className="h-6 w-6" />
+                      </div>
+                      <CardTitle className="text-xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                        {value.title}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-gray-600 leading-relaxed">{value.description}</p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* Achievements Section */}
+        <section className="py-20 relative z-10">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                Our Achievements
+              </h2>
+              <p className="text-xl text-gray-700 max-w-2xl mx-auto">
+                Milestones that mark our journey in transforming education and empowering communities.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
+              {achievements.map((achievement, index) => {
+                const IconComponent = achievement.icon;
+                return (
+                  <Card key={index} className="bg-white/90 backdrop-blur-sm border-0 shadow-xl p-6 text-center hover:shadow-2xl transition-all duration-300 group">
+                    <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-3 rounded-full w-14 h-14 mx-auto mb-4 flex items-center justify-center text-white">
+                      <IconComponent className="h-6 w-6" />
                     </div>
-                    <p className="text-muted-foreground text-sm mb-4">{member.bio}</p>
+                    <h3 className="text-lg font-bold text-gray-800 mb-2">{achievement.title}</h3>
+                    <p className="text-gray-600 text-sm">{achievement.description}</p>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* Team Section */}
+        <section className="py-20 bg-white/50 backdrop-blur-sm relative z-10">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                Meet Our Visionaries
+              </h2>
+              <p className="text-xl text-gray-700 max-w-2xl mx-auto">
+                The passionate leaders driving innovation and transforming education through technology.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
+              {teamMembers.map((member, index) => (
+                <Card key={index} className="bg-white/90 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300 group overflow-hidden">
+                  <div className="relative overflow-hidden">
+                    <img 
+                      src={member.image} 
+                      alt={member.name}
+                      className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  </div>
+                  <CardContent className="p-6 text-center">
+                    <h3 className="text-xl font-bold text-gray-800 mb-1">{member.name}</h3>
+                    <p className="text-orange-600 font-semibold mb-4">{member.role}</p>
+                    <p className="text-gray-600 text-sm mb-6 leading-relaxed">{member.bio}</p>
                     <div className="flex justify-center gap-3">
-                      <Button variant="outline" size="sm" className="p-2 hover:bg-purple-100">
-                        <Linkedin className="h-4 w-4" />
+                      <Button variant="outline" size="sm" className="p-2 hover:bg-orange-50 border-orange-200">
+                        <Linkedin className="h-4 w-4 text-orange-600" />
                       </Button>
-                      <Button variant="outline" size="sm" className="p-2 hover:bg-purple-100">
-                        <Twitter className="h-4 w-4" />
+                      <Button variant="outline" size="sm" className="p-2 hover:bg-purple-50 border-purple-200">
+                        <Twitter className="h-4 w-4 text-purple-600" />
                       </Button>
-                      <Button variant="outline" size="sm" className="p-2 hover:bg-purple-100">
-                        <Mail className="h-4 w-4" />
+                      <Button variant="outline" size="sm" className="p-2 hover:bg-gray-50 border-gray-200">
+                        <Mail className="h-4 w-4 text-gray-600" />
                       </Button>
                     </div>
                   </CardContent>
@@ -262,85 +353,78 @@ const AboutPage = () => {
         </section>
 
         {/* Video Section */}
-        <section className="py-20 bg-gradient-to-br from-purple-50 to-orange-50">
-          <div className="container mx-auto max-w-4xl px-4">
+        <section className="py-20 relative z-10">
+          <div className="container mx-auto px-4">
             <div className="text-center mb-12">
               <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                See SkillPulse in Action
+                Experience SkillPulse
               </h2>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                Discover how SkillPulse is transforming education and empowering creators worldwide.
+              <p className="text-xl text-gray-700 max-w-2xl mx-auto">
+                See how we're revolutionizing education and empowering creators in our platform demo.
               </p>
             </div>
             
-            <div className="relative group cursor-pointer" onClick={() => setShowVideo(true)}>
-              <div className="relative overflow-hidden rounded-2xl shadow-2xl bg-gradient-to-br from-orange-500 to-purple-600 p-1">
-                <div className="bg-black rounded-xl overflow-hidden">
-                  <div className="aspect-video bg-gradient-to-br from-orange-900/20 to-purple-900/20 flex items-center justify-center relative">
-                    <img 
-                      src="https://img.youtube.com/vi/B8ay-17oP_0/maxresdefault.jpg" 
-                      alt="SkillPulse Demo Video"
-                      className="w-full h-full object-cover opacity-80"
-                    />
-                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                      <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-6 rounded-full shadow-2xl group-hover:scale-110 transition-transform duration-300">
-                        <Play className="h-12 w-12 text-white ml-1" fill="white" />
+            <div className="max-w-4xl mx-auto">
+              <div className="relative group cursor-pointer" onClick={() => setShowVideo(true)}>
+                <div className="relative overflow-hidden rounded-2xl shadow-2xl bg-gradient-to-br from-orange-500 to-purple-600 p-1">
+                  <div className="bg-black rounded-xl overflow-hidden">
+                    <div className="aspect-video bg-gradient-to-br from-orange-900/20 to-purple-900/20 flex items-center justify-center relative">
+                      <img 
+                        src="https://img.youtube.com/vi/B8ay-17oP_0/maxresdefault.jpg" 
+                        alt="SkillPulse Demo Video"
+                        className="w-full h-full object-cover opacity-80 group-hover:opacity-60 transition-opacity duration-300"
+                      />
+                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center group-hover:bg-black/20 transition-all duration-300">
+                        <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-8 rounded-full shadow-2xl group-hover:scale-110 transition-transform duration-300">
+                          <Play className="h-16 w-16 text-white ml-1" fill="white" />
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-              <div className="absolute -bottom-6 -right-6 bg-gradient-to-r from-orange-500 to-purple-600 text-white p-4 rounded-2xl shadow-xl">
-                <div className="font-bold text-lg">Watch Demo</div>
-                <div className="text-sm opacity-90">2:30 minutes</div>
+                <div className="absolute -bottom-4 -right-4 bg-gradient-to-r from-orange-500 to-purple-600 text-white p-4 rounded-2xl shadow-xl">
+                  <div className="font-bold text-sm">Watch Demo</div>
+                  <div className="text-xs opacity-90">2:30 minutes</div>
+                </div>
               </div>
             </div>
           </div>
         </section>
 
-      {/* Vision Section */}
-<section className="py-20 px-4">
-  <div className="container mx-auto max-w-4xl px-0 sm:px-4"> {/* Changed px-4 to px-0 sm:px-4 */}
-    <Card className="bg-gradient-to-r from-purple-600 to-orange-500 text-white shadow-xl mx-0 sm:mx-4"> {/* Added mx-0 sm:mx-4 */}
-      <CardContent className="p-6 md:p-12 text-center"> {/* Changed p-12 to p-6 md:p-12 */}
-        <Target className="h-16 w-16 mx-auto mb-6 opacity-90" />
-        <h2 className="text-3xl md:text-4xl font-bold mb-6">Our Vision</h2> {/* Added responsive text size */}
-        <p className="text-lg md:text-xl leading-relaxed mb-8 opacity-90 px-4 sm:px-0"> {/* Added responsive text size and padding */}
-          To create a world where anyone, anywhere, can learn anything they want and 
-          share their knowledge with others. We envision a future where geographical 
-          boundaries don't limit educational opportunities, and where every person 
-          has the tools to become both a learner and a teacher.
-        </p>
-        <Button
-          size="lg"
-          className="text-lg px-8 py-6 bg-white text-black hover:bg-white/90"
-        >
-          Join Our Mission
-        </Button>
-      </CardContent>
-    </Card>
-  </div>
-</section>
-
         {/* CTA Section */}
-        <section className="py-20 px-4 bg-white">
-          <div className="container mx-auto max-w-4xl text-center">
-            <h2 className="text-4xl font-bold mb-6">Ready to Start Learning?</h2>
-            <p className="text-xl text-muted-foreground mb-8">
-              Join thousands of learners who are already transforming their lives through education.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/explore-courses">
-                <Button size="lg" className="text-lg px-8 py-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
-                  Start Learning Today
-                </Button>
-              </Link>
-              <Link to="/become-creator">
-                <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-purple-200 text-purple-600 hover:bg-purple-50">
-                  Become a Creator
-                </Button>
-              </Link>
-            </div>
+        <section className="py-20 relative z-10">
+          <div className="container mx-auto px-4">
+            <Card className="bg-gradient-to-r from-orange-500 to-purple-600 border-0 shadow-2xl max-w-4xl mx-auto overflow-hidden">
+              <CardContent className="p-12 text-center text-white">
+                <div className="mb-6">
+                  <Heart className="h-16 w-16 mx-auto mb-4 text-white/90" />
+                </div>
+                <h3 className="text-4xl font-bold mb-6">
+                  Ready to Transform Lives?
+                </h3>
+                <p className="text-xl mb-8 text-white/90 max-w-2xl mx-auto">
+                  Join our mission to democratize education and empower the next generation 
+                  of learners and creators worldwide.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <Button asChild size="lg" variant="secondary" className="bg-white text-orange-600 hover:bg-gray-100 font-semibold px-8 py-4 rounded-xl text-lg transition-all duration-300 hover:scale-105">
+                    <Link to="/explore-courses">
+                      Explore Courses
+                    </Link>
+                  </Button>
+                  <Button 
+                    asChild
+                    variant="outline" 
+                    size="lg"
+                    className="border-2 border-white text-white hover:bg-white/10 font-semibold px-8 py-4 rounded-xl text-lg transition-all duration-300"
+                  >
+                    <Link to="/become-creator">
+                      Become a Creator
+                    </Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </section>
       </div>
@@ -351,6 +435,7 @@ const AboutPage = () => {
         onClose={() => setShowVideo(false)}
         videoUrl={videoUrl}
         title="SkillPulse Platform Demo"
+        className="max-w-4xl"
       />
     </Layout>
   );
