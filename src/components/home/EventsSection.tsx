@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,9 +8,17 @@ import { Event, fetchEvents } from '@/services/eventService';
 import { format, parseISO, isAfter } from 'date-fns';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import PriceDisplay from '@/components/currency/PriceDisplay';
+import { supabase } from '@/lib/supabaseClient';
+
+interface EventWithReviews extends Event {
+  reviews?: {
+    avg_rating: number;
+    total_reviews: number;
+  };
+}
 
 const EventsSection = () => {
-  const [events, setEvents] = useState<Event[]>([]);
+  const [events, setEvents] = useState<EventWithReviews[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,16 +28,67 @@ const EventsSection = () => {
   const loadEvents = async () => {
     try {
       const eventsData = await fetchEvents();
+      
+      // Fetch reviews for all events
+      const eventsWithReviews = await Promise.all(
+        eventsData.map(async (event) => {
+          const { data: reviews } = await supabase
+            .from('event_reviews')
+            .select('rating')
+            .eq('event_id', event.id);
+
+          const totalReviews = reviews?.length || 0;
+          const avgRating = totalReviews > 0 
+            ? reviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews 
+            : 0;
+
+          return {
+            ...event,
+            reviews: {
+              avg_rating: avgRating,
+              total_reviews: totalReviews
+            }
+          };
+        })
+      );
+
       // Filter for upcoming events only
-      const upcomingEvents = eventsData
+      const upcomingEvents = eventsWithReviews
         .filter(event => isAfter(parseISO(event.start_time), new Date()))
         .slice(0, 15); // Show 15 events for 3 rows of 5
+      
       setEvents(upcomingEvents);
     } catch (error) {
       console.error('Error loading events:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const renderStarRating = (rating: number) => {
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
+    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+
+    return (
+      <div className="flex items-center gap-0.5">
+        {[...Array(fullStars)].map((_, i) => (
+          <Star key={`full-${i}`} className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+        ))}
+        {hasHalfStar && (
+          <div className="relative">
+            <Star className="h-2.5 w-2.5 text-gray-300" />
+            <div className="absolute top-0 left-0 w-1/2 overflow-hidden">
+              <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+            </div>
+          </div>
+        )}
+        {[...Array(emptyStars)].map((_, i) => (
+          <Star key={`empty-${i}`} className="h-2.5 w-2.5 text-gray-300" />
+        ))}
+        <span className="text-xs text-gray-600 ml-1">({rating.toFixed(1)})</span>
+      </div>
+    );
   };
 
   return (
@@ -130,6 +188,16 @@ const EventsSection = () => {
                 </CardHeader>
                 
                 <CardContent className="pt-0 p-3">
+                  {/* Event Reviews */}
+                  {event.reviews && event.reviews.total_reviews > 0 && (
+                    <div className="flex items-center justify-between mb-2">
+                      {renderStarRating(event.reviews.avg_rating)}
+                      <span className="text-xs text-gray-500">
+                        {event.reviews.total_reviews} review{event.reviews.total_reviews !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  )}
+
                   <div className="space-y-2 text-xs text-gray-600 mb-3">
                     <div className="flex items-center gap-1">
                       <Calendar className="h-3 w-3 text-purple-600" />
