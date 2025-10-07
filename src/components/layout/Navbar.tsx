@@ -227,14 +227,14 @@ const Navbar = () => {
               <Link
                 key={link.name}
                 to={link.path}
-                className={`${isActive(link.path)} font-medium hover:text-primary transition-colors`}
+                className={`${isActive(link.path)} font-medium hover:text-primary transition-colors text-sm`}
               >
                 {link.name}
               </Link>
             ))}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center gap-1">
+                <Button variant="ghost" className="flex items-center gap-1 text-sm">
                   <Compass className="h-4 w-4 mr-1" />
                   Explore
                 </Button>
@@ -242,7 +242,7 @@ const Navbar = () => {
               <DropdownMenuContent align="start">
                 {exploreLinks.map((link) => (
                   <DropdownMenuItem key={link.name} asChild>
-                    <Link to={link.path}>{link.name}</Link>
+                    <Link to={link.path} className="text-sm">{link.name}</Link>
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
@@ -285,35 +285,35 @@ const Navbar = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => navigate('/account')}>
+                  <DropdownMenuItem onClick={() => navigate('/account')} className="text-sm">
                     My Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/my-orders')}>
+                  <DropdownMenuItem onClick={() => navigate('/my-orders')} className="text-sm">
                     My Orders
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/my-courses')}>
+                  <DropdownMenuItem onClick={() => navigate('/my-courses')} className="text-sm">
                     My Learning
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/wishlist')}>
+                  <DropdownMenuItem onClick={() => navigate('/wishlist')} className="text-sm">
                     My Wishlist
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/gift-cards')}>
+                  <DropdownMenuItem onClick={() => navigate('/gift-cards')} className="text-sm">
                    Buy Gift Cards
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate('/explore-courses')}>
+                  <DropdownMenuItem onClick={() => navigate('/explore-courses')} className="text-sm">
                     Explore Courses
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/explore-events')}>
+                  <DropdownMenuItem onClick={() => navigate('/explore-events')} className="text-sm">
                     Explore Events
                   </DropdownMenuItem>
                   {user.user_metadata?.is_creator || user.user_metadata?.role === 'creator' ? (
                     <>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => navigate('/creator/dashboard')}>
+                      <DropdownMenuItem onClick={() => navigate('/creator/dashboard')} className="text-sm">
                         Creator Dashboard
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate('/creator/payments')}>
+                      <DropdownMenuItem onClick={() => navigate('/creator/payments')} className="text-sm">
                         Payments & Payouts
                       </DropdownMenuItem>
                     </>
@@ -321,13 +321,13 @@ const Navbar = () => {
                   {user.user_metadata?.role === 'admin' ? (
                     <>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => navigate('/admin')}>
+                      <DropdownMenuItem onClick={() => navigate('/admin')} className="text-sm">
                         Admin Dashboard
                       </DropdownMenuItem>
                     </>
                   ) : null}
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut}>
+                  <DropdownMenuItem onClick={handleSignOut} className="text-sm">
                     Sign Out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -369,7 +369,7 @@ const Navbar = () => {
                   <Link
                     key={link.name}
                     to={link.path}
-                    className={`${isActive(link.path)} font-medium text-lg py-2`}
+                    className={`${isActive(link.path)} font-medium text-base py-2`}
                     onClick={() => setIsMenuOpen(false)}
                   >
                     {link.name}
@@ -381,7 +381,7 @@ const Navbar = () => {
                     <Link
                       key={link.name}
                       to={link.path}
-                      className={`${isActive(link.path)} font-medium text-lg py-2 block`}
+                      className={`${isActive(link.path)} font-medium text-base py-2 block`}
                       onClick={() => setIsMenuOpen(false)}
                     >
                       {link.name}
