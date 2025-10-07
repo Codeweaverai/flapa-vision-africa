@@ -1,9 +1,9 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Heart } from 'lucide-react';
 import { useWishlist } from '@/hooks/useWishlist';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface WishlistButtonProps {
   itemId: string;
@@ -12,6 +12,8 @@ interface WishlistButtonProps {
   variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
   size?: 'default' | 'sm' | 'lg' | 'icon';
   children?: React.ReactNode;
+  showText?: boolean;
+  iconOnly?: boolean;
 }
 
 const WishlistButton: React.FC<WishlistButtonProps> = ({
@@ -20,21 +22,41 @@ const WishlistButton: React.FC<WishlistButtonProps> = ({
   className,
   variant = 'ghost',
   size = 'sm',
-  children
+  children,
+  showText = false,
+  iconOnly = false
 }) => {
-  const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
+  const { isInWishlist, toggleWishlist, isLoading } = useWishlist();
+  const [isProcessing, setIsProcessing] = useState(false);
   
   const inWishlist = isInWishlist(itemId, itemType);
+  const isDisabled = isLoading || isProcessing;
 
-  const handleToggle = (e: React.MouseEvent) => {
+  const handleToggle = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
-    if (inWishlist) {
-      removeFromWishlist(itemId, itemType);
-    } else {
-      addToWishlist(itemId, itemType);
+    if (isDisabled) return;
+    
+    setIsProcessing(true);
+    try {
+      await toggleWishlist(itemId, itemType);
+      // Success message is handled in the hook
+    } catch (error) {
+      toast.error('Failed to update wishlist');
+    } finally {
+      setIsProcessing(false);
     }
+  };
+
+  const getButtonText = () => {
+    if (iconOnly) return null;
+    
+    if (showText) {
+      return inWishlist ? 'Remove from Wishlist' : 'Add to Wishlist';
+    }
+    
+    return children;
   };
 
   return (
@@ -42,19 +64,30 @@ const WishlistButton: React.FC<WishlistButtonProps> = ({
       variant={variant}
       size={size}
       onClick={handleToggle}
+      disabled={isDisabled}
       className={cn(
-        "p-2 hover:bg-gray-100 transition-colors",
-        inWishlist && "text-red-500 hover:text-red-600",
+        "transition-all duration-200 ease-in-out",
+        inWishlist 
+          ? "text-red-500 hover:text-red-600 hover:bg-red-50" 
+          : "text-gray-600 hover:text-gray-900 hover:bg-gray-100",
+        isDisabled && "opacity-50 cursor-not-allowed",
+        iconOnly && "p-2",
         className
       )}
+      aria-label={inWishlist ? `Remove ${itemType} from wishlist` : `Add ${itemType} to wishlist`}
     >
       <Heart 
         className={cn(
-          "h-4 w-4",
-          inWishlist && "fill-current"
+          "h-4 w-4 transition-all duration-200",
+          inWishlist && "fill-current",
+          isProcessing && "animate-pulse"
         )} 
       />
-      {children}
+      {getButtonText() && (
+        <span className={iconOnly ? "sr-only" : "ml-2"}>
+          {getButtonText()}
+        </span>
+      )}
     </Button>
   );
 };
