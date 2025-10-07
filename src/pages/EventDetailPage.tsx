@@ -37,7 +37,6 @@ import { toast } from 'sonner';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { CurrencyCode } from '@/constants/currencies';
 import WishlistButton from '@/components/wishlist/WishlistButton';
-import GiftEventButton from '@/components/event/GiftEventButton';
 
 interface Event {
   id: string;
@@ -79,6 +78,7 @@ interface SimpleEvent {
   creator_id: string;
   created_at: string;
   updated_at: string;
+  status: 'upcoming' | 'ongoing' | 'completed';
 }
 
 interface EventTicket {
@@ -209,10 +209,37 @@ const EventDetailPage = () => {
         .from('events')
         .select('*')
         .neq('id', id)
-        .limit(3);
+        .eq('is_published', true)
+        .order('start_time', { ascending: true });
 
       if (error) throw error;
-      setRecommendedEvents(events || []);
+
+      // Filter only upcoming events and limit to 3
+      const now = new Date();
+      const upcomingEvents = (events || [])
+        .filter(event => {
+          const startTime = new Date(event.start_time);
+          return startTime > now;
+        })
+        .slice(0, 3);
+
+      // Add status to events
+      const eventsWithStatus = upcomingEvents.map(event => {
+        const startTime = new Date(event.start_time);
+        const endTime = new Date(event.end_time);
+        let status: 'upcoming' | 'ongoing' | 'completed';
+        
+        if (now < startTime) status = 'upcoming';
+        else if (now >= startTime && now <= endTime) status = 'ongoing';
+        else status = 'completed';
+
+        return {
+          ...event,
+          status
+        };
+      });
+
+      setRecommendedEvents(eventsWithStatus);
     } catch (error) {
       console.error('Error loading recommended events:', error);
     }
@@ -359,11 +386,11 @@ const EventDetailPage = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Event Header */}
+              {/* Event Header - Increased image height */}
               <Card className="shadow-lg">
                 <CardContent className="p-0">
                   {event.image_url && (
-                    <div className="h-64 bg-gray-200 rounded-t-lg overflow-hidden">
+                    <div className="h-96 bg-gray-200 rounded-t-lg overflow-hidden">
                       <img
                         src={event.image_url}
                         alt={event.title}
@@ -632,7 +659,7 @@ const EventDetailPage = () => {
                 </Card>
               )}
 
-              {/* Improved Recommended Events */}
+              {/* Improved Recommended Events - Only upcoming events */}
               {recommendedEvents.length > 0 && (
                 <Card className="shadow-lg">
                   <CardHeader>
@@ -661,8 +688,22 @@ const EventDetailPage = () => {
                             {/* Gradient overlay */}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                             
-                            {/* Price badge */}
+                            {/* Status Badge */}
                             <div className="absolute top-3 left-3">
+                              <Badge className={`px-2 py-1 text-xs font-semibold shadow-lg border-0 ${
+                                recEvent.status === 'upcoming' 
+                                  ? 'bg-green-600 text-white' 
+                                  : recEvent.status === 'ongoing'
+                                  ? 'bg-red-600 text-white'
+                                  : 'bg-orange-600 text-white'
+                              }`}>
+                                {recEvent.status === 'upcoming' ? 'Upcoming' : 
+                                 recEvent.status === 'ongoing' ? 'Live' : 'Completed'}
+                              </Badge>
+                            </div>
+
+                            {/* Price badge */}
+                            <div className="absolute top-3 right-3">
                               <Badge className={`px-2 py-1 text-xs font-semibold shadow-lg ${
                                 recEvent.is_free 
                                   ? 'bg-emerald-500 hover:bg-emerald-600 text-white border-0' 
@@ -674,13 +715,6 @@ const EventDetailPage = () => {
                                     originalCurrency={getCurrencyCode(recEvent.currency)} 
                                   />
                                 )}
-                              </Badge>
-                            </div>
-
-                            {/* Event type badge */}
-                            <div className="absolute top-3 right-3">
-                              <Badge variant="secondary" className="bg-white/20 backdrop-blur-sm text-white border-white/20 hover:bg-white/30 text-xs">
-                                {recEvent.event_type.charAt(0).toUpperCase() + recEvent.event_type.slice(1)}
                               </Badge>
                             </div>
 
@@ -852,72 +886,19 @@ const EventDetailPage = () => {
                 </CardContent>
               </Card>
 
-              {/* Wishlist Button with Gift Event Buttons */}
+              {/* Wishlist Button Only - Removed Gift Card buttons */}
               <Card className="shadow-lg">
                 <CardContent className="p-6">
                   <WishlistButton
                     itemId={event.id}
                     itemType="event"
-                    className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 mb-3"
+                    className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                    showText
                   >
                     <Heart className="w-5 h-5 mr-2" />
                     Save to Wishlist
                   </WishlistButton>
-                  
-               {/* Gift Event Buttons - Only show if not registered and tickets are available */}
-{!isRegistered && availableTickets.length > 0 && (
-  <div className="space-y-3 pt-3 border-t border-gray-200">
-    <h4 className="font-semibold text-sm text-gray-700 mb-2">Gift Tickets</h4>
-    <div className="flex flex-col gap-3">
-      {availableTickets.slice(0, 3).map((ticket) => {
-        // Determine button style based on ticket type
-        let buttonStyle = "";
-        let buttonText = "Gift This Ticket";
-        
-        if (ticket.ticket_type?.toLowerCase().includes('vip')) {
-          buttonStyle = "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0";
-          buttonText = "Gift VIP";
-        } else if (ticket.ticket_type?.toLowerCase().includes('early') || ticket.name.toLowerCase().includes('early')) {
-          buttonStyle = "bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white border-0";
-          buttonText = "Gift Early Bird";
-        } else if (ticket.ticket_type?.toLowerCase().includes('ordinary') || ticket.name.toLowerCase().includes('ordinary')) {
-          buttonStyle = "bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white border-0";
-          buttonText = "Gift Ordinary";
-        } else if (ticket.ticket_type?.toLowerCase().includes('standard') || ticket.name.toLowerCase().includes('standard')) {
-          buttonStyle = "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0";
-          buttonText = "Gift Standard";
-        } else {
-          // Default style for other ticket types
-          buttonStyle = "bg-gradient-to-r from-orange-600 to-purple-600 hover:from-orange-700 hover:to-purple-700 text-white border-0";
-          buttonText = `Gift ${ticket.name}`;
-        }
-
-        return (
-          <GiftEventButton
-            key={ticket.id}
-            event={{
-              id: event.id,
-              title: event.title,
-              start_time: event.start_time,
-              location: event.location
-            }}
-            ticket={ticket}
-            className={`w-full ${buttonStyle} font-medium py-3 px-4 rounded-lg transition-all duration-200 text-sm min-h-[48px] flex items-center justify-center`}
-            buttonText={buttonText}
-          />
-        );
-      })}
-    </div>
-    
-    {/* Show message if there are more than 3 ticket types */}
-    {availableTickets.length > 3 && (
-      <p className="text-xs text-gray-500 text-center mt-2">
-        +{availableTickets.length - 3} more ticket types available
-      </p>
-    )}
-  </div>
-)}
-</CardContent>
+                </CardContent>
               </Card>
 
               {/* Creator Profile Card */}
