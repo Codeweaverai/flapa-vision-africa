@@ -161,7 +161,7 @@ const HelpCenterPage = () => {
   if (loading) {
     return (
       <Layout>
-          <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
           <div className="section-container">
             <div className="text-center">
               <div className="animate-pulse space-y-6">
@@ -178,26 +178,17 @@ const HelpCenterPage = () => {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-orange-50 relative overflow-hidden">
-        {/* Animated background elements */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {[...Array(15)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute w-2 h-2 bg-gradient-to-r from-orange-300 to-purple-400 rounded-full animate-pulse opacity-20"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                animationDelay: `${Math.random() * 2}s`,
-                animationDuration: `${2 + Math.random() * 3}s`
-              }}
-            />
-          ))}
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 relative overflow-hidden">
+        {/* Animated background elements - matching the BecomeCreatorPage style */}
+        <div className="absolute inset-0">
+          <div className="absolute top-20 left-10 w-32 h-32 bg-gradient-to-r from-orange-300/30 to-purple-400/30 rounded-full blur-3xl"></div>
+          <div className="absolute top-40 right-20 w-40 h-40 bg-gradient-to-r from-purple-300/20 to-pink-400/20 rounded-full blur-2xl"></div>
+          <div className="absolute bottom-20 left-1/4 w-28 h-28 bg-gradient-to-r from-orange-400/25 to-purple-500/25 rounded-full blur-xl"></div>
         </div>
 
-        <div className="section-container relative z-10">
+        <div className="container mx-auto px-4 relative z-10 py-12">
           {/* Header Section */}
-          <div className="text-center mb-12">
+          <div className="text-center mb-12 pt-8">
             <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
               Help Center
             </h1>
