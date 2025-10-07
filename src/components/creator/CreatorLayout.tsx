@@ -1,4 +1,3 @@
-
 import { ReactNode, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -104,56 +103,86 @@ const CreatorLayout = ({ children, title }: CreatorLayoutProps) => {
     }
   ];
   
+  // Gradient icon component
+  const GradientIcon = ({ children, isActive }: { children: ReactNode; isActive: boolean }) => (
+    <div className={cn(
+      "mr-2 p-1 rounded-lg bg-gradient-to-r from-orange-500 to-purple-600 text-white",
+      isActive ? "opacity-100" : "opacity-70"
+    )}>
+      {children}
+    </div>
+  );
+
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 relative overflow-hidden">
+        {/* Decorative background elements matching other pages */}
+        <div className="absolute inset-0">
+          <div className="absolute top-20 left-10 w-32 h-32 bg-gradient-to-r from-orange-300/30 to-purple-400/30 rounded-full blur-3xl"></div>
+          <div className="absolute top-40 right-20 w-40 h-40 bg-gradient-to-r from-purple-300/20 to-pink-400/20 rounded-full blur-2xl"></div>
+          <div className="absolute bottom-20 left-1/4 w-28 h-28 bg-gradient-to-r from-orange-400/25 to-purple-500/25 rounded-full blur-xl"></div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            {/* Sidebar */}
             <div className="md:col-span-1">
-              <Card className="p-4 bg-white/80 backdrop-blur-sm">
+              <Card className="p-4 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
                 <div className="mb-4 flex items-center space-x-2">
-                  <div className="rounded-full bg-primary/10 p-2">
-                    <Rocket className="h-5 w-5 text-primary" />
+                  <div className="rounded-lg bg-gradient-to-r from-orange-500 to-purple-600 p-2 text-white">
+                    <Rocket className="h-5 w-5" />
                   </div>
-                  <h2 className="text-xl font-bold">Creator Portal</h2>
+                  <h2 className="text-xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    Creator Portal
+                  </h2>
                 </div>
                 
                 <nav className="space-y-1">
-                  {navItems.map((item) => (
-                    <Button
-                      key={item.href}
-                      variant="ghost"
-                      className={cn(
-                        "w-full justify-start",
-                        location.pathname === item.href && "bg-primary/10 text-primary font-medium"
-                      )}
-                      asChild
-                    >
-                      <Link to={item.href}>
-                        {item.icon}
-                        {item.label}
-                      </Link>
-                    </Button>
-                  ))}
+                  {navItems.map((item) => {
+                    const isActive = location.pathname === item.href;
+                    return (
+                      <Button
+                        key={item.href}
+                        variant="ghost"
+                        className={cn(
+                          "w-full justify-start transition-all duration-200",
+                          isActive 
+                            ? "bg-gradient-to-r from-orange-50 to-purple-50 border border-orange-200 text-gray-900 font-medium shadow-sm" 
+                            : "hover:bg-gradient-to-r hover:from-orange-50/50 hover:to-purple-50/50"
+                        )}
+                        asChild
+                      >
+                        <Link to={item.href}>
+                          <GradientIcon isActive={isActive}>
+                            {React.cloneElement(item.icon, { className: "h-4 w-4" })}
+                          </GradientIcon>
+                          {item.label}
+                        </Link>
+                      </Button>
+                    );
+                  })}
                 </nav>
                 
-                <div className="mt-8 pt-4 border-t">
+                <div className="mt-8 pt-4 border-t border-gray-200">
                   <Button
-                className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white font-semibold rounded-md hover:opacity-90 transition-all"
-                  asChild
-                 >
-               <Link to="/account">
-                Back to My Account
-                </Link>
-                </Button>
+                    className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white font-semibold rounded-lg hover:from-orange-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+                    asChild
+                  >
+                    <Link to="/account">
+                      Back to My Account
+                    </Link>
+                  </Button>
                 </div>
               </Card>
             </div>
             
+            {/* Main Content */}
             <div className="md:col-span-3">
-              <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border-0 p-6">
+              <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-xl border-0 p-6">
                 {title && (
-                  <h1 className="text-2xl font-bold mb-6">{title}</h1>
+                  <h1 className="text-2xl font-bold mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    {title}
+                  </h1>
                 )}
                 {children}
               </div>
