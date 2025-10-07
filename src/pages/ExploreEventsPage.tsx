@@ -50,7 +50,7 @@ const ExploreEventsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [sortBy, setSortBy] = useState('date');
+  const [sortBy, setSortBy] = useState('upcoming');
   const [displayCount, setDisplayCount] = useState(EVENTS_PER_PAGE);
 
   useEffect(() => {
@@ -65,7 +65,7 @@ const ExploreEventsPage = () => {
         .from('events')
         .select('*')
         .eq('is_published', true)
-        .order('start_time', { ascending: false });
+        .order('start_time', { ascending: true }); // Get events in chronological order
 
       if (eventsError) throw eventsError;
 
@@ -145,16 +145,29 @@ const ExploreEventsPage = () => {
 
   const sortedEvents = [...filteredEvents].sort((a, b) => {
     switch (sortBy) {
+      case 'upcoming':
+        // Show upcoming events first, then ongoing, then completed
+        const statusOrder = { 'upcoming': 0, 'ongoing': 1, 'completed': 2 };
+        if (statusOrder[a.status] !== statusOrder[b.status]) {
+          return statusOrder[a.status] - statusOrder[b.status];
+        }
+        // If same status, sort by date
+        return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
+      
       case 'date':
         return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
+      
       case 'title':
         return a.title.localeCompare(b.title);
+      
       case 'price':
         const aMinPrice = Math.min(...a.event_tickets.map(t => t.price));
         const bMinPrice = Math.min(...b.event_tickets.map(t => t.price));
         return aMinPrice - bMinPrice;
+      
       case 'rating':
         return b.reviews.avg_rating - a.reviews.avg_rating;
+      
       default:
         return 0;
     }
@@ -273,6 +286,7 @@ const ExploreEventsPage = () => {
                       <SelectValue placeholder="Sort by" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="upcoming">Upcoming First</SelectItem>
                       <SelectItem value="date">Date</SelectItem>
                       <SelectItem value="title">Title</SelectItem>
                       <SelectItem value="price">Price</SelectItem>
@@ -298,9 +312,9 @@ const ExploreEventsPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 mb-12">
                 {displayedEvents.map((event) => (
                   <Card key={event.id} className="group overflow-hidden hover:shadow-2xl transition-all duration-500 cursor-pointer bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:scale-[1.02]">
-                    <div onClick={() => navigate(`/events/${event.id}`)}>
+                    <div className="relative">
                       {/* Event Image */}
-                      <div className="relative h-56 overflow-hidden">
+                      <div className="relative h-56 overflow-hidden cursor-pointer" onClick={() => navigate(`/events/${event.id}`)}>
                         {event.image_url ? (
                           <img
                             src={event.image_url}
@@ -321,17 +335,6 @@ const ExploreEventsPage = () => {
                           </Badge>
                         </div>
 
-                        {/* Wishlist Button */}
-                        <div className="absolute bottom-4 right-4 z-10">
-                          <WishlistButton 
-                            itemId={event.id}
-                            itemType="event"
-                            variant="ghost"
-                            size="icon"
-                            className="bg-white/90 hover:bg-white rounded-full p-2 shadow-md hover:shadow-lg transition-all"
-                          />
-                        </div>
-
                         {/* Event Date Overlay */}
                         <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg">
                           <div className="text-sm font-semibold text-gray-900">
@@ -340,54 +343,73 @@ const ExploreEventsPage = () => {
                         </div>
                       </div>
 
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-xl font-bold text-gray-900 line-clamp-2 group-hover:text-orange-600 transition-colors">
-                          {event.title}
-                        </CardTitle>
-                        
-                        {/* Creator */}
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <div className="w-6 h-6 bg-gradient-to-r from-orange-400 to-purple-500 rounded-full flex items-center justify-center">
-                            <span className="text-xs font-semibold text-white">
-                              {event.creator_name.charAt(0)}
-                            </span>
-                          </div>
-                          <span>by {event.creator_name}</span>
-                        </div>
-                      </CardHeader>
+                      {/* Wishlist Button - Positioned absolutely over the image */}
+                      <div className="absolute top-4 right-4 z-10">
+                        <WishlistButton 
+                          itemId={event.id}
+                          itemType="event"
+                          variant="ghost"
+                          size="icon"
+                          iconOnly
+                          className="bg-white/90 hover:bg-white rounded-full p-2 shadow-md hover:shadow-lg transition-all hover:scale-110"
+                        />
+                      </div>
 
-                      <CardContent className="space-y-4">
-                        {/* Event Details */}
-                        {event.location && (
-                          <div className="flex items-center text-sm text-gray-600">
-                            <MapPin className="h-4 w-4 mr-2 text-orange-500 flex-shrink-0" />
-                            <span className="truncate">{event.location}</span>
+                      {/* Card Content */}
+                      <div onClick={() => navigate(`/events/${event.id}`)}>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-xl font-bold text-gray-900 line-clamp-2 group-hover:text-orange-600 transition-colors">
+                            {event.title}
+                          </CardTitle>
+                          
+                          {/* Creator */}
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <div className="w-6 h-6 bg-gradient-to-r from-orange-400 to-purple-500 rounded-full flex items-center justify-center">
+                              <span className="text-xs font-semibold text-white">
+                                {event.creator_name.charAt(0)}
+                              </span>
+                            </div>
+                            <span>by {event.creator_name}</span>
                           </div>
-                        )}
-                        
-                        <div className="flex items-center text-sm text-gray-600">
-                          <Users className="h-4 w-4 mr-2 text-orange-500 flex-shrink-0" />
-                          <span>{getSoldTickets(event.event_tickets)}/{getTotalCapacity(event.event_tickets)} registered</span>
-                        </div>
-                      </CardContent>
+                        </CardHeader>
 
-                      <CardFooter className="flex justify-between items-center pt-4 border-t border-gray-100">
-                        <div className="flex items-center">
-                          <DollarSign className="h-4 w-4 mr-1 text-orange-500" />
-                          <span className="font-bold text-xl text-gray-900">
-                            <PriceDisplay amount={getMinPrice(event.event_tickets)} originalCurrency="USD" />
-                          </span>
-                          {event.event_tickets.length > 1 && (
-                            <span className="text-sm text-gray-500 ml-1">+</span>
+                        <CardContent className="space-y-4">
+                          {/* Event Details */}
+                          {event.location && (
+                            <div className="flex items-center text-sm text-gray-600">
+                              <MapPin className="h-4 w-4 mr-2 text-orange-500 flex-shrink-0" />
+                              <span className="truncate">{event.location}</span>
+                            </div>
                           )}
-                        </div>
-                        <Button 
-                          size="sm" 
-                          className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg"
-                        >
-                          {event.status === 'completed' ? 'View Event' : 'Register Now'}
-                        </Button>
-                      </CardFooter>
+                          
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Users className="h-4 w-4 mr-2 text-orange-500 flex-shrink-0" />
+                            <span>{getSoldTickets(event.event_tickets)}/{getTotalCapacity(event.event_tickets)} registered</span>
+                          </div>
+                        </CardContent>
+
+                        <CardFooter className="flex justify-between items-center pt-4 border-t border-gray-100">
+                          <div className="flex items-center">
+                            <DollarSign className="h-4 w-4 mr-1 text-orange-500" />
+                            <span className="font-bold text-xl text-gray-900">
+                              {event.is_free ? (
+                                'Free'
+                              ) : (
+                                <PriceDisplay amount={getMinPrice(event.event_tickets)} originalCurrency="USD" />
+                              )}
+                            </span>
+                            {!event.is_free && event.event_tickets.length > 1 && (
+                              <span className="text-sm text-gray-500 ml-1">+</span>
+                            )}
+                          </div>
+                          <Button 
+                            size="sm" 
+                            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg"
+                          >
+                            {event.status === 'completed' ? 'View Event' : 'Register Now'}
+                          </Button>
+                        </CardFooter>
+                      </div>
                     </div>
                   </Card>
                 ))}
