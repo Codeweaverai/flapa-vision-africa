@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/lib/supabaseClient';
 import { formatDate } from '@/lib/utils';
 import { useCurrency } from '@/contexts/CurrencyContext';
@@ -25,6 +26,8 @@ interface Event {
   creator_id: string;
   capacity?: number;
   creator_name: string;
+  creator_avatar?: string;
+  creator_username?: string;
   event_tickets: Array<{
     id: string;
     name: string;
@@ -76,10 +79,16 @@ const ExploreEventsPage = () => {
       }
 
       const creatorIds = [...new Set(eventsData.map(event => event.creator_id).filter(Boolean))];
-      const { data: profiles } = await supabase
+      
+      // Fetch profiles with avatar URLs
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, username, full_name')
+        .select('id, username, full_name, avatar_url')
         .in('id', creatorIds);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+      }
 
       const eventIds = eventsData.map(event => event.id);
       const { data: tickets } = await supabase
@@ -115,6 +124,8 @@ const ExploreEventsPage = () => {
           return {
             ...event,
             creator_name: eventProfile?.full_name || eventProfile?.username || 'Unknown Creator',
+            creator_avatar: eventProfile?.avatar_url || null,
+            creator_username: eventProfile?.username || null,
             event_tickets: eventTickets,
             reviews: {
               avg_rating: avgRating,
@@ -371,13 +382,17 @@ const ExploreEventsPage = () => {
                             {event.title}
                           </CardTitle>
                           
-                          {/* Creator */}
+                          {/* Creator with Avatar */}
                           <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <div className="w-6 h-6 bg-gradient-to-r from-orange-400 to-purple-500 rounded-full flex items-center justify-center">
-                              <span className="text-xs font-semibold text-white">
-                                {event.creator_name.charAt(0)}
-                              </span>
-                            </div>
+                            <Avatar className="h-6 w-6">
+                              <AvatarImage 
+                                src={event.creator_avatar || undefined} 
+                                alt={event.creator_name}
+                              />
+                              <AvatarFallback className="bg-gradient-to-r from-orange-400 to-purple-500 text-white text-xs">
+                                {event.creator_name.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
                             <span>by {event.creator_name}</span>
                           </div>
                         </CardHeader>
