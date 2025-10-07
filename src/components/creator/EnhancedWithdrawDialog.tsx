@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -54,6 +53,14 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   const [exchangeRate, setExchangeRate] = useState(1);
   const { user } = useAuth();
   const { convertPrice, currentCurrency, formatPrice } = useCurrency();
+
+  // Helper function to remove + prefix from mobile numbers
+  const formatDisplayNumber = (phoneNumber: string | undefined) => {
+    if (!phoneNumber) return '';
+    
+    // Remove any + prefix and trim whitespace
+    return phoneNumber.replace(/^\+/, '').trim();
+  };
 
   useEffect(() => {
     if (open && user) {
@@ -387,7 +394,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                     <div>
                       <div className="font-medium">Mobile Money</div>
                       <div className="text-sm text-muted-foreground">
-                        {profileData?.mobile_money_operator} - {profileData?.mobile_money_number}
+                        {profileData?.mobile_money_operator} - {formatDisplayNumber(profileData?.mobile_money_number)}
                       </div>
                       <div className="text-xs text-muted-foreground">Within 24 hours</div>
                     </div>
