@@ -65,7 +65,7 @@ const ExploreEventsPage = () => {
         .from('events')
         .select('*')
         .eq('is_published', true)
-        .order('start_time', { ascending: true }); // Get events in chronological order
+        .order('start_time', { ascending: true });
 
       if (eventsError) throw eventsError;
 
@@ -146,12 +146,10 @@ const ExploreEventsPage = () => {
   const sortedEvents = [...filteredEvents].sort((a, b) => {
     switch (sortBy) {
       case 'upcoming':
-        // Show upcoming events first, then ongoing, then completed
         const statusOrder = { 'upcoming': 0, 'ongoing': 1, 'completed': 2 };
         if (statusOrder[a.status] !== statusOrder[b.status]) {
           return statusOrder[a.status] - statusOrder[b.status];
         }
-        // If same status, sort by date
         return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
       
       case 'date':
@@ -206,6 +204,11 @@ const ExploreEventsPage = () => {
 
   const loadMore = () => {
     setDisplayCount(prev => prev + EVENTS_PER_PAGE);
+  };
+
+  // Handle card click (excluding wishlist button)
+  const handleCardClick = (eventId: string) => {
+    navigate(`/events/${eventId}`);
   };
 
   if (loading) {
@@ -311,10 +314,13 @@ const ExploreEventsPage = () => {
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 mb-12">
                 {displayedEvents.map((event) => (
-                  <Card key={event.id} className="group overflow-hidden hover:shadow-2xl transition-all duration-500 cursor-pointer bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:scale-[1.02]">
+                  <Card key={event.id} className="group overflow-hidden hover:shadow-2xl transition-all duration-500 bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:scale-[1.02]">
                     <div className="relative">
-                      {/* Event Image */}
-                      <div className="relative h-56 overflow-hidden cursor-pointer" onClick={() => navigate(`/events/${event.id}`)}>
+                      {/* Event Image with Click Handler */}
+                      <div 
+                        className="relative h-56 overflow-hidden cursor-pointer" 
+                        onClick={() => handleCardClick(event.id)}
+                      >
                         {event.image_url ? (
                           <img
                             src={event.image_url}
@@ -343,20 +349,23 @@ const ExploreEventsPage = () => {
                         </div>
                       </div>
 
-                      {/* Wishlist Button - Positioned absolutely over the image */}
-                      <div className="absolute top-4 right-4 z-10">
+                      {/* Wishlist Button - Separate from card click */}
+                      <div className="absolute top-4 right-4 z-20">
                         <WishlistButton 
                           itemId={event.id}
                           itemType="event"
                           variant="ghost"
                           size="icon"
                           iconOnly
-                          className="bg-white/90 hover:bg-white rounded-full p-2 shadow-md hover:shadow-lg transition-all hover:scale-110"
+                          className="bg-white/90 hover:bg-white rounded-full p-2 shadow-md hover:shadow-lg transition-all hover:scale-110 border-0"
                         />
                       </div>
 
-                      {/* Card Content */}
-                      <div onClick={() => navigate(`/events/${event.id}`)}>
+                      {/* Card Content with Click Handler */}
+                      <div 
+                        className="cursor-pointer" 
+                        onClick={() => handleCardClick(event.id)}
+                      >
                         <CardHeader className="pb-3">
                           <CardTitle className="text-xl font-bold text-gray-900 line-clamp-2 group-hover:text-orange-600 transition-colors">
                             {event.title}
@@ -405,6 +414,10 @@ const ExploreEventsPage = () => {
                           <Button 
                             size="sm" 
                             className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCardClick(event.id);
+                            }}
                           >
                             {event.status === 'completed' ? 'View Event' : 'Register Now'}
                           </Button>
