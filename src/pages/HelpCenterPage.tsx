@@ -31,6 +31,53 @@ interface MediaPost {
   media_url?: string;
 }
 
+// Pulse Loading Component
+const PulseLoading = () => {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+      <Layout>
+        <div className="container mx-auto px-4 py-12">
+          <div className="flex flex-col items-center justify-center min-h-96">
+            {/* Pulse Animation Container */}
+            <div className="relative w-40 h-40 flex items-center justify-center mb-8">
+              {/* Outer Pulse Circle */}
+              <div className="absolute w-40 h-40 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 animate-ping" />
+              
+              {/* Middle Pulse Circle */}
+              <div className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-orange-500/30 to-purple-600/30 animate-pulse" />
+              
+              {/* Inner Pulse Circle */}
+              <div className="absolute w-24 h-24 rounded-full bg-gradient-to-r from-orange-500/40 to-purple-600/40 animate-pulse" />
+              
+              {/* Center Icon */}
+              <div className="absolute w-16 h-16 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center shadow-lg">
+                <MessageCircle className="h-8 w-8 text-white" />
+              </div>
+            </div>
+
+            {/* Loading Text */}
+            <div className="text-center space-y-2">
+              <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                Loading Help Center
+              </h3>
+              <p className="text-muted-foreground text-lg">
+                Preparing support resources...
+              </p>
+            </div>
+
+            {/* Progress Dots */}
+            <div className="flex space-x-2 mt-6">
+              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-3 h-3 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      </Layout>
+    </div>
+  );
+};
+
 const HelpCenterPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
@@ -46,44 +93,51 @@ const HelpCenterPage = () => {
 
   const fetchData = async () => {
     try {
-      // Fetch FAQs
-      const { data: faqData, error: faqError } = await supabase
-        .from('help_center_faqs')
-        .select('*')
-        .eq('is_published', true)
-        .order('category')
-        .order('order_index');
+      // Use Promise.all for parallel data fetching
+      const [faqResponse, mediaResponse] = await Promise.allSettled([
+        // Fetch FAQs
+        supabase
+          .from('help_center_faqs')
+          .select('*')
+          .eq('is_published', true)
+          .order('category')
+          .order('order_index'),
+        
+        // Fetch media posts with proper mapping
+        supabase
+          .from('media_posts')
+          .select('*')
+          .eq('is_published', true)
+          .order('created_at', { ascending: false })
+      ]);
 
-      if (faqError) throw faqError;
-      setFaqs(faqData || []);
-
-      // Fetch media posts with proper mapping
-      const { data: mediaData, error: mediaError } = await supabase
-        .from('media_posts')
-        .select('*')
-        .eq('is_published', true)
-        .order('created_at', { ascending: false });
-
-      if (mediaError) {
-        console.error('Error fetching media posts:', mediaError);
+      // Handle FAQ response
+      if (faqResponse.status === 'fulfilled' && !faqResponse.value.error) {
+        setFaqs(faqResponse.value.data || []);
+      } else {
+        console.error('Error fetching FAQs:', faqResponse.status === 'fulfilled' ? faqResponse.value.error : faqResponse.reason);
       }
-      
-      // Transform the data to match MediaPost interface
-      const transformedMediaData = (mediaData || []).map(post => ({
-        id: post.id,
-        title: post.title,
-        description: post.summary || post.content?.substring(0, 150) + '...' || '',
-        image_url: post.image_url || '',
-        content_type: post.post_type || 'article',
-        is_published: post.is_published,
-        created_at: post.created_at,
-        content: post.content || '',
-        post_type: post.post_type || 'article',
-        category: post.category,
-        media_url: post.media_url
-      }));
-      
-      setMediaPosts(transformedMediaData);
+
+      // Handle media posts response
+      if (mediaResponse.status === 'fulfilled' && !mediaResponse.value.error) {
+        const mediaData = mediaResponse.value.data || [];
+        const transformedMediaData = mediaData.map(post => ({
+          id: post.id,
+          title: post.title,
+          description: post.summary || post.content?.substring(0, 150) + '...' || '',
+          image_url: post.image_url || '',
+          content_type: post.post_type || 'article',
+          is_published: post.is_published,
+          created_at: post.created_at,
+          content: post.content || '',
+          post_type: post.post_type || 'article',
+          category: post.category,
+          media_url: post.media_url
+        }));
+        setMediaPosts(transformedMediaData);
+      } else {
+        console.error('Error fetching media posts:', mediaResponse.status === 'fulfilled' ? mediaResponse.value.error : mediaResponse.reason);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -122,27 +176,37 @@ const HelpCenterPage = () => {
     }
   ];
 
-  const filteredFaqs = faqs.filter(faq =>
-    faq.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    faq.answer.toLowerCase().includes(searchTerm.toLowerCase())
+  // Memoized filtered data for better performance
+  const filteredFaqs = React.useMemo(() => 
+    faqs.filter(faq =>
+      faq.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      faq.answer.toLowerCase().includes(searchTerm.toLowerCase())
+    ),
+    [faqs, searchTerm]
   );
 
-  const filteredMediaPosts = mediaPosts.filter(post =>
-    post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    post.description.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredMediaPosts = React.useMemo(() => 
+    mediaPosts.filter(post =>
+      post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      post.description.toLowerCase().includes(searchTerm.toLowerCase())
+    ),
+    [mediaPosts, searchTerm]
   );
 
-  const groupedFaqs = categories.reduce((acc, category) => {
-    const categoryKey = category.title;
-    acc[categoryKey] = filteredFaqs.filter(faq => faq.category === categoryKey);
-    return acc;
-  }, {} as Record<string, FAQ[]>);
+  const groupedFaqs = React.useMemo(() => 
+    categories.reduce((acc, category) => {
+      const categoryKey = category.title;
+      acc[categoryKey] = filteredFaqs.filter(faq => faq.category === categoryKey);
+      return acc;
+    }, {} as Record<string, FAQ[]>),
+    [filteredFaqs]
+  );
 
   const toggleFaq = (faqId: string) => {
     setExpandedFaq(expandedFaq === faqId ? null : faqId);
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = React.useCallback((dateString: string) => {
     try {
       return new Date(dateString).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -152,28 +216,15 @@ const HelpCenterPage = () => {
     } catch {
       return 'Unknown date';
     }
-  };
+  }, []);
 
   const handleViewPost = (postId: string) => {
     navigate(`/media/${postId}`);
   };
 
+  // Use the PulseLoading component
   if (loading) {
-    return (
-      <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
-          <div className="section-container">
-            <div className="text-center">
-              <div className="animate-pulse space-y-6">
-                <div className="h-8 bg-gray-300 rounded w-1/3 mx-auto"></div>
-                <div className="h-4 bg-gray-300 rounded w-1/2 mx-auto"></div>
-                <div className="h-12 bg-gray-300 rounded w-1/3 mx-auto"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Layout>
-    );
+    return <PulseLoading />;
   }
 
   return (
