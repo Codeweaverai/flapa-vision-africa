@@ -102,6 +102,53 @@ interface CreatorProfile {
   total_reviews?: number;
 }
 
+// Pulse Loading Component
+const PulseLoading = () => {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+      <Layout>
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex flex-col items-center justify-center min-h-96">
+            {/* Pulse Animation Container */}
+            <div className="relative w-40 h-40 flex items-center justify-center mb-8">
+              {/* Outer Pulse Circle */}
+              <div className="absolute w-40 h-40 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 animate-ping" />
+              
+              {/* Middle Pulse Circle */}
+              <div className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-orange-500/30 to-purple-600/30 animate-pulse" />
+              
+              {/* Inner Pulse Circle */}
+              <div className="absolute w-24 h-24 rounded-full bg-gradient-to-r from-orange-500/40 to-purple-600/40 animate-pulse" />
+              
+              {/* Center Icon */}
+              <div className="absolute w-16 h-16 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center shadow-lg">
+                <BookOpen className="h-8 w-8 text-white" />
+              </div>
+            </div>
+
+            {/* Loading Text */}
+            <div className="text-center space-y-2">
+              <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                Loading Course
+              </h3>
+              <p className="text-muted-foreground text-lg">
+                Preparing your learning experience...
+              </p>
+            </div>
+
+            {/* Progress Dots */}
+            <div className="flex space-x-2 mt-6">
+              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-3 h-3 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      </Layout>
+    </div>
+  );
+};
+
 const CourseDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -177,151 +224,154 @@ const CourseDetailPage = () => {
       setLoading(true);
       console.log('Fetching course with ID:', id);
       
-      // First, get the basic course data
-      const { data: courseData, error: courseError } = await supabase
-        .from('courses')
-        .select(`
-          *
-        `)
-        .eq('id', id)
-        .eq('is_published', true)
-        .single();
+      // Use Promise.all for parallel data fetching
+      const [
+        courseResult,
+        creatorResult,
+        previewResult,
+        modulesResult,
+        outcomesResult,
+        reviewsResult,
+        enrollmentsResult
+      ] = await Promise.allSettled([
+        // Basic course data
+        supabase
+          .from('courses')
+          .select('*')
+          .eq('id', id)
+          .eq('is_published', true)
+          .single(),
 
-      if (courseError) {
-        console.error('Error fetching course:', courseError);
-        toast.error('Failed to load course');
-        return;
-      }
+        // Creator profile
+        supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url, bio')
+          .eq('id', course?.creator_id || '')
+          .single(),
 
-      if (!courseData) {
-        toast.error('Course not found');
-        navigate('/courses');
-        return;
-      }
+        // Course preview
+        supabase
+          .from('course_previews')
+          .select('id, preview_video_url, preview_video_path')
+          .eq('course_id', id)
+          .maybeSingle(),
 
-      console.log('Course data:', courseData);
-
-      // Get creator profile
-      const { data: creatorData, error: creatorError } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url, bio')
-        .eq('id', courseData.creator_id)
-        .single();
-
-      if (creatorError) {
-        console.error('Error fetching creator:', creatorError);
-      }
-
-      // Get course preview
-      const { data: previewData, error: previewError } = await supabase
-        .from('course_previews')
-        .select('id, preview_video_url, preview_video_path')
-        .eq('course_id', id)
-        .maybeSingle();
-
-      if (previewError) {
-        console.error('Error fetching course preview:', previewError);
-      }
-
-      // Get course modules with lessons
-      const { data: modulesData, error: modulesError } = await supabase
-        .from('course_modules')
-        .select(`
-          id,
-          title,
-          description,
-          order_index,
-          lessons (
+        // Course modules with lessons
+        supabase
+          .from('course_modules')
+          .select(`
             id,
             title,
             description,
             order_index,
-            content_type,
-            video_url
-          )
-        `)
-        .eq('course_id', id)
-        .order('order_index', { ascending: true });
+            lessons (
+              id,
+              title,
+              description,
+              order_index,
+              content_type,
+              video_url
+            )
+          `)
+          .eq('course_id', id)
+          .order('order_index', { ascending: true }),
 
-      if (modulesError) {
-        console.error('Error fetching modules:', modulesError);
-      }
+        // Learning outcomes
+        supabase
+          .from('course_learning_outcomes')
+          .select('id, outcome, order_index')
+          .eq('course_id', id)
+          .order('order_index', { ascending: true }),
 
-      // Get learning outcomes
-      const { data: outcomesData, error: outcomesError } = await supabase
-        .from('course_learning_outcomes')
-        .select('id, outcome, order_index')
-        .eq('course_id', id)
-        .order('order_index', { ascending: true });
+        // Course reviews
+        supabase
+          .from('course_reviews')
+          .select(`
+            id,
+            rating,
+            review_text,
+            created_at,
+            user_id
+          `)
+          .eq('course_id', id)
+          .order('created_at', { ascending: false })
+          .limit(20), // Limit reviews for performance
 
-      if (outcomesError) {
-        console.error('Error fetching outcomes:', outcomesError);
-      }
+        // Course enrollments
+        supabase
+          .from('course_enrollments')
+          .select('id, enrollment_date')
+          .eq('course_id', id)
+      ]);
 
-      // Get course reviews with user profiles
-      const { data: reviewsData, error: reviewsError } = await supabase
-        .from('course_reviews')
-        .select(`
-          id,
-          rating,
-          review_text,
-          created_at,
-          user_id
-        `)
-        .eq('course_id', id)
-        .order('created_at', { ascending: false });
+      // Process course data
+      if (courseResult.status === 'fulfilled' && !courseResult.value.error && courseResult.value.data) {
+        const courseData = courseResult.value.data;
 
-      if (reviewsError) {
-        console.error('Error fetching reviews:', reviewsError);
-      }
+        // Process creator data
+        const creatorData = creatorResult.status === 'fulfilled' && !creatorResult.value.error ? 
+          creatorResult.value.data : { id: courseData.creator_id, full_name: 'Unknown Creator' };
 
-      // Get user profiles for reviews
-      let reviewsWithProfiles = [];
-      if (reviewsData && reviewsData.length > 0) {
-        const userIds = reviewsData.map(review => review.user_id);
-        const { data: reviewProfiles, error: reviewProfilesError } = await supabase
-          .from('profiles')
-          .select('id, full_name, avatar_url')
-          .in('id', userIds);
+        // Process preview data
+        const previewData = previewResult.status === 'fulfilled' && !previewResult.value.error ? 
+          previewResult.value.data : undefined;
 
-        if (!reviewProfilesError && reviewProfiles) {
+        // Process modules data
+        const modulesData = modulesResult.status === 'fulfilled' && !modulesResult.value.error ? 
+          modulesResult.value.data : [];
+
+        // Process outcomes data
+        const outcomesData = outcomesResult.status === 'fulfilled' && !outcomesResult.value.error ? 
+          outcomesResult.value.data : [];
+
+        // Process enrollments data
+        const enrollmentsData = enrollmentsResult.status === 'fulfilled' && !enrollmentsResult.value.error ? 
+          enrollmentsResult.value.data : [];
+
+        // Process reviews with user profiles
+        let reviewsWithProfiles = [];
+        if (reviewsResult.status === 'fulfilled' && !reviewsResult.value.error && reviewsResult.value.data) {
+          const reviewsData = reviewsResult.value.data;
+          const userIds = reviewsData.map(review => review.user_id);
+          
+          // Fetch user profiles for reviews in parallel
+          const { data: reviewProfiles } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url')
+            .in('id', userIds);
+
           reviewsWithProfiles = reviewsData.map(review => ({
             ...review,
-            profiles: reviewProfiles.find(profile => profile.id === review.user_id) || {
+            profiles: reviewProfiles?.find(profile => profile.id === review.user_id) || {
               full_name: 'Unknown User',
               avatar_url: null
             }
           }));
         }
+
+        // Combine all data
+        const completeCourse: Course = {
+          ...courseData,
+          profiles: creatorData,
+          course_preview: previewData,
+          course_modules: modulesData,
+          course_learning_outcomes: outcomesData,
+          course_reviews: reviewsWithProfiles,
+          course_enrollments: enrollmentsData
+        };
+
+        setCourse(completeCourse);
+
+        // Fetch creator profile with stats in background
+        if (courseData.creator_id) {
+          fetchCreatorProfile(courseData.creator_id);
+        }
+      } else {
+        console.error('Error fetching course:', courseResult.status === 'fulfilled' ? courseResult.value.error : courseResult.reason);
+        toast.error('Failed to load course');
+        return;
       }
 
-      // Get enrollments
-      const { data: enrollmentsData, error: enrollmentsError } = await supabase
-        .from('course_enrollments')
-        .select('id, enrollment_date')
-        .eq('course_id', id);
-
-      if (enrollmentsError) {
-        console.error('Error fetching enrollments:', enrollmentsError);
-      }
-
-      // Combine all data
-      const completeCourse: Course = {
-        ...courseData,
-        profiles: creatorData || { id: courseData.creator_id, full_name: 'Unknown Creator' },
-        course_preview: previewData || undefined,
-        course_modules: modulesData || [],
-        course_learning_outcomes: outcomesData || [],
-        course_reviews: reviewsWithProfiles || [],
-        course_enrollments: enrollmentsData || []
-      };
-
-      setCourse(completeCourse);
-
-      // Fetch creator profile with stats
-      if (courseData.creator_id) {
-        await fetchCreatorProfile(courseData.creator_id);
-      }
     } catch (error) {
       console.error('Error:', error);
       toast.error('An error occurred while loading the course');
@@ -332,30 +382,47 @@ const CourseDetailPage = () => {
 
   const fetchCreatorProfile = async (creatorId: string) => {
     try {
-      // Get creator basic info
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url, bio')
-        .eq('id', creatorId)
-        .single();
+      // Use Promise.all for parallel data fetching
+      const [profileResult, coursesResult, enrollmentsResult, reviewsResult] = await Promise.allSettled([
+        // Creator basic info
+        supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url, bio')
+          .eq('id', creatorId)
+          .single(),
 
-      // Get creator stats
-      const { data: courses } = await supabase
-        .from('courses')
-        .select('id')
-        .eq('creator_id', creatorId)
-        .eq('is_published', true);
+        // Creator courses
+        supabase
+          .from('courses')
+          .select('id')
+          .eq('creator_id', creatorId)
+          .eq('is_published', true),
 
-      const { data: enrollments } = await supabase
-        .from('course_enrollments')
-        .select('id')
-        .eq('payment_status', 'completed')
-        .in('course_id', courses?.map(c => c.id) || []);
+        // Course enrollments
+        supabase
+          .from('course_enrollments')
+          .select('id')
+          .eq('payment_status', 'completed')
+          .in('course_id', course?.id ? [course.id] : []),
 
-      const { data: reviews } = await supabase
-        .from('course_reviews')
-        .select('rating')
-        .in('course_id', courses?.map(c => c.id) || []);
+        // Course reviews
+        supabase
+          .from('course_reviews')
+          .select('rating')
+          .in('course_id', course?.id ? [course.id] : [])
+      ]);
+
+      const profile = profileResult.status === 'fulfilled' && !profileResult.value.error ? 
+        profileResult.value.data : null;
+
+      const courses = coursesResult.status === 'fulfilled' && !coursesResult.value.error ? 
+        coursesResult.value.data : [];
+
+      const enrollments = enrollmentsResult.status === 'fulfilled' && !enrollmentsResult.value.error ? 
+        enrollmentsResult.value.data : [];
+
+      const reviews = reviewsResult.status === 'fulfilled' && !reviewsResult.value.error ? 
+        reviewsResult.value.data : [];
 
       const averageRating = reviews && reviews.length > 0
         ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
@@ -517,20 +584,9 @@ const CourseDetailPage = () => {
     </div>
   );
 
+  // Use the PulseLoading component
   if (loading) {
-    return (
-      <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 relative overflow-hidden">
-          <div className="container mx-auto px-4 py-8">
-            <div className="animate-pulse space-y-4">
-              <div className="h-8 w-3/4 rounded bg-gradient-to-r from-orange-500 to-purple-600 opacity-30"></div>
-              <div className="h-4 w-1/2 rounded bg-gradient-to-r from-orange-500 to-purple-600 opacity-20"></div>
-              <div className="h-64 w-full rounded bg-gradient-to-r from-orange-500 to-purple-600 opacity-30"></div>
-            </div>
-          </div>
-        </div>
-      </Layout>
-    );
+    return <PulseLoading />;
   }
 
   if (!course) {
