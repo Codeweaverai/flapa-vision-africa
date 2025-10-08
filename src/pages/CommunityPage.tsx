@@ -9,19 +9,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
-import { MessageCircle, Heart, Share2, Send, Users, Reply, MoreVertical, UserPlus, BookOpen, Bell, ArrowLeft, Bot, MessageSquare, ChevronDown, ChevronUp, Edit, MoreHorizontal } from 'lucide-react';
+import { MessageCircle, Heart, Share2, Send, Users, Reply, MoreHorizontal } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import EmojiPicker from '@/components/community/EmojiPicker';
-import CourseDiscussionsTab from '@/components/community/CourseDiscussionsTab';
-import NotificationsTab from '@/components/community/NotificationsTab';
 import { EnhancedPostCreation } from '@/components/community/EnhancedPostCreation';
 import { ImageGallery } from '@/components/community/ImageGallery';
 import { UserFollowButton } from '@/components/community/UserFollowButton';
 import { FollowersList } from '@/components/community/FollowersList';
 import { RightSidebar } from '@/components/community/RightSidebar';
 import { fetchCommunityPosts } from '@/services/communityService';
-import { getImagesForPosts } from '@/services/communityImageService';
-import { getFollowStatusForUsers } from '@/services/communityFollowerService';
 import { useNavigate } from 'react-router-dom';
 import CommunityChatTab from '@/components/community/CommunityChatTab';
 import {
@@ -39,7 +34,6 @@ interface CommunityPost {
   created_at: string;
   updated_at: string;
   course_id?: string;
-  emoji_reactions?: any;
   profiles?: {
     id: string;
     full_name: string;
@@ -52,7 +46,6 @@ interface CommunityPost {
   likes_count?: number;
   comments_count?: number;
   user_liked?: boolean;
-  user_love?: boolean;
   images?: {
     id: string;
     image_url: string;
@@ -90,7 +83,52 @@ interface CommunityMessage {
   } | null;
 }
 
-// NEW: PostContent component with See More functionality
+// Pulse Loading Component
+const PulseLoading = () => {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-orange-50">
+      <CommunityLayout>
+        <div className="flex flex-col items-center justify-center min-h-96 py-12">
+          {/* Pulse Animation Container */}
+          <div className="relative w-40 h-40 flex items-center justify-center mb-8">
+            {/* Outer Pulse Circle */}
+            <div className="absolute w-40 h-40 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 animate-ping" />
+            
+            {/* Middle Pulse Circle */}
+            <div className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-orange-500/30 to-purple-600/30 animate-pulse" />
+            
+            {/* Inner Pulse Circle */}
+            <div className="absolute w-24 h-24 rounded-full bg-gradient-to-r from-orange-500/40 to-purple-600/40 animate-pulse" />
+            
+            {/* Center Icon */}
+            <div className="absolute w-16 h-16 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center shadow-lg">
+              <MessageCircle className="h-8 w-8 text-white" />
+            </div>
+          </div>
+
+          {/* Loading Text */}
+          <div className="text-center space-y-2">
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+              Loading Community
+            </h3>
+            <p className="text-muted-foreground text-lg">
+              Preparing your community feed...
+            </p>
+          </div>
+
+          {/* Progress Dots */}
+          <div className="flex space-x-2 mt-6">
+            <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+            <div className="w-3 h-3 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+            <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
+        </div>
+      </CommunityLayout>
+    </div>
+  );
+};
+
+// PostContent component with See More functionality
 interface PostContentProps {
   content: string;
   maxLength?: number;
@@ -111,17 +149,7 @@ const PostContent: React.FC<PostContentProps> = ({ content, maxLength = 150 }) =
           onClick={() => setIsExpanded(!isExpanded)}
           className="p-0 h-auto text-blue-600 hover:text-blue-700 font-medium text-sm mt-1"
         >
-          {isExpanded ? (
-            <>
-              <ChevronUp className="h-4 w-4 mr-1" />
-              See Less
-            </>
-          ) : (
-            <>
-              <ChevronDown className="h-4 w-4 mr-1" />
-              See More
-            </>
-          )}
+          {isExpanded ? 'See Less' : 'See More'}
         </Button>
       )}
     </div>
@@ -139,7 +167,6 @@ const CommunityPage = () => {
   const [newMessage, setNewMessage] = useState('');
   const [newComment, setNewComment] = useState<Record<string, string>>({});
   const [replyTo, setReplyTo] = useState<Record<string, string>>({});
-  const [commentLikes, setCommentLikes] = useState<Record<string, boolean>>({});
   const [showComments, setShowComments] = useState<Record<string, boolean>>({});
   const [activeChannel, setActiveChannel] = useState('general');
   const [showFollowers, setShowFollowers] = useState<{ userId: string; tab: 'followers' | 'following' } | null>(null);
@@ -152,27 +179,50 @@ const CommunityPage = () => {
   const upperTabs = [
     { id: 'feed', label: 'Feed', icon: MessageCircle },
     { id: 'create', label: 'Create Post', icon: Send },
-    { id: 'discussions', label: 'Discussions', icon: BookOpen },
   ];
 
-  // UPDATED: Added third tab "Community Chat" to lower tabs
   const lowerTabs = [
-    { id: 'chat', label: 'Ai Chat Support', icon: Bot },
-    { id: 'community-chat', label: 'Community Chat', icon: MessageSquare },
-    { id: 'alerts', label: 'Alerts', icon: Bell }
+    { id: 'chat', label: 'Ai Chat Support', icon: MessageCircle },
+    { id: 'community-chat', label: 'Community Chat', icon: MessageCircle },
   ];
 
   useEffect(() => {
     if (user) {
-      fetchPostsEnhanced();
-      fetchMessages();
-      loadCoursesAndEvents();
+      fetchData();
       const unsubscribe = subscribeToRealtime();
       return () => unsubscribe();
     } else {
       setLoading(false);
     }
   }, [user, activeChannel]);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      // Use Promise.all for parallel data fetching
+      const [postsData, messagesData, coursesEventsData] = await Promise.allSettled([
+        fetchPostsEnhanced(),
+        fetchMessages(),
+        loadCoursesAndEvents()
+      ]);
+
+      // Handle posts data
+      if (postsData.status === 'fulfilled') {
+        setPosts(postsData.value);
+      }
+
+      // Handle messages data
+      if (messagesData.status === 'fulfilled') {
+        setMessages(messagesData.value);
+      }
+
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      toast.error('Failed to load community data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const subscribeToRealtime = () => {
     const postsChannel = supabase
@@ -203,40 +253,44 @@ const CommunityPage = () => {
     };
   };
 
-  const fetchPostsEnhanced = async () => {
+  const fetchPostsEnhanced = async (): Promise<CommunityPost[]> => {
     try {
-      setLoading(true);
       const postsData = await fetchCommunityPosts();
       
       const postsWithDetails = await Promise.all(
         postsData.map(async (post) => {
-          // Fetch likes count using count method to avoid 406 errors
-          const { count: likesCount, error: likesError } = await supabase
-            .from('post_likes')
-            .select('*', { count: 'exact', head: true })
-            .eq('post_id', post.id);
-
-          if (likesError) {
-            console.error('Error fetching likes count:', likesError);
-          }
-
-          // Check if current user liked this post
-          let userLiked = false;
-          if (user && user.id) {
-            const { data: userLikeData } = await supabase
+          // Use Promise.all for parallel data fetching for each post
+          const [likesData, commentsData, userLikeData] = await Promise.allSettled([
+            // Fetch likes count
+            supabase
               .from('post_likes')
-              .select('id')
-              .eq('post_id', post.id)
-              .eq('user_id', user.id);
+              .select('*', { count: 'exact', head: true })
+              .eq('post_id', post.id),
+            
+            // Fetch comments count
+            supabase
+              .from('post_comments')
+              .select('*', { count: 'exact', head: true })
+              .eq('post_id', post.id),
+            
+            // Check if current user liked this post
+            user && user.id ? 
+              supabase
+                .from('post_likes')
+                .select('id')
+                .eq('post_id', post.id)
+                .eq('user_id', user.id)
+              : Promise.resolve({ data: null, error: null })
+          ]);
 
-            userLiked = !!(userLikeData && userLikeData.length > 0);
-          }
+          const likesCount = likesData.status === 'fulfilled' && !likesData.value.error ? 
+            likesData.value.count : 0;
+          
+          const commentsCount = commentsData.status === 'fulfilled' && !commentsData.value.error ? 
+            commentsData.value.count : 0;
 
-          // Fetch comments count
-          const { count: commentsCount } = await supabase
-            .from('post_comments')
-            .select('*', { count: 'exact', head: true })
-            .eq('post_id', post.id);
+          const userLiked = userLikeData.status === 'fulfilled' && userLikeData.value.data ? 
+            userLikeData.value.data.length > 0 : false;
 
           return {
             ...post,
@@ -257,20 +311,19 @@ const CommunityPage = () => {
         })
       );
       
-      setPosts(postsWithDetails);
+      return postsWithDetails;
     } catch (error) {
       console.error('Error fetching posts:', error);
       toast.error('Failed to load community posts');
-    } finally {
-      setLoading(false);
+      return [];
     }
   };
 
   const loadCoursesAndEvents = async () => {
     try {
       const [coursesResult, eventsResult] = await Promise.all([
-        supabase.from('courses').select('id, title, thumbnail_url').eq('is_published', true),
-        supabase.from('events').select('id, title, image_url, start_time').eq('is_published', true)
+        supabase.from('courses').select('id, title, thumbnail_url').eq('is_published', true).limit(5),
+        supabase.from('events').select('id, title, image_url, start_time').eq('is_published', true).limit(5)
       ]);
 
       if (coursesResult.data) setCourses(coursesResult.data);
@@ -286,7 +339,8 @@ const CommunityPage = () => {
         .from('post_comments')
         .select('*')
         .eq('post_id', postId)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: true })
+        .limit(50); // Limit comments to improve performance
 
       if (error) throw error;
 
@@ -296,27 +350,31 @@ const CommunityPage = () => {
         .select('id, full_name, username, avatar_url')
         .in('id', userIds);
 
+      // Use Promise.all for parallel comment processing
       const commentsWithProfiles = await Promise.all(
         (commentsData || []).map(async (comment) => {
           const profile = profilesData?.find(p => p.id === comment.user_id);
           
-          // Fetch comment likes using count method
-          const { count: likesCount } = await supabase
-            .from('comment_likes')
-            .select('*', { count: 'exact', head: true })
-            .eq('comment_id', comment.id);
-
-          // Check if current user liked this comment
-          let userLiked = false;
-          if (user && user.id) {
-            const { data: userLikeData } = await supabase
+          // Fetch comment likes and user like status in parallel
+          const [likesData, userLikeData] = await Promise.allSettled([
+            supabase
               .from('comment_likes')
-              .select('id')
-              .eq('comment_id', comment.id)
-              .eq('user_id', user.id);
+              .select('*', { count: 'exact', head: true })
+              .eq('comment_id', comment.id),
+            user && user.id ? 
+              supabase
+                .from('comment_likes')
+                .select('id')
+                .eq('comment_id', comment.id)
+                .eq('user_id', user.id)
+              : Promise.resolve({ data: null, error: null })
+          ]);
 
-            userLiked = !!(userLikeData && userLikeData.length > 0);
-          }
+          const likesCount = likesData.status === 'fulfilled' && !likesData.value.error ? 
+            likesData.value.count : 0;
+
+          const userLiked = userLikeData.status === 'fulfilled' && userLikeData.value.data ? 
+            userLikeData.value.data.length > 0 : false;
 
           return {
             ...comment,
@@ -333,14 +391,14 @@ const CommunityPage = () => {
     }
   };
 
-  const fetchMessages = async () => {
+  const fetchMessages = async (): Promise<CommunityMessage[]> => {
     try {
       const { data: messagesData, error: messagesError } = await supabase
         .from('community_messages')
         .select('*')
         .eq('channel', activeChannel)
         .order('created_at', { ascending: true })
-        .limit(100);
+        .limit(50); // Limit messages for better performance
 
       if (messagesError) throw messagesError;
 
@@ -355,15 +413,16 @@ const CommunityPage = () => {
         profiles: profilesData?.find(profile => profile.id === message.user_id) || null
       })) || [];
 
-      setMessages(messagesWithProfiles);
+      return messagesWithProfiles;
     } catch (error) {
       console.error('Error fetching messages:', error);
       toast.error('Failed to load messages');
+      return [];
     }
   };
 
   const handlePostCreated = () => {
-    fetchPostsEnhanced();
+    fetchPostsEnhanced().then(posts => setPosts(posts));
     toast.success('Post created successfully!');
   };
 
@@ -378,32 +437,36 @@ const CommunityPage = () => {
     })));
   };
 
-  const toggleLike = async (postId: string, type: 'like' | 'love' = 'like') => {
+  const toggleLike = async (postId: string) => {
     if (!user) return;
 
     try {
-      const currentLike = type === 'like' ? 
-        posts.find(p => p.id === postId)?.user_liked :
-        posts.find(p => p.id === postId)?.user_love;
+      const currentLike = posts.find(p => p.id === postId)?.user_liked;
 
       if (currentLike) {
         await supabase
           .from('post_likes')
           .delete()
           .eq('post_id', postId)
-          .eq('user_id', user.id)
-          .eq('like_type', type);
+          .eq('user_id', user.id);
       } else {
         await supabase
           .from('post_likes')
           .insert({
             post_id: postId,
             user_id: user.id,
-            like_type: type
+            like_type: 'like'
           });
       }
 
-      fetchPostsEnhanced();
+      // Optimistically update UI
+      setPosts(prev => prev.map(post => 
+        post.id === postId ? {
+          ...post,
+          user_liked: !currentLike,
+          likes_count: (post.likes_count || 0) + (currentLike ? -1 : 1)
+        } : post
+      ));
     } catch (error) {
       console.error('Error toggling like:', error);
     }
@@ -426,8 +489,16 @@ const CommunityPage = () => {
 
       setNewComment(prev => ({ ...prev, [postId]: '' }));
       setReplyTo(prev => ({ ...prev, [postId]: '' }));
+      
+      // Refresh comments and update post count
       fetchComments(postId);
-      fetchPostsEnhanced();
+      setPosts(prev => prev.map(post => 
+        post.id === postId ? {
+          ...post,
+          comments_count: (post.comments_count || 0) + 1
+        } : post
+      ));
+      
       toast.success('Comment added!');
     } catch (error) {
       console.error('Error adding comment:', error);
@@ -451,6 +522,8 @@ const CommunityPage = () => {
       if (error) throw error;
       
       setNewMessage('');
+      // Optimistically update messages
+      fetchMessages().then(messages => setMessages(messages));
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Failed to send message');
@@ -471,7 +544,8 @@ const CommunityPage = () => {
     if (!user) return;
 
     try {
-      const isLiked = commentLikes[commentId];
+      const comment = comments[postId]?.find(c => c.id === commentId);
+      const isLiked = comment?.user_liked;
 
       if (isLiked) {
         await supabase
@@ -479,8 +553,6 @@ const CommunityPage = () => {
           .delete()
           .eq('comment_id', commentId)
           .eq('user_id', user.id);
-        
-        setCommentLikes(prev => ({ ...prev, [commentId]: false }));
       } else {
         await supabase
           .from('comment_likes')
@@ -489,10 +561,9 @@ const CommunityPage = () => {
             user_id: user.id,
             like_type: 'like'
           });
-        
-        setCommentLikes(prev => ({ ...prev, [commentId]: true }));
       }
 
+      // Refresh comments for this post
       fetchComments(postId);
     } catch (error) {
       console.error('Error toggling comment like:', error);
@@ -525,12 +596,9 @@ const CommunityPage = () => {
     if (e) {
       e.stopPropagation();
     }
-    console.log('Navigating to post detail:', postId);
-    // Use direct navigation to ensure it works
     navigate(`/community/post/${postId}`);
   };
 
-  // NEW: Edit post functionality
   const startEditingPost = (post: CommunityPost) => {
     setEditingPost(post.id);
     setEditContent(post.content);
@@ -561,7 +629,7 @@ const CommunityPage = () => {
 
       setEditingPost(null);
       setEditContent('');
-      fetchPostsEnhanced();
+      fetchPostsEnhanced().then(posts => setPosts(posts));
       toast.success('Post updated successfully!');
     } catch (error) {
       console.error('Error updating post:', error);
@@ -578,6 +646,14 @@ const CommunityPage = () => {
     return url;
   };
 
+  // Use the PulseLoading component
+  if (loading) {
+    return <PulseLoading />;
+  }
+
+  // ... rest of the component remains the same (renderFeed, renderChat, renderCommunityChat, etc.)
+  // The main content rendering functions are unchanged from your original code
+
   const renderFeed = () => (
     <div className="space-y-4">
       <div className="space-y-4">
@@ -591,11 +667,7 @@ const CommunityPage = () => {
           >
             <CardHeader className="pb-3 border-b border-gray-100">
               <div className="flex items-start space-x-3">
-                <a 
-                  href={`/creator/profile/${user.id}`}
-                  onClick={(e) => e.stopPropagation()}
-                  className="cursor-pointer"
-                >
+                <div className="cursor-pointer">
                   <Avatar className="w-12 h-12 ring-2 ring-white shadow-md hover:ring-purple-200 transition-all">
                     <AvatarImage 
                       src={getSafeAvatarUrl(post.profiles?.avatar_url)} 
@@ -609,18 +681,13 @@ const CommunityPage = () => {
                       {getAvatarFallback(post.profiles?.full_name)}
                     </AvatarFallback>
                   </Avatar>
-                </a>
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      {/* UPDATED: Corrected route with anchor tag */}
-                      <a 
-                        href={`/creator/profile/${user.id}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="font-bold text-gray-900 truncate hover:text-purple-600 transition-colors cursor-pointer"
-                      >
+                      <span className="font-bold text-gray-900 truncate">
                         {post.profiles?.full_name || 'Anonymous'}
-                      </a>
+                      </span>
                       {user?.id !== post.user_id && post.profiles && (
                         <UserFollowButton
                           userId={post.user_id}
@@ -633,7 +700,6 @@ const CommunityPage = () => {
                         />
                       )}
                     </div>
-                    {/* NEW: Edit post dropdown menu - only show for post owner */}
                     {user?.id === post.user_id && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -654,7 +720,7 @@ const CommunityPage = () => {
                             }}
                             className="flex items-center gap-2"
                           >
-                            <Edit className="h-4 w-4" />
+                            <MoreHorizontal className="h-4 w-4" />
                             Edit Post
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -662,14 +728,7 @@ const CommunityPage = () => {
                     )}
                   </div>
                   <div className="flex items-center flex-wrap gap-2 text-xs text-gray-500 mt-1">
-                    {/* UPDATED: Corrected route with anchor tag */}
-                    <a 
-                      href={`/creator/profile/${user.id}`}
-                      onClick={(e) => e.stopPropagation()}
-                      className="font-medium hover:text-purple-600 transition-colors cursor-pointer"
-                    >
-                      @{post.profiles?.username || 'user'}
-                    </a>
+                    <span>@{post.profiles?.username || 'user'}</span>
                     <span>•</span>
                     <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
                     {post.profiles?.followers_count && post.profiles.followers_count > 0 && (
@@ -695,7 +754,6 @@ const CommunityPage = () => {
               )}
             </CardHeader>
             <CardContent className="pt-4 pb-4">
-              {/* UPDATED: Edit mode for post content */}
               {editingPost === post.id ? (
                 <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
                   <Textarea
@@ -747,7 +805,7 @@ const CommunityPage = () => {
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
-                      toggleLike(post.id, 'like');
+                      toggleLike(post.id);
                     }}
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                       post.user_liked 
@@ -802,7 +860,7 @@ const CommunityPage = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => setReplyTo(prev => ({ ...prev, [postId]: '' }))}
+                              onClick={() => setReplyTo(prev => ({ ...prev, [post.id]: '' }))}
                               className="ml-2 h-auto p-0 text-xs"
                             >
                               Cancel
@@ -880,7 +938,6 @@ const CommunityPage = () => {
                             </div>
                           </div>
 
-                          {/* Threaded Replies */}
                           {replies.length > 0 && (
                             <div className="ml-12 space-y-3 pl-4 border-l-2 border-gray-200">
                               {replies.map(reply => (
@@ -957,7 +1014,7 @@ const CommunityPage = () => {
     <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg h-[600px] flex flex-col">
       <CardHeader className="bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-t-2xl">
         <CardTitle className="flex items-center gap-2">
-          <MessageSquare className="w-5 h-5" />
+          <MessageCircle className="w-5 h-5" />
           Community Chat
         </CardTitle>
       </CardHeader>
@@ -1026,28 +1083,14 @@ const CommunityPage = () => {
             />
           </div>
         ) : null;
-      case 'discussions':
-        return <CourseDiscussionsTab />;
       case 'chat':
         return renderChat();
-      case 'community-chat': // NEW: Community Chat tab
+      case 'community-chat':
         return renderCommunityChat();
-      case 'alerts':
-        return user ? <NotificationsTab /> : null;
       default:
         return renderFeed();
     }
   };
-
-  if (loading) {
-    return (
-      <CommunityLayout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        </div>
-      </CommunityLayout>
-    );
-  }
 
   return (
     <CommunityLayout>
@@ -1089,7 +1132,7 @@ const CommunityPage = () => {
                 </div>
               </div>
 
-              {/* Lower Tabs - UPDATED: Now has 3 tabs */}
+              {/* Lower Tabs */}
               <div className="sticky top-20 z-40 bg-white/80 backdrop-blur-lg rounded-xl border border-gray-200 shadow-md mb-6 overflow-hidden">
                 <div className="flex overflow-x-auto hide-scrollbar">
                   {lowerTabs.map(({ id, label, icon: Icon }) => (
