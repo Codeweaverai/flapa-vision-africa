@@ -19,7 +19,10 @@ import {
   Heart,
   ChevronDown,
   ChevronUp,
-  Share2
+  Share2,
+  BarChart3,
+  GraduationCap,
+  ThumbsUp
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import CourseReviews from '@/components/course/CourseReviews';
@@ -596,9 +599,6 @@ const CourseDetailPage = () => {
     }
   };
 
-  // Rest of the component remains the same...
-  // [Previous handleAddToCart, handleEnrollNow, handleFreeEnrollment functions remain unchanged]
-
   const handleAddToCart = async () => {
     if (!user) {
       navigate('/auth', { state: { from: location.pathname } });
@@ -781,7 +781,7 @@ const CourseDetailPage = () => {
                       )}
                     </div>
                     <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">{course.title}</h1>
-                    <p className="text-gray-600 text-lg mb-6">{course.summary}</p>
+                    <p className="text-gray-600 text-base mb-6">{course.summary}</p>
                     
                     {/* Course Stats */}
                     <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-sm text-gray-600">
@@ -882,7 +882,7 @@ const CourseDetailPage = () => {
                         About this course
                       </h3>
                       <div className="prose max-w-none">
-                        <p className="text-gray-700 leading-relaxed text-lg">{course.description}</p>
+                        <p className="text-gray-700 leading-relaxed text-base">{course.description}</p>
                       </div>
                     </CardContent>
                   </Card>
@@ -1039,7 +1039,7 @@ const CourseDetailPage = () => {
                 </CardContent>
               </Card>
 
-              {/* Creator Card - FIXED PROFILE DATA */}
+              {/* Creator Card - IMPROVED DESIGN */}
               {creatorProfile && (
                 <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
                   <CardContent className="p-6">
@@ -1057,20 +1057,39 @@ const CourseDetailPage = () => {
                         <p className="text-sm text-gray-600">Instructor</p>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-4 text-center">
-                      <div>
-                        <p className="font-bold text-gray-900">{creatorProfile.total_courses || 0}</p>
+                    
+                    {/* Stats with Icons */}
+                    <div className="grid grid-cols-3 gap-4 text-center mb-4">
+                      <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-3 rounded-lg">
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <BookOpen className="w-4 h-4 text-orange-600" />
+                          <p className="font-bold text-gray-900 text-lg">{creatorProfile.total_courses || 0}</p>
+                        </div>
                         <p className="text-xs text-gray-600">Courses</p>
                       </div>
-                      <div>
-                        <p className="font-bold text-gray-900">{creatorProfile.total_students || 0}</p>
+                      <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-3 rounded-lg">
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <Users className="w-4 h-4 text-purple-600" />
+                          <p className="font-bold text-gray-900 text-lg">{creatorProfile.total_students || 0}</p>
+                        </div>
                         <p className="text-xs text-gray-600">Students</p>
                       </div>
-                      <div>
-                        <p className="font-bold text-gray-900">{creatorProfile.average_rating?.toFixed(1) || '0.0'}</p>
+                      <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-3 rounded-lg">
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <Star className="w-4 h-4 text-yellow-600" />
+                          <p className="font-bold text-gray-900 text-lg">{creatorProfile.average_rating?.toFixed(1) || '0.0'}</p>
+                        </div>
                         <p className="text-xs text-gray-600">Rating</p>
                       </div>
                     </div>
+
+                    {/* View Profile Button */}
+                    <Button 
+                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 font-semibold py-2"
+                      onClick={() => navigate(`/creatorprofile/${creatorProfile.id}`)}
+                    >
+                      View Profile
+                    </Button>
                   </CardContent>
                 </Card>
               )}
@@ -1108,25 +1127,29 @@ const CourseDetailPage = () => {
                     )}
                   </div>
                   
-                  {/* Wishlist Button */}
+                  {/* Wishlist Button - FIXED DUPLICATE */}
                   {!isEnrolled && (
-                    <div className="mt-6 pt-6 border-t border-gray-200 space-y-6">
+                    <div className="mt-6 pt-6 border-t border-gray-200">
                       <WishlistButton
                         itemId={course.id}
                         itemType="course"
-                        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-medium py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
+                        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-medium py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center"
                       >
                         <Heart className="w-4 h-4 mr-2" />
                         Add to Wishlist
                       </WishlistButton>
-
-                      {/* Social Share Icons */}
-                      <SocialShareIcons courseTitle={course.title} courseUrl={courseUrl} />
-
-                      {/* FAQ Section */}
-                      <FAQSection />
                     </div>
                   )}
+
+                  {/* Social Share Icons - ALWAYS SHOWN */}
+                  <div className="mt-6 pt-6 border-t border-gray-200">
+                    <SocialShareIcons courseTitle={course.title} courseUrl={courseUrl} />
+                  </div>
+
+                  {/* FAQ Section - ALWAYS SHOWN */}
+                  <div className="mt-6 pt-6 border-t border-gray-200">
+                    <FAQSection />
+                  </div>
                 </CardContent>
               </Card>
 
