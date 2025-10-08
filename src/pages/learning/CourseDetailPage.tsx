@@ -1086,7 +1086,7 @@ const CourseDetailPage = () => {
                     {/* View Profile Button */}
                     <Button 
                       className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 font-semibold py-2"
-                      onClick={() => navigate(`/creatorprofile/${creatorProfile.id}`)}
+                      onClick={() => navigate(`/creator/profile/${creator.id}`)}
                     >
                       View Profile
                     </Button>
