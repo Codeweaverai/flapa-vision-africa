@@ -26,7 +26,6 @@ import { useCart } from '@/contexts/CartContext';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import ReactPlayer from 'react-player';
 import WishlistButton from '@/components/wishlist/WishlistButton';
-import GiftCourseButton from '@/components/course/GiftCourseButton';
 
 interface Course {
   id: string;
@@ -224,9 +223,22 @@ const CourseDetailPage = () => {
       setLoading(true);
       console.log('Fetching course with ID:', id);
       
+      // First get the course data to get creator_id
+      const { data: courseData, error: courseError } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', id)
+        .eq('is_published', true)
+        .single();
+
+      if (courseError || !courseData) {
+        console.error('Error fetching course:', courseError);
+        toast.error('Failed to load course');
+        return;
+      }
+
       // Use Promise.all for parallel data fetching
       const [
-        courseResult,
         creatorResult,
         previewResult,
         modulesResult,
@@ -234,19 +246,11 @@ const CourseDetailPage = () => {
         reviewsResult,
         enrollmentsResult
       ] = await Promise.allSettled([
-        // Basic course data
-        supabase
-          .from('courses')
-          .select('*')
-          .eq('id', id)
-          .eq('is_published', true)
-          .single(),
-
-        // Creator profile
+        // Creator profile - use the actual creator_id from courseData
         supabase
           .from('profiles')
           .select('id, full_name, avatar_url, bio')
-          .eq('id', course?.creator_id || '')
+          .eq('id', courseData.creator_id)
           .single(),
 
         // Course preview
@@ -295,7 +299,7 @@ const CourseDetailPage = () => {
           `)
           .eq('course_id', id)
           .order('created_at', { ascending: false })
-          .limit(20), // Limit reviews for performance
+          .limit(10), // Limit reviews for performance
 
         // Course enrollments
         supabase
@@ -304,73 +308,67 @@ const CourseDetailPage = () => {
           .eq('course_id', id)
       ]);
 
-      // Process course data
-      if (courseResult.status === 'fulfilled' && !courseResult.value.error && courseResult.value.data) {
-        const courseData = courseResult.value.data;
-
-        // Process creator data
-        const creatorData = creatorResult.status === 'fulfilled' && !creatorResult.value.error ? 
-          creatorResult.value.data : { id: courseData.creator_id, full_name: 'Unknown Creator' };
-
-        // Process preview data
-        const previewData = previewResult.status === 'fulfilled' && !previewResult.value.error ? 
-          previewResult.value.data : undefined;
-
-        // Process modules data
-        const modulesData = modulesResult.status === 'fulfilled' && !modulesResult.value.error ? 
-          modulesResult.value.data : [];
-
-        // Process outcomes data
-        const outcomesData = outcomesResult.status === 'fulfilled' && !outcomesResult.value.error ? 
-          outcomesResult.value.data : [];
-
-        // Process enrollments data
-        const enrollmentsData = enrollmentsResult.status === 'fulfilled' && !enrollmentsResult.value.error ? 
-          enrollmentsResult.value.data : [];
-
-        // Process reviews with user profiles
-        let reviewsWithProfiles = [];
-        if (reviewsResult.status === 'fulfilled' && !reviewsResult.value.error && reviewsResult.value.data) {
-          const reviewsData = reviewsResult.value.data;
-          const userIds = reviewsData.map(review => review.user_id);
-          
-          // Fetch user profiles for reviews in parallel
-          const { data: reviewProfiles } = await supabase
-            .from('profiles')
-            .select('id, full_name, avatar_url')
-            .in('id', userIds);
-
-          reviewsWithProfiles = reviewsData.map(review => ({
-            ...review,
-            profiles: reviewProfiles?.find(profile => profile.id === review.user_id) || {
-              full_name: 'Unknown User',
-              avatar_url: null
-            }
-          }));
-        }
-
-        // Combine all data
-        const completeCourse: Course = {
-          ...courseData,
-          profiles: creatorData,
-          course_preview: previewData,
-          course_modules: modulesData,
-          course_learning_outcomes: outcomesData,
-          course_reviews: reviewsWithProfiles,
-          course_enrollments: enrollmentsData
+      // Process creator data
+      const creatorData = creatorResult.status === 'fulfilled' && !creatorResult.value.error ? 
+        creatorResult.value.data : { 
+          id: courseData.creator_id, 
+          full_name: 'Unknown Creator',
+          avatar_url: null,
+          bio: null
         };
 
-        setCourse(completeCourse);
+      // Process preview data
+      const previewData = previewResult.status === 'fulfilled' && !previewResult.value.error ? 
+        previewResult.value.data : undefined;
 
-        // Fetch creator profile with stats in background
-        if (courseData.creator_id) {
-          fetchCreatorProfile(courseData.creator_id);
-        }
-      } else {
-        console.error('Error fetching course:', courseResult.status === 'fulfilled' ? courseResult.value.error : courseResult.reason);
-        toast.error('Failed to load course');
-        return;
+      // Process modules data
+      const modulesData = modulesResult.status === 'fulfilled' && !modulesResult.value.error ? 
+        modulesResult.value.data : [];
+
+      // Process outcomes data
+      const outcomesData = outcomesResult.status === 'fulfilled' && !outcomesResult.value.error ? 
+        outcomesResult.value.data : [];
+
+      // Process enrollments data
+      const enrollmentsData = enrollmentsResult.status === 'fulfilled' && !enrollmentsResult.value.error ? 
+        enrollmentsResult.value.data : [];
+
+      // Process reviews with user profiles
+      let reviewsWithProfiles = [];
+      if (reviewsResult.status === 'fulfilled' && !reviewsResult.value.error && reviewsResult.value.data) {
+        const reviewsData = reviewsResult.value.data;
+        const userIds = reviewsData.map(review => review.user_id);
+        
+        // Fetch user profiles for reviews in parallel
+        const { data: reviewProfiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .in('id', userIds);
+
+        reviewsWithProfiles = reviewsData.map(review => ({
+          ...review,
+          profiles: reviewProfiles?.find(profile => profile.id === review.user_id) || {
+            full_name: 'Unknown User',
+            avatar_url: null
+          }
+        }));
       }
+
+      // Combine all data
+      const completeCourse: Course = {
+        ...courseData,
+        profiles: creatorData,
+        course_preview: previewData,
+        course_modules: modulesData,
+        course_learning_outcomes: outcomesData,
+        course_reviews: reviewsWithProfiles,
+        course_enrollments: enrollmentsData
+      };
+
+      setCourse(completeCourse);
+
+      // Fetch creator profile with stats in background
+      fetchCreatorProfile(courseData.creator_id);
 
     } catch (error) {
       console.error('Error:', error);
@@ -383,14 +381,7 @@ const CourseDetailPage = () => {
   const fetchCreatorProfile = async (creatorId: string) => {
     try {
       // Use Promise.all for parallel data fetching
-      const [profileResult, coursesResult, enrollmentsResult, reviewsResult] = await Promise.allSettled([
-        // Creator basic info
-        supabase
-          .from('profiles')
-          .select('id, full_name, avatar_url, bio')
-          .eq('id', creatorId)
-          .single(),
-
+      const [coursesResult, enrollmentsResult] = await Promise.allSettled([
         // Creator courses
         supabase
           .from('courses')
@@ -403,17 +394,8 @@ const CourseDetailPage = () => {
           .from('course_enrollments')
           .select('id')
           .eq('payment_status', 'completed')
-          .in('course_id', course?.id ? [course.id] : []),
-
-        // Course reviews
-        supabase
-          .from('course_reviews')
-          .select('rating')
           .in('course_id', course?.id ? [course.id] : [])
       ]);
-
-      const profile = profileResult.status === 'fulfilled' && !profileResult.value.error ? 
-        profileResult.value.data : null;
 
       const courses = coursesResult.status === 'fulfilled' && !coursesResult.value.error ? 
         coursesResult.value.data : [];
@@ -421,18 +403,29 @@ const CourseDetailPage = () => {
       const enrollments = enrollmentsResult.status === 'fulfilled' && !enrollmentsResult.value.error ? 
         enrollmentsResult.value.data : [];
 
-      const reviews = reviewsResult.status === 'fulfilled' && !reviewsResult.value.error ? 
-        reviewsResult.value.data : [];
+      // Get reviews for all creator's courses
+      const courseIds = courses.map(c => c.id);
+      let totalReviews = 0;
+      let totalRating = 0;
 
-      const averageRating = reviews && reviews.length > 0
-        ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
-        : 0;
+      if (courseIds.length > 0) {
+        const { data: reviews } = await supabase
+          .from('course_reviews')
+          .select('rating')
+          .in('course_id', courseIds)
+          .limit(100); // Limit for performance
+
+        totalReviews = reviews?.length || 0;
+        totalRating = reviews?.reduce((sum, review) => sum + review.rating, 0) || 0;
+      }
+
+      const averageRating = totalReviews > 0 ? totalRating / totalReviews : 0;
 
       setCreatorProfile({
-        ...profile,
-        total_courses: courses?.length || 0,
-        total_students: enrollments?.length || 0,
-        total_reviews: reviews?.length || 0,
+        id: creatorId,
+        total_courses: courses.length,
+        total_students: enrollments.length,
+        total_reviews: totalReviews,
         average_rating: averageRating
       });
     } catch (error) {
@@ -499,16 +492,13 @@ const CourseDetailPage = () => {
 
     try {
       setEnrollmentLoading(true);
-      console.log('Starting free enrollment for user:', user.id, 'course:', course.id);
       
-      // Check for existing enrollment with detailed logging
+      // Check for existing enrollment
       const { data: existingEnrollment, error: checkError } = await supabase
         .from('course_enrollments')
         .select('id, user_id, course_id, payment_status')
         .eq('user_id', user.id)
         .eq('course_id', course.id);
-
-      console.log('Existing enrollment check result:', { existingEnrollment, checkError });
 
       if (checkError) {
         console.error('Error checking enrollment:', checkError);
@@ -518,14 +508,11 @@ const CourseDetailPage = () => {
 
       // If any enrollment exists, consider user enrolled
       if (existingEnrollment && existingEnrollment.length > 0) {
-        console.log('User already has enrollment:', existingEnrollment[0]);
         setIsEnrolled(true);
         toast.success('You are already enrolled in this course!');
         navigate(`/learning/course/${course.id}`);
         return;
       }
-
-      console.log('No existing enrollment found, proceeding with insertion...');
 
       // Proceed with enrollment
       const enrollmentData = {
@@ -535,26 +522,14 @@ const CourseDetailPage = () => {
         enrollment_date: new Date().toISOString()
       };
 
-      console.log('Inserting enrollment with data:', enrollmentData);
-
       const { data: newEnrollment, error: insertError } = await supabase
         .from('course_enrollments')
         .insert(enrollmentData)
         .select();
 
-      console.log('Insert result:', { newEnrollment, insertError });
-
       if (insertError) {
-        console.error('Enrollment error details:', {
-          message: insertError.message,
-          code: insertError.code,
-          details: insertError.details,
-          hint: insertError.hint
-        });
-
         // Handle specific error cases
         if (insertError.code === '23505') { // Unique constraint violation
-          console.log('Unique constraint violation detected');
           setIsEnrolled(true);
           toast.success('You are already enrolled in this course!');
           navigate(`/learning/course/${course.id}`);
@@ -565,7 +540,6 @@ const CourseDetailPage = () => {
         return;
       }
 
-      console.log('Enrollment successful:', newEnrollment);
       setIsEnrolled(true);
       toast.success('Successfully enrolled in course!');
       navigate(`/learning/course/${course.id}`);
@@ -679,15 +653,14 @@ const CourseDetailPage = () => {
                     </div>
                   </div>
 
-                  {/* Course Preview Video */}
+                  {/* Course Preview Video - REMOVED GRADIENT BORDER */}
                   {course.course_preview?.preview_video_url && (
                     <div className="mb-6">
                       <h3 className="text-lg font-semibold mb-3">Course Preview</h3>
-                      <div className="aspect-video rounded-xl overflow-hidden bg-gradient-to-r from-orange-500 to-purple-600 p-1">
+                      <div className="aspect-video rounded-xl overflow-hidden bg-gray-100"> {/* Changed from gradient border */}
                         <ReactPlayer
                           url={course.course_preview.preview_video_url}
                           controls={true}
-                          playing={true}
                           width="100%"
                           height="100%"
                           light={course.thumbnail_url}
@@ -706,7 +679,7 @@ const CourseDetailPage = () => {
                     </div>
                   )}
 
-                  {/* Instructor */}
+                  {/* Instructor - FIXED CREATOR PROFILE FETCHING */}
                   <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg border border-orange-200">
                     <Avatar className="w-12 h-12 border-2 border-orange-300">
                       <AvatarImage src={course.profiles?.avatar_url} />
@@ -716,7 +689,10 @@ const CourseDetailPage = () => {
                     </Avatar>
                     <div>
                       <p className="text-sm text-gray-600">Instructor</p>
-                      <p className="font-semibold text-gray-900">{course.profiles?.full_name || 'Unknown'}</p>
+                      <p className="font-semibold text-gray-900">{course.profiles?.full_name || 'Unknown Creator'}</p>
+                      {course.profiles?.bio && (
+                        <p className="text-sm text-gray-600 mt-1">{course.profiles.bio}</p>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -826,7 +802,7 @@ const CourseDetailPage = () => {
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <h3 className="text-xl font-semibold text-gray-900">{course.profiles?.full_name || 'Unknown'}</h3>
+                          <h3 className="text-xl font-semibold text-gray-900">{course.profiles?.full_name || 'Unknown Creator'}</h3>
                           <p className="text-gray-600">Course Instructor</p>
                         </div>
                       </div>
@@ -856,7 +832,7 @@ const CourseDetailPage = () => {
 
                   {isEnrolled ? (
                     <Button 
-                      className="w-full mb-4 bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700"
+                      className="w-full mb-4 bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700" // CHANGED TO ORANGE-PURPLE GRADIENT
                       onClick={() => navigate(`/learning/course/${course.id}`)}
                     >
                       <BookOpen className="w-4 h-4 mr-2" />
@@ -943,9 +919,9 @@ const CourseDetailPage = () => {
                     )}
                   </div>
                   
-                  {/* Wishlist Button - Only show if not enrolled */}
+                  {/* Wishlist Button - Only show if not enrolled - FIXED SINGLE HEART ICON */}
                   {!isEnrolled && (
-                    <div className="mt-6 pt-6 border-t border-gray-200 space-y-3">
+                    <div className="mt-6 pt-6 border-t border-gray-200">
                       <WishlistButton
                         itemId={course.id}
                         itemType="course"
@@ -954,15 +930,7 @@ const CourseDetailPage = () => {
                         <Heart className="w-4 h-4 mr-2" />
                         Add to Wishlist
                       </WishlistButton>
-                      
-                      {/* Gift Course Button */}
-                      <GiftCourseButton
-                        course={{
-                          id: course.id,
-                          title: course.title,
-                          price: course.price
-                        }}
-                      />
+                      {/* REMOVED GIFT COURSE BUTTON */}
                     </div>
                   )}
                 </CardContent>
