@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -12,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
-import { LayoutDashboard, ChevronRight, User, UserPlus, Settings, ExternalLink } from 'lucide-react';
+import { LayoutDashboard, ChevronRight, User, UserPlus, Settings, ExternalLink, BookOpen } from 'lucide-react';
 import ProfilePictureUpload from '@/components/user/ProfilePictureUpload';
 
 interface ProfileData {
@@ -30,6 +29,71 @@ interface CreatorStats {
   courses: number;
   events: number;
 }
+
+// Pulse Loading Component for Account Page
+const AccountPulseLoading = () => {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-200 via-purple-200 to-orange-300">
+      <Layout>
+        <div className="container mx-auto py-8 px-4 max-w-6xl">
+          <div className="flex flex-col items-center justify-center min-h-96">
+            {/* Pulse Animation Container */}
+            <div className="relative w-40 h-40 flex items-center justify-center mb-8">
+              {/* Outer Pulse Circle */}
+              <div className="absolute w-40 h-40 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 animate-ping" />
+              
+              {/* Middle Pulse Circle */}
+              <div className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-orange-500/30 to-purple-600/30 animate-pulse" />
+              
+              {/* Inner Pulse Circle */}
+              <div className="absolute w-24 h-24 rounded-full bg-gradient-to-r from-orange-500/40 to-purple-600/40 animate-pulse" />
+              
+              {/* Center Icon */}
+              <div className="absolute w-16 h-16 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center shadow-lg">
+                <User className="h-8 w-8 text-white" />
+              </div>
+            </div>
+
+            {/* Loading Text */}
+            <div className="text-center space-y-2">
+              <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                Loading Your Profile
+              </h3>
+              <p className="text-gray-700 text-lg">
+                Getting your account information ready...
+              </p>
+            </div>
+
+            {/* Progress Dots */}
+            <div className="flex space-x-2 mt-6">
+              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-3 h-3 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      </Layout>
+    </div>
+  );
+};
+
+// Alternative Minimal Loading
+const MinimalAccountLoading = () => {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-200 via-purple-200 to-orange-300 flex items-center justify-center">
+      <div className="text-center">
+        <div className="relative inline-block">
+          {/* Pulse Rings */}
+          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 animate-ping" />
+          <div className="relative w-20 h-20 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center shadow-lg">
+            <User className="h-10 w-10 text-white" />
+          </div>
+        </div>
+        <h3 className="mt-4 text-xl font-semibold text-gray-700">Loading your account...</h3>
+      </div>
+    </div>
+  );
+};
 
 const AccountPage = () => {
   const { user } = useAuth();
@@ -223,16 +287,11 @@ const AccountPage = () => {
     return <Navigate to="/auth" replace />;
   }
 
+  // Use the AccountPulseLoading component instead of the simple spinner
   if (loading) {
-    return (
-      <Layout>
-        <div className="container mx-auto py-8 px-4 max-w-4xl">
-          <div className="flex justify-center items-center min-h-96">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          </div>
-        </div>
-      </Layout>
-    );
+    return <AccountPulseLoading />;
+    // Alternatively, you can use the minimal version:
+    // return <MinimalAccountLoading />;
   }
 
   return (
