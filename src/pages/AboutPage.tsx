@@ -140,12 +140,12 @@ const AboutPage = () => {
                 Transforming Education
               </Badge>
               
-              <h1 className="text-5xl md:text-7xl font-bold mb-8 leading-tight">
+              <h2 className="text-5xl md:text-7xl font-bold mb-8 leading-tight">
                 Empowering The
                 <span className="block bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
                   Skill-Driven Generation
                 </span>
-              </h1>
+              </h2>
               
               <p className="text-xl md:text-2xl text-gray-700 mb-12 max-w-4xl mx-auto leading-relaxed">
                 "Democratizing skill development and event hosting to empower creators worldwide 
