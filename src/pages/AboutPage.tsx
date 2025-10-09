@@ -62,7 +62,7 @@ const AboutPage = () => {
     },
     {
       name: "George Munganga",
-      role: "CTO",
+      role: "Chief Technology Officer",
       bio: "A full-stack developer with deep expertise in building scalable learning platforms and integrating AI to enhance user experiences and educational outcomes.",
       image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//1675545655734.jpg?w=400&h=400&fit=crop&crop=face",
       linkedin: "#",
