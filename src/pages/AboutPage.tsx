@@ -398,7 +398,7 @@ const AboutPage = () => {
   <div className="container mx-auto px-4">
     <div className="relative rounded-3xl overflow-hidden shadow-2xl">
       {/* Background Image with Gradient Overlay */}
-      <div className="relative h-[500px] md:h-[600px] lg:h-[700px] overflow-hidden">
+      <div className="relative h-[600px] md:h-[600px] lg:h-[700px] overflow-hidden">
         <img 
           src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/citizen-amazed-by-city-buildings.jpg"
           alt="Skill Development in Africa"
