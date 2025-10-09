@@ -86,6 +86,15 @@ const AboutPage = () => {
       linkedin: "#",
       twitter: "#",
       email: "chishala@skillpulse.cloud"
+    },
+    {
+      name: "Jessica Komani",
+      role: "Director Company Secretary",
+      bio: "Experienced legal professional specializing in corporate governance and compliance. Ensures regulatory adherence and provides strategic legal guidance to support the company's mission of transforming education across Africa.",
+      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/WhatsApp%20Image%202025-09-26%20at%2010.43.26_892d6d70.jpg?w=400&h=400&fit=crop&crop=face",
+      linkedin: "#",
+      twitter: "#",
+      email: "jessica@skillpulse.cloud"
     }
   ];
 
@@ -319,30 +328,30 @@ const AboutPage = () => {
                 The passionate leaders driving innovation and transforming education through technology.
               </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
               {teamMembers.map((member, index) => (
-                <Card key={index} className="bg-white/90 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300 group overflow-hidden">
+                <Card key={index} className="bg-white/90 backdrop-blur-sm border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 group overflow-hidden hover:scale-[1.02]">
                   <div className="relative overflow-hidden">
                     <img 
                       src={member.image} 
                       alt={member.name}
-                      className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-500"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
                   </div>
-                  <CardContent className="p-6 text-center">
-                    <h3 className="text-xl font-bold text-gray-800 mb-1">{member.name}</h3>
-                    <p className="text-orange-600 font-semibold mb-4">{member.role}</p>
-                    <p className="text-gray-600 text-sm mb-6 leading-relaxed">{member.bio}</p>
-                    <div className="flex justify-center gap-3">
-                      <Button variant="outline" size="sm" className="p-2 hover:bg-orange-50 border-orange-200">
-                        <Linkedin className="h-4 w-4 text-orange-600" />
+                  <CardContent className="p-5 text-center">
+                    <h3 className="text-lg font-bold text-gray-800 mb-1">{member.name}</h3>
+                    <p className="text-orange-600 font-semibold text-sm mb-3">{member.role}</p>
+                    <p className="text-gray-600 text-xs mb-4 leading-relaxed line-clamp-3">{member.bio}</p>
+                    <div className="flex justify-center gap-2">
+                      <Button variant="ghost" size="sm" className="p-1.5 hover:bg-orange-50 rounded-full transition-colors">
+                        <Linkedin className="h-3.5 w-3.5 text-gray-600 hover:text-orange-600" />
                       </Button>
-                      <Button variant="outline" size="sm" className="p-2 hover:bg-purple-50 border-purple-200">
-                        <Twitter className="h-4 w-4 text-purple-600" />
+                      <Button variant="ghost" size="sm" className="p-1.5 hover:bg-purple-50 rounded-full transition-colors">
+                        <Twitter className="h-3.5 w-3.5 text-gray-600 hover:text-purple-600" />
                       </Button>
-                      <Button variant="outline" size="sm" className="p-2 hover:bg-gray-50 border-gray-200">
-                        <Mail className="h-4 w-4 text-gray-600" />
+                      <Button variant="ghost" size="sm" className="p-1.5 hover:bg-gray-50 rounded-full transition-colors">
+                        <Mail className="h-3.5 w-3.5 text-gray-600 hover:text-gray-700" />
                       </Button>
                     </div>
                   </CardContent>
