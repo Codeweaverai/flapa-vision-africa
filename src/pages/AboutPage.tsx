@@ -55,7 +55,7 @@ const AboutPage = () => {
       name: "Mbolela Pule",
       role: "CEO & Founder",
       bio: "Driven by a passion to democratize education across Africa through innovative technology. With over 7 years of experience in EdTech and Travel Tech, he is committed to building accessible, impactful learning and event platforms that empower individuals and creators alike.",
-      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//profile.jpeg?w=400&h=400&fit=crop&crop=face",
+      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/WhatsApp%20Image%202025-10-09%20at%2021.14.53_f06845c1.jpg?w=400&h=400&fit=crop&crop=face",
       linkedin: "#",
       twitter: "#",
       email: "mbolela.pule@skillpulse.cloud"
@@ -328,33 +328,65 @@ const AboutPage = () => {
                 The passionate leaders driving innovation and transforming education through technology.
               </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 max-w-7xl mx-auto">
               {teamMembers.map((member, index) => (
-                <Card key={index} className="bg-white/90 backdrop-blur-sm border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 group overflow-hidden hover:scale-[1.02]">
-                  <div className="relative overflow-hidden">
-                    <img 
-                      src={member.image} 
-                      alt={member.name}
-                      className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                  </div>
-                  <CardContent className="p-5 text-center">
-                    <h3 className="text-lg font-bold text-gray-800 mb-1">{member.name}</h3>
-                    <p className="text-orange-600 font-semibold text-sm mb-3">{member.role}</p>
-                    <p className="text-gray-600 text-xs mb-4 leading-relaxed line-clamp-3">{member.bio}</p>
-                    <div className="flex justify-center gap-2">
-                      <Button variant="ghost" size="sm" className="p-1.5 hover:bg-orange-50 rounded-full transition-colors">
-                        <Linkedin className="h-3.5 w-3.5 text-gray-600 hover:text-orange-600" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="p-1.5 hover:bg-purple-50 rounded-full transition-colors">
-                        <Twitter className="h-3.5 w-3.5 text-gray-600 hover:text-purple-600" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="p-1.5 hover:bg-gray-50 rounded-full transition-colors">
-                        <Mail className="h-3.5 w-3.5 text-gray-600 hover:text-gray-700" />
-                      </Button>
+                <Card key={index} className="bg-white/95 backdrop-blur-sm border-0 shadow-lg hover:shadow-2xl transition-all duration-500 group overflow-hidden hover:scale-105">
+                  {/* Gradient Border Effect */}
+                  <div className="relative p-0.5 bg-gradient-to-r from-orange-500 to-purple-600 rounded-xl">
+                    <div className="bg-white rounded-xl overflow-hidden">
+                      {/* Profile Image with Gradient Overlay */}
+                      <div className="relative overflow-hidden">
+                        <img 
+                          src={member.image} 
+                          alt={member.name}
+                          className="w-full h-40 object-cover group-hover:scale-110 transition-transform duration-500"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                        
+                        {/* Role Badge */}
+                        <div className="absolute bottom-3 left-3 right-3">
+                          <div className="bg-gradient-to-r from-orange-500 to-purple-600 text-white text-xs font-semibold px-3 py-1.5 rounded-full text-center backdrop-blur-sm">
+                            {member.role}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Content */}
+                      <CardContent className="p-4 text-center">
+                        <h3 className="text-sm font-bold text-gray-800 mb-2 leading-tight">
+                          {member.name}
+                        </h3>
+                        <p className="text-xs text-gray-600 mb-3 leading-relaxed line-clamp-2">
+                          {member.bio}
+                        </p>
+                        
+                        {/* Social Links */}
+                        <div className="flex justify-center gap-1.5">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="p-1.5 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 rounded-full transition-all duration-300 group/social"
+                          >
+                            <Linkedin className="h-3 w-3 text-gray-500 group-hover/social:text-orange-600 transition-colors" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="p-1.5 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 rounded-full transition-all duration-300 group/social"
+                          >
+                            <Twitter className="h-3 w-3 text-gray-500 group-hover/social:text-purple-600 transition-colors" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="p-1.5 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 rounded-full transition-all duration-300 group/social"
+                          >
+                            <Mail className="h-3 w-3 text-gray-500 group-hover/social:text-gray-700 transition-colors" />
+                          </Button>
+                        </div>
+                      </CardContent>
                     </div>
-                  </CardContent>
+                  </div>
                 </Card>
               ))}
             </div>
