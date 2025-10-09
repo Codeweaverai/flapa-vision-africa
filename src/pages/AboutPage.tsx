@@ -4,7 +4,7 @@ import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Users, Award, Globe, Zap, Heart, Target, CheckCircle, ArrowRight, Linkedin, Twitter, Mail, Play, Star, TrendingUp, BookOpen, Shield } from 'lucide-react';
+import { Users, Award, Globe, Zap, Heart, Target, CheckCircle, ArrowRight, Linkedin, Twitter, Mail, Play, Star, TrendingUp, BookOpen, Shield, Quote } from 'lucide-react';
 import YouTubeModal from '@/components/video/YouTubeModal';
 
 const AboutPage = () => {
@@ -55,7 +55,7 @@ const AboutPage = () => {
       name: "Mbolela Pule",
       role: "CEO & Founder",
       bio: "Driven by a passion to democratize education across Africa through innovative technology. With over 7 years of experience in EdTech and Travel Tech, he is committed to building accessible, impactful learning and event platforms that empower individuals and creators alike.",
-      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/WhatsApp%20Image%202025-10-09%20at%2021.14.53_f06845c1.jpg?w=400&h=400&fit=crop&crop=face",
+      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//profile.jpeg?w=400&h=400&fit=crop&crop=face",
       linkedin: "#",
       twitter: "#",
       email: "mbolela.pule@skillpulse.cloud"
@@ -339,7 +339,7 @@ const AboutPage = () => {
                         <img 
                           src={member.image} 
                           alt={member.name}
-                          className="w-full h-40 object-cover group-hover:scale-110 transition-transform duration-500"
+                          className="w-full h-52 object-cover group-hover:scale-110 transition-transform duration-500"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
                         
@@ -352,11 +352,11 @@ const AboutPage = () => {
                       </div>
                       
                       {/* Content */}
-                      <CardContent className="p-4 text-center">
+                      <CardContent className="p-5 text-center">
                         <h3 className="text-sm font-bold text-gray-800 mb-2 leading-tight">
                           {member.name}
                         </h3>
-                        <p className="text-xs text-gray-600 mb-3 leading-relaxed line-clamp-2">
+                        <p className="text-xs text-gray-600 mb-4 leading-relaxed line-clamp-3">
                           {member.bio}
                         </p>
                         
@@ -389,6 +389,54 @@ const AboutPage = () => {
                   </div>
                 </Card>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Impact Hero Section */}
+        <section className="py-20 relative z-10">
+          <div className="container mx-auto px-4">
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+              {/* Background Image with Gradient Overlay */}
+              <div className="relative h-96 md:h-[500px] overflow-hidden">
+                <img 
+                  src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/citizen-amazed-by-city-buildings.jpg"
+                  alt="Skill Development in Africa"
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-orange-600/80 to-purple-600/80"></div>
+                
+                {/* Content */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center text-white max-w-4xl mx-auto px-6">
+                    <Quote className="h-12 w-12 mx-auto mb-6 text-white/80" />
+                    <h2 className="text-3xl md:text-5xl font-bold mb-6 leading-tight">
+                      Revolutionizing Skill Development
+                      <span className="block text-white/90">Across Africa</span>
+                    </h2>
+                    <p className="text-lg md:text-xl mb-8 max-w-2xl mx-auto leading-relaxed">
+                      "SkillPulse is bridging the digital divide by making quality education accessible 
+                      to every African youth. We're not just teaching skills—we're building the next 
+                      generation of innovators, creators, and leaders who will transform our continent."
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                      <Button 
+                        size="lg"
+                        className="bg-white text-orange-600 hover:bg-white/90 font-semibold px-8 py-4 rounded-xl text-lg transition-all duration-300 hover:scale-105"
+                      >
+                        Join the Movement
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="lg"
+                        className="border-2 border-white text-white hover:bg-white/10 font-semibold px-8 py-4 rounded-xl text-lg transition-all duration-300"
+                      >
+                        See Our Impact
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
