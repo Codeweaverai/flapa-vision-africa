@@ -339,7 +339,7 @@ const AboutPage = () => {
                         <img 
                           src={member.image} 
                           alt={member.name}
-                          className="w-full h-65 object-cover group-hover:scale-110 transition-transform duration-500"
+                          className="w-full h-62 object-cover group-hover:scale-110 transition-transform duration-500"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
                         
