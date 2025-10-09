@@ -55,7 +55,7 @@ const AboutPage = () => {
       name: "Mbolela Pule",
       role: "CEO & Founder",
       bio: "Driven by a passion to democratize education across Africa through innovative technology. With over 7 years of experience in EdTech and Travel Tech, he is committed to building accessible, impactful learning and event platforms that empower individuals and creators alike.",
-      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//profile.jpeg?w=400&h=400&fit=crop&crop=face",
+      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/WhatsApp%20Image%202025-10-09%20at%2021.14.53_f06845c1.jpg?w=400&h=400&fit=crop&crop=face",
       linkedin: "#",
       twitter: "#",
       email: "mbolela.pule@skillpulse.cloud"
