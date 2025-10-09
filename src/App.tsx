@@ -33,7 +33,6 @@ import MyEventsPage from '@/pages/MyEventsPage';
 import WishlistPage from '@/pages/WishlistPage';
 import GiftCardsPage from '@/pages/GiftCardsPage';
 import GiftRedeemPage from '@/pages/GiftRedeemPage';
-import ImpactPage from '@/pages/ImpactPage';
 
 // Import account pages
 import AccountPage from '@/pages/AccountPage';
@@ -304,7 +303,6 @@ function App() {
                   <Route path="/contact" element={<ContactPage />} />
                   <Route path="/pricing" element={<PricingPage />} />
                   <Route path="/blog" element={<BlogPage />} />
-                   <Route path="/impact" element={<ImpactPage />} />
                   <Route path="/blog/:slug" element={<BlogPostPage />} />
                   <Route path="/media" element={<MediaPage />} />
                   <Route path="/media/:id" element={<MediaPostDetailPage />} />
