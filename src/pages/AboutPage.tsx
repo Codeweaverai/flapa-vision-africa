@@ -394,52 +394,56 @@ const AboutPage = () => {
         </section>
 
         {/* Impact Hero Section */}
-        <section className="py-20 relative z-10">
-          <div className="container mx-auto px-4">
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl">
-              {/* Background Image with Gradient Overlay */}
-              <div className="relative h-96 md:h-[500px] overflow-hidden">
-                <img 
-                  src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/citizen-amazed-by-city-buildings.jpg"
-                  alt="Skill Development in Africa"
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-r from-orange-600/80 to-purple-600/80"></div>
-                
-                {/* Content */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center text-white max-w-4xl mx-auto px-6">
-                    <Quote className="h-12 w-12 mx-auto mb-6 text-white/80" />
-                    <h2 className="text-3xl md:text-5xl font-bold mb-6 leading-tight">
-                      Revolutionizing Skill Development
-                      <span className="block text-white/90">Across Africa</span>
-                    </h2>
-                    <p className="text-lg md:text-xl mb-8 max-w-2xl mx-auto leading-relaxed">
-                      "SkillPulse is bridging the digital divide by making quality education accessible 
-                      to every African youth. We're not just teaching skills—we're building the next 
-                      generation of innovators, creators, and leaders who will transform our continent."
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                      <Button 
-                        size="lg"
-                        className="bg-white text-orange-600 hover:bg-white/90 font-semibold px-8 py-4 rounded-xl text-lg transition-all duration-300 hover:scale-105"
-                      >
-                        Join the Movement
-                      </Button>
-                      <Button 
-                        variant="secondary" 
-                        size="lg"
-                        className="border-2 border-white text-white hover:bg-white/10 font-semibold px-8 py-4 rounded-xl text-lg transition-all duration-300"
-                      >
-                        See Our Impact
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+<section className="py-20 relative z-10">
+  <div className="container mx-auto px-4">
+    <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+      {/* Background Image with Gradient Overlay */}
+      <div className="relative h-[500px] md:h-[600px] lg:h-[700px] overflow-hidden">
+        <img 
+          src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/citizen-amazed-by-city-buildings.jpg"
+          alt="Skill Development in Africa"
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-orange-600/80 to-purple-600/80"></div>
+        
+        {/* Content */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-center text-white max-w-4xl mx-auto px-6">
+            <Quote className="h-12 w-12 mx-auto mb-6 text-white/80" />
+            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
+              Revolutionizing Skill Development
+              <span className="block text-white/90 mt-2">Across Africa</span>
+            </h2>
+            <p className="text-lg md:text-xl lg:text-2xl mb-8 max-w-3xl mx-auto leading-relaxed">
+              "SkillPulse is bridging the digital divide by making quality education accessible 
+              to every African youth. We're not just teaching skills—we're building the next 
+              generation of innovators, creators, and leaders who will transform our continent."
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button 
+                size="lg"
+                className="bg-white text-orange-600 hover:bg-white/90 font-semibold px-8 py-4 rounded-xl text-lg transition-all duration-300 hover:scale-105"
+              >
+                Join the Movement
+              </Button>
+              <Button 
+                asChild
+                variant="outline" 
+                size="lg"
+                className="bg-transparent border-2 border-white text-white hover:bg-white/10 font-semibold px-8 py-4 rounded-xl text-lg transition-all duration-300"
+              >
+                <Link to="/impact">
+                  See Our Impact
+                </Link>
+              </Button>
             </div>
           </div>
-        </section>
+        </div>
+      </div>
+    </div>
+      </div>
+   </section>
+
 
         {/* Video Section */}
         <section className="py-20 relative z-10">
