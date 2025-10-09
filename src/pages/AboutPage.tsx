@@ -73,7 +73,7 @@ const AboutPage = () => {
       name: "Nakolo Pule",
       role: "Head of Content",
       bio: "Specializing in content creation and finance, where she leads the development of engaging, high-quality educational material tailored to empower learners and creators alike.",
-      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//WhatsApp_Image_2025-06-12_at_17.40.14_5fcc6eb5-removebg-preview.png?w=400&h=400&fit=crop&crop=face",
+      image: "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/WhatsApp%20Image%202025-10-09%20at%2021.05.23_3e2ef36d.jpg?w=400&h=400&fit=crop&crop=face",
       linkedin: "#",
       twitter: "#",
       email: "nakolo@skillpulse.cloud"
