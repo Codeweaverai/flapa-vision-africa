@@ -141,7 +141,7 @@ const CreatorWorkplaces: React.FC = () => {
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="space-y-2">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Your Workplaces</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Your Workspaces</h1>
             <p className="text-sm text-gray-600 max-w-2xl">
               Collaborate and manage your creative projects with team members in dedicated workspaces
             </p>
@@ -151,8 +151,8 @@ const CreatorWorkplaces: React.FC = () => {
             className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-2.5 rounded-xl font-semibold w-full sm:w-auto group"
           >
             <Plus className="h-5 w-5 mr-2 transition-transform group-hover:scale-110" />
-            <span className="hidden sm:inline">Create Workplace</span>
-            <span className="sm:hidden">New Workplace</span>
+            <span className="hidden sm:inline">Create Workspace</span>
+            <span className="sm:hidden">New Workspace</span>
           </Button>
         </div>
 
@@ -169,9 +169,9 @@ const CreatorWorkplaces: React.FC = () => {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-xl font-bold text-gray-900">No workplaces yet</h3>
+                  <h3 className="text-xl font-bold text-gray-900">No workspaces yet</h3>
                   <p className="text-gray-600 max-w-sm mx-auto">
-                    Start collaborating by creating your first workplace. Invite team members and organize your projects.
+                    Start collaborating by creating your first workspace. Invite team members and organize your projects.
                   </p>
                 </div>
                 <Button 
@@ -179,7 +179,7 @@ const CreatorWorkplaces: React.FC = () => {
                   className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-8 py-2.5 rounded-xl font-semibold mt-4 group"
                 >
                   <Plus className="h-5 w-5 mr-2 transition-transform group-hover:scale-110" />
-                  Create Your First Workplace
+                  Create Your First Workspace
                 </Button>
               </div>
             </CardContent>
