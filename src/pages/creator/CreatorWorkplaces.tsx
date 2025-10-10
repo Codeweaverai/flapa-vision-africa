@@ -250,14 +250,14 @@ const CreatorWorkplaces: React.FC = () => {
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle className="text-xl text-gray-900">Workplaces</CardTitle>
+                      <CardTitle className="text-xl text-gray-900">Workspaces</CardTitle>
                       <CardDescription className="text-gray-600 mt-1">
                         {workplaces.length} workplace{workplaces.length !== 1 ? 's' : ''} • Manage your collaborative spaces
                       </CardDescription>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Users className="h-4 w-4" />
-                      <span>Total members across all workplaces</span>
+                      <span>Total members across all workspaces</span>
                     </div>
                   </div>
                 </CardHeader>
@@ -265,7 +265,7 @@ const CreatorWorkplaces: React.FC = () => {
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-gradient-to-r from-orange-50/50 to-purple-50/50 hover:bg-transparent">
-                        <TableHead className="text-gray-800 font-semibold py-4 text-base">Workplace Name</TableHead>
+                        <TableHead className="text-gray-800 font-semibold py-4 text-base">Workspace Name</TableHead>
                         <TableHead className="text-gray-800 font-semibold py-4 text-base">Role</TableHead>
                         <TableHead className="text-gray-800 font-semibold py-4 text-base">Members</TableHead>
                         <TableHead className="text-gray-800 font-semibold py-4 text-base">Actions</TableHead>
