@@ -57,7 +57,7 @@ const CreatorLayout = ({ children, title }: CreatorLayoutProps) => {
       icon: <Calendar className="h-5 w-5" />
     },
     {
-      label: 'Workplaces',
+      label: 'Workspaces',
       href: '/creator/workplaces',
       icon: <Building2 className="h-5 w-5" />
     },
