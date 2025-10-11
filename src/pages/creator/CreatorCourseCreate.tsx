@@ -8,12 +8,20 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { X, Plus, Upload, MessageCircle, BarChart3, Users, ChefHat, Code, Smartphone, Database, TrendingUp, Cpu, PaintBucket, Music, Camera, Heart, Globe, BookOpen, Cloud, Shield } from 'lucide-react';
+import { 
+  X, Plus, Upload, MessageCircle, BarChart3, Users, ChefHat, Code, 
+  Smartphone, Database, TrendingUp, Cpu, PaintBucket, Music, Camera, 
+  Heart, Globe, BookOpen, Cloud, Shield, Zap, Target, Coffee, Palette,
+  Video, Mic, Gamepad2, Car, Leaf, Building2, School, Brain, Atom,
+  FlaskConical, Binary, Network, Rocket, Wallet, ShoppingCart, Mail,
+  Lock, Users2, Calendar, FileText, Presentation, Calculator, TestTube
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
 const CATEGORIES = [
+  // Original Categories
   { name: 'Web Development', icon: Code, color: 'from-orange-500 to-purple-600' },
   { name: 'Mobile App Development', icon: Smartphone, color: 'from-orange-500 to-purple-600' },
   { name: 'Data Science', icon: Database, color: 'from-orange-500 to-purple-600' },
@@ -30,7 +38,34 @@ const CATEGORIES = [
   { name: 'Language', icon: Globe, color: 'from-orange-500 to-purple-600' },
   { name: 'Personal Development', icon: BookOpen, color: 'from-orange-500 to-purple-600' },
   { name: 'Cloud Computing', icon: Cloud, color: 'from-orange-500 to-purple-600' },
-  { name: 'Cybersecurity', icon: Shield, color: 'from-orange-500 to-purple-600' }
+  { name: 'Cybersecurity', icon: Shield, color: 'from-orange-500 to-purple-600' },
+  
+  // Additional Upskilling Categories
+  { name: 'Digital Marketing', icon: Target, color: 'from-orange-500 to-purple-600' },
+  { name: 'Project Management', icon: Calendar, color: 'from-orange-500 to-purple-600' },
+  { name: 'UI/UX Design', icon: Palette, color: 'from-orange-500 to-purple-600' },
+  { name: 'Video Production', icon: Video, color: 'from-orange-500 to-purple-600' },
+  { name: 'Public Speaking', icon: Mic, color: 'from-orange-500 to-purple-600' },
+  { name: 'Game Development', icon: Gamepad2, color: 'from-orange-500 to-purple-600' },
+  { name: 'Electric Vehicles', icon: Car, color: 'from-orange-500 to-purple-600' },
+  { name: 'Sustainability', icon: Leaf, color: 'from-orange-500 to-purple-600' },
+  { name: 'Real Estate', icon: Building2, color: 'from-orange-500 to-purple-600' },
+  { name: 'Education & Teaching', icon: School, color: 'from-orange-500 to-purple-600' },
+  { name: 'Psychology', icon: Brain, color: 'from-orange-500 to-purple-600' },
+  { name: 'Physics', icon: Atom, color: 'from-orange-500 to-purple-600' },
+  { name: 'Chemistry', icon: FlaskConical, color: 'from-orange-500 to-purple-600' },
+  { name: 'Blockchain & Web3', icon: Binary, color: 'from-orange-500 to-purple-600' },
+  { name: 'Networking', icon: Network, color: 'from-orange-500 to-purple-600' },
+  { name: 'Entrepreneurship', icon: Rocket, color: 'from-orange-500 to-purple-600' },
+  { name: 'Personal Finance', icon: Wallet, color: 'from-orange-500 to-purple-600' },
+  { name: 'E-commerce', icon: ShoppingCart, color: 'from-orange-500 to-purple-600' },
+  { name: 'Email Marketing', icon: Mail, color: 'from-orange-500 to-purple-600' },
+  { name: 'Cryptography', icon: Lock, color: 'from-orange-500 to-purple-600' },
+  { name: 'Human Resources', icon: Users2, color: 'from-orange-500 to-purple-600' },
+  { name: 'Technical Writing', icon: FileText, color: 'from-orange-500 to-purple-600' },
+  { name: 'Sales & Negotiation', icon: Presentation, color: 'from-orange-500 to-purple-600' },
+  { name: 'Mathematics', icon: Calculator, color: 'from-orange-500 to-purple-600' },
+  { name: 'Biotechnology', icon: TestTube, color: 'from-orange-500 to-purple-600' }
 ];
 
 const VALID_DIFFICULTY_LEVELS = [
@@ -392,7 +427,7 @@ const CreatorCourseCreate = () => {
                   type="button" 
                   onClick={addTag} 
                   size="sm"
-                  className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                  className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
