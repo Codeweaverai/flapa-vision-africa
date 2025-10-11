@@ -312,20 +312,20 @@ const BrowseCategoriesSection = () => {
   };
 
   return (
-    <section className="py-20 bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 relative overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute top-0 left-0 w-72 h-72 bg-gradient-to-r from-blue-400/20 to-purple-400/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-r from-orange-400/20 to-pink-400/20 rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
+    <section className="py-20 bg-white relative overflow-hidden">
+      {/* Light Orange Background Elements */}
+      <div className="absolute top-0 left-0 w-72 h-72 bg-gradient-to-r from-orange-100/40 to-purple-100/40 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
+      <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-r from-orange-100/40 to-pink-100/40 rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
       
       <div className="container mx-auto px-4 relative z-10">
         <div className="text-center mb-16">
           <div className="relative inline-block">
-            <h2 className="text-5xl font-bold mb-6 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+            <h2 className="text-5xl font-bold mb-6 bg-gradient-to-r from-orange-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
               Explore Categories
             </h2>
-            <div className="absolute -top-4 -left-4 -right-4 -bottom-4 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-2xl blur-xl opacity-50"></div>
+            <div className="absolute -top-4 -left-4 -right-4 -bottom-4 bg-gradient-to-r from-orange-200/30 to-purple-200/30 rounded-2xl blur-xl opacity-60"></div>
             <Sparkles className="absolute -top-2 -right-2 h-6 w-6 text-purple-500 animate-pulse" />
-            <Sparkles className="absolute -bottom-2 -left-2 h-6 w-6 text-blue-500 animate-pulse delay-1000" />
+            <Sparkles className="absolute -bottom-2 -left-2 h-6 w-6 text-orange-500 animate-pulse delay-1000" />
           </div>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8 leading-relaxed">
             Discover thousands of courses across diverse categories. Find your passion and accelerate your learning journey with expert-led content.
@@ -333,7 +333,7 @@ const BrowseCategoriesSection = () => {
 
           {/* Enhanced Search Form */}
           <div className="max-w-4xl mx-auto mb-16">
-            <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/40 shadow-blue-500/10">
+            <div className="bg-white rounded-3xl p-8 shadow-xl border border-gray-100">
               <div className="flex flex-col lg:flex-row gap-6 items-center">
                 <div className="flex-1 w-full">
                   <div className="relative">
@@ -344,13 +344,13 @@ const BrowseCategoriesSection = () => {
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onKeyPress={handleKeyPress}
-                      className="h-14 text-lg border-2 border-gray-200 focus:border-blue-400 rounded-2xl pl-12 pr-4 bg-white/80 backdrop-blur-sm"
+                      className="h-14 text-lg border-2 border-gray-200 focus:border-orange-400 rounded-2xl pl-12 pr-4 bg-white"
                     />
                   </div>
                 </div>
                 <div className="w-full lg:w-56">
                   <Select value={searchType} onValueChange={setSearchType}>
-                    <SelectTrigger className="h-14 border-2 border-gray-200 focus:border-purple-400 rounded-2xl bg-white/80 backdrop-blur-sm">
+                    <SelectTrigger className="h-14 border-2 border-gray-200 focus:border-purple-400 rounded-2xl bg-white">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -362,7 +362,7 @@ const BrowseCategoriesSection = () => {
                 </div>
                 <Button 
                   onClick={handleSearch}
-                  className="h-14 px-8 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-2xl font-semibold text-lg shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300"
+                  className="h-14 px-8 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white rounded-2xl font-semibold text-lg shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 transition-all duration-300"
                 >
                   <Search className="h-5 w-5 mr-3" />
                   Explore
@@ -384,7 +384,7 @@ const BrowseCategoriesSection = () => {
                 variant="outline"
                 size="icon"
                 onClick={toggleAutoScroll}
-                className="h-10 w-10 rounded-xl border-2 border-gray-200 hover:border-blue-400 transition-all duration-300"
+                className="h-10 w-10 rounded-xl border-2 border-gray-200 hover:border-orange-400 transition-all duration-300"
               >
                 {isPlaying ? (
                   <Pause className="h-4 w-4 text-gray-600" />
@@ -397,7 +397,7 @@ const BrowseCategoriesSection = () => {
                   variant="outline"
                   size="icon"
                   onClick={scrollToPrev}
-                  className="h-10 w-10 rounded-xl border-2 border-gray-200 hover:border-blue-400 transition-all duration-300"
+                  className="h-10 w-10 rounded-xl border-2 border-gray-200 hover:border-orange-400 transition-all duration-300"
                 >
                   <ArrowLeft className="h-4 w-4 text-gray-600" />
                 </Button>
@@ -405,7 +405,7 @@ const BrowseCategoriesSection = () => {
                   variant="outline"
                   size="icon"
                   onClick={scrollToNext}
-                  className="h-10 w-10 rounded-xl border-2 border-gray-200 hover:border-blue-400 transition-all duration-300"
+                  className="h-10 w-10 rounded-xl border-2 border-gray-200 hover:border-orange-400 transition-all duration-300"
                 >
                   <ArrowRight className="h-4 w-4 text-gray-600" />
                 </Button>
@@ -431,7 +431,7 @@ const BrowseCategoriesSection = () => {
                       to={`/explore-courses?category=${encodeURIComponent(category.searchParam)}`}
                       className="block group"
                     >
-                      <Card className="h-48 border-0 bg-white/90 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-all duration-500 group-hover:bg-white relative overflow-hidden">
+                      <Card className="h-48 border-0 bg-white shadow-xl hover:shadow-2xl transition-all duration-500 group-hover:bg-white relative overflow-hidden border border-gray-100">
                         {/* Gradient Border Effect */}
                         <div className={`absolute inset-0 bg-gradient-to-r ${category.color} opacity-0 group-hover:opacity-5 transition-opacity duration-500 rounded-2xl`}></div>
                         
@@ -454,7 +454,7 @@ const BrowseCategoriesSection = () => {
                           <p className="text-gray-600 group-hover:text-gray-700 transition-colors duration-300 text-sm leading-relaxed line-clamp-2">
                             {category.description}
                           </p>
-                          <div className="mt-3 flex items-center text-blue-600 group-hover:text-blue-700 transition-colors duration-300">
+                          <div className="mt-3 flex items-center text-orange-600 group-hover:text-orange-700 transition-colors duration-300">
                             <span className="text-sm font-semibold">Explore</span>
                             <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform duration-300" />
                           </div>
@@ -470,8 +470,8 @@ const BrowseCategoriesSection = () => {
             </div>
 
             {/* Gradient Overlays */}
-            <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-slate-50/90 to-transparent pointer-events-none"></div>
-            <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-slate-50/90 to-transparent pointer-events-none"></div>
+            <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-white to-transparent pointer-events-none"></div>
+            <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-white to-transparent pointer-events-none"></div>
           </div>
 
           {/* Progress Indicators */}
@@ -482,7 +482,7 @@ const BrowseCategoriesSection = () => {
                 onClick={() => setCurrentIndex(index)}
                 className={`w-2 h-2 rounded-full transition-all duration-300 ${
                   index === currentIndex 
-                    ? 'bg-blue-500 w-6' 
+                    ? 'bg-gradient-to-r from-orange-500 to-purple-600 w-6' 
                     : 'bg-gray-300 hover:bg-gray-400'
                 }`}
               />
@@ -491,28 +491,28 @@ const BrowseCategoriesSection = () => {
         </div>
 
         {/* Quick Stats */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-lg border border-white/40 mb-12">
+        <div className="bg-orange-50/50 rounded-3xl p-8 shadow-lg border border-orange-100 mb-12">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             <div>
-              <div className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              <div className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
                 2,000+
               </div>
               <div className="text-gray-600 font-medium">Courses</div>
             </div>
             <div>
-              <div className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+              <div className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
                 500+
               </div>
               <div className="text-gray-600 font-medium">Instructors</div>
             </div>
             <div>
-              <div className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
+              <div className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
                 50K+
               </div>
               <div className="text-gray-600 font-medium">Students</div>
             </div>
             <div>
-              <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+              <div className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
                 25+
               </div>
               <div className="text-gray-600 font-medium">Categories</div>
@@ -525,7 +525,7 @@ const BrowseCategoriesSection = () => {
           <Button 
             asChild 
             size="lg"
-            className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-12 py-7 text-lg font-semibold rounded-2xl shadow-xl shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300 transform hover:scale-105"
+            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white px-12 py-7 text-lg font-semibold rounded-2xl shadow-xl shadow-orange-500/25 hover:shadow-orange-500/40 transition-all duration-300 transform hover:scale-105"
           >
             <Link to="/explore-courses" className="flex items-center gap-3">
               <BookOpen className="h-6 w-6" />
