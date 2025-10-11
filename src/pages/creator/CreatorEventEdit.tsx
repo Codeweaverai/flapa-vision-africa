@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -11,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateTimePicker } from '@/components/ui/date-time-picker';
-import { Upload, X, Plus, Trash2 } from 'lucide-react';
+import { Upload, X, Plus, Trash2, Calendar, BookOpen } from 'lucide-react';
 import { 
   Form, 
   FormControl, 
@@ -25,7 +24,6 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { supabase } from '@/lib/supabaseClient';
-import { VALID_EVENT_TYPES, Event } from '@/services/eventService';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface TicketType {
@@ -38,6 +36,33 @@ interface TicketType {
   early_bird_end_date: string;
   is_active: boolean;
 }
+
+// Event categories with icons matching the mobile app
+const EVENT_CATEGORIES = [
+  { value: 'webinar', label: 'Webinar', icon: Calendar, color: 'from-blue-500 to-cyan-600' },
+  { value: 'conferences', label: 'Conferences', icon: Calendar, color: 'from-purple-500 to-indigo-600' },
+  { value: 'live-music', label: 'Live Music', icon: Calendar, color: 'from-pink-500 to-rose-600' },
+  { value: 'sports-events', label: 'Sports Events', icon: Calendar, color: 'from-green-500 to-emerald-600' },
+  { value: 'night-life', label: 'Night Life', icon: Calendar, color: 'from-purple-500 to-pink-600' },
+  { value: 'concerts', label: 'Concerts', icon: Calendar, color: 'from-orange-500 to-red-600' },
+  { value: 'comedy-shows', label: 'Comedy Shows', icon: Calendar, color: 'from-yellow-500 to-amber-600' },
+  { value: 'business-events', label: 'Business Events', icon: Calendar, color: 'from-blue-500 to-indigo-600' },
+  { value: 'wellness-events', label: 'Wellness Events', icon: Calendar, color: 'from-green-500 to-teal-600' },
+  { value: 'summit', label: 'Summit', icon: Calendar, color: 'from-gray-500 to-blue-600' },
+  { value: 'picnic', label: 'Picnic', icon: Calendar, color: 'from-green-500 to-lime-600' },
+  { value: 'workshops', label: 'Workshops', icon: Calendar, color: 'from-purple-500 to-blue-600' },
+  { value: 'festivals', label: 'Festivals', icon: Calendar, color: 'from-orange-500 to-yellow-600' },
+  { value: 'gaming-events', label: 'Gaming Events', icon: Calendar, color: 'from-green-500 to-emerald-600' },
+  { value: 'food-drink', label: 'Food & Drink', icon: Calendar, color: 'from-red-500 to-orange-600' },
+  { value: 'art-exhibitions', label: 'Art Exhibitions', icon: Calendar, color: 'from-pink-500 to-purple-600' },
+  { value: 'travel-events', label: 'Travel Events', icon: Calendar, color: 'from-blue-500 to-cyan-600' },
+  { value: 'tech-meetups', label: 'Tech Meetups', icon: Calendar, color: 'from-blue-500 to-indigo-600' },
+  { value: 'science-fairs', label: 'Science Fairs', icon: Calendar, color: 'from-purple-500 to-blue-600' },
+  { value: 'cultural-events', label: 'Cultural Events', icon: Calendar, color: 'from-amber-500 to-orange-600' },
+  { value: 'auto-shows', label: 'Auto Shows', icon: Calendar, color: 'from-gray-500 to-red-600' },
+  { value: 'science-events', label: 'Science Events', icon: Calendar, color: 'from-purple-500 to-pink-600' },
+  { value: 'community-events', label: 'Community Events', icon: Calendar, color: 'from-green-500 to-blue-600' }
+];
 
 // Define the form schema
 const eventSchema = z.object({
@@ -57,10 +82,54 @@ const eventSchema = z.object({
 
 type EventFormValues = z.infer<typeof eventSchema>;
 
+// Pulse Loading Component
+const PulseLoading = () => {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-orange-50">
+      <div className="flex flex-col items-center justify-center min-h-96">
+        {/* Pulse Animation Container */}
+        <div className="relative w-40 h-40 flex items-center justify-center mb-8">
+          {/* Outer Pulse Circle */}
+          <div className="absolute w-40 h-40 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 animate-ping" />
+          
+          {/* Middle Pulse Circle */}
+          <div className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-orange-500/30 to-purple-600/30 animate-pulse" />
+          
+          {/* Inner Pulse Circle */}
+          <div className="absolute w-24 h-24 rounded-full bg-gradient-to-r from-orange-500/40 to-purple-600/40 animate-pulse" />
+          
+          {/* Center Icon */}
+          <div className="absolute w-16 h-16 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center shadow-lg">
+            <Calendar className="h-8 w-8 text-white" />
+          </div>
+        </div>
+
+        {/* Loading Text */}
+        <div className="text-center space-y-2">
+          <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+            Loading Event Details
+          </h3>
+          <p className="text-muted-foreground text-lg">
+            Preparing your event editor...
+          </p>
+        </div>
+
+        {/* Progress Dots */}
+        <div className="flex space-x-2 mt-6">
+          <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+          <div className="w-3 h-3 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+          <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const CreatorEventEdit = () => {
   const { id: eventId } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [ticketTypes, setTicketTypes] = useState<TicketType[]>([]);
@@ -222,7 +291,7 @@ const CreatorEventEdit = () => {
       return;
     }
     
-    setLoading(true);
+    setSubmitting(true);
     try {
       // Upload image if provided
       const imageUrl = await uploadImage();
@@ -282,436 +351,487 @@ const CreatorEventEdit = () => {
       console.error('Error updating event:', error);
       toast.error('Failed to update event');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
+  if (loading) {
+    return <PulseLoading />;
+  }
+
   return (
     <CreatorLayout title="Edit Event">
-      <Card>
-        <CardHeader>
-          <CardTitle>Edit Event</CardTitle>
-          <CardDescription>Update your event details below</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Event Title*</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter event title" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Provide a description of your event" 
-                        className="min-h-[120px]" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 py-6">
+        <div className="container mx-auto px-4">
+          <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-2xl">
+            <CardHeader className="text-center pb-6">
+              <CardTitle className="text-4xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                Edit Event
+              </CardTitle>
+              <CardDescription className="text-lg text-gray-600">
+                Update your event details and make it even more amazing
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-8">
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                  {/* Event Categories Horizontal Scroll */}
+                  <div className="space-y-4">
+                    <Label className="text-lg font-semibold text-gray-900">Event Category</Label>
+                    <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
+                      {EVENT_CATEGORIES.map((category) => (
+                        <button
+                          key={category.value}
+                          type="button"
+                          onClick={() => setValue('event_type', category.value)}
+                          className={`flex items-center gap-2 px-4 py-3 rounded-xl font-medium transition-all duration-300 flex-shrink-0 ${
+                            form.watch('event_type') === category.value
+                              ? `bg-gradient-to-r ${category.color} text-white shadow-lg transform scale-105`
+                              : 'bg-white/80 text-gray-700 hover:bg-white hover:shadow-md border border-gray-200/50'
+                          }`}
+                        >
+                          <category.icon className="h-4 w-4" />
+                          {category.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-              {/* Event Image Upload */}
-              <div>
-                <Label htmlFor="image">Event Image</Label>
-                <div className="space-y-4">
-                  {imagePreview ? (
-                    <div className="relative inline-block">
-                      <img 
-                        src={imagePreview} 
-                        alt="Event image preview" 
-                        className="max-h-48 rounded-md border"
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Left Column - Basic Info */}
+                    <div className="space-y-6">
+                      <FormField
+                        control={form.control}
+                        name="title"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base font-semibold">Event Title*</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Enter an engaging event title" 
+                                className="h-12 bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        className="absolute -top-2 -right-2 h-6 w-6"
-                        onClick={removeImage}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
+                      
+                      <FormField
+                        control={form.control}
+                        name="description"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base font-semibold">Description</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Describe what attendees can expect from your event..." 
+                                className="min-h-[140px] bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl resize-none" 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Event Image Upload */}
+                      <div className="space-y-4">
+                        <Label className="text-base font-semibold">Event Image</Label>
+                        <div className="space-y-4">
+                          {imagePreview ? (
+                            <div className="relative inline-block">
+                              <img 
+                                src={imagePreview} 
+                                alt="Event image preview" 
+                                className="max-h-48 rounded-xl border-2 border-gray-200 shadow-lg"
+                              />
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="icon"
+                                className="absolute -top-2 -right-2 h-8 w-8 bg-gradient-to-r from-red-500 to-pink-600 border-0 shadow-lg"
+                                onClick={removeImage}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center bg-white/50 hover:bg-white transition-colors">
+                              <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                              <div className="space-y-2">
+                                <Label htmlFor="image" className="cursor-pointer">
+                                  <span className="text-base font-medium text-gray-700">Click to upload event image</span>
+                                  <Input
+                                    id="image"
+                                    name="image"
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageChange}
+                                    className="hidden"
+                                  />
+                                </Label>
+                                <p className="text-sm text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                      <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                      <div className="mt-4">
-                        <Label htmlFor="image" className="cursor-pointer">
-                          <span className="text-sm text-gray-600">Click to upload event image</span>
-                          <Input
-                            id="image"
-                            name="image"
-                            type="file"
-                            accept="image/*"
-                            onChange={handleImageChange}
-                            className="hidden"
+
+                    {/* Right Column - Details */}
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 gap-6">
+                        <FormField
+                          control={form.control}
+                          name="capacity"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold">Capacity (optional)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  placeholder="Maximum number of attendees" 
+                                  className="h-12 bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                                  {...field}
+                                  value={field.value || ''}
+                                  onChange={(e) => {
+                                    const value = parseInt(e.target.value);
+                                    field.onChange(!isNaN(value) ? value : undefined);
+                                  }}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <div className="grid grid-cols-1 gap-6">
+                          <FormField
+                            control={form.control}
+                            name="start_time"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-base font-semibold">Start Time*</FormLabel>
+                                <FormControl>
+                                  <DateTimePicker
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                    className="bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
                           />
-                        </Label>
+                          
+                          <FormField
+                            control={form.control}
+                            name="end_time"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-base font-semibold">End Time*</FormLabel>
+                                <FormControl>
+                                  <DateTimePicker
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                    className="bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 gap-6">
+                        <FormField
+                          control={form.control}
+                          name="location"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold">Location (For in-person events)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="Enter event venue or address" 
+                                  className="h-12 bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                                  {...field} 
+                                  value={field.value || ''} 
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="online_meeting_link"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold">Online Meeting Link (For virtual events)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="https://zoom.us/j/..." 
+                                  className="h-12 bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                                  {...field} 
+                                  value={field.value || ''} 
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       </div>
                     </div>
-                  )}
+                  </div>
                   
-                  {!imagePreview && (
-                    <Input
-                      id="image"
-                      name="image"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                    />
-                  )}
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="event_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Event Type*</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select event type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {VALID_EVENT_TYPES.map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {type.charAt(0).toUpperCase() + type.slice(1)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="capacity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Capacity (optional)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          placeholder="Maximum number of attendees" 
-                          {...field}
-                          value={field.value || ''}
-                          onChange={(e) => {
-                            const value = parseInt(e.target.value);
-                            field.onChange(!isNaN(value) ? value : undefined);
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="start_time"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Start Time*</FormLabel>
-                      <FormControl>
-                        <DateTimePicker
-                          value={field.value}
-                          onChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="end_time"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>End Time*</FormLabel>
-                      <FormControl>
-                        <DateTimePicker
-                          value={field.value}
-                          onChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="location"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Location (For in-person events)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Event location" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="online_meeting_link"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Online Meeting Link (For virtual events)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Zoom/Meet link" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="is_free"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">Free Event</FormLabel>
-                        <FormDescription>
-                          Toggle if this is a free event or requires payment
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={(checked) => {
-                            field.onChange(checked);
-                            if (checked) {
-                              setTicketTypes([]);
-                            }
-                          }}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                
-                {!isFree && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Pricing Section */}
+                  <div className="space-y-6">
                     <FormField
                       control={form.control}
-                      name="price"
+                      name="is_free"
                       render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Base Price (for fallback)*</FormLabel>
+                        <FormItem className="flex flex-row items-center justify-between rounded-2xl border-2 border-gray-200 p-6 bg-white/80">
+                          <div className="space-y-1">
+                            <FormLabel className="text-base font-semibold">Free Event</FormLabel>
+                            <FormDescription className="text-gray-600">
+                              Toggle if this is a free event or requires payment
+                            </FormDescription>
+                          </div>
                           <FormControl>
-                            <Input 
-                              type="number" 
-                              step="0.01"
-                              placeholder="Event price" 
-                              {...field}
-                              onChange={(e) => {
-                                const value = parseFloat(e.target.value);
-                                field.onChange(!isNaN(value) ? value : 0);
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={(checked) => {
+                                field.onChange(checked);
+                                if (checked) {
+                                  setTicketTypes([]);
+                                }
                               }}
+                              className="data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-orange-500 data-[state=checked]:to-purple-600"
                             />
                           </FormControl>
-                          <FormMessage />
                         </FormItem>
                       )}
                     />
                     
-                    <FormField
-                      control={form.control}
-                      name="currency"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Currency*</FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
-                            defaultValue={field.value}
-                            value={field.value || 'USD'}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select currency" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="USD">USD - US Dollar</SelectItem>
-                              <SelectItem value="EUR">EUR - Euro</SelectItem>
-                              <SelectItem value="GBP">GBP - British Pound</SelectItem>
-                              <SelectItem value="CAD">CAD - Canadian Dollar</SelectItem>
-                              <SelectItem value="AUD">AUD - Australian Dollar</SelectItem>
-                              <SelectItem value="ZMW">ZMW - Zambian Kwacha</SelectItem>
-                              <SelectItem value="XOF">XOF - West African CFA Franc</SelectItem>
-                              <SelectItem value="XAF">XAF - Central African CFA Franc</SelectItem>
-                              <SelectItem value="GHS">GHS - Ghanaian Cedi</SelectItem>
-                              <SelectItem value="KES">KES - Kenyan Shilling</SelectItem>
-                              <SelectItem value="LSL">LSL - Lesotho Loti</SelectItem>
-                              <SelectItem value="MWK">MWK - Malawian Kwacha</SelectItem>
-                              <SelectItem value="MZN">MZN - Mozambican Metical</SelectItem>
-                              <SelectItem value="NGN">NGN - Nigerian Naira</SelectItem>
-                              <SelectItem value="RWF">RWF - Rwandan Franc</SelectItem>
-                              <SelectItem value="SLL">SLL - Sierra Leonean Leone</SelectItem>
-                              <SelectItem value="TZS">TZS - Tanzanian Shilling</SelectItem>
-                              <SelectItem value="UGX">UGX - Ugandan Shilling</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Ticket Types Section */}
-              {!isFree && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-lg font-semibold">Ticket Types</Label>
-                    <Button type="button" onClick={addTicketType} variant="outline" size="sm">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Ticket Type
-                    </Button>
-                  </div>
-
-                  {ticketTypes.map((ticket, index) => (
-                    <Card key={ticket.id} className="p-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label>Ticket Name *</Label>
-                          <Input
-                            value={ticket.name}
-                            onChange={(e) => updateTicketType(index, 'name', e.target.value)}
-                            placeholder="e.g., Early Bird, VIP, Standard"
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Ticket Type</Label>
-                          <Select 
-                            value={ticket.ticket_type} 
-                            onValueChange={(value) => updateTicketType(index, 'ticket_type', value)}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="ordinary">Ordinary</SelectItem>
-                              <SelectItem value="standard">Standard</SelectItem>
-                              <SelectItem value="vip">VIP</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Price *</Label>
-                          <Input
-                            type="number"
-                            value={ticket.price}
-                            onChange={(e) => updateTicketType(index, 'price', parseFloat(e.target.value) || 0)}
-                            min="0"
-                            step="0.01"
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Quantity Available *</Label>
-                          <Input
-                            type="number"
-                            value={ticket.quantity_available}
-                            onChange={(e) => updateTicketType(index, 'quantity_available', parseInt(e.target.value) || 0)}
-                            min="1"
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Early Bird End Date (Optional)</Label>
-                          <Input
-                            type="datetime-local"
-                            value={ticket.early_bird_end_date}
-                            onChange={(e) => updateTicketType(index, 'early_bird_end_date', e.target.value)}
-                          />
-                        </div>
-
-                        <div className="flex items-end">
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => removeTicketType(index)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 space-y-2">
-                        <Label>Description</Label>
-                        <Textarea
-                          value={ticket.description}
-                          onChange={(e) => updateTicketType(index, 'description', e.target.value)}
-                          placeholder="What's included with this ticket?"
-                          rows={2}
+                    {!isFree && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <FormField
+                          control={form.control}
+                          name="price"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold">Base Price (for fallback)*</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  step="0.01"
+                                  placeholder="0.00" 
+                                  className="h-12 bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                                  {...field}
+                                  onChange={(e) => {
+                                    const value = parseFloat(e.target.value);
+                                    field.onChange(!isNaN(value) ? value : 0);
+                                  }}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="currency"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold">Currency*</FormLabel>
+                              <Select 
+                                onValueChange={field.onChange} 
+                                defaultValue={field.value}
+                                value={field.value || 'USD'}
+                              >
+                                <FormControl>
+                                  <SelectTrigger className="h-12 bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl">
+                                    <SelectValue placeholder="Select currency" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="USD">USD - US Dollar</SelectItem>
+                                  <SelectItem value="EUR">EUR - Euro</SelectItem>
+                                  <SelectItem value="GBP">GBP - British Pound</SelectItem>
+                                  <SelectItem value="CAD">CAD - Canadian Dollar</SelectItem>
+                                  <SelectItem value="AUD">AUD - Australian Dollar</SelectItem>
+                                  <SelectItem value="ZMW">ZMW - Zambian Kwacha</SelectItem>
+                                  <SelectItem value="XOF">XOF - West African CFA Franc</SelectItem>
+                                  <SelectItem value="XAF">XAF - Central African CFA Franc</SelectItem>
+                                  <SelectItem value="GHS">GHS - Ghanaian Cedi</SelectItem>
+                                  <SelectItem value="KES">KES - Kenyan Shilling</SelectItem>
+                                  <SelectItem value="LSL">LSL - Lesotho Loti</SelectItem>
+                                  <SelectItem value="MWK">MWK - Malawian Kwacha</SelectItem>
+                                  <SelectItem value="MZN">MZN - Mozambican Metical</SelectItem>
+                                  <SelectItem value="NGN">NGN - Nigerian Naira</SelectItem>
+                                  <SelectItem value="RWF">RWF - Rwandan Franc</SelectItem>
+                                  <SelectItem value="SLL">SLL - Sierra Leonean Leone</SelectItem>
+                                  <SelectItem value="TZS">TZS - Tanzanian Shilling</SelectItem>
+                                  <SelectItem value="UGX">UGX - Ugandan Shilling</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
                       </div>
-                    </Card>
-                  ))}
-                </div>
-              )}
-              
-              <div className="flex justify-end space-x-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate('/creator/events')}
-                  disabled={loading}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={loading}>
-                  {loading ? 'Updating...' : 'Update Event'}
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+                    )}
+                  </div>
+
+                  {/* Ticket Types Section */}
+                  {!isFree && (
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                          Ticket Types
+                        </Label>
+                        <Button 
+                          type="button" 
+                          onClick={addTicketType} 
+                          className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Ticket Type
+                        </Button>
+                      </div>
+
+                      {ticketTypes.map((ticket, index) => (
+                        <Card key={ticket.id} className="p-6 bg-white/80 backdrop-blur-sm border-2 border-gray-200 shadow-lg">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                            <div className="space-y-2">
+                              <Label className="font-semibold">Ticket Name *</Label>
+                              <Input
+                                value={ticket.name}
+                                onChange={(e) => updateTicketType(index, 'name', e.target.value)}
+                                placeholder="e.g., Early Bird, VIP, Standard"
+                                className="bg-white border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                                required
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label className="font-semibold">Ticket Type</Label>
+                              <Select 
+                                value={ticket.ticket_type} 
+                                onValueChange={(value) => updateTicketType(index, 'ticket_type', value)}
+                              >
+                                <SelectTrigger className="bg-white border-2 border-gray-200 focus:border-orange-500 rounded-xl">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="ordinary">Ordinary</SelectItem>
+                                  <SelectItem value="standard">Standard</SelectItem>
+                                  <SelectItem value="vip">VIP</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label className="font-semibold">Price *</Label>
+                              <Input
+                                type="number"
+                                value={ticket.price}
+                                onChange={(e) => updateTicketType(index, 'price', parseFloat(e.target.value) || 0)}
+                                min="0"
+                                step="0.01"
+                                className="bg-white border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                                required
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label className="font-semibold">Quantity Available *</Label>
+                              <Input
+                                type="number"
+                                value={ticket.quantity_available}
+                                onChange={(e) => updateTicketType(index, 'quantity_available', parseInt(e.target.value) || 0)}
+                                min="1"
+                                className="bg-white border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div className="space-y-2">
+                              <Label className="font-semibold">Early Bird End Date (Optional)</Label>
+                              <Input
+                                type="datetime-local"
+                                value={ticket.early_bird_end_date}
+                                onChange={(e) => updateTicketType(index, 'early_bird_end_date', e.target.value)}
+                                className="bg-white border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                              />
+                            </div>
+
+                            <div className="flex items-end justify-end">
+                              <Button
+                                type="button"
+                                className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300"
+                                onClick={() => removeTicketType(index)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Remove
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="font-semibold">Description</Label>
+                            <Textarea
+                              value={ticket.description}
+                              onChange={(e) => updateTicketType(index, 'description', e.target.value)}
+                              placeholder="What's included with this ticket? Any special benefits or features?"
+                              rows={3}
+                              className="bg-white border-2 border-gray-200 focus:border-orange-500 rounded-xl resize-none"
+                            />
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Action Buttons */}
+                  <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => navigate('/creator/events')}
+                      disabled={submitting}
+                      className="h-12 px-8 border-2 border-gray-300 hover:border-orange-500 text-gray-700 hover:text-orange-600 rounded-xl font-semibold transition-all duration-300"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={submitting}
+                      className="h-12 px-8 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl font-semibold"
+                    >
+                      {submitting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Updating Event...
+                        </>
+                      ) : (
+                        'Update Event'
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </CreatorLayout>
   );
 };
