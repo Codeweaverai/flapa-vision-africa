@@ -5,7 +5,7 @@ import {
   ChevronDown, Heart, Zap, Music, Mic, Gamepad2, Utensils, 
   Camera, Mountain, Martini, Theater, GraduationCap, Ticket,
   Plane, Lightbulb, Microscope, Castle, Car, Beaker, Building2,
-  Dumbbell, Palmtree
+  Dumbbell, Palmtree, BookOpen
 } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -51,7 +51,7 @@ interface Event {
 
 // Modern event categories matching the mobile app
 const EVENT_CATEGORIES = [
-  { value: 'all', label: 'All Categories', icon: Calendar, color: 'from-gray-500 to-gray-600' },
+  { value: 'all', label: 'All Categories', icon: Calendar, color: 'from-orange-500 to-purple-600' },
   { value: 'webinar', label: 'Webinar', icon: Users, color: 'from-blue-500 to-cyan-600' },
   { value: 'conferences', label: 'Conferences', icon: Building2, color: 'from-purple-500 to-indigo-600' },
   { value: 'live-music', label: 'Live Music', icon: Music, color: 'from-pink-500 to-rose-600' },
@@ -78,6 +78,53 @@ const EVENT_CATEGORIES = [
 ];
 
 const EVENTS_PER_PAGE = 8;
+
+// Pulse Loading Component from MyCourses
+const PulseLoading = () => {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-orange-50">
+      <Layout>
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex flex-col items-center justify-center min-h-96">
+            {/* Pulse Animation Container */}
+            <div className="relative w-40 h-40 flex items-center justify-center mb-8">
+              {/* Outer Pulse Circle */}
+              <div className="absolute w-40 h-40 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 animate-ping" />
+              
+              {/* Middle Pulse Circle */}
+              <div className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-orange-500/30 to-purple-600/30 animate-pulse" />
+              
+              {/* Inner Pulse Circle */}
+              <div className="absolute w-24 h-24 rounded-full bg-gradient-to-r from-orange-500/40 to-purple-600/40 animate-pulse" />
+              
+              {/* Center Icon */}
+              <div className="absolute w-16 h-16 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center shadow-lg">
+                <Calendar className="h-8 w-8 text-white" />
+              </div>
+            </div>
+
+            {/* Loading Text */}
+            <div className="text-center space-y-2">
+              <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                Loading Amazing Events
+              </h3>
+              <p className="text-muted-foreground text-lg">
+                Discovering the best experiences for you...
+              </p>
+            </div>
+
+            {/* Progress Dots */}
+            <div className="flex space-x-2 mt-6">
+              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-3 h-3 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      </Layout>
+    </div>
+  );
+};
 
 const ExploreEventsPage = () => {
   const navigate = useNavigate();
@@ -282,30 +329,8 @@ const ExploreEventsPage = () => {
     navigate(`/events/${eventId}`);
   };
 
-  // Enhanced Loading Animation with Gradient Rings
-  const LoadingAnimation = () => (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
-      <div className="text-center">
-        <div className="relative inline-block">
-          {/* Outer Ring */}
-          <div className="w-20 h-20 border-4 border-transparent border-t-orange-500 border-r-purple-600 rounded-full animate-spin"></div>
-          {/* Middle Ring */}
-          <div className="absolute top-2 left-2 w-16 h-16 border-4 border-transparent border-b-purple-500 border-l-orange-400 rounded-full animate-spin animation-delay-200"></div>
-          {/* Inner Ring */}
-          <div className="absolute top-4 left-4 w-12 h-12 border-4 border-transparent border-t-purple-400 border-r-orange-300 rounded-full animate-spin animation-delay-400"></div>
-          {/* Center Dot */}
-          <div className="absolute top-7 left-7 w-6 h-6 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full animate-pulse"></div>
-        </div>
-        <p className="mt-6 text-lg font-semibold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-          Loading Amazing Events...
-        </p>
-        <p className="mt-2 text-gray-600">Discovering the best experiences for you</p>
-      </div>
-    </div>
-  );
-
   if (loading) {
-    return <LoadingAnimation />;
+    return <PulseLoading />;
   }
 
   return (
@@ -468,8 +493,8 @@ const ExploreEventsPage = () => {
                           </div>
                         </div>
 
-                        {/* Wishlist Button */}
-                        <div className="absolute top-4 right-4 z-20">
+                        {/* Wishlist Button - Moved to Bottom Right */}
+                        <div className="absolute bottom-4 right-4 z-20">
                           <WishlistButton 
                             itemId={event.id}
                             itemType="event"
