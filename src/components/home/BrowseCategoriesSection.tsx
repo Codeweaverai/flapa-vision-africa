@@ -2,17 +2,19 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
-  BookOpen, Code, Briefcase, Camera, Music, Heart, Search, TrendingUp, 
+  BookOpen, Code, Briefcase, Camera, Music, Heart, TrendingUp, 
   Palette, Globe, Cpu, Smartphone, Database, Cloud, Shield, Gamepad2, 
   GraduationCap, Mic, Video, Coffee, Users2, Home, Car, Utensils, 
-  BarChart3, Zap, Sparkles, ArrowRight, ArrowLeft, Play, Pause
+  BarChart3, Zap, Sparkles, ArrowRight, ArrowLeft, Play, Pause,
+  Calendar, Users, Ticket, Music2, Mic2, GamepadIcon, UtensilsCrossed,
+  Dumbbell, Mountain, Palmtree, Martini, Castle, CarFront, Plane,
+  CameraIcon, Theater, GraduationCap as GradCap, Building2,
+  Lightbulb, Microscope, TestTube, Beaker
 } from 'lucide-react';
 
-// Extended categories with all options
-const categories = [
+// Course categories (existing)
+const courseCategories = [
   {
     icon: Code,
     title: 'Web Development',
@@ -116,131 +118,227 @@ const categories = [
     count: '65+ courses',
     searchParam: 'Lifestyle',
     color: 'from-amber-500 to-orange-600'
-  },
+  }
+];
+
+// New event categories
+const eventCategories = [
   {
-    icon: Users2,
-    title: 'Social Media',
-    description: 'Grow your online presence',
-    count: '70+ courses',
-    searchParam: 'Social Media',
-    color: 'from-purple-500 to-fuchsia-600'
-  },
-  {
-    icon: Home,
-    title: 'Home Improvement',
-    description: 'DIY projects and home maintenance',
-    count: '40+ courses',
-    searchParam: 'Home Improvement',
-    color: 'from-green-500 to-emerald-600'
-  },
-  {
-    icon: Car,
-    title: 'Automotive',
-    description: 'Car maintenance and repair',
-    count: '35+ courses',
-    searchParam: 'Automotive',
-    color: 'from-gray-500 to-gray-600'
-  },
-  {
-    icon: Utensils,
-    title: 'Culinary Arts',
-    description: 'Cooking and baking techniques',
-    count: '50+ courses',
-    searchParam: 'Culinary Arts',
-    color: 'from-red-500 to-orange-600'
-  },
-  {
-    icon: Palette,
-    title: 'Graphic Design',
-    description: 'Visual communication and design',
-    count: '110+ courses',
-    searchParam: 'Graphic Design',
-    color: 'from-purple-500 to-indigo-600'
-  },
-  {
-    icon: Music,
-    title: 'Music Production',
-    description: 'Create and produce music',
-    count: '60+ courses',
-    searchParam: 'Music Production',
-    color: 'from-pink-500 to-rose-600'
-  },
-  {
-    icon: Camera,
-    title: 'Photography',
-    description: 'Capture stunning images',
-    count: '85+ courses',
-    searchParam: 'Photography',
+    icon: Users,
+    title: 'Webinar',
+    description: 'Interactive online seminars and workshops',
+    count: '120+ events',
+    searchParam: 'Webinar',
     color: 'from-blue-500 to-cyan-600'
   },
   {
-    icon: Palette,
-    title: 'Art & Crafts',
-    description: 'Creative arts and handmade crafts',
-    count: '55+ courses',
-    searchParam: 'Art & Crafts',
-    color: 'from-amber-500 to-yellow-600'
+    icon: Building2,
+    title: 'Conferences',
+    description: 'Professional gatherings and industry events',
+    count: '85+ events',
+    searchParam: 'Conferences',
+    color: 'from-purple-500 to-indigo-600'
   },
   {
-    icon: Cpu,
-    title: 'AI & Machine Learning',
-    description: 'Artificial intelligence and ML',
-    count: '95+ courses',
-    searchParam: 'AI & Machine Learning',
-    color: 'from-cyan-500 to-blue-600'
+    icon: Music2,
+    title: 'Live Music',
+    description: 'Concerts, gigs, and musical performances',
+    count: '200+ events',
+    searchParam: 'Live Music',
+    color: 'from-pink-500 to-rose-600'
   },
   {
-    icon: Globe,
-    title: 'Blockchain',
-    description: 'Cryptocurrency and Web3',
-    count: '45+ courses',
-    searchParam: 'Blockchain',
-    color: 'from-amber-500 to-orange-600'
+    icon: Dumbbell,
+    title: 'Sports Events',
+    description: 'Games, tournaments, and athletic competitions',
+    count: '150+ events',
+    searchParam: 'Sports Events',
+    color: 'from-green-500 to-emerald-600'
   },
   {
-    icon: BarChart3,
-    title: 'Digital Marketing',
-    description: 'Online marketing strategies',
-    count: '130+ courses',
-    searchParam: 'Digital Marketing',
+    icon: Martini,
+    title: 'Night Life',
+    description: 'Clubs, bars, and evening entertainment',
+    count: '95+ events',
+    searchParam: 'Night Life',
+    color: 'from-purple-500 to-pink-600'
+  },
+  {
+    icon: Theater,
+    title: 'Concerts',
+    description: 'Live performances and music festivals',
+    count: '180+ events',
+    searchParam: 'Concerts',
+    color: 'from-orange-500 to-red-600'
+  },
+  {
+    icon: Mic2,
+    title: 'Comedy Shows',
+    description: 'Stand-up comedy and improv performances',
+    count: '65+ events',
+    searchParam: 'Comedy Shows',
+    color: 'from-yellow-500 to-amber-600'
+  },
+  {
+    icon: Briefcase,
+    title: 'Business Events',
+    description: 'Networking and professional development',
+    count: '110+ events',
+    searchParam: 'Business Events',
+    color: 'from-blue-500 to-indigo-600'
+  },
+  {
+    icon: Heart,
+    title: 'Wellness Events',
+    description: 'Yoga, meditation, and health workshops',
+    count: '75+ events',
+    searchParam: 'Wellness Events',
     color: 'from-green-500 to-teal-600'
   },
   {
-    icon: TrendingUp,
-    title: 'Professional Skills',
-    description: 'Career development and workplace',
-    count: '120+ courses',
-    searchParam: 'Professional Skills',
+    icon: Mountain,
+    title: 'Summit',
+    description: 'Leadership and industry peak events',
+    count: '45+ events',
+    searchParam: 'Summit',
+    color: 'from-gray-500 to-blue-600'
+  },
+  {
+    icon: Palmtree,
+    title: 'Picnic',
+    description: 'Outdoor gatherings and social events',
+    count: '60+ events',
+    searchParam: 'Picnic',
+    color: 'from-green-500 to-lime-600'
+  },
+  {
+    icon: GradCap,
+    title: 'Workshops',
+    description: 'Hands-on learning and skill-building sessions',
+    count: '90+ events',
+    searchParam: 'Workshops',
+    color: 'from-purple-500 to-blue-600'
+  },
+  {
+    icon: Ticket,
+    title: 'Festivals',
+    description: 'Cultural celebrations and community events',
+    count: '70+ events',
+    searchParam: 'Festivals',
+    color: 'from-orange-500 to-yellow-600'
+  },
+  {
+    icon: GamepadIcon,
+    title: 'Gaming Events',
+    description: 'Esports tournaments and gaming conventions',
+    count: '55+ events',
+    searchParam: 'Gaming Events',
+    color: 'from-green-500 to-emerald-600'
+  },
+  {
+    icon: UtensilsCrossed,
+    title: 'Food & Drink',
+    description: 'Culinary experiences and tasting events',
+    count: '85+ events',
+    searchParam: 'Food & Drink',
+    color: 'from-red-500 to-orange-600'
+  },
+  {
+    icon: CameraIcon,
+    title: 'Art Exhibitions',
+    description: 'Gallery shows and creative displays',
+    count: '50+ events',
+    searchParam: 'Art Exhibitions',
+    color: 'from-pink-500 to-purple-600'
+  },
+  {
+    icon: Plane,
+    title: 'Travel Events',
+    description: 'Adventure trips and exploration gatherings',
+    count: '40+ events',
+    searchParam: 'Travel Events',
+    color: 'from-blue-500 to-cyan-600'
+  },
+  {
+    icon: Lightbulb,
+    title: 'Tech Meetups',
+    description: 'Technology discussions and innovation talks',
+    count: '95+ events',
+    searchParam: 'Tech Meetups',
     color: 'from-blue-500 to-indigo-600'
+  },
+  {
+    icon: Microscope,
+    title: 'Science Fairs',
+    description: 'Research presentations and scientific displays',
+    count: '35+ events',
+    searchParam: 'Science Fairs',
+    color: 'from-purple-500 to-blue-600'
+  },
+  {
+    icon: Castle,
+    title: 'Cultural Events',
+    description: 'Heritage celebrations and traditional gatherings',
+    count: '65+ events',
+    searchParam: 'Cultural Events',
+    color: 'from-amber-500 to-orange-600'
+  },
+  {
+    icon: CarFront,
+    title: 'Auto Shows',
+    description: 'Vehicle exhibitions and automotive events',
+    count: '30+ events',
+    searchParam: 'Auto Shows',
+    color: 'from-gray-500 to-red-600'
+  },
+  {
+    icon: Beaker,
+    title: 'Science Events',
+    description: 'Experiments, demonstrations, and discoveries',
+    count: '45+ events',
+    searchParam: 'Science Events',
+    color: 'from-purple-500 to-pink-600'
+  },
+  {
+    icon: Calendar,
+    title: 'Community Events',
+    description: 'Local gatherings and neighborhood activities',
+    count: '120+ events',
+    searchParam: 'Community Events',
+    color: 'from-green-500 to-blue-600'
   }
 ];
 
 const BrowseCategoriesSection = () => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchType, setSearchType] = useState('courses');
-  const [isPlaying, setIsPlaying] = useState(true);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const animationRef = useRef<number>();
-  const scrollSpeed = 1; // pixels per frame
+  // Course categories state
+  const [coursePlaying, setCoursePlaying] = useState(true);
+  const [courseCurrentIndex, setCourseCurrentIndex] = useState(0);
+  const courseScrollContainerRef = useRef<HTMLDivElement>(null);
+  const courseScrollSpeed = 1;
+
+  // Event categories state
+  const [eventPlaying, setEventPlaying] = useState(true);
+  const [eventCurrentIndex, setEventCurrentIndex] = useState(0);
+  const eventScrollContainerRef = useRef<HTMLDivElement>(null);
+  const eventScrollSpeed = 1;
 
   // Duplicate categories for seamless infinite scroll
-  const duplicatedCategories = [...categories, ...categories, ...categories];
+  const duplicatedCourseCategories = [...courseCategories, ...courseCategories, ...courseCategories];
+  const duplicatedEventCategories = [...eventCategories, ...eventCategories, ...eventCategories];
 
-  // Auto-scroll animation
+  // Course auto-scroll animation
   useEffect(() => {
-    const scrollContainer = scrollContainerRef.current;
+    const scrollContainer = courseScrollContainerRef.current;
     if (!scrollContainer) return;
 
     let animationId: number;
     let scrollPosition = 0;
 
     const animateScroll = () => {
-      if (!isPlaying || !scrollContainer) return;
+      if (!coursePlaying || !scrollContainer) return;
 
-      scrollPosition += scrollSpeed;
+      scrollPosition += courseScrollSpeed;
       
-      // Reset position when reaching the end of duplicated content
       const maxScroll = scrollContainer.scrollWidth / 3;
       if (scrollPosition >= maxScroll) {
         scrollPosition = 0;
@@ -250,7 +348,7 @@ const BrowseCategoriesSection = () => {
       animationId = requestAnimationFrame(animateScroll);
     };
 
-    if (isPlaying) {
+    if (coursePlaying) {
       animationId = requestAnimationFrame(animateScroll);
     }
 
@@ -259,47 +357,48 @@ const BrowseCategoriesSection = () => {
         cancelAnimationFrame(animationId);
       }
     };
-  }, [isPlaying]);
+  }, [coursePlaying]);
 
-  const handleSearch = () => {
-    if (!searchQuery.trim()) return;
-    
-    const searchParams = new URLSearchParams();
-    searchParams.set('search', searchQuery);
-    searchParams.set('type', searchType);
-    
-    if (searchType === 'courses') {
-      window.location.href = `/explore-courses?${searchParams.toString()}`;
-    } else {
-      window.location.href = `/explore-events?${searchParams.toString()}`;
+  // Event auto-scroll animation
+  useEffect(() => {
+    const scrollContainer = eventScrollContainerRef.current;
+    if (!scrollContainer) return;
+
+    let animationId: number;
+    let scrollPosition = 0;
+
+    const animateScroll = () => {
+      if (!eventPlaying || !scrollContainer) return;
+
+      scrollPosition += eventScrollSpeed;
+      
+      const maxScroll = scrollContainer.scrollWidth / 3;
+      if (scrollPosition >= maxScroll) {
+        scrollPosition = 0;
+      }
+
+      scrollContainer.scrollLeft = scrollPosition;
+      animationId = requestAnimationFrame(animateScroll);
+    };
+
+    if (eventPlaying) {
+      animationId = requestAnimationFrame(animateScroll);
     }
-  };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSearch();
-    }
-  };
+    return () => {
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
+    };
+  }, [eventPlaying]);
 
-  const scrollToNext = () => {
-    const scrollContainer = scrollContainerRef.current;
-    if (scrollContainer) {
-      const cardWidth = 320; // Approximate card width with margin
-      const newIndex = (currentIndex + 1) % categories.length;
-      setCurrentIndex(newIndex);
-      scrollContainer.scrollTo({
-        left: newIndex * cardWidth,
-        behavior: 'smooth'
-      });
-    }
-  };
-
-  const scrollToPrev = () => {
-    const scrollContainer = scrollContainerRef.current;
+  // Course navigation
+  const scrollCourseToNext = () => {
+    const scrollContainer = courseScrollContainerRef.current;
     if (scrollContainer) {
       const cardWidth = 320;
-      const newIndex = (currentIndex - 1 + categories.length) % categories.length;
-      setCurrentIndex(newIndex);
+      const newIndex = (courseCurrentIndex + 1) % courseCategories.length;
+      setCourseCurrentIndex(newIndex);
       scrollContainer.scrollTo({
         left: newIndex * cardWidth,
         behavior: 'smooth'
@@ -307,8 +406,98 @@ const BrowseCategoriesSection = () => {
     }
   };
 
-  const toggleAutoScroll = () => {
-    setIsPlaying(!isPlaying);
+  const scrollCourseToPrev = () => {
+    const scrollContainer = courseScrollContainerRef.current;
+    if (scrollContainer) {
+      const cardWidth = 320;
+      const newIndex = (courseCurrentIndex - 1 + courseCategories.length) % courseCategories.length;
+      setCourseCurrentIndex(newIndex);
+      scrollContainer.scrollTo({
+        left: newIndex * cardWidth,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  // Event navigation
+  const scrollEventToNext = () => {
+    const scrollContainer = eventScrollContainerRef.current;
+    if (scrollContainer) {
+      const cardWidth = 320;
+      const newIndex = (eventCurrentIndex + 1) % eventCategories.length;
+      setEventCurrentIndex(newIndex);
+      scrollContainer.scrollTo({
+        left: newIndex * cardWidth,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  const scrollEventToPrev = () => {
+    const scrollContainer = eventScrollContainerRef.current;
+    if (scrollContainer) {
+      const cardWidth = 320;
+      const newIndex = (eventCurrentIndex - 1 + eventCategories.length) % eventCategories.length;
+      setEventCurrentIndex(newIndex);
+      scrollContainer.scrollTo({
+        left: newIndex * cardWidth,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  const toggleCourseAutoScroll = () => {
+    setCoursePlaying(!coursePlaying);
+  };
+
+  const toggleEventAutoScroll = () => {
+    setEventPlaying(!eventPlaying);
+  };
+
+  const CategoryCard = ({ category, type }: { category: any; type: 'course' | 'event' }) => {
+    const IconComponent = category.icon;
+    const linkUrl = type === 'course' 
+      ? `/explore-courses?category=${encodeURIComponent(category.searchParam)}`
+      : `/explore-events?category=${encodeURIComponent(category.searchParam)}`;
+
+    return (
+      <div className="flex-shrink-0 w-80 transform transition-all duration-500 hover:scale-105">
+        <Link to={linkUrl} className="block group">
+          <Card className="h-48 border-0 bg-white shadow-xl hover:shadow-2xl transition-all duration-500 group-hover:bg-white relative overflow-hidden border border-gray-100">
+            {/* Gradient Border Effect */}
+            <div className={`absolute inset-0 bg-gradient-to-r ${category.color} opacity-0 group-hover:opacity-5 transition-opacity duration-500 rounded-2xl`}></div>
+            
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-4">
+                <div className={`p-3 bg-gradient-to-r ${category.color} rounded-2xl group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
+                  <IconComponent className="h-7 w-7 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <CardTitle className="text-lg font-bold text-gray-800 group-hover:text-gray-900 transition-colors duration-300 truncate">
+                    {category.title}
+                  </CardTitle>
+                  <CardDescription className="text-sm text-gray-500 font-medium">
+                    {category.count}
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <p className="text-gray-600 group-hover:text-gray-700 transition-colors duration-300 text-sm leading-relaxed line-clamp-2">
+                {category.description}
+              </p>
+              <div className="mt-3 flex items-center text-orange-600 group-hover:text-orange-700 transition-colors duration-300">
+                <span className="text-sm font-semibold">Explore</span>
+                <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform duration-300" />
+              </div>
+            </CardContent>
+
+            {/* Hover Effect Glow */}
+            <div className={`absolute inset-0 bg-gradient-to-r ${category.color} rounded-2xl opacity-0 group-hover:opacity-10 transition-opacity duration-500 -z-10`}></div>
+          </Card>
+        </Link>
+      </div>
+    );
   };
 
   return (
@@ -318,75 +507,21 @@ const BrowseCategoriesSection = () => {
       <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-r from-orange-100/40 to-pink-100/40 rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
       
       <div className="container mx-auto px-4 relative z-10">
-        <div className="text-center mb-16">
-          <div className="relative inline-block">
-            <h2 className="text-5xl font-bold mb-6 bg-gradient-to-r from-orange-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-              Explore Categories
-            </h2>
-            <div className="absolute -top-4 -left-4 -right-4 -bottom-4 bg-gradient-to-r from-orange-200/30 to-purple-200/30 rounded-2xl blur-xl opacity-60"></div>
-            <Sparkles className="absolute -top-2 -right-2 h-6 w-6 text-purple-500 animate-pulse" />
-            <Sparkles className="absolute -bottom-2 -left-2 h-6 w-6 text-orange-500 animate-pulse delay-1000" />
-          </div>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8 leading-relaxed">
-            Discover thousands of courses across diverse categories. Find your passion and accelerate your learning journey with expert-led content.
-          </p>
-
-          {/* Enhanced Search Form */}
-          <div className="max-w-4xl mx-auto mb-16">
-            <div className="bg-white rounded-3xl p-8 shadow-xl border border-gray-100">
-              <div className="flex flex-col lg:flex-row gap-6 items-center">
-                <div className="flex-1 w-full">
-                  <div className="relative">
-                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <Input
-                      type="text"
-                      placeholder="What do you want to learn today?"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      className="h-14 text-lg border-2 border-gray-200 focus:border-orange-400 rounded-2xl pl-12 pr-4 bg-white"
-                    />
-                  </div>
-                </div>
-                <div className="w-full lg:w-56">
-                  <Select value={searchType} onValueChange={setSearchType}>
-                    <SelectTrigger className="h-14 border-2 border-gray-200 focus:border-purple-400 rounded-2xl bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="courses">🎓 Courses</SelectItem>
-                      <SelectItem value="events">📅 Events</SelectItem>
-                      <SelectItem value="both">🔍 Both</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button 
-                  onClick={handleSearch}
-                  className="h-14 px-8 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white rounded-2xl font-semibold text-lg shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 transition-all duration-300"
-                >
-                  <Search className="h-5 w-5 mr-3" />
-                  Explore
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Infinite Horizontal Scroll Section */}
-        <div className="relative mb-12">
+        {/* Course Categories Section */}
+        <div className="relative mb-16">
           {/* Navigation Controls */}
           <div className="flex justify-between items-center mb-8">
             <h3 className="text-2xl font-bold text-gray-800">
-              Popular Categories
+              Popular Course Categories
             </h3>
             <div className="flex items-center gap-3">
               <Button
                 variant="outline"
                 size="icon"
-                onClick={toggleAutoScroll}
+                onClick={toggleCourseAutoScroll}
                 className="h-10 w-10 rounded-xl border-2 border-gray-200 hover:border-orange-400 transition-all duration-300"
               >
-                {isPlaying ? (
+                {coursePlaying ? (
                   <Pause className="h-4 w-4 text-gray-600" />
                 ) : (
                   <Play className="h-4 w-4 text-gray-600" />
@@ -396,7 +531,7 @@ const BrowseCategoriesSection = () => {
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={scrollToPrev}
+                  onClick={scrollCourseToPrev}
                   className="h-10 w-10 rounded-xl border-2 border-gray-200 hover:border-orange-400 transition-all duration-300"
                 >
                   <ArrowLeft className="h-4 w-4 text-gray-600" />
@@ -404,7 +539,7 @@ const BrowseCategoriesSection = () => {
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={scrollToNext}
+                  onClick={scrollCourseToNext}
                   className="h-10 w-10 rounded-xl border-2 border-gray-200 hover:border-orange-400 transition-all duration-300"
                 >
                   <ArrowRight className="h-4 w-4 text-gray-600" />
@@ -416,57 +551,13 @@ const BrowseCategoriesSection = () => {
           {/* Scroll Container */}
           <div className="relative">
             <div
-              ref={scrollContainerRef}
+              ref={courseScrollContainerRef}
               className="flex gap-6 overflow-x-hidden py-4 scrollbar-hide"
               style={{ scrollBehavior: 'smooth' }}
             >
-              {duplicatedCategories.map((category, index) => {
-                const IconComponent = category.icon;
-                return (
-                  <div
-                    key={index}
-                    className="flex-shrink-0 w-80 transform transition-all duration-500 hover:scale-105"
-                  >
-                    <Link 
-                      to={`/explore-courses?category=${encodeURIComponent(category.searchParam)}`}
-                      className="block group"
-                    >
-                      <Card className="h-48 border-0 bg-white shadow-xl hover:shadow-2xl transition-all duration-500 group-hover:bg-white relative overflow-hidden border border-gray-100">
-                        {/* Gradient Border Effect */}
-                        <div className={`absolute inset-0 bg-gradient-to-r ${category.color} opacity-0 group-hover:opacity-5 transition-opacity duration-500 rounded-2xl`}></div>
-                        
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center gap-4">
-                            <div className={`p-3 bg-gradient-to-r ${category.color} rounded-2xl group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
-                              <IconComponent className="h-7 w-7 text-white" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <CardTitle className="text-lg font-bold text-gray-800 group-hover:text-gray-900 transition-colors duration-300 truncate">
-                                {category.title}
-                              </CardTitle>
-                              <CardDescription className="text-sm text-gray-500 font-medium">
-                                {category.count}
-                              </CardDescription>
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="pt-0">
-                          <p className="text-gray-600 group-hover:text-gray-700 transition-colors duration-300 text-sm leading-relaxed line-clamp-2">
-                            {category.description}
-                          </p>
-                          <div className="mt-3 flex items-center text-orange-600 group-hover:text-orange-700 transition-colors duration-300">
-                            <span className="text-sm font-semibold">Explore</span>
-                            <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform duration-300" />
-                          </div>
-                        </CardContent>
-
-                        {/* Hover Effect Glow */}
-                        <div className={`absolute inset-0 bg-gradient-to-r ${category.color} rounded-2xl opacity-0 group-hover:opacity-10 transition-opacity duration-500 -z-10`}></div>
-                      </Card>
-                    </Link>
-                  </div>
-                );
-              })}
+              {duplicatedCourseCategories.map((category, index) => (
+                <CategoryCard key={index} category={category} type="course" />
+              ))}
             </div>
 
             {/* Gradient Overlays */}
@@ -476,12 +567,86 @@ const BrowseCategoriesSection = () => {
 
           {/* Progress Indicators */}
           <div className="flex justify-center items-center gap-2 mt-8">
-            {categories.map((_, index) => (
+            {courseCategories.map((_, index) => (
               <button
                 key={index}
-                onClick={() => setCurrentIndex(index)}
+                onClick={() => setCourseCurrentIndex(index)}
                 className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                  index === currentIndex 
+                  index === courseCurrentIndex 
+                    ? 'bg-gradient-to-r from-orange-500 to-purple-600 w-6' 
+                    : 'bg-gray-300 hover:bg-gray-400'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Event Categories Section */}
+        <div className="relative mb-12">
+          {/* Navigation Controls */}
+          <div className="flex justify-between items-center mb-8">
+            <h3 className="text-2xl font-bold text-gray-800">
+              Popular Event Categories
+            </h3>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={toggleEventAutoScroll}
+                className="h-10 w-10 rounded-xl border-2 border-gray-200 hover:border-orange-400 transition-all duration-300"
+              >
+                {eventPlaying ? (
+                  <Pause className="h-4 w-4 text-gray-600" />
+                ) : (
+                  <Play className="h-4 w-4 text-gray-600" />
+                )}
+              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={scrollEventToPrev}
+                  className="h-10 w-10 rounded-xl border-2 border-gray-200 hover:border-orange-400 transition-all duration-300"
+                >
+                  <ArrowLeft className="h-4 w-4 text-gray-600" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={scrollEventToNext}
+                  className="h-10 w-10 rounded-xl border-2 border-gray-200 hover:border-orange-400 transition-all duration-300"
+                >
+                  <ArrowRight className="h-4 w-4 text-gray-600" />
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Scroll Container */}
+          <div className="relative">
+            <div
+              ref={eventScrollContainerRef}
+              className="flex gap-6 overflow-x-hidden py-4 scrollbar-hide"
+              style={{ scrollBehavior: 'smooth' }}
+            >
+              {duplicatedEventCategories.map((category, index) => (
+                <CategoryCard key={index} category={category} type="event" />
+              ))}
+            </div>
+
+            {/* Gradient Overlays */}
+            <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-white to-transparent pointer-events-none"></div>
+            <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-white to-transparent pointer-events-none"></div>
+          </div>
+
+          {/* Progress Indicators */}
+          <div className="flex justify-center items-center gap-2 mt-8">
+            {eventCategories.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setEventCurrentIndex(index)}
+                className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                  index === eventCurrentIndex 
                     ? 'bg-gradient-to-r from-orange-500 to-purple-600 w-6' 
                     : 'bg-gray-300 hover:bg-gray-400'
                 }`}
@@ -501,9 +666,9 @@ const BrowseCategoriesSection = () => {
             </div>
             <div>
               <div className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                500+
+                1,500+
               </div>
-              <div className="text-gray-600 font-medium">Instructors</div>
+              <div className="text-gray-600 font-medium">Events</div>
             </div>
             <div>
               <div className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
@@ -513,7 +678,7 @@ const BrowseCategoriesSection = () => {
             </div>
             <div>
               <div className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                25+
+                40+
               </div>
               <div className="text-gray-600 font-medium">Categories</div>
             </div>
