@@ -88,7 +88,7 @@ const CreatorCourseEdit = () => {
   const [course, setCourse] = useState<Course | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Form state
+  // Form state - removed currency field
   const [formData, setFormData] = useState({
     title: '',
     summary: '',
@@ -97,7 +97,6 @@ const CreatorCourseEdit = () => {
     difficulty_level: '',
     duration_minutes: 0,
     price: 0,
-    currency: 'USD',
     is_free: true,
     is_published: false,
     certificate_enabled: false,
@@ -134,7 +133,6 @@ const CreatorCourseEdit = () => {
           difficulty_level: courseData.difficulty_level || '',
           duration_minutes: courseData.duration_minutes || 0,
           price: Number(courseData.price) || 0,
-          currency: courseData.currency || 'USD',
           is_free: courseData.is_free ?? true,
           is_published: courseData.is_published ?? false,
           certificate_enabled: courseData.certificate_enabled ?? false,
@@ -268,9 +266,21 @@ const CreatorCourseEdit = () => {
     try {
       setSaving(true);
       
+      // Prepare update data without currency field
       const updateData = {
-        ...formData,
-        price: formData.is_free ? 0 : formData.price
+        title: formData.title,
+        summary: formData.summary,
+        description: formData.description,
+        category: formData.category,
+        difficulty_level: formData.difficulty_level,
+        duration_minutes: formData.duration_minutes,
+        price: formData.is_free ? 0 : formData.price,
+        is_free: formData.is_free,
+        is_published: formData.is_published,
+        certificate_enabled: formData.certificate_enabled,
+        thumbnail_url: formData.thumbnail_url,
+        tags: formData.tags
+        // Removed currency field
       };
 
       await updateCourse(id, updateData);
@@ -501,7 +511,7 @@ const CreatorCourseEdit = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Pricing</Label>
                 <div className="flex items-center space-x-2 p-3 border-2 rounded-lg">
@@ -517,35 +527,20 @@ const CreatorCourseEdit = () => {
               </div>
 
               {!formData.is_free && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="price" className="text-base font-semibold">Price</Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      value={formData.price}
-                      onChange={(e) => handleInputChange('price', parseFloat(e.target.value) || 0)}
-                      placeholder="99.99"
-                      min="0"
-                      step="0.01"
-                      className="h-12 border-2 focus:border-orange-300"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="currency" className="text-base font-semibold">Currency</Label>
-                    <Select value={formData.currency} onValueChange={(value) => handleInputChange('currency', value)}>
-                      <SelectTrigger className="h-12 border-2 focus:border-orange-300">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="USD">USD</SelectItem>
-                        <SelectItem value="EUR">EUR</SelectItem>
-                        <SelectItem value="GBP">GBP</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </>
+                <div className="space-y-2">
+                  <Label htmlFor="price" className="text-base font-semibold">Price (USD)</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    value={formData.price}
+                    onChange={(e) => handleInputChange('price', parseFloat(e.target.value) || 0)}
+                    placeholder="99.99"
+                    min="0"
+                    step="0.01"
+                    className="h-12 border-2 focus:border-orange-300"
+                    required={!formData.is_free}
+                  />
+                </div>
               )}
             </div>
 
