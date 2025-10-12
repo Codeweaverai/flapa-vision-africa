@@ -512,7 +512,7 @@ const BrowseCategoriesSection = () => {
           {/* Navigation Controls */}
           <div className="flex justify-between items-center mb-8">
             <h3 className="text-2xl font-bold text-gray-800">
-              Popular Course Categories
+              Explore Courses
             </h3>
             <div className="flex items-center gap-3">
               <Button
@@ -586,7 +586,7 @@ const BrowseCategoriesSection = () => {
           {/* Navigation Controls */}
           <div className="flex justify-between items-center mb-8">
             <h3 className="text-2xl font-bold text-gray-800">
-              Popular Event Categories
+              Explore Events 
             </h3>
             <div className="flex items-center gap-3">
               <Button
