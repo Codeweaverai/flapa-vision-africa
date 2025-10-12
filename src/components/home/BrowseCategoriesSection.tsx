@@ -501,7 +501,7 @@ const BrowseCategoriesSection = () => {
   };
 
   return (
-    <section className="py-20 bg-white relative overflow-hidden">
+    <section className="py-20 bg-orange-50 relative overflow-hidden">
       {/* Light Orange Background Elements */}
       <div className="absolute top-0 left-0 w-72 h-72 bg-gradient-to-r from-orange-100/40 to-purple-100/40 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
       <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-r from-orange-100/40 to-pink-100/40 rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
@@ -561,8 +561,8 @@ const BrowseCategoriesSection = () => {
             </div>
 
             {/* Gradient Overlays */}
-            <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-white to-transparent pointer-events-none"></div>
-            <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-white to-transparent pointer-events-none"></div>
+            <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-orange-50 to-transparent pointer-events-none"></div>
+            <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-orange-50 to-transparent pointer-events-none"></div>
           </div>
 
           {/* Progress Indicators */}
@@ -635,8 +635,8 @@ const BrowseCategoriesSection = () => {
             </div>
 
             {/* Gradient Overlays */}
-            <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-white to-transparent pointer-events-none"></div>
-            <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-white to-transparent pointer-events-none"></div>
+            <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-orange-50 to-transparent pointer-events-none"></div>
+            <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-orange-50 to-transparent pointer-events-none"></div>
           </div>
 
           {/* Progress Indicators */}
@@ -656,7 +656,7 @@ const BrowseCategoriesSection = () => {
         </div>
 
         {/* Quick Stats */}
-        <div className="bg-orange-50/50 rounded-3xl p-8 shadow-lg border border-orange-100 mb-12">
+        <div className="bg-orange-100/50 rounded-3xl p-8 shadow-lg border border-orange-200 mb-12">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             <div>
               <div className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
