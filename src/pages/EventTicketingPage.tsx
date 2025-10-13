@@ -115,13 +115,13 @@ const EventTicketingPage = () => {
         </p>
         
         <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in">
-          <Link to="/create-event">
+          <Link to="/auth">
             <Button size="lg" className="bg-white text-purple-600 hover:bg-gray-100 text-lg px-8 py-6 shadow-xl">
               Get Started for Free
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </Link>
-          <Link to="/contact-sales">
+          <Link to="/contact">
             <Button size="lg" variant="outline" className="border-2 border-white text-white hover:bg-white/10 text-lg px-8 py-6">
               Contact Sales
             </Button>
