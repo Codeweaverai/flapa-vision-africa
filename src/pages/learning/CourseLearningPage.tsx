@@ -816,7 +816,7 @@ const CourseLearningPage = () => {
             </div>
 
             {/* Main Content Area - Reduced Width to prevent overlay */}
-                <div className="xl:col-span-3 max-w-4xl">
+              <div className="xl:col-span-3 max-w-4xl xl:ml-auto">
               <Card className="shadow-xl border-0">
                 <CardContent className="p-0">
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
