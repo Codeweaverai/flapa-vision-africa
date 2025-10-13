@@ -110,7 +110,7 @@ const MyCoursesPage = () => {
 
   useEffect(() => {
     if (!user) {
-      navigate('/signin');
+      navigate('/auth');
       return;
     }
     fetchEnrolledCourses();
