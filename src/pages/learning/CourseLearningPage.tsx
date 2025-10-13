@@ -32,6 +32,55 @@ import RecommendedCourses from '@/components/course/RecommendedCourses';
 import Layout from '@/components/layout/Layout';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 
+// Beautiful Loading Animation Component
+const PulseLoading = () => {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-orange-50">
+      <Layout>
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex flex-col items-center justify-center min-h-96">
+            {/* Pulse Animation Container */}
+            <div className="relative w-40 h-40 flex items-center justify-center mb-8">
+              {/* Outer Pulse Circle */}
+              <div className="absolute w-40 h-40 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 animate-ping" />
+              
+              {/* Middle Pulse Circle */}
+              <div className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-orange-500/30 to-purple-600/30 animate-pulse" />
+              
+              {/* Inner Pulse Circle */}
+              <div className="absolute w-24 h-24 rounded-full bg-gradient-to-r from-orange-500/40 to-purple-600/40 animate-pulse" />
+              
+              {/* Center Icon */}
+              <div className="absolute w-16 h-16 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center shadow-lg">
+                <BookOpen className="h-8 w-8 text-white" />
+              </div>
+            </div>
+
+            {/* Loading Text */}
+            <div className="text-center space-y-2">
+              <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                Loading Your Course
+              </h3>
+              <p className="text-muted-foreground text-lg">
+                Preparing your learning experience...
+              </p>
+            </div>
+
+            {/* Progress Dots */}
+            <div className="flex space-x-2 mt-6">
+              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-3 h-3 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      </Layout>
+    </div>
+  );
+};
+
+// ... (keep all existing interfaces the same)
+
 interface Course {
   id: string;
   title: string;
@@ -573,25 +622,9 @@ const CourseLearningPage = () => {
     await loadExamResult(); // Reload exam result after completion
   };
 
-  // Beautiful loading animation
+  // Use the beautiful loading animation
   if (loading) {
-    return (
-      <Layout>
-        <main className="flex-grow flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-          <div className="text-center">
-            <div className="relative">
-              <div className="w-20 h-20 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full animate-pulse mx-auto mb-4"></div>
-              <div className="absolute inset-0 w-20 h-20 border-4 border-orange-200 border-t-purple-500 rounded-full animate-spin mx-auto"></div>
-            </div>
-            <div className="space-y-3">
-              <div className="h-4 bg-gradient-to-r from-orange-400 to-purple-500 rounded-full animate-pulse w-48 mx-auto"></div>
-              <div className="h-3 bg-gradient-to-r from-orange-300 to-purple-400 rounded-full animate-pulse w-32 mx-auto"></div>
-            </div>
-            <p className="text-gray-600 mt-6 animate-pulse">Preparing your learning experience...</p>
-          </div>
-        </main>
-      </Layout>
-    );
+    return <PulseLoading />;
   }
 
   if (!courseId) {
@@ -742,7 +775,7 @@ const CourseLearningPage = () => {
             </Button>
           </div>
 
-          {/* Main Content Grid */}
+          {/* Main Content Grid - Reduced main content width */}
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
             {/* Sidebar - Course Curriculum - Increased Width with Better Spacing */}
             <div className={`xl:col-span-1 ${isMobileSidebarOpen ? 'block' : 'hidden'} xl:block`}>
@@ -782,8 +815,8 @@ const CourseLearningPage = () => {
               </Card>
             </div>
 
-            {/* Main Content Area - Reduced Width */}
-            <div className="xl:col-span-3">
+            {/* Main Content Area - Reduced Width to prevent overlay */}
+            <div className="xl:col-span-3 max-w-5xl">
               <Card className="shadow-xl border-0">
                 <CardContent className="p-0">
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
