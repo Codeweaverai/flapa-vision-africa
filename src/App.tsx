@@ -128,6 +128,7 @@ import BecomeCreatorPage from '@/pages/BecomeCreatorPage';
 import AboutPage from '@/pages/AboutPage';
 import ContactPage from '@/pages/ContactPage';
 import PricingPage from '@/pages/PricingPage';
+import EventTicketingPage from '@/pages/EventTicketingPage';
 import BlogPage from '@/pages/BlogPage';
 import BlogPostPage from '@/pages/BlogPostPage';
 import MediaPage from '@/pages/MediaPage';
@@ -302,6 +303,7 @@ function App() {
                   <Route path="/about" element={<AboutPage />} />
                   <Route path="/contact" element={<ContactPage />} />
                   <Route path="/pricing" element={<PricingPage />} />
+                  <Route path="/event-ticketing" element={<EventTicketingPage />} />
                   <Route path="/blog" element={<BlogPage />} />
                   <Route path="/blog/:slug" element={<BlogPostPage />} />
                   <Route path="/media" element={<MediaPage />} />
