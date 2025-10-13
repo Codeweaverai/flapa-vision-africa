@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -19,7 +18,10 @@ import {
   BarChart3,
   CheckCircle,
   Award,
-  PlayCircle
+  PlayCircle,
+  Heart,
+  Zap,
+  Target
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -134,29 +136,6 @@ const CareersPage = () => {
     }
   ];
 
-  const steps = [
-    {
-      step: "1",
-      title: "Sign Up",
-      description: "Create your account and complete your profile to get started."
-    },
-    {
-      step: "2",
-      title: "Enable Creator Mode",
-      description: "Click 'Enable Creator Mode' in your account settings to unlock creator features."
-    },
-    {
-      step: "3",
-      title: "Create Content",
-      description: "Start building your first course or event using our intuitive creation tools."
-    },
-    {
-      step: "4",
-      title: "Start Earning",
-      description: "Publish your content and start accepting payments from students worldwide."
-    }
-  ];
-
   const benefits = [
     "Competitive salary packages",
     "Flexible remote work options",
@@ -167,68 +146,107 @@ const CareersPage = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-light-purple via-white to-light-purple">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
       <Layout>
-        {/* Hero Section */}
-        <section className="relative py-20 px-4 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-orange-500/10" />
+        {/* Enhanced Hero Section */}
+        <section className="relative py-24 px-4 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-orange-500/20 via-purple-600/15 to-transparent" />
+          <div className="absolute top-0 left-0 w-72 h-72 bg-orange-300/10 rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl" />
+          <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-400/10 rounded-full translate-x-1/3 translate-y-1/3 blur-3xl" />
+          
           <div className="container mx-auto text-center relative z-10">
             <div className="max-w-4xl mx-auto">
-              <Badge className="mb-6" variant="outline">
-                Join Our Mission
+              <Badge className="mb-6 px-4 py-1.5 bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0">
+                🚀 Join Our Mission
               </Badge>
-              <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+              <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-orange-500 via-purple-600 to-orange-500 bg-clip-text text-transparent bg-size-200 animate-gradient">
                 Build the Future of Education
               </h1>
-              <p className="text-xl md:text-2xl text-muted-foreground mb-8 leading-relaxed">
+              <p className="text-xl md:text-2xl text-slate-600 mb-10 leading-relaxed font-light">
                 Join a passionate team dedicated to democratizing education and empowering creators worldwide. 
                 Help us build the next generation of learning platforms.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button size="lg" className="text-lg px-8 py-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700" asChild>
+                <Button size="lg" className="text-lg px-8 py-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1" asChild>
                   <a href="#open-positions">
                     View Open Positions <ArrowRight className="ml-2 h-5 w-5" />
                   </a>
                 </Button>
-                <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-purple-200 text-purple-600 hover:bg-purple-50" asChild>
+                <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-2 border-purple-200 text-purple-600 hover:bg-purple-50 hover:border-purple-300 transition-all duration-300" asChild>
                   <Link to="/learn-our-culture">
+                    <PlayCircle className="mr-2 h-5 w-5" />
                     Learn About Our Culture
                   </Link>
                 </Button>
               </div>
             </div>
-            {/* Hero Image */}
-            <div className="mt-16 relative">
-              <img
-                src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//male-employee-getting-used-his-new-office-job-along-with-female-colleagues.jpg?w=1200&h=600&fit=crop"
-                alt="Team collaboration"
-                className="rounded-2xl shadow-2xl mx-auto max-w-4xl w-full"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-2xl" />
+            
+            {/* Enhanced Hero Image */}
+            <div className="mt-20 relative max-w-6xl mx-auto">
+              <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+                <img
+                  src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//male-employee-getting-used-his-new-office-job-along-with-female-colleagues.jpg?w=1200&h=600&fit=crop"
+                  alt="Team collaboration at SkillPulse"
+                  className="w-full h-[500px] object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                <div className="absolute bottom-0 left-0 right-0 p-8 text-white text-left">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
+                    <span className="text-sm font-medium">Live: Join our team today</span>
+                  </div>
+                  <h3 className="text-2xl font-bold">Create Impact That Matters</h3>
+                </div>
+              </div>
+              
+              {/* Floating elements */}
+              <div className="absolute -top-4 -right-4 bg-white rounded-2xl p-4 shadow-xl border border-purple-100">
+                <div className="flex items-center gap-2">
+                  <Target className="h-5 w-5 text-orange-500" />
+                  <span className="font-semibold text-sm">50+ Positions</span>
+                </div>
+              </div>
+              <div className="absolute -bottom-4 -left-4 bg-white rounded-2xl p-4 shadow-xl border border-orange-100">
+                <div className="flex items-center gap-2">
+                  <Globe className="h-5 w-5 text-purple-500" />
+                  <span className="font-semibold text-sm">Remote First</span>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
         {/* Why Join Us Section */}
-        <section className="py-20 px-4 bg-white/50">
+        <section className="py-20 px-4 bg-white/80 backdrop-blur-sm">
           <div className="container mx-auto max-w-6xl">
             <div className="text-center mb-16">
-              <h2 className="text-4xl font-bold mb-4">Why Join SkillPulse?</h2>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+                Why Join SkillPulse?
+              </h2>
+              <p className="text-xl text-slate-600 max-w-2xl mx-auto font-light">
                 We're not just building a product - we're creating a movement that transforms how people learn and teach.
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {features.map((feature, index) => (
-                <Card key={index} className="hover:shadow-lg transition-shadow border-purple-100">
-                  <CardHeader>
-                    <div className="mb-4">
-                      <feature.icon className="h-8 w-8 text-purple-600" />
+                <Card 
+                  key={index} 
+                  className="group hover:shadow-2xl transition-all duration-500 border-slate-100 hover:border-orange-200/50 hover:scale-105 cursor-pointer bg-gradient-to-br from-white to-slate-50/50"
+                >
+                  <CardHeader className="pb-4">
+                    <div className="mb-4 transform group-hover:scale-110 transition-transform duration-300">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-purple-600 flex items-center justify-center">
+                        <feature.icon className="h-6 w-6 text-white" />
+                      </div>
                     </div>
-                    <CardTitle className="text-purple-800">{feature.title}</CardTitle>
+                    <CardTitle className="text-slate-800 group-hover:text-orange-600 transition-colors duration-300">
+                      {feature.title}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <CardDescription className="text-base">{feature.description}</CardDescription>
+                    <CardDescription className="text-slate-600 text-base leading-relaxed">
+                      {feature.description}
+                    </CardDescription>
                   </CardContent>
                 </Card>
               ))}
@@ -236,93 +254,128 @@ const CareersPage = () => {
           </div>
         </section>
 
-        {/* Benefits Section */}
-        <section className="py-20 px-4">
+        {/* Enhanced Benefits Section */}
+        <section className="py-20 px-4 bg-gradient-to-br from-orange-50/50 to-purple-50/50">
           <div className="container mx-auto max-w-6xl">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
               <div>
-                <h2 className="text-4xl font-bold mb-6">
+                <h2 className="text-4xl md:text-5xl font-bold mb-8 bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
                   Amazing Benefits & Perks
                 </h2>
-                <p className="text-xl text-muted-foreground mb-8">
+                <p className="text-xl text-slate-600 mb-10 font-light leading-relaxed">
                   We believe in taking care of our team so they can do their best work and live their best lives.
                 </p>
-                <div className="space-y-4">
+                <div className="space-y-5">
                   {benefits.map((benefit, index) => (
-                    <div key={index} className="flex items-center gap-3">
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                      <span className="text-lg">{benefit}</span>
+                    <div key={index} className="flex items-center gap-4 group">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300">
+                        <CheckCircle className="h-4 w-4 text-white" />
+                      </div>
+                      <span className="text-lg text-slate-700 group-hover:text-slate-900 transition-colors duration-300 font-medium">
+                        {benefit}
+                      </span>
                     </div>
                   ))}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <Card className="p-6 text-center bg-gradient-to-br from-purple-50 to-orange-50 border-purple-200">
-                  <Award className="h-12 w-12 text-purple-500 mx-auto mb-4" />
-                  <h3 className="font-semibold mb-2">Recognition</h3>
-                  <p className="text-sm text-muted-foreground">Performance bonuses and awards</p>
+              
+              <div className="grid grid-cols-2 gap-6">
+                <Card className="p-6 text-center bg-gradient-to-br from-white to-orange-50/30 border-orange-100 group hover:shadow-xl transition-all duration-500">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                    <Award className="h-8 w-8 text-white" />
+                  </div>
+                  <h3 className="font-bold text-slate-800 mb-2 text-lg">Recognition</h3>
+                  <p className="text-sm text-slate-600">Performance bonuses and awards</p>
                 </Card>
-                <Card className="p-6 text-center bg-gradient-to-br from-orange-50 to-purple-50 border-orange-200">
-                  <Globe className="h-12 w-12 text-orange-500 mx-auto mb-4" />
-                  <h3 className="font-semibold mb-2">Global Impact</h3>
-                  <p className="text-sm text-muted-foreground">Work that changes lives</p>
+                
+                <Card className="p-6 text-center bg-gradient-to-br from-white to-purple-50/30 border-purple-100 group hover:shadow-xl transition-all duration-500">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                    <Globe className="h-8 w-8 text-white" />
+                  </div>
+                  <h3 className="font-bold text-slate-800 mb-2 text-lg">Global Impact</h3>
+                  <p className="text-sm text-slate-600">Work that changes lives</p>
                 </Card>
-                <Card className="p-6 text-center bg-gradient-to-br from-purple-50 to-orange-50 border-purple-200">
-                  <Users className="h-12 w-12 text-purple-500 mx-auto mb-4" />
-                  <h3 className="font-semibold mb-2">Amazing Team</h3>
-                  <p className="text-sm text-muted-foreground">Collaborate with the best</p>
+                
+                <Card className="p-6 text-center bg-gradient-to-br from-white to-orange-50/30 border-orange-100 group hover:shadow-xl transition-all duration-500">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-purple-600 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                    <Users className="h-8 w-8 text-white" />
+                  </div>
+                  <h3 className="font-bold text-slate-800 mb-2 text-lg">Amazing Team</h3>
+                  <p className="text-sm text-slate-600">Collaborate with the best</p>
                 </Card>
-                <Card className="p-6 text-center bg-gradient-to-br from-orange-50 to-purple-50 border-orange-200">
-                  <TrendingUp className="h-12 w-12 text-orange-500 mx-auto mb-4" />
-                  <h3 className="font-semibold mb-2">Growth</h3>
-                  <p className="text-sm text-muted-foreground">Continuous learning opportunities</p>
+                
+                <Card className="p-6 text-center bg-gradient-to-br from-white to-purple-50/30 border-purple-100 group hover:shadow-xl transition-all duration-500">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-orange-500 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                    <Zap className="h-8 w-8 text-white" />
+                  </div>
+                  <h3 className="font-bold text-slate-800 mb-2 text-lg">Fast Growth</h3>
+                  <p className="text-sm text-slate-600">Rapid career advancement</p>
                 </Card>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Open Positions Section */}
-        <section id="open-positions" className="py-20 px-4 bg-white/50">
+        {/* Enhanced Open Positions Section */}
+        <section id="open-positions" className="py-20 px-4 bg-white">
           <div className="container mx-auto max-w-6xl">
             <div className="text-center mb-16">
-              <h2 className="text-4xl font-bold mb-4">Open Positions</h2>
-              <p className="text-xl text-muted-foreground">
+              <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+                Open Positions
+              </h2>
+              <p className="text-xl text-slate-600 max-w-2xl mx-auto font-light">
                 Find your next career opportunity and help us build the future of education.
               </p>
             </div>
             
             {loading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                <p className="text-muted-foreground mt-4">Loading job openings...</p>
+              <div className="text-center py-16">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+                <p className="text-slate-600 font-medium">Loading amazing opportunities...</p>
               </div>
             ) : jobOpenings.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">No job openings available at the moment. Check back soon!</p>
+              <div className="text-center py-16 bg-gradient-to-br from-slate-50 to-purple-50/30 rounded-3xl border border-slate-100">
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-orange-500 to-purple-600 flex items-center justify-center mx-auto mb-6">
+                  <Heart className="h-10 w-10 text-white" />
+                </div>
+                <h3 className="text-2xl font-bold text-slate-800 mb-4">No Open Positions Right Now</h3>
+                <p className="text-slate-600 max-w-md mx-auto mb-6">
+                  We're always looking for amazing talent! Check back soon or send us your resume for future opportunities.
+                </p>
+                <Button className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
+                  <a href="mailto:jobs@skillpulse.cloud">Send Your Resume</a>
+                </Button>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-6 max-w-4xl mx-auto">
                 {jobOpenings.map((position) => (
-                  <Card key={position.id} className="p-6 hover:shadow-lg transition-shadow border-purple-100">
+                  <Card 
+                    key={position.id} 
+                    className="p-8 hover:shadow-2xl transition-all duration-500 border-slate-100 group hover:border-orange-200 cursor-pointer bg-gradient-to-br from-white to-slate-50/50"
+                  >
                     <div className="flex flex-col md:flex-row md:items-center justify-between">
-                      <div className="mb-4 md:mb-0">
-                        <h3 className="text-xl font-semibold mb-2 text-purple-800">{position.title}</h3>
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant="outline" className="border-purple-200 text-purple-600">
+                      <div className="mb-6 md:mb-0 md:flex-1">
+                        <h3 className="text-2xl font-bold mb-3 text-slate-800 group-hover:text-orange-600 transition-colors duration-300">
+                          {position.title}
+                        </h3>
+                        <div className="flex flex-wrap gap-3">
+                          <Badge className="px-3 py-1.5 bg-orange-500/10 text-orange-600 border-orange-200 group-hover:bg-orange-500/20 transition-colors duration-300">
                             {position.department}
                           </Badge>
-                          <Badge variant="outline" className="border-orange-200 text-orange-600">
+                          <Badge className="px-3 py-1.5 bg-purple-500/10 text-purple-600 border-purple-200 group-hover:bg-purple-500/20 transition-colors duration-300">
                             {position.location}
                           </Badge>
-                          <Badge variant="outline" className="border-green-200 text-green-600">
+                          <Badge className="px-3 py-1.5 bg-green-500/10 text-green-600 border-green-200 group-hover:bg-green-500/20 transition-colors duration-300">
                             {position.employment_type}
                           </Badge>
                         </div>
                       </div>
-                      <Button className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700" asChild>
+                      <Button 
+                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 shadow-lg hover:shadow-xl transform group-hover:scale-105 transition-all duration-300 px-8 py-6 text-lg" 
+                        asChild
+                      >
                         <Link to={`/job/${position.id}`}>
-                          Apply Now
+                          Apply Now <ArrowRight className="ml-2 h-5 w-5" />
                         </Link>
                       </Button>
                     </div>
@@ -333,34 +386,41 @@ const CareersPage = () => {
           </div>
         </section>
 
-        {/* Team Testimonials Section */}
-        <section className="py-20 px-4">
+        {/* Enhanced Team Testimonials Section */}
+        <section className="py-20 px-4 bg-gradient-to-br from-slate-50 to-purple-50/30">
           <div className="container mx-auto max-w-6xl">
             <div className="text-center mb-16">
-              <h2 className="text-4xl font-bold mb-4">What Our Team Says</h2>
-              <p className="text-xl text-muted-foreground">
+              <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+                What Our Team Says
+              </h2>
+              <p className="text-xl text-slate-600 max-w-2xl mx-auto font-light">
                 Hear from our team members about their experience working at SkillPulse.
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {testimonials.map((testimonial, index) => (
-                <Card key={index} className="p-6 border-purple-100">
+                <Card 
+                  key={index} 
+                  className="p-8 border-slate-100 bg-white/70 backdrop-blur-sm group hover:shadow-2xl transition-all duration-500 hover:scale-105"
+                >
                   <CardContent className="p-0">
-                    <div className="flex items-center gap-1 mb-4">
+                    <div className="flex items-center gap-1 mb-6">
                       {[...Array(testimonial.rating)].map((_, i) => (
-                        <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                        <Star key={i} className="h-6 w-6 fill-yellow-400 text-yellow-400 drop-shadow-sm" />
                       ))}
                     </div>
-                    <p className="text-muted-foreground mb-6 italic">"{testimonial.content}"</p>
-                    <div className="flex items-center gap-3">
+                    <p className="text-slate-700 mb-8 text-lg leading-relaxed italic font-light">
+                      "{testimonial.content}"
+                    </p>
+                    <div className="flex items-center gap-4">
                       <img 
                         src={testimonial.image} 
                         alt={testimonial.name}
-                        className="w-12 h-12 rounded-full object-cover"
+                        className="w-14 h-14 rounded-2xl object-cover border-2 border-white shadow-lg group-hover:border-orange-200 transition-colors duration-300"
                       />
                       <div>
-                        <div className="font-semibold">{testimonial.name}</div>
-                        <div className="text-sm text-muted-foreground">{testimonial.role}</div>
+                        <div className="font-bold text-slate-800 text-lg">{testimonial.name}</div>
+                        <div className="text-slate-600 font-medium">{testimonial.role}</div>
                       </div>
                     </div>
                   </CardContent>
@@ -370,30 +430,73 @@ const CareersPage = () => {
           </div>
         </section>
 
-        {/* CTA Section */}
-        <section className="py-20 px-4 bg-gradient-to-r from-purple-600 to-orange-500 text-white">
-          <div className="container mx-auto max-w-4xl text-center">
-            <h2 className="text-4xl font-bold mb-6">Ready to Join Our Mission?</h2>
-            <p className="text-xl mb-8 opacity-90">
+        {/* Enhanced CTA Section */}
+        <section className="py-24 px-4 bg-gradient-to-r from-orange-500 via-purple-600 to-orange-500 bg-size-200 animate-gradient text-white relative overflow-hidden">
+          <div className="absolute inset-0 bg-black/10" />
+          <div className="absolute top-0 left-0 w-64 h-64 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl" />
+          <div className="absolute bottom-0 right-0 w-80 h-80 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3 blur-3xl" />
+          
+          <div className="container mx-auto max-w-4xl text-center relative z-10">
+            <h2 className="text-4xl md:text-6xl font-bold mb-8">
+              Ready to Join Our Mission?
+            </h2>
+            <p className="text-xl md:text-2xl mb-12 opacity-95 font-light leading-relaxed">
               Be part of a team that's transforming education and empowering creators worldwide. 
               Your next career adventure starts here.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" variant="secondary" className="text-lg px-8 py-6" asChild>
+            <div className="flex flex-col sm:flex-row gap-6 justify-center">
+              <Button 
+                size="lg" 
+                variant="secondary" 
+                className="text-lg px-10 py-7 bg-white text-slate-800 hover:bg-slate-100 shadow-2xl hover:shadow-3xl transform hover:-translate-y-1 transition-all duration-300 font-semibold border-0"
+                asChild
+              >
                 <a href="#open-positions">
-                  Browse All Positions
+                  Browse All Positions <ArrowRight className="ml-2 h-5 w-5" />
                 </a>
               </Button>
-              <Button size="lg" variant="outline" className="text-lg px-8 py-6 bg-transparent border-white text-white hover:bg-white hover:text-purple-600">
-                <a href="mailto:jobs@skillpulse.cloud">Contact HR Team</a>
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="text-lg px-10 py-7 bg-transparent border-2 border-white text-white hover:bg-white hover:text-purple-600 transition-all duration-300 font-semibold"
+              >
+                <a href="mailto:jobs@skillpulse.cloud" className="flex items-center">
+                  Contact HR Team
+                </a>
               </Button>
             </div>
-            <div className="mt-8 text-sm opacity-75">
-              Equal opportunity employer • Remote-first culture • Diverse and inclusive team
+            <div className="mt-12 text-lg opacity-90 font-medium flex flex-col sm:flex-row justify-center gap-8">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-300" />
+                Equal opportunity employer
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-300" />
+                Remote-first culture
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-300" />
+                Diverse and inclusive team
+              </div>
             </div>
           </div>
         </section>
       </Layout>
+      
+      <style jsx>{`
+        @keyframes gradient {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        .animate-gradient {
+          animation: gradient 3s ease infinite;
+          background-size: 200% 200%;
+        }
+        .bg-size-200 {
+          background-size: 200% 200%;
+        }
+      `}</style>
     </div>
   );
 };
