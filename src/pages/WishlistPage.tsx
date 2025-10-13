@@ -14,6 +14,71 @@ import Layout from '@/components/layout/Layout';
 import WishlistButton from '@/components/wishlist/WishlistButton';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 
+// Pulse Loading Component
+const PulseLoading = () => {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+      <Layout>
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex flex-col items-center justify-center min-h-96">
+            {/* Pulse Animation Container */}
+            <div className="relative w-40 h-40 flex items-center justify-center mb-8">
+              {/* Outer Pulse Circle */}
+              <div className="absolute w-40 h-40 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 animate-ping" />
+              
+              {/* Middle Pulse Circle */}
+              <div className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-orange-500/30 to-purple-600/30 animate-pulse" />
+              
+              {/* Inner Pulse Circle */}
+              <div className="absolute w-24 h-24 rounded-full bg-gradient-to-r from-orange-500/40 to-purple-600/40 animate-pulse" />
+              
+              {/* Center Icon */}
+              <div className="absolute w-16 h-16 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center shadow-lg">
+                <Heart className="h-8 w-8 text-white" />
+              </div>
+            </div>
+
+            {/* Loading Text */}
+            <div className="text-center space-y-2">
+              <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                Loading Your Wishlist
+              </h3>
+              <p className="text-muted-foreground text-lg">
+                Gathering your saved items...
+              </p>
+            </div>
+
+            {/* Progress Dots */}
+            <div className="flex space-x-2 mt-6">
+              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-3 h-3 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      </Layout>
+    </div>
+  );
+};
+
+// Alternative Minimal Pulse Loading (if you prefer a simpler version)
+const MinimalPulseLoading = () => {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="relative inline-block">
+          {/* Pulse Rings */}
+          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 animate-ping" />
+          <div className="relative w-20 h-20 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center shadow-lg">
+            <Heart className="h-10 w-10 text-white" />
+          </div>
+        </div>
+        <h3 className="mt-4 text-xl font-semibold text-gray-700">Loading your wishlist...</h3>
+      </div>
+    </div>
+  );
+};
+
 const WishlistPage = () => {
   const navigate = useNavigate();
   const { wishlistItems, loading: wishlistLoading, removeFromWishlist } = useWishlist();
@@ -131,16 +196,11 @@ const WishlistPage = () => {
     event.location?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Use the PulseLoading component instead of the simple spinner
   if (wishlistLoading || loading) {
-    return (
-      <Layout>
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
-          </div>
-        </div>
-      </Layout>
-    );
+    return <PulseLoading />;
+    // Alternatively, you can use the minimal version:
+    // return <MinimalPulseLoading />;
   }
 
   if (wishlistItems.length === 0) {
