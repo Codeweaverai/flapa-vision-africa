@@ -122,7 +122,7 @@ const EventTicketingPage = () => {
             </Button>
           </Link>
           <Link to="/contact">
-            <Button size="lg" variant="outline" className="border-2 border-white text-white hover:bg-white/10 text-lg px-8 py-6">
+            <Button size="lg" variant="secondary" className="border-2 border-white text-white hover:bg-white/10 text-lg px-8 py-6">
               Contact Sales
             </Button>
           </Link>
