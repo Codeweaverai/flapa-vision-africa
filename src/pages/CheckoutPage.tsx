@@ -13,7 +13,23 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import { CreditCard, Smartphone, Plus, Minus, Trash2, Gift, CheckCircle, User, Mail, MessageSquare } from 'lucide-react';
+import { 
+  CreditCard, 
+  Smartphone, 
+  Plus, 
+  Minus, 
+  Trash2, 
+  Gift, 
+  CheckCircle, 
+  User, 
+  Mail, 
+  MessageSquare,
+  Sparkles,
+  Zap,
+  Shield,
+  Lock,
+  ArrowRight
+} from 'lucide-react';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import MobileMoneyPaymentDialog from '@/components/payment/MobileMoneyPaymentDialog';
 
@@ -316,97 +332,116 @@ const CheckoutPage = () => {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 py-8">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50/30 via-white to-purple-50/30 py-8">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
-            <h1 className="text-3xl font-bold text-center mb-8">Checkout</h1>
+            {/* Enhanced Header */}
+            <div className="text-center mb-12">
+              <Badge className="mb-4 px-4 py-1.5 bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 shadow-lg">
+                <Sparkles className="h-3 w-3 mr-1" />
+                Secure Checkout
+              </Badge>
+              <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+                Complete Your Purchase
+              </h1>
+              <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+                Review your items and choose your preferred payment method
+              </p>
+            </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Cart Items */}
-              <div className="lg:col-span-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Order Summary</CardTitle>
+              {/* Enhanced Cart Items */}
+              <div className="lg:col-span-2 space-y-6">
+                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-2xl rounded-3xl overflow-hidden">
+                  <CardHeader className="bg-gradient-to-r from-orange-500/5 to-purple-600/5 border-b border-slate-100">
+                    <CardTitle className="flex items-center gap-3 text-slate-800">
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-purple-600 flex items-center justify-center">
+                        <Zap className="h-4 w-4 text-white" />
+                      </div>
+                      Order Summary ({items.length} {items.length === 1 ? 'item' : 'items'})
+                    </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="p-6 space-y-4">
                     {items.map((item) => (
-                      <div key={item.itemId} className="flex flex-col p-4 border rounded-lg">
+                      <div key={item.itemId} className="flex flex-col p-6 border border-slate-100 rounded-2xl bg-white/50 hover:shadow-lg transition-all duration-300 group">
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
-                            <h4 className="font-medium">{item.itemName}</h4>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Badge variant="secondary">
+                            <h4 className="font-bold text-lg text-slate-800 group-hover:text-orange-600 transition-colors duration-300">
+                              {item.itemName}
+                            </h4>
+                            <div className="flex items-center gap-2 mt-2">
+                              <Badge className="bg-gradient-to-r from-orange-500/10 to-purple-600/10 text-orange-700 border-orange-200">
                                 {item.itemType === 'course' || item.itemType === 'gift_course' ? 'Course' : 
                                  item.itemType === 'event_ticket' || item.itemType === 'gift_event' ? 'Event Ticket' :
                                  item.itemType === 'gift_card' ? 'Gift Card' : 
                                  item.itemType}
                               </Badge>
                               {item.itemType.startsWith('gift_') && (
-                                <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200">
+                                <Badge className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200">
                                   <Gift className="h-3 w-3 mr-1" />
                                   Gift
                                 </Badge>
                               )}
                             </div>
-                            <div className="mt-2 space-y-1">
-                              <div className="text-lg font-semibold">
+                            <div className="mt-3 space-y-1">
+                              <div className="text-xl font-bold text-slate-800">
                                 <PriceDisplay 
                                   amount={item.price} 
                                   originalCurrency="USD"
                                 />
                               </div>
                               {currentCurrency !== 'USD' && (
-                                <div className="text-sm text-gray-500">
+                                <div className="text-sm text-slate-500">
                                   Original: ${item.price.toFixed(2)} USD
                                 </div>
                               )}
                             </div>
 
-                            {/* Display gift metadata if available */}
+                            {/* Enhanced gift metadata display */}
                             {item.giftMetadata && (
-                              <div className="mt-3 p-3 bg-gray-50 rounded-lg space-y-2">
-                                <div className="flex items-center gap-2 text-sm text-gray-600">
-                                  <User className="h-4 w-4" />
-                                  <span>To: {truncateText(item.giftMetadata.recipientName)}</span>
+                              <div className="mt-4 p-4 bg-gradient-to-r from-orange-50 to-purple-50 rounded-xl border border-orange-100 space-y-3">
+                                <div className="flex items-center gap-2 text-sm text-slate-700">
+                                  <User className="h-4 w-4 text-orange-500" />
+                                  <span className="font-medium">To: {truncateText(item.giftMetadata.recipientName)}</span>
                                 </div>
                                 {item.giftMetadata.recipientEmail && (
-                                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                                    <Mail className="h-4 w-4" />
+                                  <div className="flex items-center gap-2 text-sm text-slate-700">
+                                    <Mail className="h-4 w-4 text-purple-500" />
                                     <span>Email: {truncateText(item.giftMetadata.recipientEmail)}</span>
                                   </div>
                                 )}
                                 {item.giftMetadata.personalMessage && (
-                                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                                    <MessageSquare className="h-4 w-4" />
+                                  <div className="flex items-center gap-2 text-sm text-slate-700">
+                                    <MessageSquare className="h-4 w-4 text-blue-500" />
                                     <span>Message: {truncateText(item.giftMetadata.personalMessage)}</span>
                                   </div>
                                 )}
                                 {item.giftMetadata.amount && (
-                                  <div className="text-sm text-gray-600">
-                                    Amount: ${item.giftMetadata.amount}
+                                  <div className="text-sm font-medium text-green-600">
+                                    Gift Amount: ${item.giftMetadata.amount}
                                   </div>
                                 )}
                               </div>
                             )}
                           </div>
                           
-                          <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-3">
                             {item.itemType === 'event_ticket' && (
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 bg-slate-50 rounded-xl p-1">
                                 <Button
-                                  variant="outline"
+                                  variant="ghost"
                                   size="sm"
                                   onClick={() => updateQuantity(item.itemId, item.quantity - 1)}
-                                  className="h-8 w-8 p-0"
+                                  className="h-8 w-8 p-0 hover:bg-white hover:shadow-md transition-all duration-200"
                                 >
                                   <Minus className="h-4 w-4" />
                                 </Button>
-                                <span className="text-sm font-medium w-8 text-center">{item.quantity}</span>
+                                <span className="text-sm font-bold w-8 text-center text-slate-800">{item.quantity}</span>
                                 <Button
-                                  variant="outline"
+                                  variant="ghost"
                                   size="sm"
                                   onClick={() => updateQuantity(item.itemId, item.quantity + 1)}
-                                  className="h-8 w-8 p-0"
+                                  className="h-8 w-8 p-0 hover:bg-white hover:shadow-md transition-all duration-200"
                                 >
                                   <Plus className="h-4 w-4" />
                                 </Button>
@@ -417,7 +452,7 @@ const CheckoutPage = () => {
                               variant="ghost"
                               size="sm"
                               onClick={() => removeFromCart(item.itemId)}
-                              className="text-red-600 hover:text-red-700"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-all duration-200"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -429,114 +464,150 @@ const CheckoutPage = () => {
                 </Card>
               </div>
 
-              {/* Payment Details */}
+              {/* Enhanced Payment Details */}
               <div className="space-y-6">
-                {/* Promo Code */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Promo Code</CardTitle>
+                {/* Enhanced Promo Code */}
+                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-2xl rounded-3xl overflow-hidden">
+                  <CardHeader className="bg-gradient-to-r from-orange-500/5 to-purple-600/5 border-b border-slate-100">
+                    <CardTitle className="flex items-center gap-3 text-slate-800">
+                      <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-orange-500 to-purple-600 flex items-center justify-center">
+                        <Sparkles className="h-3 w-3 text-white" />
+                      </div>
+                      Promo Code
+                    </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="flex gap-2">
+                  <CardContent className="p-6">
+                    <div className="flex gap-3">
                       <Input
                         placeholder="Enter promo code"
                         value={promoCode}
                         onChange={(e) => setPromoCode(e.target.value)}
+                        className="border-slate-200 focus:border-orange-300 transition-colors duration-200"
                       />
-                      <Button onClick={applyPromoCode} variant="outline">
+                      <Button 
+                        onClick={applyPromoCode} 
+                        variant="outline"
+                        className="border-orange-200 text-orange-600 hover:bg-orange-50 hover:border-orange-300 transition-all duration-200"
+                      >
                         Apply
                       </Button>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Gift Card */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Gift className="h-5 w-5" />
+                {/* Enhanced Gift Card */}
+                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-2xl rounded-3xl overflow-hidden">
+                  <CardHeader className="bg-gradient-to-r from-orange-500/5 to-purple-600/5 border-b border-slate-100">
+                    <CardTitle className="flex items-center gap-3 text-slate-800">
+                      <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-orange-500 to-purple-600 flex items-center justify-center">
+                        <Gift className="h-3 w-3 text-white" />
+                      </div>
                       Gift Card
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-6">
                     {appliedGiftCard ? (
-                      <div className="space-y-2 p-3 bg-green-50 rounded-lg">
+                      <div className="space-y-3 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
                         <div className="flex justify-between items-center">
-                          <span className="font-medium">Gift Card Applied:</span>
-                          <Badge variant="outline" className="bg-green-100">
+                          <span className="font-bold text-green-800">Gift Card Applied</span>
+                          <Badge className="bg-green-500 text-white border-0">
                             {appliedGiftCard.code}
                           </Badge>
                         </div>
-                        <div className="text-sm text-green-600">
+                        <div className="text-sm text-green-700">
                           Remaining Balance: ${appliedGiftCard.remaining_balance.toFixed(2)}
                         </div>
                         <Button
                           onClick={removeGiftCard}
                           variant="outline"
                           size="sm"
-                          className="mt-2"
+                          className="mt-2 border-green-200 text-green-700 hover:bg-green-50"
                         >
-                          Remove
+                          Remove Gift Card
                         </Button>
                       </div>
                     ) : (
-                      <div className="flex gap-2">
+                      <div className="flex gap-3">
                         <Input
                           placeholder="Enter gift card code"
                           value={giftCardCode}
                           onChange={(e) => setGiftCardCode(e.target.value.toUpperCase())}
                           disabled={giftCardLoading}
+                          className="border-slate-200 focus:border-purple-300 transition-colors duration-200"
                         />
                         <Button 
                           onClick={applyGiftCard} 
                           variant="outline"
                           disabled={giftCardLoading || !giftCardCode.trim()}
+                          className="border-purple-200 text-purple-600 hover:bg-purple-50 hover:border-purple-300 transition-all duration-200 disabled:opacity-50"
                         >
-                          {giftCardLoading ? "..." : "Apply"}
+                          {giftCardLoading ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div>
+                          ) : (
+                            "Apply"
+                          )}
                         </Button>
                       </div>
                     )}
                   </CardContent>
                 </Card>
 
-                {/* Payment Method - Updated for Free purchases */}
+                {/* Enhanced Payment Method */}
                 {finalAmountUSD > 0 ? (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Payment Method</CardTitle>
+                  <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-2xl rounded-3xl overflow-hidden">
+                    <CardHeader className="bg-gradient-to-r from-orange-500/5 to-purple-600/5 border-b border-slate-100">
+                      <CardTitle className="flex items-center gap-3 text-slate-800">
+                        <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-orange-500 to-purple-600 flex items-center justify-center">
+                          <CreditCard className="h-3 w-3 text-white" />
+                        </div>
+                        Payment Method
+                      </CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-6">
                       <RadioGroup 
                         value={paymentMethod} 
                         onValueChange={(value) => setPaymentMethod(value as 'stripe' | 'pawapay')}
+                        className="space-y-4"
                       >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="stripe" id="stripe" />
-                          <Label htmlFor="stripe" className="flex items-center gap-2">
-                            <CreditCard className="h-4 w-4" />
-                            Credit/Debit Card
+                        <div className="flex items-center space-x-3 p-4 border border-slate-100 rounded-xl hover:border-orange-200 hover:bg-orange-50/50 transition-all duration-200 cursor-pointer">
+                          <RadioGroupItem value="stripe" id="stripe" className="text-orange-500 border-slate-300" />
+                          <Label htmlFor="stripe" className="flex items-center gap-3 cursor-pointer flex-1">
+                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                              <CreditCard className="h-5 w-5 text-white" />
+                            </div>
+                            <div>
+                              <div className="font-semibold text-slate-800">Credit/Debit Card</div>
+                              <div className="text-sm text-slate-600">Pay securely with Stripe</div>
+                            </div>
                           </Label>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="pawapay" id="pawapay" />
-                          <Label htmlFor="pawapay" className="flex items-center gap-2">
-                            <Smartphone className="h-4 w-4" />
-                            Mobile Money
+                        <div className="flex items-center space-x-3 p-4 border border-slate-100 rounded-xl hover:border-purple-200 hover:bg-purple-50/50 transition-all duration-200 cursor-pointer">
+                          <RadioGroupItem value="pawapay" id="pawapay" className="text-purple-500 border-slate-300" />
+                          <Label htmlFor="pawapay" className="flex items-center gap-3 cursor-pointer flex-1">
+                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+                              <Smartphone className="h-5 w-5 text-white" />
+                            </div>
+                            <div>
+                              <div className="font-semibold text-slate-800">Mobile Money</div>
+                              <div className="text-sm text-slate-600">Available in 19 African countries</div>
+                            </div>
                           </Label>
                         </div>
                       </RadioGroup>
                     </CardContent>
                   </Card>
                 ) : (
-                  <Card className="bg-green-50 border-green-200">
+                  <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 shadow-2xl rounded-3xl">
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-green-800">
-                        <CheckCircle className="h-5 w-5" />
+                      <CardTitle className="flex items-center gap-3 text-green-800">
+                        <div className="w-8 h-8 rounded-lg bg-green-500 flex items-center justify-center">
+                          <CheckCircle className="h-5 w-5 text-white" />
+                        </div>
                         Gift Card Payment
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-green-700 text-sm">
+                      <p className="text-green-700 text-sm leading-relaxed">
                         Your gift card balance covers the entire purchase amount. 
                         No additional payment is required.
                       </p>
@@ -544,71 +615,105 @@ const CheckoutPage = () => {
                   </Card>
                 )}
 
-                {/* Order Total */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Order Total</CardTitle>
+                {/* Enhanced Order Total */}
+                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-2xl rounded-3xl overflow-hidden">
+                  <CardHeader className="bg-gradient-to-r from-orange-500/5 to-purple-600/5 border-b border-slate-100">
+                    <CardTitle className="flex items-center gap-3 text-slate-800">
+                      <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-orange-500 to-purple-600 flex items-center justify-center">
+                        <Lock className="h-3 w-3 text-white" />
+                      </div>
+                      Order Total
+                    </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div className="flex justify-between">
+                  <CardContent className="p-6 space-y-4">
+                    <div className="flex justify-between text-slate-700">
                       <span>Subtotal</span>
                       <PriceDisplay amount={convertedAmounts.total} originalCurrency={currentCurrency as any} />
                     </div>
                     
                     {discount > 0 && (
-                      <div className="flex justify-between text-green-600">
+                      <div className="flex justify-between text-green-600 font-medium">
                         <span>Promo Discount</span>
                         <span>-<PriceDisplay amount={convertedAmounts.discount} originalCurrency={currentCurrency as any} /></span>
                       </div>
                     )}
                     
                     {giftCardDiscount > 0 && (
-                      <div className="flex justify-between text-green-600">
+                      <div className="flex justify-between text-green-600 font-medium">
                         <span>Gift Card</span>
                         <span>-<PriceDisplay amount={convertedAmounts.giftCardDiscount} originalCurrency={currentCurrency as any} /></span>
                       </div>
                     )}
                     
-                    <div className="flex justify-between">
+                    <div className="flex justify-between text-slate-700">
                       <span>Tax</span>
                       <PriceDisplay amount={convertedAmounts.tax} originalCurrency={currentCurrency as any} />
                     </div>
                     
-                    <Separator />
+                    <Separator className="bg-slate-200" />
                     
-                    <div className="flex justify-between font-bold text-lg">
-                      <span>Total</span>
+                    <div className="flex justify-between font-bold text-xl">
+                      <span className="text-slate-800">Total</span>
                       <PriceDisplay 
                         amount={convertedAmounts.final} 
                         originalCurrency={currentCurrency as any} 
-                        className={finalAmountUSD <= 0 ? "text-green-600" : ""}
+                        className={finalAmountUSD <= 0 ? "text-green-600" : "text-slate-800"}
                       />
                     </div>
                     
                     {currentCurrency !== 'USD' && (
-                      <div className="text-sm text-gray-500 text-right">
+                      <div className="text-sm text-slate-500 text-right">
                         Original: ${finalAmountUSD.toFixed(2)} USD
                       </div>
                     )}
 
                     {finalAmountUSD <= 0 && (
-                      <div className="text-sm text-green-600 text-right mt-2">
+                      <div className="text-sm text-green-600 text-right mt-2 font-medium">
                         ✓ Fully covered by gift card balance
                       </div>
                     )}
                   </CardContent>
                 </Card>
 
+                {/* Enhanced Checkout Button */}
                 <Button
                   onClick={handleCheckout}
                   disabled={loading}
-                  className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white py-3"
+                  className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white py-4 text-lg font-semibold shadow-2xl hover:shadow-3xl transform hover:-translate-y-1 transition-all duration-300 rounded-2xl border-0"
                   size="lg"
                 >
-                  {loading ? "Processing..." : 
-                   finalAmountUSD <= 0 ? "Complete Purchase with Gift Card" :
-                   paymentMethod === 'stripe' ? "Pay with Card" : "Pay with Mobile Money"}
+                  {loading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      Processing...
+                    </div>
+                  ) : finalAmountUSD <= 0 ? (
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5" />
+                      Complete Purchase with Gift Card
+                    </div>
+                  ) : paymentMethod === 'stripe' ? (
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="h-5 w-5" />
+                      Pay with Card
+                      <ArrowRight className="h-4 w-4 ml-1" />
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Smartphone className="h-5 w-5" />
+                      Pay with Mobile Money
+                      <ArrowRight className="h-4 w-4 ml-1" />
+                    </div>
+                  )}
                 </Button>
+
+                {/* Security Badge */}
+                <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <div className="flex items-center justify-center gap-2 text-sm text-slate-600">
+                    <Shield className="h-4 w-4 text-green-500" />
+                    <span>Secure SSL Encryption • 256-bit Security</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
