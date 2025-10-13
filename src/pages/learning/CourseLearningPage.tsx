@@ -162,6 +162,7 @@ const CourseLearningPage = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('content');
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [secondaryTab, setSecondaryTab] = useState('transcripts');
   
   const isEnrolled = enrollment?.payment_status === 'completed';
   const progressPercentage = progress?.progress_percentage || 0;
@@ -572,13 +573,21 @@ const CourseLearningPage = () => {
     await loadExamResult(); // Reload exam result after completion
   };
 
+  // Beautiful loading animation
   if (loading) {
     return (
       <Layout>
         <main className="flex-grow flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading your learning experience...</p>
+            <div className="relative">
+              <div className="w-20 h-20 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full animate-pulse mx-auto mb-4"></div>
+              <div className="absolute inset-0 w-20 h-20 border-4 border-orange-200 border-t-purple-500 rounded-full animate-spin mx-auto"></div>
+            </div>
+            <div className="space-y-3">
+              <div className="h-4 bg-gradient-to-r from-orange-400 to-purple-500 rounded-full animate-pulse w-48 mx-auto"></div>
+              <div className="h-3 bg-gradient-to-r from-orange-300 to-purple-400 rounded-full animate-pulse w-32 mx-auto"></div>
+            </div>
+            <p className="text-gray-600 mt-6 animate-pulse">Preparing your learning experience...</p>
           </div>
         </main>
       </Layout>
@@ -624,7 +633,7 @@ const CourseLearningPage = () => {
     <Layout>
       <main className="flex-grow bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 min-h-screen">
         <div className="container mx-auto px-4 py-6">
-          {/* Simplified Header Section - Removed course stats and summary */}
+          {/* Simplified Header Section */}
           <div className="mb-8">
             <div className="flex flex-wrap items-center gap-2 mb-4">
               <Badge variant="secondary" className="text-sm bg-blue-100 text-blue-700">{course.category}</Badge>
@@ -734,10 +743,10 @@ const CourseLearningPage = () => {
           </div>
 
           {/* Main Content Grid */}
-          <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-            {/* Sidebar - Course Curriculum - Increased Width */}
+          <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+            {/* Sidebar - Course Curriculum - Increased Width with Better Spacing */}
             <div className={`xl:col-span-1 ${isMobileSidebarOpen ? 'block' : 'hidden'} xl:block`}>
-              <Card className="sticky top-6 shadow-xl border-0 h-fit min-w-[380px]">
+              <Card className="sticky top-8 shadow-xl border-0 h-fit min-w-[400px] mt-4 mb-8">
                 <CardHeader className="p-6 border-b bg-gradient-to-r from-slate-50 to-blue-50 rounded-t-lg">
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-3 text-lg font-bold text-gray-900">
@@ -758,7 +767,7 @@ const CourseLearningPage = () => {
                     <span>{completedLessons.length} of {totalLessons} lessons completed</span>
                   </div>
                 </CardHeader>
-                <CardContent className="p-0">
+                <CardContent className="p-4">
                   <EnhancedCourseModuleList 
                     modules={modules}
                     courseId={courseId}
@@ -773,25 +782,19 @@ const CourseLearningPage = () => {
               </Card>
             </div>
 
-            {/* Main Content Area */}
+            {/* Main Content Area - Reduced Width */}
             <div className="xl:col-span-3">
               <Card className="shadow-xl border-0">
                 <CardContent className="p-0">
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="w-full grid grid-cols-2 h-12 bg-slate-50/50 p-1 rounded-t-lg">
+                    {/* Single Content Tab */}
+                    <TabsList className="w-full h-12 bg-slate-50/50 p-1 rounded-t-lg">
                       <TabsTrigger 
                         value="content" 
-                        className="text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-orange-600 transition-all duration-200"
+                        className="w-full text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-orange-600 transition-all duration-200"
                       >
                         <Play className="h-4 w-4 mr-2" />
                         Content
-                      </TabsTrigger>
-                      <TabsTrigger 
-                        value="notes" 
-                        className="text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-orange-600 transition-all duration-200"
-                      >
-                        <StickyNote className="h-4 w-4 mr-2" />
-                        Notes
                       </TabsTrigger>
                     </TabsList>
                     
@@ -829,7 +832,7 @@ const CourseLearningPage = () => {
 
                             {/* Video Player */}
                             {(selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url) && (
-                              <div className="space-y-4">
+                              <div className="space-y-6">
                                 <div className="aspect-video rounded-xl overflow-hidden bg-black shadow-2xl">
                                   <ReactPlayer
                                     url={selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url}
@@ -875,12 +878,59 @@ const CourseLearningPage = () => {
                                     </Button>
                                   )}
                                 </div>
+
+                                {/* Secondary Tabs Below Video Player */}
+                                <div className="border border-gray-200 rounded-lg mt-6">
+                                  <Tabs value={secondaryTab} onValueChange={setSecondaryTab} className="w-full">
+                                    <TabsList className="w-full grid grid-cols-4 h-12 bg-gray-50/50 p-1">
+                                      <TabsTrigger value="transcripts" className="text-sm">
+                                        <FileText className="h-4 w-4 mr-2" />
+                                        Transcript
+                                      </TabsTrigger>
+                                      <TabsTrigger value="notes" className="text-sm">
+                                        <StickyNote className="h-4 w-4 mr-2" />
+                                        Notes
+                                      </TabsTrigger>
+                                      <TabsTrigger value="reviews" className="text-sm">
+                                        <Star className="h-4 w-4 mr-2" />
+                                        Reviews
+                                      </TabsTrigger>
+                                      <TabsTrigger value="discussion" className="text-sm">
+                                        <Users className="h-4 w-4 mr-2" />
+                                        Discussion
+                                      </TabsTrigger>
+                                    </TabsList>
+                                    
+                                    <TabsContent value="transcripts" className="p-4">
+                                      <VideoTranscripts 
+                                        lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
+                                        currentTime={currentVideoTime}
+                                        onSeekTo={handleSeekTo}
+                                        showHeader={false}
+                                      />
+                                    </TabsContent>
+                                    
+                                    <TabsContent value="notes" className="p-4">
+                                      <LessonNotesTab 
+                                        lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
+                                      />
+                                    </TabsContent>
+                                    
+                                    <TabsContent value="reviews" className="p-4">
+                                      <CourseReviewsTab courseId={courseId} />
+                                    </TabsContent>
+                                    
+                                    <TabsContent value="discussion" className="p-4">
+                                      <LessonDiscussionTab lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} />
+                                    </TabsContent>
+                                  </Tabs>
+                                </div>
                               </div>
                             )}
 
                             {/* Lesson Content - Improved Section */}
                             {(selectedLesson?.content || modules[0]?.lessons[0]?.content) && (
-                              <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
+                              <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm mt-6">
                                 <div className="flex items-center gap-3 mb-4">
                                   <FileText className="h-6 w-6 text-orange-500" />
                                   <div>
@@ -934,27 +984,6 @@ const CourseLearningPage = () => {
                             onClick={() => navigate(`/course/${courseId}/enroll`)}
                           >
                             <Rocket className="h-5 w-5 mr-2" />
-                            Enroll Now
-                          </Button>
-                        </div>
-                      )}
-                    </TabsContent>
-
-                    {/* Notes Tab */}
-                    <TabsContent value="notes" className="p-6 m-0">
-                      {isEnrolled ? (
-                        <LessonNotesTab 
-                          lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
-                        />
-                      ) : (
-                        <div className="text-center py-12">
-                          <StickyNote className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-                          <h3 className="text-xl font-semibold mb-2">Enroll to Take Notes</h3>
-                          <p className="text-gray-600 mb-6">Start taking notes and track your learning progress</p>
-                          <Button 
-                            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-lg px-8 py-3"
-                            onClick={() => navigate(`/course/${courseId}/enroll`)}
-                          >
                             Enroll Now
                           </Button>
                         </div>
