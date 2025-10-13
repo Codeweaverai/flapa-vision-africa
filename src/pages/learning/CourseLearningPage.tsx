@@ -779,7 +779,7 @@ const CourseLearningPage = () => {
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
             {/* Sidebar - Course Curriculum - Increased Width with Better Spacing */}
             <div className={`xl:col-span-1 ${isMobileSidebarOpen ? 'block' : 'hidden'} xl:block`}>
-              <Card className="sticky top-8 shadow-xl border-0 h-fit min-w-[380px] mt-4 mb-8">
+              <Card className="sticky top-8 shadow-xl border-0 h-fit min-w-[350px] mt-4 mb-8">
                 <CardHeader className="p-6 border-b bg-gradient-to-r from-slate-50 to-blue-50 rounded-t-lg">
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-3 text-lg font-bold text-gray-900">
