@@ -1102,7 +1102,7 @@ const CommunityPage = () => {
                 <Users className="h-16 w-16 mx-auto mb-4 text-gradient-to-r from-orange-500 to-purple-600" />
                 <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Join the Community</h2>
                 <p className="text-muted-foreground mb-6">Connect with learners worldwide and share your journey.</p>
-                <Button className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg" onClick={() => window.location.href = '/login'}>
+                <Button className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg" onClick={() => window.location.href = '/Auth'}>
                   Sign In to Continue
                 </Button>
               </CardContent>
