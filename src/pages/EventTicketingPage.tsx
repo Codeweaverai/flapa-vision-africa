@@ -81,63 +81,67 @@ const EventTicketingPage = () => {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-        {/* Hero Section with New Image */}
-        <section className="relative overflow-hidden bg-gradient-to-br from-[#1e1b4b] via-purple-900 to-orange-900 text-white">
-          <div 
-            className="absolute inset-0 bg-cover bg-center"
-            style={{
-              backgroundImage: 'url("https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/rsz_couples-celebrating-birthday_1.jpg")'
-            }}
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-purple-600 mix-blend-multiply"></div>
-          </div>
-          
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDE0YzMuMzEgMCA2LTIuNjkgNi02cy0yLjY5LTYtNi02LTYgMi42OS02IDYgMi42OSA2IDYgNnptMCA0MGMzLjMxIDAgNi0yLjY5IDYtNnMtMi42OS02LTYtNi02IDIuNjktNiA2IDIuNjkgNiA2IDZ6TTE0IDE0YzMuMzEgMCA2LTIuNjkgNi02cy0yLjY5LTYtNi02LTYgMi42OS02IDYgMi42OSA2IDYgNnptMCA0MGMzLjMxIDAgNi0yLjY5IDYtNnMtMi42OS02LTYtNi02IDIuNjktNiA2IDIuNjkgNiA2IDZ6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-10"></div>
-          
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-            <div className="text-center max-w-4xl mx-auto">
-              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full mb-6 animate-fade-in">
-                <Ticket className="h-5 w-5 text-orange-400" />
-                <span className="text-sm font-medium">Leading Event Ticketing Platform</span>
-              </div>
-              
-              <h1 className="text-5xl md:text-6xl font-bold mb-6 animate-fade-in">
-                Sell Tickets Now on{" "}
-                <span className="bg-gradient-to-r from-orange-400 to-purple-400 bg-clip-text text-transparent">
-                  SkillPulse Events
-                </span>
-              </h1>
-              
-              <p className="text-xl text-gray-200 mb-8 max-w-3xl mx-auto animate-fade-in">
-                An all-in-one ticketing and marketing platform that offers great value for your money. 
-                Create events and sell tickets for free, and reach the right audience across Africa.
-              </p>
-              
-              <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in">
-                <Button size="lg" className="bg-white text-purple-900 hover:bg-gray-100 text-lg px-8 py-6 shadow-xl">
-                  Get Started for Free
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-                <Button size="lg" variant="secondary" className="border-2 border-white text-white hover:bg-white/10 text-lg px-8 py-6">
-                  Contact Sales
-                </Button>
-              </div>
+      <div className="min-h-screen bg-gradient-to-b from-orange-50 to-purple-50">
+  {/* Hero Section with New Image */}
+  <section className="relative overflow-hidden bg-gradient-to-r from-orange-500 to-purple-600 text-white">
+    <div 
+      className="absolute inset-0 bg-cover bg-center"
+      style={{
+        backgroundImage: 'url("https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/rsz_couples-celebrating-birthday_1.jpg")'
+      }}
+    >
+      <div className="absolute inset-0 bg-gradient-to-r from-orange-500/80 to-purple-600/80 mix-blend-multiply"></div>
+    </div>
+    
+    <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDE0YzMuMzEgMCA2LTIuNjkgNi02cy0yLjY5LTYtNi02LTYgMi42OS02IDYgMi42OSA2IDYgNnptMCA0MGMzLjMxIDAgNi0yLjY5IDYtNnMtMi42OS02LTYtNi02IDIuNjktNiA2IDIuNjkgNiA2IDZ6TTE0IDE0YzMuMzEgMCA2LTIuNjkgNi02cy0yLjY5LTYtNi02LTYgMi42OS02IDYgMi42OSA2IDYgNnptMCA0MGMzLjMzIDAgNi0yLjY5IDYtNnMtMi42OS02LTYtNi02IDIuNjktNiA2IDIuNjkgNiA2IDZ6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-10"></div>
+    
+    <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+      <div className="text-center max-w-4xl mx-auto">
+        <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full mb-6 animate-fade-in">
+          <Ticket className="h-5 w-5 text-orange-400" />
+          <span className="text-sm font-medium">Leading Event Ticketing Platform</span>
+        </div>
+        
+        <h1 className="text-5xl md:text-6xl font-bold mb-6 animate-fade-in">
+          Sell Tickets Now on{" "}
+          <span className="bg-gradient-to-r from-orange-200 to-purple-200 bg-clip-text text-transparent">
+            SkillPulse Events
+          </span>
+        </h1>
+        
+        <p className="text-xl text-white/90 mb-8 max-w-3xl mx-auto animate-fade-in">
+          An all-in-one ticketing and marketing platform that offers great value for your money. 
+          Create events and sell tickets for free, and reach the right audience across Africa.
+        </p>
+        
+        <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in">
+          <Link to="/create-event">
+            <Button size="lg" className="bg-white text-purple-600 hover:bg-gray-100 text-lg px-8 py-6 shadow-xl">
+              Get Started for Free
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+          </Link>
+          <Link to="/contact-sales">
+            <Button size="lg" variant="outline" className="border-2 border-white text-white hover:bg-white/10 text-lg px-8 py-6">
+              Contact Sales
+            </Button>
+          </Link>
+        </div>
 
-              {/* Stats Bar */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-16">
-                {stats.map((stat, index) => (
-                  <div key={index} className="text-center animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
-                    <div className="text-4xl font-bold bg-gradient-to-r from-orange-400 to-purple-400 bg-clip-text text-transparent">
-                      {stat.number}
-                    </div>
-                    <div className="text-sm text-gray-300 mt-2">{stat.label}</div>
-                  </div>
-                ))}
+        {/* Stats Bar */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-16">
+          {stats.map((stat, index) => (
+            <div key={index} className="text-center animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+              <div className="text-4xl font-bold bg-gradient-to-r from-orange-200 to-purple-200 bg-clip-text text-transparent">
+                {stat.number}
               </div>
+              <div className="text-sm text-white/80 mt-2">{stat.label}</div>
             </div>
-          </div>
-        </section>
+          ))}
+        </div>
+      </div>
+    </div>
+  </section>
 
         {/* Features Section */}
         <section className="py-20">
