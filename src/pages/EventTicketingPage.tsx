@@ -432,30 +432,34 @@ const EventTicketingPage = () => {
         </section>
 
         {/* CTA Section */}
-        <section className="py-20 bg-gradient-to-br from-[#1e1b4b] via-purple-900 to-orange-900 text-white">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-4xl md:text-5xl font-bold mb-6">
-              Ready to Start Selling Tickets?
-            </h2>
-            <p className="text-xl text-gray-200 mb-8 max-w-2xl mx-auto">
-              Join thousands of event creators across Africa who trust SkillPulse to power their events.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" className="bg-white text-purple-900 hover:bg-gray-100 text-lg px-8 py-6 shadow-xl">
-                Get Started for Free
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-              <Button size="lg" variant="secondary" className="border-2 border-white text-white hover:bg-white/10 text-lg px-8 py-6">
-                Contact Sales Team
-              </Button>
-            </div>
+<section className="py-20 bg-gradient-to-r from-orange-500 to-purple-600 text-white">
+  <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+    <h2 className="text-4xl md:text-5xl font-bold mb-6">
+      Ready to Start Selling Tickets?
+    </h2>
+    <p className="text-xl text-white/90 mb-8 max-w-2xl mx-auto">
+      Join thousands of event creators across Africa who trust SkillPulse to power their events.
+    </p>
+    
+    <div className="flex flex-col sm:flex-row gap-4 justify-center">
+      <Link to="/create-event">
+        <Button size="lg" className="bg-white text-purple-900 hover:bg-gray-100 text-lg px-8 py-6 shadow-xl">
+          Get Started for Free
+          <ArrowRight className="ml-2 h-5 w-5" />
+        </Button>
+      </Link>
+      <Link to="/contact-sales">
+        <Button size="lg" variant="secondary" className="border-2 border-white text-white hover:bg-white/10 text-lg px-8 py-6">
+          Contact Sales Team
+        </Button>
+      </Link>
+    </div>
 
-            <p className="mt-6 text-sm text-gray-300">
-              No credit card required • Free to start • Cancel anytime
-            </p>
-          </div>
-        </section>
+    <p className="mt-6 text-sm text-white/80">
+      No credit card required • Free to start • Cancel anytime
+    </p>
+  </div>
+</section>
       </div>
     </Layout>
   );
