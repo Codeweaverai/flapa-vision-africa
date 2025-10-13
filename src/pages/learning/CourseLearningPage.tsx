@@ -8,11 +8,14 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import ReactPlayer from 'react-player';
 import { 
   Play, Clock, User, BookOpen, Award, Star, Users,
   MessageCircle, Target, CheckCircle, StickyNote,
-  CheckCircle2, GraduationCap, Eye, FileText, ChevronUp, ChevronDown
+  CheckCircle2, GraduationCap, Eye, FileText, ChevronUp, ChevronDown,
+  Zap, Bookmark, Share, Download, Crown, Rocket, Trophy, Sparkles,
+  Menu, X
 } from 'lucide-react';
 import { toast } from 'sonner';
 import EnhancedCourseModuleList from '@/components/course/EnhancedCourseModuleList';
@@ -139,15 +142,18 @@ const CourseLearningPage = () => {
   const [quizPassed, setQuizPassed] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState<CourseLesson | null>(null);
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
-  const [showResumeButton, setShowResumeButton] = useState(false);
+  const [showResumeModal, setShowResumeModal] = useState(false);
   const [resumeLesson, setResumeLesson] = useState<CourseLesson | null>(null);
   const [showTranscript, setShowTranscript] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
   const isEnrolled = enrollment?.payment_status === 'completed';
   const progressPercentage = progress?.progress_percentage || 0;
   const isNotComplete = progressPercentage < 100;
   const hasLessons = modules.some(module => module.lessons.length > 0);
   const totalLessons = modules.reduce((total, module) => total + module.lessons.length, 0);
+  const isCourseCompleted = progressPercentage === 100;
 
   const calculateCourseProgress = (completed: string[], total: number): number => {
     if (total === 0) return 0;
@@ -348,7 +354,7 @@ const CourseLearningPage = () => {
             .find(l => l.id === progress.last_accessed_lesson_id);
           if (lastLesson) {
             setResumeLesson(lastLesson);
-            setShowResumeButton(true);
+            setShowResumeModal(true);
             return lastLesson;
           }
         }
@@ -437,7 +443,16 @@ const CourseLearningPage = () => {
     if (resumeLesson) {
       setSelectedLesson(resumeLesson);
       setCurrentLessonId(resumeLesson.id);
-      setShowResumeButton(false);
+      setShowResumeModal(false);
+    }
+  };
+
+  const handleStartFromBeginning = () => {
+    const firstLesson = modules[0]?.lessons?.[0];
+    if (firstLesson) {
+      setSelectedLesson(firstLesson);
+      setCurrentLessonId(firstLesson.id);
+      setShowResumeModal(false);
     }
   };
 
@@ -467,6 +482,7 @@ const CourseLearningPage = () => {
   const handleLessonSelect = (lesson: CourseLesson) => {
     setCurrentLessonId(lesson.id);
     setSelectedLesson(lesson);
+    setIsMobileSidebarOpen(false);
   };
 
   const handleSeekTo = (time: number) => {
@@ -497,8 +513,11 @@ const CourseLearningPage = () => {
   if (loading) {
     return (
       <Layout>
-        <main className="flex-grow flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+        <main className="flex-grow flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading your learning experience...</p>
+          </div>
         </main>
       </Layout>
     );
@@ -507,12 +526,14 @@ const CourseLearningPage = () => {
   if (!courseId) {
     return (
       <Layout>
-        <main className="flex-grow flex items-center justify-center">
+        <main className="flex-grow flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Invalid course URL</h1>
             <p className="text-gray-600 mb-4">The course ID is missing from the URL.</p>
             <Link to="/explore-courses">
-              <Button>Browse Courses</Button>
+              <Button className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
+                Browse Courses
+              </Button>
             </Link>
           </div>
         </main>
@@ -523,11 +544,13 @@ const CourseLearningPage = () => {
   if (!course) {
     return (
       <Layout>
-        <main className="flex-grow flex items-center justify-center">
+        <main className="flex-grow flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Course not found</h1>
             <Link to="/explore-courses">
-              <Button>Browse Courses</Button>
+              <Button className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
+                Browse Courses
+              </Button>
             </Link>
           </div>
         </main>
@@ -535,128 +558,154 @@ const CourseLearningPage = () => {
     );
   }
 
- return (
+  return (
     <Layout>
-      <main className="flex-grow bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
-        <div className="container mx-auto px-4 py-6 sm:py-8">
-          {/* Resume Button */}
-          {showResumeButton && resumeLesson && (
-            <div className="mb-4">
-              <Button 
-                onClick={handleResumeLearning}
-                className="bg-blue-600 hover:bg-blue-700 text-white text-sm sm:text-base"
-                size="sm"
-              >
-                <Play className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                Resume: {resumeLesson.title.length > 30 ? 
-                  `${resumeLesson.title.substring(0, 30)}...` : 
-                  resumeLesson.title}
-              </Button>
-            </div>
-          )}
-
-          {/* Course Header */}
-          <div className="mb-6 sm:mb-8">
-            <div className="flex flex-wrap items-center gap-2 mb-3 sm:mb-4">
-              <Badge variant="secondary" className="text-xs sm:text-sm">{course.category}</Badge>
-              <Badge variant="outline" className="text-xs sm:text-sm">{course.difficulty_level}</Badge>
-              {course.is_free && <Badge className="bg-green-500 text-xs sm:text-sm">Free</Badge>}
+      <main className="flex-grow bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 min-h-screen">
+        <div className="container mx-auto px-4 py-6">
+          {/* Header Section */}
+          <div className="mb-8">
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <Badge variant="secondary" className="text-sm bg-blue-100 text-blue-700">{course.category}</Badge>
+              <Badge variant="outline" className="text-sm border-orange-200 text-orange-600">{course.difficulty_level}</Badge>
+              {course.is_free && <Badge className="bg-green-500 text-sm">Free</Badge>}
+              {course.certificate_enabled && <Badge className="bg-purple-500 text-sm flex items-center gap-1"><Award className="h-3 w-3" /> Certificate</Badge>}
             </div>
             
-            <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2 sm:mb-4">{course.title}</h1>
-            <p className="text-base sm:text-xl text-gray-600 mb-4 sm:mb-6">{course.summary}</p>
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 leading-tight">{course.title}</h1>
+            <p className="text-xl text-gray-600 mb-6 leading-relaxed">{course.summary}</p>
             
-            <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-sm sm:text-base text-gray-600">
-              <div className="flex items-center gap-1 sm:gap-2">
-                <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
-                <span>{course.duration_minutes} min</span>
+            <div className="flex flex-wrap items-center gap-6 text-sm text-gray-600">
+              <div className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-orange-500" />
+                <span>{course.duration_minutes} min total</span>
               </div>
-              <div className="flex items-center gap-1 sm:gap-2">
-                <BookOpen className="h-4 w-4 sm:h-5 sm:w-5" />
-                <span>{modules.length} mods</span>
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-blue-500" />
+                <span>{modules.length} modules • {totalLessons} lessons</span>
               </div>
-              <div className="flex items-center gap-1 sm:gap-2">
-                <Users className="h-4 w-4 sm:h-5 sm:w-5" />
-                <span>{enrollmentCount}</span>
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-green-500" />
+                <span>{enrollmentCount.toLocaleString()} students</span>
               </div>
-              <div className="flex items-center gap-1 sm:gap-2">
-                <Star className="h-4 w-4 sm:h-5 sm:w-5 fill-yellow-400 text-yellow-400" />
-                <span>{averageRating.toFixed(1)} ({reviewCount})</span>
+              <div className="flex items-center gap-2">
+                <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                <span>{averageRating.toFixed(1)} ({reviewCount} reviews)</span>
               </div>
             </div>
           </div>
 
-          {/* Progress Card */}
+          {/* Progress Section */}
           {isEnrolled && (
-            <Card className="mb-6 sm:mb-8 bg-gradient-to-r from-orange-100 to-purple-100 border-0">
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex items-center justify-between mb-3 sm:mb-4">
-                  <h3 className="text-base sm:text-lg font-semibold">Your Progress</h3>
-                  <span className="text-xl sm:text-2xl font-bold text-orange-600">{progressPercentage}%</span>
-                </div>
-                <Progress value={progressPercentage} className="h-2 sm:h-3" />
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mt-3 sm:mt-4 gap-2">
-                  <p className="text-xs sm:text-sm text-gray-600">
-                    {progressPercentage < 50 ? 'Keep going! You\'re doing great.' : 
-                     progressPercentage < 80 ? 'You\'re making excellent progress!' :
-                     'Almost there! Finish strong!'}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {isNotComplete && hasLessons && (
-                      <Button
-                        onClick={markAllLessonsComplete}
-                        disabled={markingComplete}
-                        size="xs"
-                        className="bg-green-600 hover:bg-green-700 text-white text-xs"
-                      >
-                        {markingComplete ? (
-                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
-                        ) : (
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                        )}
-                        {markingComplete ? 'Processing...' : 'Mark Complete'}
-                      </Button>
-                    )}
-                    
-                    {(!hasLessons || progressPercentage === 100) && finalExam && (
-                      <Button
-                        onClick={handleTakeExam}
-                        size="sm"
-                        className="bg-orange-600 hover:bg-orange-700 text-white text-sm py-1 px-3"
-                      >
-                        <GraduationCap className="h-4 w-4 mr-2" />
-                        Final Exam
-                      </Button>
-                    )}
-
-                    {progressPercentage === 100 && (
-                      <Button
-                        onClick={navigateToCourseResults}
-                        size="sm"
-                        className="bg-purple-600 hover:bg-purple-700 text-white text-sm py-1 px-3"
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Results
-                      </Button>
-                    )}
+            <Card className="mb-8 bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Your Learning Progress</h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {progressPercentage < 50 ? 'Keep going! You\'re doing great.' : 
+                       progressPercentage < 80 ? 'You\'re making excellent progress!' :
+                       'Almost there! Finish strong!'}
+                    </p>
                   </div>
+                  <div className="text-right">
+                    <span className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                      {progressPercentage}%
+                    </span>
+                    <p className="text-sm text-gray-600">Complete</p>
+                  </div>
+                </div>
+                
+                <Progress value={progressPercentage} className="h-3 bg-gray-200">
+                  <div 
+                    className="h-full bg-gradient-to-r from-orange-500 to-purple-600 rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${progressPercentage}%` }}
+                  />
+                </Progress>
+
+                <div className="flex flex-wrap gap-3 mt-4">
+                  {isNotComplete && hasLessons && (
+                    <Button
+                      onClick={markAllLessonsComplete}
+                      disabled={markingComplete}
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      {markingComplete ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      ) : (
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                      )}
+                      {markingComplete ? 'Processing...' : 'Mark All Complete'}
+                    </Button>
+                  )}
+                  
+                  {(!hasLessons || isCourseCompleted) && finalExam && (
+                    <Button
+                      onClick={handleTakeExam}
+                      size="sm"
+                      className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
+                    >
+                      <GraduationCap className="h-4 w-4 mr-2" />
+                      Take Final Exam
+                    </Button>
+                  )}
+
+                  {isCourseCompleted && (
+                    <Button
+                      onClick={navigateToCourseResults}
+                      size="sm"
+                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                    >
+                      <Trophy className="h-4 w-4 mr-2" />
+                      View Certificate
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
           )}
 
+          {/* Mobile Sidebar Toggle */}
+          <div className="lg:hidden mb-4">
+            <Button
+              onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+              className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
+            >
+              {isMobileSidebarOpen ? (
+                <X className="h-4 w-4 mr-2" />
+              ) : (
+                <Menu className="h-4 w-4 mr-2" />
+              )}
+              {isMobileSidebarOpen ? 'Close Curriculum' : 'Show Curriculum'}
+            </Button>
+          </div>
+
           {/* Main Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
-            {/* Course Curriculum */}
-            <div className="lg:col-span-4">
-              <Card className="sticky top-4">
-                <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                    <BookOpen className="h-4 w-4 sm:h-5 sm:w-5" />
-                    Curriculum
-                  </CardTitle>
+          <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+            {/* Sidebar - Course Curriculum */}
+            <div className={`xl:col-span-1 ${isMobileSidebarOpen ? 'block' : 'hidden'} xl:block`}>
+              <Card className="sticky top-6 shadow-xl border-0 h-fit">
+                <CardHeader className="p-6 border-b bg-gradient-to-r from-slate-50 to-blue-50 rounded-t-lg">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-3 text-lg font-bold text-gray-900">
+                      <BookOpen className="h-5 w-5 text-orange-500" />
+                      Course Content
+                    </CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsMobileSidebarOpen(false)}
+                      className="xl:hidden"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <span>{completedLessons.length} of {totalLessons} lessons completed</span>
+                  </div>
                 </CardHeader>
-                <CardContent className="p-2 sm:p-4">
+                <CardContent className="p-0 max-h-[calc(100vh-200px)] overflow-y-auto">
                   <EnhancedCourseModuleList 
                     modules={modules}
                     courseId={courseId}
@@ -671,49 +720,77 @@ const CourseLearningPage = () => {
               </Card>
             </div>
 
-            {/* Content Tabs */}
-            <div className="lg:col-span-8">
-              <Tabs defaultValue="content" className="w-full">
-                <TabsList className="grid w-full grid-cols-5 h-10 sm:h-12">
-                  <TabsTrigger value="content" className="text-xs sm:text-sm p-1 sm:p-2">
-                    <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                    Content
-                  </TabsTrigger>
-                  <TabsTrigger value="lesson-notes" className="text-xs sm:text-sm p-1 sm:p-2">
-                    <StickyNote className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                    Notes
-                  </TabsTrigger>
-                  <TabsTrigger value="transcripts" className="text-xs sm:text-sm p-1 sm:p-2">
-                    <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                    Transcript
-                  </TabsTrigger>
-                  <TabsTrigger value="reviews" className="text-xs sm:text-sm p-1 sm:p-2">
-                    <MessageCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                    Reviews
-                  </TabsTrigger>
-                  <TabsTrigger value="discussion" className="text-xs sm:text-sm p-1 sm:p-2">
-                    <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                    Discuss
-                  </TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="content" className="space-y-6">
-                  {isEnrolled ? (
-                    <Card>
-                      <CardContent className="p-4 sm:p-6">
-                        {selectedLesson || modules[0]?.lessons[0] ? (
-                          <div>
-                            <h3 className="text-lg sm:text-xl font-semibold mb-4">
-                              {selectedLesson?.title || modules[0]?.lessons[0]?.title}
-                            </h3>
-                            {(selectedLesson?.description || modules[0]?.lessons[0]?.description) && (
-                              <p className="text-gray-600 mb-4 text-sm sm:text-base">
-                                {selectedLesson?.description || modules[0]?.lessons[0]?.description}
-                              </p>
-                            )}
+            {/* Main Content Area */}
+            <div className="xl:col-span-3">
+              <Card className="shadow-xl border-0">
+                <CardContent className="p-0">
+                  <Tabs defaultValue="content" className="w-full">
+                    <TabsList className="w-full grid grid-cols-5 h-12 bg-slate-50/50 p-1 rounded-t-lg">
+                      <TabsTrigger 
+                        value="content" 
+                        className="text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-orange-600 transition-all duration-200"
+                      >
+                        <Play className="h-4 w-4 mr-2" />
+                        Content
+                      </TabsTrigger>
+                      <TabsTrigger 
+                        value="lesson-notes" 
+                        className="text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-orange-600 transition-all duration-200"
+                      >
+                        <StickyNote className="h-4 w-4 mr-2" />
+                        Notes
+                      </TabsTrigger>
+                      <TabsTrigger 
+                        value="transcripts" 
+                        className="text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-orange-600 transition-all duration-200"
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Transcript
+                      </TabsTrigger>
+                      <TabsTrigger 
+                        value="reviews" 
+                        className="text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-orange-600 transition-all duration-200"
+                      >
+                        <Star className="h-4 w-4 mr-2" />
+                        Reviews
+                      </TabsTrigger>
+                      <TabsTrigger 
+                        value="discussion" 
+                        className="text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-orange-600 transition-all duration-200"
+                      >
+                        <Users className="h-4 w-4 mr-2" />
+                        Discuss
+                      </TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="content" className="p-6 m-0">
+                      {isEnrolled ? (
+                        selectedLesson || modules[0]?.lessons[0] ? (
+                          <div className="space-y-6">
+                            {/* Lesson Header */}
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                                  {selectedLesson?.title || modules[0]?.lessons[0]?.title}
+                                </h2>
+                                {selectedLesson?.description && (
+                                  <p className="text-gray-600 text-lg">
+                                    {selectedLesson.description}
+                                  </p>
+                                )}
+                              </div>
+                              {selectedLesson && completedLessons.includes(selectedLesson.id) && (
+                                <Badge className="bg-green-500 text-white flex items-center gap-1">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  Completed
+                                </Badge>
+                              )}
+                            </div>
+
+                            {/* Video Player */}
                             {(selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url) && (
-                              <>
-                                <div className="aspect-video rounded-lg overflow-hidden bg-black mb-4">
+                              <div className="space-y-4">
+                                <div className="aspect-video rounded-xl overflow-hidden bg-black shadow-2xl">
                                   <ReactPlayer
                                     url={selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url}
                                     width="100%"
@@ -729,17 +806,34 @@ const CourseLearningPage = () => {
                                     onProgress={handleVideoProgress}
                                     progressInterval={1000}
                                     light={course.thumbnail_url}
+                                    playing={false}
                                   />
                                 </div>
                                 
-                                {/* Video Transcript Section */}
-                                <div className="mt-6">
+                                {/* Video Controls */}
+                                <div className="flex flex-wrap gap-3">
+                                  <Button variant="outline" size="sm">
+                                    <Bookmark className="h-4 w-4 mr-2" />
+                                    Bookmark
+                                  </Button>
+                                  <Button variant="outline" size="sm">
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Download
+                                  </Button>
+                                  <Button variant="outline" size="sm">
+                                    <Share className="h-4 w-4 mr-2" />
+                                    Share
+                                  </Button>
+                                </div>
+
+                                {/* Transcript Section */}
+                                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                                   <div 
-                                    className="flex items-center justify-between cursor-pointer mb-3"
+                                    className="flex items-center justify-between p-4 cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors"
                                     onClick={() => setShowTranscript(!showTranscript)}
                                   >
                                     <h4 className="text-lg font-semibold flex items-center">
-                                      <FileText className="h-5 w-5 mr-2 text-orange-600" />
+                                      <FileText className="h-5 w-5 mr-3 text-orange-500" />
                                       Video Transcript
                                     </h4>
                                     {showTranscript ? (
@@ -749,7 +843,7 @@ const CourseLearningPage = () => {
                                     )}
                                   </div>
                                   {showTranscript && (
-                                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                    <div className="p-4 max-h-96 overflow-y-auto">
                                       <VideoTranscripts 
                                         lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
                                         currentTime={currentVideoTime}
@@ -759,10 +853,13 @@ const CourseLearningPage = () => {
                                     </div>
                                   )}
                                 </div>
-                              </>
+                              </div>
                             )}
+
+                            {/* Lesson Content */}
                             {(selectedLesson?.content || modules[0]?.lessons[0]?.content) && (
-                              <div className="prose max-w-none mt-6 text-sm sm:text-base">
+                              <div className="prose prose-lg max-w-none bg-white rounded-lg p-6 border border-gray-200">
+                                <h3 className="text-xl font-semibold mb-4">Lesson Materials</h3>
                                 {typeof (selectedLesson?.content || modules[0]?.lessons[0]?.content) === 'string' 
                                   ? (selectedLesson?.content || modules[0]?.lessons[0]?.content)
                                   : JSON.stringify(selectedLesson?.content || modules[0]?.lessons[0]?.content)
@@ -771,88 +868,91 @@ const CourseLearningPage = () => {
                             )}
                           </div>
                         ) : (
-                          <p className="text-gray-500">This course doesn't have any lessons yet</p>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <Card>
-                      <CardContent className="text-center py-8">
-                        <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                        <p className="text-gray-500 mb-4">Enroll in this course to access lesson content</p>
-                        <Button 
-                          className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                          onClick={() => navigate(`/course/${courseId}/enroll`)}
-                        >
-                          Enroll Now
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  )}
-                </TabsContent>
+                          <div className="text-center py-12">
+                            <BookOpen className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                            <p className="text-gray-500 text-lg">This course doesn't have any lessons yet</p>
+                          </div>
+                        )
+                      ) : (
+                        <div className="text-center py-12">
+                          <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full flex items-center justify-center">
+                            <Crown className="h-10 w-10 text-white" />
+                          </div>
+                          <h3 className="text-xl font-semibold mb-2">Enroll to Access Content</h3>
+                          <p className="text-gray-600 mb-6">Join thousands of students learning this course</p>
+                          <Button 
+                            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-lg px-8 py-3 shadow-lg transition-all duration-200"
+                            onClick={() => navigate(`/course/${courseId}/enroll`)}
+                          >
+                            <Rocket className="h-5 w-5 mr-2" />
+                            Enroll Now
+                          </Button>
+                        </div>
+                      )}
+                    </TabsContent>
 
-                <TabsContent value="lesson-notes" className="space-y-6">
-                  {isEnrolled ? (
-                    <LessonNotesTab 
-                      lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
-                    />
-                  ) : (
-                    <Card>
-                      <CardContent className="text-center py-8">
-                        <StickyNote className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                        <p className="text-gray-500 mb-4">Enroll in this course to start taking lesson notes</p>
-                        <Button 
-                          className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                          onClick={() => navigate(`/course/${courseId}/enroll`)}
-                        >
-                          Enroll Now
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  )}
-                </TabsContent>
-                
-                <TabsContent value="transcripts">
-                  {isEnrolled ? (
-                    <VideoTranscripts 
-                      lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
-                      currentTime={currentVideoTime}
-                      onSeekTo={handleSeekTo}
-                    />
-                  ) : (
-                    <Card>
-                      <CardContent className="text-center py-8">
-                        <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                        <p className="text-gray-500 mb-4">Enroll in this course to access video transcripts</p>
-                        <Button 
-                          className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                          onClick={() => navigate(`/course/${courseId}/enroll`)}
-                        >
-                          Enroll Now
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  )}
-                </TabsContent>
-                
-                <TabsContent value="reviews">
-                  <CourseReviewsTab courseId={courseId} />
-                </TabsContent>
-                
-                <TabsContent value="discussion">
-                  <LessonDiscussionTab lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} />
-                </TabsContent>
-              </Tabs>
+                    <TabsContent value="lesson-notes" className="p-6 m-0">
+                      {isEnrolled ? (
+                        <LessonNotesTab 
+                          lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
+                        />
+                      ) : (
+                        <div className="text-center py-12">
+                          <StickyNote className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                          <h3 className="text-xl font-semibold mb-2">Enroll to Take Notes</h3>
+                          <p className="text-gray-600 mb-6">Start taking notes and track your learning progress</p>
+                          <Button 
+                            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-lg px-8 py-3"
+                            onClick={() => navigate(`/course/${courseId}/enroll`)}
+                          >
+                            Enroll Now
+                          </Button>
+                        </div>
+                      )}
+                    </TabsContent>
+                    
+                    <TabsContent value="transcripts" className="p-6 m-0">
+                      {isEnrolled ? (
+                        <VideoTranscripts 
+                          lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
+                          currentTime={currentVideoTime}
+                          onSeekTo={handleSeekTo}
+                        />
+                      ) : (
+                        <div className="text-center py-12">
+                          <FileText className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                          <h3 className="text-xl font-semibold mb-2">Enroll to Access Transcripts</h3>
+                          <p className="text-gray-600 mb-6">Get full access to video transcripts and learning materials</p>
+                          <Button 
+                            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-lg px-8 py-3"
+                            onClick={() => navigate(`/course/${courseId}/enroll`)}
+                          >
+                            Enroll Now
+                          </Button>
+                        </div>
+                      )}
+                    </TabsContent>
+                    
+                    <TabsContent value="reviews" className="p-6 m-0">
+                      <CourseReviewsTab courseId={courseId} />
+                    </TabsContent>
+                    
+                    <TabsContent value="discussion" className="p-6 m-0">
+                      <LessonDiscussionTab lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} />
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
             </div>
           </div>
 
-          {/* Enrollment Card */}
+          {/* Enrollment Card for Non-Enrolled Users */}
           {!isEnrolled && (
-            <Card className="mt-6 sm:mt-8 sticky bottom-4">
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div>
-                    <div className="text-xl sm:text-3xl font-bold text-orange-600 mb-1 sm:mb-2">
+            <Card className="mt-8 sticky bottom-6 shadow-2xl border-0 bg-gradient-to-r from-orange-50 to-purple-50 z-10">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div className="text-center md:text-left">
+                    <div className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent mb-2">
                       {course.is_free ? 'Free' : (
                         <PriceDisplay 
                           amount={course.price} 
@@ -861,33 +961,32 @@ const CourseLearningPage = () => {
                         />
                       )}
                     </div>
-                    {!course.is_free && (
-                      <p className="text-xs sm:text-sm text-gray-600">One-time payment</p>
-                    )}
+                    <p className="text-gray-600">Lifetime access • Certificate included</p>
                   </div>
                   {user ? (
-                    <div className="flex gap-2">
+                    <div className="flex gap-3">
                       {!course.is_free && (
                         <AddToCartButton
                           itemType="course"
                           itemId={courseId}
                           itemName={course.title}
                           price={course.price || 0}
-                          size="sm"
+                          size="lg"
                         />
                       )}
                       <Button 
-                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-sm"
-                        size="sm"
+                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white text-lg px-8 py-3 shadow-lg transition-all duration-200 hover:scale-105"
+                        size="lg"
                         onClick={() => navigate(`/course/${courseId}/enroll`)}
                       >
+                        <Sparkles className="h-5 w-5 mr-2" />
                         {course.is_free ? 'Enroll Free' : 'Enroll Now'}
                       </Button>
                     </div>
                   ) : (
                     <Button 
-                      className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-sm"
-                      size="sm"
+                      className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white text-lg px-8 py-3 shadow-lg transition-all duration-200 hover:scale-105"
+                      size="lg"
                       onClick={() => navigate('/auth')}
                     >
                       Sign in to Enroll
@@ -899,24 +998,106 @@ const CourseLearningPage = () => {
           )}
 
           {/* Recommended Courses */}
-          <div className="mt-6 sm:mt-8">
+          <div className="mt-12">
             <RecommendedCourses 
               currentCourseId={course.id} 
               category={course.category} 
             />
           </div>
-
-          <FloatingAILearningAssistant 
-            courseId={courseId}
-            lessonId={selectedLesson?.id || modules[0]?.lessons[0]?.id || ''}
-            lessonTitle={selectedLesson?.title || modules[0]?.lessons[0]?.title || ''}
-            lessonContent={typeof (selectedLesson?.content || modules[0]?.lessons[0]?.content) === 'string' 
-              ? (selectedLesson?.content || modules[0]?.lessons[0]?.content || '')
-              : JSON.stringify(selectedLesson?.content || modules[0]?.lessons[0]?.content || {})}
-          />
         </div>
+
+        {/* AI Learning Assistant */}
+        <FloatingAILearningAssistant 
+          courseId={courseId}
+          lessonId={selectedLesson?.id || modules[0]?.lessons[0]?.id || ''}
+          lessonTitle={selectedLesson?.title || modules[0]?.lessons[0]?.title || ''}
+          lessonContent={typeof (selectedLesson?.content || modules[0]?.lessons[0]?.content) === 'string' 
+            ? (selectedLesson?.content || modules[0]?.lessons[0]?.content || '')
+            : JSON.stringify(selectedLesson?.content || modules[0]?.lessons[0]?.content || {})}
+        />
       </main>
 
+      {/* Resume Learning Modal */}
+      <Dialog open={showResumeModal} onOpenChange={setShowResumeModal}>
+        <DialogContent className="sm:max-w-md bg-gradient-to-br from-orange-50 to-purple-50 border-0 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-center text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+              {isCourseCompleted ? 'Course Completed!' : 'Continue Learning?'}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="text-center py-6">
+            {isCourseCompleted ? (
+              <div className="space-y-4">
+                <div className="w-16 h-16 mx-auto bg-gradient-to-r from-green-500 to-emerald-600 rounded-full flex items-center justify-center">
+                  <Trophy className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900">Congratulations! 🎉</h3>
+                <p className="text-gray-600">
+                  You've successfully completed this course. Ready to take the final exam and earn your certificate?
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="w-16 h-16 mx-auto bg-gradient-to-r from-orange-500 to-purple-600 rounded-full flex items-center justify-center">
+                  <Play className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900">Welcome Back!</h3>
+                <p className="text-gray-600">
+                  Continue from where you left off or start from the beginning.
+                </p>
+                {resumeLesson && (
+                  <div className="bg-white rounded-lg p-4 border border-orange-200 shadow-sm">
+                    <p className="font-medium text-gray-900">{resumeLesson.title}</p>
+                    <p className="text-sm text-gray-600 mt-1">Your last watched lesson</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            {isCourseCompleted ? (
+              <>
+                <Button
+                  onClick={() => setShowResumeModal(false)}
+                  variant="outline"
+                  className="flex-1 border-gray-300 hover:bg-gray-50"
+                >
+                  Review Course
+                </Button>
+                {finalExam && (
+                  <Button
+                    onClick={handleTakeExam}
+                    className="flex-1 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg"
+                  >
+                    Take Final Exam
+                  </Button>
+                )}
+              </>
+            ) : (
+              <>
+                <Button
+                  onClick={handleStartFromBeginning}
+                  variant="outline"
+                  className="flex-1 border-gray-300 hover:bg-gray-50"
+                >
+                  Start Over
+                </Button>
+                <Button
+                  onClick={handleResumeLearning}
+                  className="flex-1 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg transition-all duration-200 hover:scale-105"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Continue
+                </Button>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Exam Modal */}
       {finalExam && (
         <FinalExamModal
           isOpen={showExamModal}
@@ -927,6 +1108,7 @@ const CourseLearningPage = () => {
         />
       )}
 
+      {/* Quiz Modal */}
       <QuizModal
         isOpen={showQuizModal}
         onClose={() => setShowQuizModal(false)}
@@ -935,6 +1117,7 @@ const CourseLearningPage = () => {
         onComplete={handleQuizComplete}
       />
 
+      {/* Quiz Results Modal */}
       {currentQuiz && (
         <QuizResultsModal
           isOpen={showQuizResultsModal}
@@ -947,7 +1130,6 @@ const CourseLearningPage = () => {
           hasNextContent={true}
         />
       )}
-       
     </Layout>
   );
 };
