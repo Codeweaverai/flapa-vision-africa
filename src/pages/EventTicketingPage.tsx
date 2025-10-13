@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { 
   Ticket, TrendingUp, Users, Mail, Share2, BarChart3, 
   Smartphone, Calendar, Lock, Zap, Globe, CheckCircle2,
-  ArrowRight, Download, Play
+  ArrowRight, Download, Play, Home, BookOpen, CreditCard, Phone, MailIcon
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -80,8 +80,60 @@ const EventTicketingPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      {/* Hero Section */}
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            {/* Logo */}
+            <Link to="/" className="flex items-center space-x-2">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center">
+                <Ticket className="h-6 w-6 text-white" />
+              </div>
+              <span className="text-xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                SkillPulse
+              </span>
+            </Link>
+
+            {/* Navigation */}
+            <nav className="hidden md:flex space-x-8">
+              <Link to="/" className="text-gray-700 hover:text-orange-500 font-medium transition-colors">
+                Home
+              </Link>
+              <Link to="/events" className="text-gray-700 hover:text-orange-500 font-medium transition-colors">
+                Events
+              </Link>
+              <Link to="/pricing" className="text-gray-700 hover:text-orange-500 font-medium transition-colors">
+                Pricing
+              </Link>
+              <Link to="/about" className="text-gray-700 hover:text-orange-500 font-medium transition-colors">
+                About
+              </Link>
+            </nav>
+
+            {/* CTA Buttons */}
+            <div className="flex items-center space-x-4">
+              <Button variant="outline" className="hidden sm:flex">
+                Sign In
+              </Button>
+              <Button className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white">
+                Get Started
+              </Button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Hero Section with New Image */}
       <section className="relative overflow-hidden bg-gradient-to-br from-[#1e1b4b] via-purple-900 to-orange-900 text-white">
+        <div 
+          className="absolute inset-0 bg-cover bg-center"
+          style={{
+            backgroundImage: 'url("https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/rsz_couples-celebrating-birthday_1.jpg")'
+          }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-orange-500/80 to-purple-600/80 mix-blend-multiply"></div>
+        </div>
+        
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDE0YzMuMzEgMCA2LTIuNjkgNi02cy0yLjY5LTYtNi02LTYgMi42OS02IDYgMi42OSA2IDYgNnptMCA0MGMzLjMxIDAgNi0yLjY5IDYtNnMtMi42OS02LTYtNi02IDIuNjktNiA2IDIuNjkgNiA2IDZ6TTE0IDE0YzMuMzEgMCA2LTIuNjkgNi02cy0yLjY5LTYtNi02LTYgMi42OS02IDYgMi42OSA2IDYgNnptMCA0MGMzLjMxIDAgNi0yLjY5IDYtNnMtMi42OS02LTYtNi02IDIuNjktNiA2IDIuNjkgNiA2IDZ6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-10"></div>
         
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
@@ -282,11 +334,50 @@ const EventTicketingPage = () => {
             </div>
 
             <div className="text-center lg:text-left">
-              <div className="inline-flex items-center justify-center w-64 h-64 rounded-3xl bg-gradient-to-br from-orange-500/20 to-purple-600/20 backdrop-blur-sm border-2 border-white/20 mb-8 mx-auto">
-                <Smartphone className="h-32 w-32 text-white/80" />
+              {/* Mobile App Image with Shadow Effect */}
+              <div className="relative mx-auto lg:mx-0 max-w-sm">
+                <div className="absolute inset-0 bg-gradient-to-br from-orange-500 to-purple-600 rounded-[3rem] blur-xl opacity-30 transform scale-105"></div>
+                <div className="relative bg-gradient-to-br from-gray-900 to-gray-800 rounded-[2.5rem] p-6 shadow-2xl border-8 border-gray-900">
+                  <div className="bg-gradient-to-br from-orange-500/20 to-purple-600/20 rounded-2xl p-4 backdrop-blur-sm">
+                    <div className="bg-black rounded-lg aspect-[9/19] relative overflow-hidden border-2 border-gray-700">
+                      {/* App Screen Content */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-orange-500 to-purple-600">
+                        <div className="p-6 text-white">
+                          <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                              <Ticket className="h-6 w-6" />
+                            </div>
+                            <span className="font-bold text-lg">SkillPulse</span>
+                          </div>
+                          
+                          <div className="space-y-4">
+                            <div className="bg-white/10 rounded-xl p-4 backdrop-blur-sm">
+                              <h3 className="font-semibold mb-2">Your Events</h3>
+                              <p className="text-sm opacity-80">3 upcoming events</p>
+                            </div>
+                            
+                            <div className="bg-white/10 rounded-xl p-4 backdrop-blur-sm">
+                              <h3 className="font-semibold mb-2">Total Sales</h3>
+                              <p className="text-sm opacity-80">$2,450 this month</p>
+                            </div>
+                            
+                            <div className="bg-white/10 rounded-xl p-4 backdrop-blur-sm">
+                              <h3 className="font-semibold mb-2">Attendees</h3>
+                              <p className="text-sm opacity-80">156 checked in today</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Home Indicator */}
+                  <div className="mt-4 flex justify-center">
+                    <div className="w-32 h-1 bg-gray-700 rounded-full"></div>
+                  </div>
+                </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mt-8">
                 <Button size="lg" className="bg-white text-purple-900 hover:bg-gray-100 shadow-xl">
                   <Download className="mr-2 h-5 w-5" />
                   Download on iOS
@@ -297,7 +388,7 @@ const EventTicketingPage = () => {
                 </Button>
               </div>
 
-              <p className="mt-6 text-sm text-gray-300">
+              <p className="mt-6 text-sm text-gray-300 text-center lg:text-left">
                 Available for iOS and Android • Free Download
               </p>
             </div>
@@ -406,6 +497,64 @@ const EventTicketingPage = () => {
           </p>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="bg-gradient-to-r from-gray-900 to-purple-900 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            {/* Company Info */}
+            <div className="col-span-1 md:col-span-2">
+              <div className="flex items-center space-x-2 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center">
+                  <Ticket className="h-6 w-6 text-white" />
+                </div>
+                <span className="text-xl font-bold">SkillPulse</span>
+              </div>
+              <p className="text-gray-300 mb-4 max-w-md">
+                The leading event ticketing platform in Africa. Create, promote, and sell tickets to unforgettable experiences.
+              </p>
+              <div className="flex space-x-4">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform">
+                  <Share2 className="h-4 w-4 text-white" />
+                </div>
+                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform">
+                  <MailIcon className="h-4 w-4 text-white" />
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Links */}
+            <div>
+              <h3 className="font-semibold mb-4">Quick Links</h3>
+              <ul className="space-y-2">
+                <li><Link to="/" className="text-gray-300 hover:text-white transition-colors">Home</Link></li>
+                <li><Link to="/events" className="text-gray-300 hover:text-white transition-colors">Events</Link></li>
+                <li><Link to="/pricing" className="text-gray-300 hover:text-white transition-colors">Pricing</Link></li>
+                <li><Link to="/about" className="text-gray-300 hover:text-white transition-colors">About</Link></li>
+              </ul>
+            </div>
+
+            {/* Contact Info */}
+            <div>
+              <h3 className="font-semibold mb-4">Contact</h3>
+              <ul className="space-y-2">
+                <li className="flex items-center space-x-2 text-gray-300">
+                  <Mail className="h-4 w-4" />
+                  <span>support@skillpulse.com</span>
+                </li>
+                <li className="flex items-center space-x-2 text-gray-300">
+                  <Phone className="h-4 w-4" />
+                  <span>+1 (555) 123-4567</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+          
+          <div className="border-t border-gray-700 mt-8 pt-8 text-center text-gray-300">
+            <p>&copy; 2024 SkillPulse. All rights reserved.</p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };
