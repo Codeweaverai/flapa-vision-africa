@@ -240,7 +240,7 @@ const EventTicketingPage = () => {
   <div 
     className="absolute inset-0 bg-cover bg-center"
     style={{
-      backgroundImage: 'url("https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/Yellow%20and%20Blue%20Modern%20Mobile%20App%20Promotion%20Instagram%20Post%20(1).png")'
+      backgroundImage: 'url("https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/pexels-olly-3769021.jpg")'
     }}
   >
     <div className="absolute inset-0 bg-gradient-to-r from-orange-500/90 to-purple-600/90"></div>
