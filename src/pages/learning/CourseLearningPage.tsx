@@ -15,7 +15,7 @@ import {
   MessageCircle, Target, CheckCircle, StickyNote,
   CheckCircle2, GraduationCap, Eye, FileText, ChevronUp, ChevronDown,
   Zap, Bookmark, Share, Download, Crown, Rocket, Trophy, Sparkles,
-  Menu, X
+  Menu, X, HelpCircle, AlertCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import EnhancedCourseModuleList from '@/components/course/EnhancedCourseModuleList';
@@ -75,6 +75,8 @@ interface CourseLesson {
   updated_at: string;
   is_complete?: boolean;
   duration_minutes?: number;
+  has_quiz?: boolean;
+  quiz_id?: string;
 }
 
 interface CourseEnrollment {
@@ -114,6 +116,16 @@ interface FinalExam {
   updated_at: string;
 }
 
+interface ExamResult {
+  id: string;
+  enrollment_id: string;
+  exam_id: string;
+  score: number;
+  passed: boolean;
+  completed_at: string;
+  attempts: number;
+}
+
 const CourseLearningPage = () => {
   const params = useParams();
   const navigate = useNavigate();
@@ -129,6 +141,7 @@ const CourseLearningPage = () => {
   const [averageRating, setAverageRating] = useState(0);
   const [reviewCount, setReviewCount] = useState(0);
   const [finalExam, setFinalExam] = useState<FinalExam | null>(null);
+  const [examResult, setExamResult] = useState<ExamResult | null>(null);
   const [instructor, setInstructor] = useState<Profile | null>(null);
   const [markingComplete, setMarkingComplete] = useState(false);
   const [showExamModal, setShowExamModal] = useState(false);
@@ -144,9 +157,10 @@ const CourseLearningPage = () => {
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [resumeLesson, setResumeLesson] = useState<CourseLesson | null>(null);
-  const [showTranscript, setShowTranscript] = useState(true);
+  const [showTranscript, setShowTranscript] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('content');
   
   const isEnrolled = enrollment?.payment_status === 'completed';
   const progressPercentage = progress?.progress_percentage || 0;
@@ -154,6 +168,10 @@ const CourseLearningPage = () => {
   const hasLessons = modules.some(module => module.lessons.length > 0);
   const totalLessons = modules.reduce((total, module) => total + module.lessons.length, 0);
   const isCourseCompleted = progressPercentage === 100;
+  const hasPassedExam = examResult?.passed;
+  const isFirstExamAttempt = !examResult;
+  const showTakeExamButton = isCourseCompleted && finalExam && isFirstExamAttempt;
+  const showRetakeExamButton = isCourseCompleted && finalExam && examResult && !hasPassedExam;
 
   const calculateCourseProgress = (completed: string[], total: number): number => {
     if (total === 0) return 0;
@@ -203,6 +221,25 @@ const CourseLearningPage = () => {
     }
   };
 
+  // Load exam result
+  const loadExamResult = async () => {
+    if (!enrollment || !finalExam) return;
+
+    try {
+      const { data: examResultData, error } = await supabase
+        .from('exam_results')
+        .select('*')
+        .eq('enrollment_id', enrollment.id)
+        .eq('exam_id', finalExam.id)
+        .maybeSingle();
+
+      if (error) throw error;
+      setExamResult(examResultData);
+    } catch (error) {
+      console.error('Error loading exam result:', error);
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       if (!courseId) {
@@ -245,7 +282,25 @@ const CourseLearningPage = () => {
               .order('order_index', { ascending: true });
 
             if (lessonsError) return { ...module, lessons: [] };
-            return { ...module, lessons: lessonsData as CourseLesson[] };
+            
+            // Check for quizzes for each lesson
+            const lessonsWithQuizInfo = await Promise.all(
+              (lessonsData as CourseLesson[]).map(async (lesson) => {
+                const { data: quizData } = await supabase
+                  .from('quizzes')
+                  .select('id')
+                  .eq('lesson_id', lesson.id)
+                  .maybeSingle();
+
+                return {
+                  ...lesson,
+                  has_quiz: !!quizData,
+                  quiz_id: quizData?.id
+                };
+              })
+            );
+
+            return { ...module, lessons: lessonsWithQuizInfo };
           })
         );
         
@@ -329,6 +384,12 @@ const CourseLearningPage = () => {
   }, [courseId, user]);
 
   useEffect(() => {
+    if (finalExam && enrollment) {
+      loadExamResult();
+    }
+  }, [finalExam, enrollment]);
+
+  useEffect(() => {
     if (isEnrolled && selectedLesson) {
       supabase
         .from('course_progress')
@@ -397,6 +458,14 @@ const CourseLearningPage = () => {
 
         if (error) throw error;
         await syncCourseProgress();
+
+        // Auto-show quiz if lesson has one and was just completed
+        if (selectedLesson.has_quiz && selectedLesson.quiz_id) {
+          setTimeout(() => {
+            setCurrentQuizId(selectedLesson.quiz_id!);
+            setShowQuizModal(true);
+          }, 1000);
+        }
       } catch (error) {
         console.error('Error updating lesson progress:', error);
       }
@@ -493,8 +562,9 @@ const CourseLearningPage = () => {
     navigate(`/course/${courseId}/results`);
   };
 
-  const handleExamComplete = (result: any) => {
+  const handleExamComplete = async (result: any) => {
     setShowExamModal(false);
+    await loadExamResult(); // Reload exam result after completion
     fetchCourseData();
   };
 
@@ -639,7 +709,7 @@ const CourseLearningPage = () => {
                     </Button>
                   )}
                   
-                  {(!hasLessons || isCourseCompleted) && finalExam && (
+                  {showTakeExamButton && (
                     <Button
                       onClick={handleTakeExam}
                       size="sm"
@@ -650,7 +720,18 @@ const CourseLearningPage = () => {
                     </Button>
                   )}
 
-                  {isCourseCompleted && (
+                  {showRetakeExamButton && (
+                    <Button
+                      onClick={handleTakeExam}
+                      size="sm"
+                      className="bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 text-white"
+                    >
+                      <GraduationCap className="h-4 w-4 mr-2" />
+                      Retake Final Exam
+                    </Button>
+                  )}
+
+                  {isCourseCompleted && hasPassedExam && (
                     <Button
                       onClick={navigateToCourseResults}
                       size="sm"
@@ -658,6 +739,17 @@ const CourseLearningPage = () => {
                     >
                       <Trophy className="h-4 w-4 mr-2" />
                       View Certificate
+                    </Button>
+                  )}
+
+                  {isCourseCompleted && !finalExam && (
+                    <Button
+                      onClick={navigateToCourseResults}
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      <Trophy className="h-4 w-4 mr-2" />
+                      Get Certificate
                     </Button>
                   )}
                 </div>
@@ -682,9 +774,9 @@ const CourseLearningPage = () => {
 
           {/* Main Content Grid */}
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-            {/* Sidebar - Course Curriculum */}
+            {/* Sidebar - Course Curriculum - Increased Width */}
             <div className={`xl:col-span-1 ${isMobileSidebarOpen ? 'block' : 'hidden'} xl:block`}>
-              <Card className="sticky top-6 shadow-xl border-0 h-fit">
+              <Card className="sticky top-6 shadow-xl border-0 h-fit min-w-[320px]">
                 <CardHeader className="p-6 border-b bg-gradient-to-r from-slate-50 to-blue-50 rounded-t-lg">
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-3 text-lg font-bold text-gray-900">
@@ -705,7 +797,8 @@ const CourseLearningPage = () => {
                     <span>{completedLessons.length} of {totalLessons} lessons completed</span>
                   </div>
                 </CardHeader>
-                <CardContent className="p-0 max-h-[calc(100vh-200px)] overflow-y-auto">
+                <CardContent className="p-0">
+                  {/* Removed scrollable container for curriculum */}
                   <EnhancedCourseModuleList 
                     modules={modules}
                     courseId={courseId}
@@ -724,7 +817,7 @@ const CourseLearningPage = () => {
             <div className="xl:col-span-3">
               <Card className="shadow-xl border-0">
                 <CardContent className="p-0">
-                  <Tabs defaultValue="content" className="w-full">
+                  <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                     <TabsList className="w-full grid grid-cols-5 h-12 bg-slate-50/50 p-1 rounded-t-lg">
                       <TabsTrigger 
                         value="content" 
@@ -779,12 +872,20 @@ const CourseLearningPage = () => {
                                   </p>
                                 )}
                               </div>
-                              {selectedLesson && completedLessons.includes(selectedLesson.id) && (
-                                <Badge className="bg-green-500 text-white flex items-center gap-1">
-                                  <CheckCircle2 className="h-3 w-3" />
-                                  Completed
-                                </Badge>
-                              )}
+                              <div className="flex items-center gap-2">
+                                {selectedLesson && completedLessons.includes(selectedLesson.id) && (
+                                  <Badge className="bg-green-500 text-white flex items-center gap-1">
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    Completed
+                                  </Badge>
+                                )}
+                                {selectedLesson?.has_quiz && (
+                                  <Badge className="bg-blue-500 text-white flex items-center gap-1">
+                                    <HelpCircle className="h-3 w-3" />
+                                    Quiz Available
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
 
                             {/* Video Player */}
@@ -810,6 +911,53 @@ const CourseLearningPage = () => {
                                   />
                                 </div>
                                 
+                                {/* Secondary Tabs for Notes, Transcripts, Reviews, Discussion */}
+                                <div className="border border-gray-200 rounded-lg">
+                                  <Tabs defaultValue="resources" className="w-full">
+                                    <TabsList className="w-full grid grid-cols-4 h-12 bg-gray-50/50 p-1">
+                                      <TabsTrigger value="resources" className="text-sm">
+                                        <StickyNote className="h-4 w-4 mr-2" />
+                                        Notes
+                                      </TabsTrigger>
+                                      <TabsTrigger value="transcript" className="text-sm">
+                                        <FileText className="h-4 w-4 mr-2" />
+                                        Transcript
+                                      </TabsTrigger>
+                                      <TabsTrigger value="reviews" className="text-sm">
+                                        <Star className="h-4 w-4 mr-2" />
+                                        Reviews
+                                      </TabsTrigger>
+                                      <TabsTrigger value="discussion" className="text-sm">
+                                        <Users className="h-4 w-4 mr-2" />
+                                        Discussion
+                                      </TabsTrigger>
+                                    </TabsList>
+                                    
+                                    <TabsContent value="resources" className="p-4">
+                                      <LessonNotesTab 
+                                        lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
+                                      />
+                                    </TabsContent>
+                                    
+                                    <TabsContent value="transcript" className="p-4">
+                                      <VideoTranscripts 
+                                        lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
+                                        currentTime={currentVideoTime}
+                                        onSeekTo={handleSeekTo}
+                                        showHeader={false}
+                                      />
+                                    </TabsContent>
+                                    
+                                    <TabsContent value="reviews" className="p-4">
+                                      <CourseReviewsTab courseId={courseId} />
+                                    </TabsContent>
+                                    
+                                    <TabsContent value="discussion" className="p-4">
+                                      <LessonDiscussionTab lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} />
+                                    </TabsContent>
+                                  </Tabs>
+                                </div>
+
                                 {/* Video Controls */}
                                 <div className="flex flex-wrap gap-3">
                                   <Button variant="outline" size="sm">
@@ -824,46 +972,55 @@ const CourseLearningPage = () => {
                                     <Share className="h-4 w-4 mr-2" />
                                     Share
                                   </Button>
-                                </div>
-
-                                {/* Transcript Section */}
-                                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                                  <div 
-                                    className="flex items-center justify-between p-4 cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors"
-                                    onClick={() => setShowTranscript(!showTranscript)}
-                                  >
-                                    <h4 className="text-lg font-semibold flex items-center">
-                                      <FileText className="h-5 w-5 mr-3 text-orange-500" />
-                                      Video Transcript
-                                    </h4>
-                                    {showTranscript ? (
-                                      <ChevronUp className="h-5 w-5 text-gray-500" />
-                                    ) : (
-                                      <ChevronDown className="h-5 w-5 text-gray-500" />
-                                    )}
-                                  </div>
-                                  {showTranscript && (
-                                    <div className="p-4 max-h-96 overflow-y-auto">
-                                      <VideoTranscripts 
-                                        lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
-                                        currentTime={currentVideoTime}
-                                        onSeekTo={handleSeekTo}
-                                        showHeader={false}
-                                      />
-                                    </div>
+                                  {selectedLesson?.has_quiz && selectedLesson.quiz_id && (
+                                    <Button 
+                                      onClick={() => handleQuizStart(selectedLesson.quiz_id!, selectedLesson.id)}
+                                      size="sm"
+                                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                                    >
+                                      <HelpCircle className="h-4 w-4 mr-2" />
+                                      Take Quiz
+                                    </Button>
                                   )}
                                 </div>
                               </div>
                             )}
 
-                            {/* Lesson Content */}
+                            {/* Lesson Content - Improved Section */}
                             {(selectedLesson?.content || modules[0]?.lessons[0]?.content) && (
-                              <div className="prose prose-lg max-w-none bg-white rounded-lg p-6 border border-gray-200">
-                                <h3 className="text-xl font-semibold mb-4">Lesson Materials</h3>
-                                {typeof (selectedLesson?.content || modules[0]?.lessons[0]?.content) === 'string' 
-                                  ? (selectedLesson?.content || modules[0]?.lessons[0]?.content)
-                                  : JSON.stringify(selectedLesson?.content || modules[0]?.lessons[0]?.content)
-                                }
+                              <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
+                                <div className="flex items-center gap-3 mb-4">
+                                  <FileText className="h-6 w-6 text-orange-500" />
+                                  <div>
+                                    <h3 className="text-xl font-semibold text-gray-900">Lesson Materials</h3>
+                                    <p className="text-gray-600 text-sm">
+                                      Supplementary resources and materials to enhance your learning experience
+                                    </p>
+                                  </div>
+                                </div>
+                                
+                                <div className="prose prose-lg max-w-none bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                  {typeof (selectedLesson?.content || modules[0]?.lessons[0]?.content) === 'string' 
+                                    ? (selectedLesson?.content || modules[0]?.lessons[0]?.content)
+                                    : JSON.stringify(selectedLesson?.content || modules[0]?.lessons[0]?.content)
+                                  }
+                                </div>
+                                
+                                {selectedLesson?.materials_urls && selectedLesson.materials_urls.length > 0 && (
+                                  <div className="mt-4">
+                                    <h4 className="font-semibold text-gray-900 mb-2">Downloadable Resources</h4>
+                                    <div className="space-y-2">
+                                      {selectedLesson.materials_urls.map((url, index) => (
+                                        <div key={index} className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800">
+                                          <Download className="h-4 w-4" />
+                                          <a href={url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                            Resource {index + 1}
+                                          </a>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
@@ -891,6 +1048,7 @@ const CourseLearningPage = () => {
                       )}
                     </TabsContent>
 
+                    {/* Keep other main tabs for full-page views */}
                     <TabsContent value="lesson-notes" className="p-6 m-0">
                       {isEnrolled ? (
                         <LessonNotesTab 
@@ -1034,8 +1192,19 @@ const CourseLearningPage = () => {
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900">Congratulations! 🎉</h3>
                 <p className="text-gray-600">
-                  You've successfully completed this course. Ready to take the final exam and earn your certificate?
+                  {finalExam 
+                    ? "You've completed all lessons! Ready to take the final exam and earn your certificate?"
+                    : "You've successfully completed this course! You can now generate your certificate."
+                  }
                 </p>
+                {examResult && !hasPassedExam && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-yellow-800">
+                      <AlertCircle className="h-4 w-4" />
+                      <span className="text-sm font-medium">Previous exam score: {examResult.score}%</span>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-4">
@@ -1066,12 +1235,28 @@ const CourseLearningPage = () => {
                 >
                   Review Course
                 </Button>
-                {finalExam && (
+                {showTakeExamButton && (
                   <Button
                     onClick={handleTakeExam}
                     className="flex-1 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg"
                   >
                     Take Final Exam
+                  </Button>
+                )}
+                {showRetakeExamButton && (
+                  <Button
+                    onClick={handleTakeExam}
+                    className="flex-1 bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 text-white shadow-lg"
+                  >
+                    Retake Exam
+                  </Button>
+                )}
+                {isCourseCompleted && (!finalExam || hasPassedExam) && (
+                  <Button
+                    onClick={navigateToCourseResults}
+                    className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg"
+                  >
+                    Get Certificate
                   </Button>
                 )}
               </>
@@ -1105,6 +1290,7 @@ const CourseLearningPage = () => {
           exam={finalExam}
           enrollmentId={enrollment?.id || ''}
           onComplete={handleExamComplete}
+          previousAttempt={examResult}
         />
       )}
 
