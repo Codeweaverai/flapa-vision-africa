@@ -161,6 +161,7 @@ const CourseLearningPage = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('content');
+  const [dataLoaded, setDataLoaded] = useState(false);
   
   const isEnrolled = enrollment?.payment_status === 'completed';
   const progressPercentage = progress?.progress_percentage || 0;
@@ -172,6 +173,7 @@ const CourseLearningPage = () => {
   const isFirstExamAttempt = !examResult;
   const showTakeExamButton = isCourseCompleted && finalExam && isFirstExamAttempt;
   const showRetakeExamButton = isCourseCompleted && finalExam && examResult && !hasPassedExam;
+  const showViewCertificateButton = isCourseCompleted && (!finalExam || hasPassedExam);
 
   const calculateCourseProgress = (completed: string[], total: number): number => {
     if (total === 0) return 0;
@@ -240,9 +242,10 @@ const CourseLearningPage = () => {
     }
   };
 
+  // Load data only once
   useEffect(() => {
     const loadData = async () => {
-      if (!courseId) {
+      if (!courseId || dataLoaded) {
         setLoading(false);
         return;
       }
@@ -372,6 +375,8 @@ const CourseLearningPage = () => {
             setCompletedLessons(completedData?.map(item => item.lesson_id) || []);
           }
         }
+
+        setDataLoaded(true);
       } catch (error) {
         toast.error('Failed to load course data');
         console.error(error);
@@ -381,7 +386,7 @@ const CourseLearningPage = () => {
     };
 
     loadData();
-  }, [courseId, user]);
+  }, [courseId, user, dataLoaded]);
 
   useEffect(() => {
     if (finalExam && enrollment) {
@@ -408,7 +413,7 @@ const CourseLearningPage = () => {
   }, [selectedLesson, isEnrolled]);
 
   useEffect(() => {
-    if (isEnrolled && modules.length > 0 && !selectedLesson) {
+    if (isEnrolled && modules.length > 0 && !selectedLesson && !loading) {
       const determineInitialLesson = () => {
         if (progress?.last_accessed_lesson_id) {
           const lastLesson = modules.flatMap(m => m.lessons)
@@ -433,7 +438,7 @@ const CourseLearningPage = () => {
         setCurrentLessonId(initialLesson.id);
       }
     }
-  }, [isEnrolled, modules, progress, completedLessons]);
+  }, [isEnrolled, modules, progress, completedLessons, loading]);
 
   const handleVideoProgress = async (progress: { played: number, playedSeconds: number }) => {
     setCurrentVideoTime(progress.playedSeconds);
@@ -565,19 +570,6 @@ const CourseLearningPage = () => {
   const handleExamComplete = async (result: any) => {
     setShowExamModal(false);
     await loadExamResult(); // Reload exam result after completion
-    fetchCourseData();
-  };
-
-  const fetchCourseData = async () => {
-    if (!courseId) return;
-    
-    const { data: courseData } = await supabase
-      .from('courses')
-      .select('*')
-      .eq('id', courseId)
-      .single();
-    
-    if (courseData) setCourse(courseData);
   };
 
   if (loading) {
@@ -632,7 +624,7 @@ const CourseLearningPage = () => {
     <Layout>
       <main className="flex-grow bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 min-h-screen">
         <div className="container mx-auto px-4 py-6">
-          {/* Header Section */}
+          {/* Simplified Header Section - Removed course stats and summary */}
           <div className="mb-8">
             <div className="flex flex-wrap items-center gap-2 mb-4">
               <Badge variant="secondary" className="text-sm bg-blue-100 text-blue-700">{course.category}</Badge>
@@ -642,26 +634,6 @@ const CourseLearningPage = () => {
             </div>
             
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 leading-tight">{course.title}</h1>
-            <p className="text-xl text-gray-600 mb-6 leading-relaxed">{course.summary}</p>
-            
-            <div className="flex flex-wrap items-center gap-6 text-sm text-gray-600">
-              <div className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-orange-500" />
-                <span>{course.duration_minutes} min total</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-blue-500" />
-                <span>{modules.length} modules • {totalLessons} lessons</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-green-500" />
-                <span>{enrollmentCount.toLocaleString()} students</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                <span>{averageRating.toFixed(1)} ({reviewCount} reviews)</span>
-              </div>
-            </div>
           </div>
 
           {/* Progress Section */}
@@ -731,7 +703,7 @@ const CourseLearningPage = () => {
                     </Button>
                   )}
 
-                  {isCourseCompleted && hasPassedExam && (
+                  {showViewCertificateButton && (
                     <Button
                       onClick={navigateToCourseResults}
                       size="sm"
@@ -739,17 +711,6 @@ const CourseLearningPage = () => {
                     >
                       <Trophy className="h-4 w-4 mr-2" />
                       View Certificate
-                    </Button>
-                  )}
-
-                  {isCourseCompleted && !finalExam && (
-                    <Button
-                      onClick={navigateToCourseResults}
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                    >
-                      <Trophy className="h-4 w-4 mr-2" />
-                      Get Certificate
                     </Button>
                   )}
                 </div>
@@ -776,7 +737,7 @@ const CourseLearningPage = () => {
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
             {/* Sidebar - Course Curriculum - Increased Width */}
             <div className={`xl:col-span-1 ${isMobileSidebarOpen ? 'block' : 'hidden'} xl:block`}>
-              <Card className="sticky top-6 shadow-xl border-0 h-fit min-w-[320px]">
+              <Card className="sticky top-6 shadow-xl border-0 h-fit min-w-[380px]">
                 <CardHeader className="p-6 border-b bg-gradient-to-r from-slate-50 to-blue-50 rounded-t-lg">
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-3 text-lg font-bold text-gray-900">
@@ -798,7 +759,6 @@ const CourseLearningPage = () => {
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                  {/* Removed scrollable container for curriculum */}
                   <EnhancedCourseModuleList 
                     modules={modules}
                     courseId={courseId}
@@ -818,7 +778,7 @@ const CourseLearningPage = () => {
               <Card className="shadow-xl border-0">
                 <CardContent className="p-0">
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="w-full grid grid-cols-5 h-12 bg-slate-50/50 p-1 rounded-t-lg">
+                    <TabsList className="w-full grid grid-cols-2 h-12 bg-slate-50/50 p-1 rounded-t-lg">
                       <TabsTrigger 
                         value="content" 
                         className="text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-orange-600 transition-all duration-200"
@@ -827,32 +787,11 @@ const CourseLearningPage = () => {
                         Content
                       </TabsTrigger>
                       <TabsTrigger 
-                        value="lesson-notes" 
+                        value="notes" 
                         className="text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-orange-600 transition-all duration-200"
                       >
                         <StickyNote className="h-4 w-4 mr-2" />
                         Notes
-                      </TabsTrigger>
-                      <TabsTrigger 
-                        value="transcripts" 
-                        className="text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-orange-600 transition-all duration-200"
-                      >
-                        <FileText className="h-4 w-4 mr-2" />
-                        Transcript
-                      </TabsTrigger>
-                      <TabsTrigger 
-                        value="reviews" 
-                        className="text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-orange-600 transition-all duration-200"
-                      >
-                        <Star className="h-4 w-4 mr-2" />
-                        Reviews
-                      </TabsTrigger>
-                      <TabsTrigger 
-                        value="discussion" 
-                        className="text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-orange-600 transition-all duration-200"
-                      >
-                        <Users className="h-4 w-4 mr-2" />
-                        Discuss
                       </TabsTrigger>
                     </TabsList>
                     
@@ -911,53 +850,6 @@ const CourseLearningPage = () => {
                                   />
                                 </div>
                                 
-                                {/* Secondary Tabs for Notes, Transcripts, Reviews, Discussion */}
-                                <div className="border border-gray-200 rounded-lg">
-                                  <Tabs defaultValue="resources" className="w-full">
-                                    <TabsList className="w-full grid grid-cols-4 h-12 bg-gray-50/50 p-1">
-                                      <TabsTrigger value="resources" className="text-sm">
-                                        <StickyNote className="h-4 w-4 mr-2" />
-                                        Notes
-                                      </TabsTrigger>
-                                      <TabsTrigger value="transcript" className="text-sm">
-                                        <FileText className="h-4 w-4 mr-2" />
-                                        Transcript
-                                      </TabsTrigger>
-                                      <TabsTrigger value="reviews" className="text-sm">
-                                        <Star className="h-4 w-4 mr-2" />
-                                        Reviews
-                                      </TabsTrigger>
-                                      <TabsTrigger value="discussion" className="text-sm">
-                                        <Users className="h-4 w-4 mr-2" />
-                                        Discussion
-                                      </TabsTrigger>
-                                    </TabsList>
-                                    
-                                    <TabsContent value="resources" className="p-4">
-                                      <LessonNotesTab 
-                                        lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
-                                      />
-                                    </TabsContent>
-                                    
-                                    <TabsContent value="transcript" className="p-4">
-                                      <VideoTranscripts 
-                                        lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
-                                        currentTime={currentVideoTime}
-                                        onSeekTo={handleSeekTo}
-                                        showHeader={false}
-                                      />
-                                    </TabsContent>
-                                    
-                                    <TabsContent value="reviews" className="p-4">
-                                      <CourseReviewsTab courseId={courseId} />
-                                    </TabsContent>
-                                    
-                                    <TabsContent value="discussion" className="p-4">
-                                      <LessonDiscussionTab lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} />
-                                    </TabsContent>
-                                  </Tabs>
-                                </div>
-
                                 {/* Video Controls */}
                                 <div className="flex flex-wrap gap-3">
                                   <Button variant="outline" size="sm">
@@ -1048,8 +940,8 @@ const CourseLearningPage = () => {
                       )}
                     </TabsContent>
 
-                    {/* Keep other main tabs for full-page views */}
-                    <TabsContent value="lesson-notes" className="p-6 m-0">
+                    {/* Notes Tab */}
+                    <TabsContent value="notes" className="p-6 m-0">
                       {isEnrolled ? (
                         <LessonNotesTab 
                           lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
@@ -1067,36 +959,6 @@ const CourseLearningPage = () => {
                           </Button>
                         </div>
                       )}
-                    </TabsContent>
-                    
-                    <TabsContent value="transcripts" className="p-6 m-0">
-                      {isEnrolled ? (
-                        <VideoTranscripts 
-                          lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} 
-                          currentTime={currentVideoTime}
-                          onSeekTo={handleSeekTo}
-                        />
-                      ) : (
-                        <div className="text-center py-12">
-                          <FileText className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-                          <h3 className="text-xl font-semibold mb-2">Enroll to Access Transcripts</h3>
-                          <p className="text-gray-600 mb-6">Get full access to video transcripts and learning materials</p>
-                          <Button 
-                            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-lg px-8 py-3"
-                            onClick={() => navigate(`/course/${courseId}/enroll`)}
-                          >
-                            Enroll Now
-                          </Button>
-                        </div>
-                      )}
-                    </TabsContent>
-                    
-                    <TabsContent value="reviews" className="p-6 m-0">
-                      <CourseReviewsTab courseId={courseId} />
-                    </TabsContent>
-                    
-                    <TabsContent value="discussion" className="p-6 m-0">
-                      <LessonDiscussionTab lessonId={currentLessonId || modules[0]?.lessons[0]?.id || ''} />
                     </TabsContent>
                   </Tabs>
                 </CardContent>
@@ -1251,12 +1113,12 @@ const CourseLearningPage = () => {
                     Retake Exam
                   </Button>
                 )}
-                {isCourseCompleted && (!finalExam || hasPassedExam) && (
+                {showViewCertificateButton && (
                   <Button
                     onClick={navigateToCourseResults}
                     className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg"
                   >
-                    Get Certificate
+                    View Certificate
                   </Button>
                 )}
               </>
