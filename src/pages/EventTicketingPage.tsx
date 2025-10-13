@@ -234,202 +234,105 @@ const EventTicketingPage = () => {
           </div>
         </section>
 
-        {/* Mobile App Section */}
-        <section className="py-20 bg-gradient-to-br from-[#1e1b4b] via-purple-900 to-orange-900 text-white relative overflow-hidden">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDE0YzMuMzEgMCA2LTIuNjkgNi02cy0yLjY5LTYtNi02LTYgMi42OS02IDYgMi42OSA2IDYgNnptMCA0MGMzLjMxIDAgNi0yLjY5IDYtNnMtMi42OS02LTYtNi02IDIuNjktNiA2IDIuNjkgNiA2IDZ6TTE0IDE0YzMuMzEgMCA2LTIuNjkgNi02cy0yLjY5LTYtNi02LTYgMi42OS02IDYgMi42OSA2IDYgNnptMCA0MGMzLjMxIDAgNi0yLjY5IDYtNnMtMi42OS02LTYtNi02IDIuNjktNiA2IDIuNjkgNiA2IDZ6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-10"></div>
-          
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-12">
-              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full mb-6">
-                <Smartphone className="h-5 w-5 text-orange-400" />
-                <span className="text-sm font-medium">Manage Events On-The-Go</span>
-              </div>
-              
-              <h2 className="text-4xl font-bold mb-4">
-                Download the SkillPulse Mobile App
-              </h2>
-              <p className="text-xl text-gray-200 max-w-2xl mx-auto">
-                Create events, sell tickets, check-in attendees, and track sales in real-time from anywhere.
-              </p>
+       {/* Mobile App Section */}
+<section className="py-20 bg-gradient-to-r from-orange-500 to-purple-600 text-white relative overflow-hidden">
+  {/* Background Image with Overlay */}
+  <div 
+    className="absolute inset-0 bg-cover bg-center"
+    style={{
+      backgroundImage: 'url("https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/Yellow%20and%20Blue%20Modern%20Mobile%20App%20Promotion%20Instagram%20Post%20(1).png")'
+    }}
+  >
+    <div className="absolute inset-0 bg-gradient-to-r from-orange-500/90 to-purple-600/90"></div>
+  </div>
+  
+  <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDE0YzMuMzEgMCA2LTIuNjkgNi02cy0yLjY5LTYtNi02LTYgMi42OS02IDYgMi42OSA2IDYgNnptMCA0MGMzLjMxIDAgNi0yLjY5IDYtNnMtMi42OS02LTYtNi02IDIuNjktNiA2IDIuNjkgNiA2IDZ6TTE0IDE0YzMuMzEgMCA2LTIuNjkgNi02cy0yLjY5LTYtNi02LTYgMi42OS02IDYgMi42OSA2IDYgNnptMCA0MGMzLjMxIDAgNi0yLjY5IDYtNnMtMi42OS02LTYtNi02IDIuNjktNiA2IDIuNjkgNiA2IDZ6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-10"></div>
+  
+  <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="text-center mb-16">
+      <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full mb-6">
+        <Smartphone className="h-5 w-5 text-white" />
+        <span className="text-sm font-medium">Manage Events On-The-Go</span>
+      </div>
+      
+      <h2 className="text-4xl md:text-5xl font-bold mb-4">
+        Download the SkillPulse Mobile App
+      </h2>
+      <p className="text-xl text-white/90 max-w-2xl mx-auto">
+        Create events, sell tickets, check-in attendees, and track sales in real-time from anywhere.
+      </p>
+    </div>
+
+    <div className="grid lg:grid-cols-2 gap-12 items-center">
+      <div className="space-y-6">
+        <Card className="p-6 bg-white/10 backdrop-blur-sm border-white/20 hover:bg-white/15 transition-all hover:scale-105">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+              <Calendar className="h-6 w-6 text-white" />
             </div>
-
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
-              <div className="space-y-6">
-                <Card className="p-6 bg-white/10 backdrop-blur-sm border-white/20 hover:bg-white/15 transition-all">
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                      <Calendar className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold mb-2">Create & Manage Events</h3>
-                      <p className="text-gray-300">Set up your event, manage tickets, and update details on the go.</p>
-                    </div>
-                  </div>
-                </Card>
-
-                <Card className="p-6 bg-white/10 backdrop-blur-sm border-white/20 hover:bg-white/15 transition-all">
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-orange-600 flex items-center justify-center flex-shrink-0">
-                      <Ticket className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold mb-2">Instant Check-Ins</h3>
-                      <p className="text-gray-300">Scan QR codes and check in attendees seamlessly at the door.</p>
-                    </div>
-                  </div>
-                </Card>
-
-                <Card className="p-6 bg-white/10 backdrop-blur-sm border-white/20 hover:bg-white/15 transition-all">
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                      <BarChart3 className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold mb-2">Real-Time Analytics</h3>
-                      <p className="text-gray-300">Monitor ticket sales and attendance data as it happens.</p>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-
-              <div className="text-center lg:text-left">
-                {/* Mobile App Image with Shadow Effect */}
-                <div className="relative mx-auto lg:mx-0 max-w-sm">
-                  <div className="absolute inset-0 bg-gradient-to-br from-orange-500 to-purple-600 rounded-[3rem] blur-xl opacity-30 transform scale-105"></div>
-                  <div className="relative bg-gradient-to-br from-gray-900 to-gray-800 rounded-[2.5rem] p-6 shadow-2xl border-8 border-gray-900">
-                    <div className="bg-gradient-to-br from-orange-500/20 to-purple-600/20 rounded-2xl p-4 backdrop-blur-sm">
-                      <div className="bg-black rounded-lg aspect-[9/19] relative overflow-hidden border-2 border-gray-700">
-                        {/* App Screen Content */}
-                        <div className="absolute inset-0 bg-gradient-to-br from-orange-500 to-purple-600">
-                          <div className="p-6 text-white">
-                            <div className="flex items-center gap-3 mb-6">
-                              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                                <Ticket className="h-6 w-6" />
-                              </div>
-                              <span className="font-bold text-lg">SkillPulse</span>
-                            </div>
-                            
-                            <div className="space-y-4">
-                              <div className="bg-white/10 rounded-xl p-4 backdrop-blur-sm">
-                                <h3 className="font-semibold mb-2">Your Events</h3>
-                                <p className="text-sm opacity-80">3 upcoming events</p>
-                              </div>
-                              
-                              <div className="bg-white/10 rounded-xl p-4 backdrop-blur-sm">
-                                <h3 className="font-semibold mb-2">Total Sales</h3>
-                                <p className="text-sm opacity-80">$2,450 this month</p>
-                              </div>
-                              
-                              <div className="bg-white/10 rounded-xl p-4 backdrop-blur-sm">
-                                <h3 className="font-semibold mb-2">Attendees</h3>
-                                <p className="text-sm opacity-80">156 checked in today</p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    {/* Home Indicator */}
-                    <div className="mt-4 flex justify-center">
-                      <div className="w-32 h-1 bg-gray-700 rounded-full"></div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mt-8">
-                  <Button size="lg" className="bg-white text-purple-900 hover:bg-gray-100 shadow-xl">
-                    <Download className="mr-2 h-5 w-5" />
-                    Download on iOS
-                  </Button>
-                  <Button size="lg" className="bg-white text-purple-900 hover:bg-gray-100 shadow-xl">
-                    <Play className="mr-2 h-5 w-5" />
-                    Get it on Android
-                  </Button>
-                </div>
-
-                <p className="mt-6 text-sm text-gray-300 text-center lg:text-left">
-                  Available for iOS and Android • Free Download
-                </p>
-              </div>
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Create & Manage Events</h3>
+              <p className="text-white/80">Set up your event, manage tickets, and update details on the go.</p>
             </div>
           </div>
-        </section>
+        </Card>
 
-        {/* Pricing Section */}
-        <section className="py-20">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-4xl font-bold text-gray-900 mb-6">
-              Transparent & Fair Pricing
-            </h2>
-            <p className="text-xl text-gray-600 mb-12">
-              No hidden fees. Only pay when you earn. Free events stay free.
-            </p>
+        <Card className="p-6 bg-white/10 backdrop-blur-sm border-white/20 hover:bg-white/15 transition-all hover:scale-105">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+              <Ticket className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Instant Check-Ins</h3>
+              <p className="text-white/80">Scan QR codes and check in attendees seamlessly at the door.</p>
+            </div>
+          </div>
+        </Card>
 
-            <Card className="p-8 md:p-12 bg-gradient-to-br from-purple-50 to-orange-50 border-2 border-purple-200">
-              <div className="grid md:grid-cols-3 gap-8 text-center">
-                <div>
-                  <div className="text-5xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent mb-3">
-                    8%
-                  </div>
-                  <div className="text-sm text-gray-600 font-medium">Platform Fee</div>
-                  <p className="text-xs text-gray-500 mt-2">On paid tickets only</p>
-                </div>
-                
-                <div>
-                  <div className="text-5xl font-bold bg-gradient-to-r from-purple-500 to-orange-600 bg-clip-text text-transparent mb-3">
-                    92%
-                  </div>
-                  <div className="text-sm text-gray-600 font-medium">You Keep</div>
-                  <p className="text-xs text-gray-500 mt-2">Creator earnings</p>
-                </div>
-                
-                <div>
-                  <div className="text-5xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent mb-3">
-                    2.9%
-                  </div>
-                  <div className="text-sm text-gray-600 font-medium">Processing Fee</div>
-                  <p className="text-xs text-gray-500 mt-2">+ taxes per order</p>
-                </div>
-              </div>
+        <Card className="p-6 bg-white/10 backdrop-blur-sm border-white/20 hover:bg-white/15 transition-all hover:scale-105">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+              <BarChart3 className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Real-Time Analytics</h3>
+              <p className="text-white/80">Monitor ticket sales and attendance data as it happens.</p>
+            </div>
+          </div>
+        </Card>
+      </div>
 
-              <div className="mt-8 p-6 bg-white/60 rounded-xl border border-purple-200">
-                <div className="flex items-center justify-center gap-3 mb-3">
-                  <Lock className="h-6 w-6 text-purple-600" />
-                  <h3 className="text-lg font-semibold text-gray-900">7-Day Secure Holding</h3>
-                </div>
-                <p className="text-gray-600">
-                  Funds are securely held for 7 days after purchase, then moved to your available balance. 
-                  Withdraw anytime via Mobile Money (19 African countries) or bank transfer.
-                </p>
-              </div>
-            </Card>
-
-            <Link to="/pricing">
-              <Button size="lg" className="mt-8 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
-                Learn More About Pricing
-                <ArrowRight className="ml-2 h-5 w-5" />
+      {/* App Download CTA */}
+      <div className="text-center">
+        <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
+          <h3 className="text-2xl font-bold mb-4">Get the App Today</h3>
+          <p className="text-white/80 mb-6">
+            Available on both iOS and Android platforms. Start managing your events from anywhere.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link to="/download-ios">
+              <Button size="lg" className="bg-white text-purple-600 hover:bg-gray-100 shadow-lg w-full sm:w-auto">
+                <Download className="mr-2 h-5 w-5" />
+                Download on iOS
+              </Button>
+            </Link>
+            <Link to="/download-android">
+              <Button size="lg" className="bg-white text-purple-600 hover:bg-gray-100 shadow-lg w-full sm:w-auto">
+                <Play className="mr-2 h-5 w-5" />
+                Get it on Android
               </Button>
             </Link>
           </div>
-        </section>
-
-        {/* FAQ Section */}
-        <section className="py-20 bg-gray-50">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-4xl font-bold text-gray-900 text-center mb-12">
-              Frequently Asked Questions
-            </h2>
-
-            <div className="space-y-6">
-              {faqs.map((faq, index) => (
-                <Card key={index} className="p-6 hover:shadow-lg transition-shadow">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">{faq.question}</h3>
-                  <p className="text-gray-600 leading-relaxed">{faq.answer}</p>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
+          
+          <p className="mt-6 text-sm text-white/80">
+            Available for iOS and Android • Free Download
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
         {/* CTA Section */}
 <section className="py-20 bg-gradient-to-r from-orange-500 to-purple-600 text-white">
