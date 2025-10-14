@@ -28,10 +28,12 @@ import {
   Zap,
   Shield,
   Lock,
-  ArrowRight
+  ArrowRight,
+  Building
 } from 'lucide-react';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import MobileMoneyPaymentDialog from '@/components/payment/MobileMoneyPaymentDialog';
+import LencoPaymentDialog from '@/components/payment/LencoPaymentDialog';
 
 // Gift card validation function
 const validateGiftCard = async (giftCardCode: string, orderAmount: number) => {
@@ -57,7 +59,7 @@ const CheckoutPage = () => {
   const { currentCurrency, convertPrice } = useCurrency();
   const navigate = useNavigate();
   
-  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'pawapay' | 'free'>('stripe');
+  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'pawapay' | 'lenco' | 'free'>('stripe');
   const [promoCode, setPromoCode] = useState('');
   const [giftCardCode, setGiftCardCode] = useState('');
   const [discount, setDiscount] = useState(0);
@@ -66,6 +68,7 @@ const CheckoutPage = () => {
   const [loading, setLoading] = useState(false);
   const [giftCardLoading, setGiftCardLoading] = useState(false);
   const [showMobileMoneyDialog, setShowMobileMoneyDialog] = useState(false);
+  const [showLencoDialog, setShowLencoDialog] = useState(false);
   const [convertedAmounts, setConvertedAmounts] = useState<{
     total: number;
     tax: number;
@@ -307,9 +310,12 @@ const CheckoutPage = () => {
         } else {
           throw new Error('No checkout URL returned');
         }
-      } else {
+      } else if (paymentMethod === 'pawapay') {
         // Mobile Money payment
         setShowMobileMoneyDialog(true);
+      } else if (paymentMethod === 'lenco') {
+        // Lenco payment
+        setShowLencoDialog(true);
       }
     } catch (error) {
       console.error('Checkout error:', error);
@@ -566,7 +572,7 @@ const CheckoutPage = () => {
                     <CardContent className="p-6">
                       <RadioGroup 
                         value={paymentMethod} 
-                        onValueChange={(value) => setPaymentMethod(value as 'stripe' | 'pawapay')}
+                        onValueChange={(value) => setPaymentMethod(value as 'stripe' | 'pawapay' | 'lenco')}
                         className="space-y-4"
                       >
                         <div className="flex items-center space-x-3 p-4 border border-slate-100 rounded-xl hover:border-orange-200 hover:bg-orange-50/50 transition-all duration-200 cursor-pointer">
@@ -581,6 +587,20 @@ const CheckoutPage = () => {
                             </div>
                           </Label>
                         </div>
+                        
+                        <div className="flex items-center space-x-3 p-4 border border-slate-100 rounded-xl hover:border-blue-200 hover:bg-blue-50/50 transition-all duration-200 cursor-pointer">
+                          <RadioGroupItem value="lenco" id="lenco" className="text-blue-500 border-slate-300" />
+                          <Label htmlFor="lenco" className="flex items-center gap-3 cursor-pointer flex-1">
+                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center">
+                              <Building className="h-5 w-5 text-white" />
+                            </div>
+                            <div>
+                              <div className="font-semibold text-slate-800">Pay by Lenco</div>
+                              <div className="text-sm text-slate-600">Card & Mobile Money (Zambia)</div>
+                            </div>
+                          </Label>
+                        </div>
+                        
                         <div className="flex items-center space-x-3 p-4 border border-slate-100 rounded-xl hover:border-purple-200 hover:bg-purple-50/50 transition-all duration-200 cursor-pointer">
                           <RadioGroupItem value="pawapay" id="pawapay" className="text-purple-500 border-slate-300" />
                           <Label htmlFor="pawapay" className="flex items-center gap-3 cursor-pointer flex-1">
@@ -698,6 +718,12 @@ const CheckoutPage = () => {
                       Pay with Card
                       <ArrowRight className="h-4 w-4 ml-1" />
                     </div>
+                  ) : paymentMethod === 'lenco' ? (
+                    <div className="flex items-center gap-2">
+                      <Building className="h-5 w-5" />
+                      Pay by Lenco
+                      <ArrowRight className="h-4 w-4 ml-1" />
+                    </div>
                   ) : (
                     <div className="flex items-center gap-2">
                       <Smartphone className="h-5 w-5" />
@@ -721,39 +747,75 @@ const CheckoutPage = () => {
       </div>
 
       {finalAmountUSD > 0 && (
-        <MobileMoneyPaymentDialog
-          isOpen={showMobileMoneyDialog}
-          onClose={() => setShowMobileMoneyDialog(false)}
-          amount={convertedAmounts.final}
-          currency={currentCurrency}
-          items={items.map(item => ({
-            item_id: item.itemId,
-            item_type: item.itemType,
-            item_name: item.itemName,
-            quantity: item.quantity,
-            price: item.price,
-            // Pass metadata to mobile money dialog as well
-            metadata: item.giftMetadata ? {
-              sender_name: item.giftMetadata.senderName,
-              recipient_name: item.giftMetadata.recipientName,
-              recipient_email: item.giftMetadata.recipientEmail,
-              personal_message: item.giftMetadata.personalMessage,
-              amount: item.giftMetadata.amount,
-              ...(item.itemType === 'gift_course' || item.itemType === 'gift_event') && {
-                original_item_id: item.itemId,
-                original_item_name: item.itemName
-              },
-              ...(item.itemType === 'event_ticket' || item.itemType === 'gift_event') && {
-                ticket_holder_names: item.ticketHolderNames || [],
-                ticket_holder_emails: item.ticketHolderEmails || []
-              }
-            } : {}
-          }))}
-          discount={convertedAmounts.discount + convertedAmounts.giftCardDiscount}
-          taxAmount={convertedAmounts.tax}
-          promoCode={promoCode}
-          giftCardCode={appliedGiftCard?.code}
-        />
+        <>
+          <MobileMoneyPaymentDialog
+            isOpen={showMobileMoneyDialog}
+            onClose={() => setShowMobileMoneyDialog(false)}
+            amount={convertedAmounts.final}
+            currency={currentCurrency}
+            items={items.map(item => ({
+              item_id: item.itemId,
+              item_type: item.itemType,
+              item_name: item.itemName,
+              quantity: item.quantity,
+              price: item.price,
+              // Pass metadata to mobile money dialog as well
+              metadata: item.giftMetadata ? {
+                sender_name: item.giftMetadata.senderName,
+                recipient_name: item.giftMetadata.recipientName,
+                recipient_email: item.giftMetadata.recipientEmail,
+                personal_message: item.giftMetadata.personalMessage,
+                amount: item.giftMetadata.amount,
+                ...(item.itemType === 'gift_course' || item.itemType === 'gift_event') && {
+                  original_item_id: item.itemId,
+                  original_item_name: item.itemName
+                },
+                ...(item.itemType === 'event_ticket' || item.itemType === 'gift_event') && {
+                  ticket_holder_names: item.ticketHolderNames || [],
+                  ticket_holder_emails: item.ticketHolderEmails || []
+                }
+              } : {}
+            }))}
+            discount={convertedAmounts.discount + convertedAmounts.giftCardDiscount}
+            taxAmount={convertedAmounts.tax}
+            promoCode={promoCode}
+            giftCardCode={appliedGiftCard?.code}
+          />
+
+          <LencoPaymentDialog
+            isOpen={showLencoDialog}
+            onClose={() => setShowLencoDialog(false)}
+            amount={convertedAmounts.final}
+            currency={currentCurrency}
+            items={items.map(item => ({
+              item_id: item.itemId,
+              item_type: item.itemType,
+              item_name: item.itemName,
+              quantity: item.quantity,
+              price: item.price,
+              // Pass metadata to Lenco dialog as well
+              metadata: item.giftMetadata ? {
+                sender_name: item.giftMetadata.senderName,
+                recipient_name: item.giftMetadata.recipientName,
+                recipient_email: item.giftMetadata.recipientEmail,
+                personal_message: item.giftMetadata.personalMessage,
+                amount: item.giftMetadata.amount,
+                ...(item.itemType === 'gift_course' || item.itemType === 'gift_event') && {
+                  original_item_id: item.itemId,
+                  original_item_name: item.itemName
+                },
+                ...(item.itemType === 'event_ticket' || item.itemType === 'gift_event') && {
+                  ticket_holder_names: item.ticketHolderNames || [],
+                  ticket_holder_emails: item.ticketHolderEmails || []
+                }
+              } : {}
+            }))}
+            discount={convertedAmounts.discount + convertedAmounts.giftCardDiscount}
+            taxAmount={convertedAmounts.tax}
+            promoCode={promoCode}
+            giftCardCode={appliedGiftCard?.code}
+          />
+        </>
       )}
     </Layout>
   );
