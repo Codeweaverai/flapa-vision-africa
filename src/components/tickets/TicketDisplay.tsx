@@ -98,23 +98,36 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
     });
   };
 
+  // Debug event data
+  console.log('Event data:', event);
+  console.log('Event type:', event.event_type);
+
   // Safe format event type for display with error handling
   const formatEventType = (eventType: string | undefined): string => {
-    if (!eventType) return 'EVENT';
+    console.log('Formatting event type:', eventType);
+    
+    if (!eventType || eventType === 'undefined' || eventType === 'null') {
+      return 'EVENT';
+    }
     
     try {
+      // Handle different event type formats
+      if (typeof eventType !== 'string') {
+        return 'EVENT';
+      }
+      
       return eventType
         .split('-')
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
     } catch (error) {
-      console.warn('Error formatting event type:', error);
-      return eventType.toUpperCase();
+      console.warn('Error formatting event type:', error, 'Raw event type:', eventType);
+      return typeof eventType === 'string' ? eventType.toUpperCase() : 'EVENT';
     }
   };
 
-  // Safe event type access with fallback
-  const eventType = event.event_type || 'event';
+  // Safe event type access with fallback and validation
+  const eventType = event?.event_type || 'event';
   const formattedEventType = formatEventType(eventType);
 
   return (
@@ -124,15 +137,14 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
         <div className="flex justify-center gap-4 mb-6">
           <button
             onClick={handlePrint}
-            className="flex items-center gap-2 px-6 py-3 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
-            style={{ backgroundColor: '#FFAC1C' }}
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-purple-500 text-white rounded-lg shadow-md hover:from-orange-600 hover:to-purple-600 transition-all duration-300"
           >
             <Printer className="h-5 w-5" />
             Print Ticket
           </button>
           <button
             onClick={downloadPdfTicket}
-            className="flex items-center gap-2 px-6 py-3 bg-purple-500 text-white rounded-lg shadow-md hover:bg-purple-600 transition-all duration-300"
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg shadow-md hover:from-purple-600 hover:to-indigo-600 transition-all duration-300"
           >
             <Download className="h-5 w-5" />
             Download PDF
@@ -153,11 +165,9 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
           ))}
         </div>
 
-        {/* Header with bright orange background */}
-        <div 
-          className="relative text-white p-5 print:bg-[#FFAC1C]"
-          style={{ backgroundColor: '#FFAC1C' }}
-        >
+        {/* Header with orange to purple gradient */}
+        <div className="relative bg-gradient-to-r from-orange-500 to-purple-600 text-white p-5 print:bg-gradient-to-r print:from-orange-500 print:to-purple-600">
+          <div className="absolute inset-0 bg-black bg-opacity-10"></div>
           <div className="relative z-10 text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
               <Ticket className="h-5 w-5 text-white" />
@@ -180,13 +190,7 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
         <div className="p-5">
           {/* Event Title */}
           <div className="text-center mb-4">
-            <h2 
-              className="text-lg font-black text-gray-900 relative pb-2"
-              style={{ 
-                borderBottom: '2px solid #FFAC1C',
-                paddingBottom: '8px'
-              }}
-            >
+            <h2 className="text-lg font-black text-gray-900 relative pb-2 after:content-[''] after:absolute after:bottom-0 after:left-1/4 after:w-1/2 after:h-1 after:bg-gradient-to-r after:from-orange-500 after:to-purple-600 after:rounded print:after:bg-gradient-to-r print:after:from-orange-500 print:after:to-purple-600">
               {event.title}
             </h2>
           </div>
@@ -250,10 +254,7 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
                   fgColor="#000000"
                 />
               </div>
-              <p 
-                className="font-bold text-lg mt-2 tracking-wider"
-                style={{ color: '#FFAC1C' }}
-              >
+              <p className="font-bold text-orange-500 text-lg mt-2 tracking-wider print:text-orange-600">
                 SCAN HERE
               </p>
               <p className="text-xs text-gray-500 mt-1">
@@ -265,10 +266,7 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
 
         {/* Footer - Simplified */}
         <div className="bg-gray-50 p-4 text-center border-t-2 border-dashed border-gray-300 print:bg-gray-50">
-          <p 
-            className="font-bold mb-1 text-sm"
-            style={{ color: '#FFAC1C' }}
-          >
+          <p className="font-bold text-orange-500 mb-1 text-sm print:text-orange-600">
             BRING YOUR VALID ID CARD
           </p>
           <p className="font-semibold text-blue-600 text-xs">
