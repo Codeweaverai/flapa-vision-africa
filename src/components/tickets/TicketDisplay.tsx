@@ -22,7 +22,7 @@ interface TicketProps {
         location: string;
         image_url?: string;
         description?: string;
-        event_type?: string;
+        event_type: string;
       };
       event_ticket: {
         name: string;
@@ -98,36 +98,49 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
     });
   };
 
-  // Debug event data
-  console.log('Event data:', event);
-  console.log('Event type:', event.event_type);
-
-  // Safe format event type for display with error handling
-  const formatEventType = (eventType: string | undefined): string => {
-    console.log('Formatting event type:', eventType);
-    
-    if (!eventType || eventType === 'undefined' || eventType === 'null') {
+  // Enhanced event type formatting with all your event types
+  const formatEventType = (eventType: string): string => {
+    if (!eventType) {
       return 'EVENT';
     }
-    
+
     try {
-      // Handle different event type formats
-      if (typeof eventType !== 'string') {
-        return 'EVENT';
-      }
-      
-      return eventType
+      // Handle different event type formats from your schema
+      const formatted = eventType
         .split('-')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .map(word => {
+          // Special cases for specific event types
+          if (word === 'tech') return 'Tech';
+          if (word === 'live') return 'Live';
+          if (word === 'science') return 'Science';
+          if (word === 'business') return 'Business';
+          if (word === 'wellness') return 'Wellness';
+          if (word === 'cultural') return 'Cultural';
+          if (word === 'community') return 'Community';
+          if (word === 'gaming') return 'Gaming';
+          if (word === 'food') return 'Food';
+          if (word === 'art') return 'Art';
+          if (word === 'travel') return 'Travel';
+          if (word === 'auto') return 'Auto';
+          if (word === 'night') return 'Night';
+          if (word === 'comedy') return 'Comedy';
+          if (word === 'sports') return 'Sports';
+          
+          // Default capitalization
+          return word.charAt(0).toUpperCase() + word.slice(1);
+        })
         .join(' ');
+
+      return formatted;
+
     } catch (error) {
-      console.warn('Error formatting event type:', error, 'Raw event type:', eventType);
-      return typeof eventType === 'string' ? eventType.toUpperCase() : 'EVENT';
+      console.error('Error formatting event type:', error, 'Raw:', eventType);
+      return eventType.toUpperCase();
     }
   };
 
-  // Safe event type access with fallback and validation
-  const eventType = event?.event_type || 'event';
+  // Direct access to event_type - it should always exist based on your schema
+  const eventType = event.event_type;
   const formattedEventType = formatEventType(eventType);
 
   return (
@@ -165,20 +178,27 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
           ))}
         </div>
 
-        {/* Header with orange to purple gradient */}
+        {/* Header with orange to purple gradient and large left icon */}
         <div className="relative bg-gradient-to-r from-orange-500 to-purple-600 text-white p-5 print:bg-gradient-to-r print:from-orange-500 print:to-purple-600">
           <div className="absolute inset-0 bg-black bg-opacity-10"></div>
-          <div className="relative z-10 text-center">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <Ticket className="h-5 w-5 text-white" />
-              <h1 className="text-xl font-black tracking-wider">EVENT TICKET</h1>
+          <div className="relative z-10">
+            <div className="flex items-center justify-start gap-4">
+              {/* Large Ticket Icon on Left */}
+              <div className="flex-shrink-0">
+                <Ticket className="h-12 w-12 text-white" />
+              </div>
+              
+              {/* Text Content */}
+              <div className="text-left">
+                <h1 className="text-xl font-black tracking-wider mb-1">EVENT TICKET</h1>
+                <h2 className="text-base font-medium tracking-widest">
+                  {formattedEventType.toUpperCase()}
+                </h2>
+              </div>
             </div>
-            <h2 className="text-base font-medium tracking-widest">
-              {formattedEventType.toUpperCase()}
-            </h2>
             
             {/* Decorative elements */}
-            <div className="flex justify-center gap-2 mt-2">
+            <div className="flex justify-start gap-2 mt-3 ml-16">
               <div className="w-1 h-1 bg-white rounded-full opacity-60"></div>
               <div className="w-1 h-1 bg-white rounded-full opacity-60"></div>
               <div className="w-1 h-1 bg-white rounded-full opacity-60"></div>
