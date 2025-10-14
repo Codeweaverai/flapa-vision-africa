@@ -22,7 +22,7 @@ interface TicketProps {
         location: string;
         image_url?: string;
         description?: string;
-        event_type?: string; // Made optional with fallback
+        event_type?: string;
       };
       event_ticket: {
         name: string;
@@ -113,45 +113,9 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
     }
   };
 
-  // Get appropriate gradient based on event type with fallback
-  const getHeaderGradient = (eventType: string | undefined): string => {
-    const gradients = {
-      'webinar': 'from-orange-500 to-amber-600',
-      'conference': 'from-blue-500 to-indigo-600',
-      'workshop': 'from-green-500 to-emerald-600',
-      'concert': 'from-purple-500 to-pink-600',
-      'meetup': 'from-cyan-500 to-blue-600',
-      'seminar': 'from-violet-500 to-purple-600',
-      'training': 'from-teal-500 to-green-600',
-      'festival': 'from-rose-500 to-red-600',
-      'sports-events': 'from-red-500 to-orange-600',
-      'business-events': 'from-gray-600 to-gray-800',
-      'live-music': 'from-purple-500 to-pink-600',
-      'night-life': 'from-indigo-500 to-purple-600',
-      'comedy-shows': 'from-yellow-500 to-orange-600',
-      'wellness-events': 'from-green-500 to-teal-600',
-      'summit': 'from-blue-500 to-cyan-600',
-      'picnic': 'from-green-500 to-lime-600',
-      'festivals': 'from-rose-500 to-pink-600',
-      'gaming-events': 'from-purple-500 to-indigo-600',
-      'food-drink': 'from-red-500 to-orange-600',
-      'art-exhibitions': 'from-pink-500 to-rose-600',
-      'travel-events': 'from-blue-500 to-cyan-600',
-      'tech-meetups': 'from-blue-500 to-indigo-600',
-      'science-fairs': 'from-purple-500 to-violet-600',
-      'cultural-events': 'from-orange-500 to-red-600',
-      'auto-shows': 'from-gray-500 to-gray-700',
-      'science-events': 'from-purple-500 to-blue-600',
-      'community-events': 'from-green-500 to-emerald-600',
-    };
-    
-    return gradients[eventType as keyof typeof gradients] || 'from-orange-500 to-amber-600';
-  };
-
   // Safe event type access with fallback
   const eventType = event.event_type || 'event';
   const formattedEventType = formatEventType(eventType);
-  const headerGradient = getHeaderGradient(eventType);
 
   return (
     <div className={`ticket-container ${showPrintStyles ? 'print-ticket' : ''}`}>
@@ -160,14 +124,14 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
         <div className="flex justify-center gap-4 mb-6">
           <button
             onClick={handlePrint}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
+            className="flex items-center gap-2 px-6 py-3 bg-orange-500 text-white rounded-lg shadow-md hover:bg-orange-600 transition-all duration-300"
           >
             <Printer className="h-5 w-5" />
             Print Ticket
           </button>
           <button
             onClick={downloadPdfTicket}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
+            className="flex items-center gap-2 px-6 py-3 bg-purple-500 text-white rounded-lg shadow-md hover:bg-purple-600 transition-all duration-300"
           >
             <Download className="h-5 w-5" />
             Download PDF
@@ -188,20 +152,22 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
           ))}
         </div>
 
-        {/* Header with dynamic gradient */}
-        <div className={`relative bg-gradient-to-r ${headerGradient} text-white p-6 print:bg-gradient-to-r print:from-orange-500 print:to-amber-600`}>
-          <div className="absolute inset-0 bg-black bg-opacity-10"></div>
+        {/* Header with solid orange background */}
+        <div className="relative bg-orange-500 text-white p-6 print:bg-orange-500">
           <div className="relative z-10 text-center">
-            <h1 className="text-2xl font-black tracking-wider mb-1">EVENT TICKET</h1>
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <Ticket className="h-6 w-6 text-white" />
+              <h1 className="text-2xl font-black tracking-wider">EVENT TICKET</h1>
+            </div>
             <h2 className="text-lg font-medium tracking-widest">
               {formattedEventType.toUpperCase()}
             </h2>
             
             {/* Decorative elements */}
             <div className="flex justify-center gap-3 mt-3">
-              <div className="w-2 h-2 bg-white rounded-full opacity-60"></div>
-              <div className="w-2 h-2 bg-white rounded-full opacity-60"></div>
-              <div className="w-2 h-2 bg-white rounded-full opacity-60"></div>
+              <div className="w-1 h-1 bg-white rounded-full opacity-60"></div>
+              <div className="w-1 h-1 bg-white rounded-full opacity-60"></div>
+              <div className="w-1 h-1 bg-white rounded-full opacity-60"></div>
             </div>
           </div>
         </div>
@@ -210,7 +176,7 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
         <div className="p-6">
           {/* Event Title */}
           <div className="text-center mb-6">
-            <h2 className="text-xl font-black text-gray-900 relative pb-3 after:content-[''] after:absolute after:bottom-0 after:left-1/4 after:w-1/2 after:h-1 after:bg-gradient-to-r after:from-orange-500 after:to-amber-600 after:rounded print:after:bg-gradient-to-r print:after:from-orange-500 print:after:to-amber-600">
+            <h2 className="text-xl font-black text-gray-900 relative pb-3 after:content-[''] after:absolute after:bottom-0 after:left-1/4 after:w-1/2 after:h-1 after:bg-orange-500 after:rounded print:after:bg-orange-500">
               {event.title}
             </h2>
           </div>
@@ -263,15 +229,10 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
 
           {/* QR Code Section */}
           <div className="text-center mb-6">
-            <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-5 shadow-inner border border-gray-200 print:bg-gray-50">
+            <div className="bg-gray-50 rounded-xl p-5 border border-gray-200 print:bg-gray-50">
               <div className="bg-white p-4 rounded-lg mx-auto w-48 h-48 flex items-center justify-center border border-gray-300">
                 <QRCodeSVG 
-                  value={ticket.qr_code_data || JSON.stringify({
-                    ticket_code: ticket.ticket_code,
-                    booking_code: ticket.booking.booking_code,
-                    event_title: event.title,
-                    ticket_holder: ticket.ticket_holder_name
-                  })}
+                  value={ticket.qr_code_data}
                   size={160}
                   level="M"
                   includeMargin={false}
@@ -289,16 +250,13 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-5 text-center border-t-2 border-dashed border-gray-300 print:bg-gray-50">
+        {/* Footer - Simplified */}
+        <div className="bg-gray-50 p-5 text-center border-t-2 border-dashed border-gray-300 print:bg-gray-50">
           <p className="font-bold text-orange-500 mb-2 print:text-orange-600">
             BRING YOUR VALID ID CARD
           </p>
-          <p className="font-semibold text-blue-600 text-sm mb-2 print:text-blue-700">
+          <p className="font-semibold text-blue-600 text-sm print:text-blue-700">
             Powered by SkillPulse Innovations Limited
-          </p>
-          <p className="text-xs text-gray-500 leading-tight">
-            This ticket is non-transferable and non-refundable. Management reserves the right to refuse admission. Lost or stolen tickets will not be replaced.
           </p>
         </div>
       </div>
