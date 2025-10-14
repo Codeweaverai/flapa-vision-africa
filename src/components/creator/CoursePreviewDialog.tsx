@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -191,22 +191,47 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
         }
       }
 
-      // Save preview data
-      const { error: previewError } = await supabase
+      // Check if preview already exists and use upsert with proper conflict handling
+      const { data: existingPreview, error: checkError } = await supabase
         .from('course_previews')
-        .upsert({
-          course_id: course.id,
-          preview_video_url: videoData.url,
-          preview_video_path: videoData.path
-        });
+        .select('id')
+        .eq('course_id', course.id)
+        .single();
+
+      let previewError;
+      
+      if (existingPreview) {
+        // Update existing preview
+        const { error } = await supabase
+          .from('course_previews')
+          .update({
+            preview_video_url: videoData.url,
+            preview_video_path: videoData.path,
+            updated_at: new Date().toISOString()
+          })
+          .eq('course_id', course.id);
+        previewError = error;
+      } else {
+        // Insert new preview
+        const { error } = await supabase
+          .from('course_previews')
+          .insert({
+            course_id: course.id,
+            preview_video_url: videoData.url,
+            preview_video_path: videoData.path
+          });
+        previewError = error;
+      }
 
       if (previewError) throw previewError;
 
       // Delete existing learning outcomes
-      await supabase
+      const { error: deleteOutcomesError } = await supabase
         .from('course_learning_outcomes')
         .delete()
         .eq('course_id', course.id);
+
+      if (deleteOutcomesError) throw deleteOutcomesError;
 
       // Save learning outcomes
       if (learningOutcomes.length > 0) {
@@ -228,10 +253,12 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
       }
 
       // Delete existing skill outcomes
-      await supabase
+      const { error: deleteSkillsError } = await supabase
         .from('course_skill_outcomes')
         .delete()
         .eq('course_id', course.id);
+
+      if (deleteSkillsError) throw deleteSkillsError;
 
       // Save skill outcomes
       if (skillOutcomes.length > 0) {
@@ -258,9 +285,17 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
       toast.success('Course preview and outcomes updated successfully!');
       onOpenChange(false);
       await onPreviewAdded();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving preview:', error);
-      toast.error('Failed to save course preview');
+      
+      // More specific error messages
+      if (error.code === '23505') {
+        toast.error('This course already has a preview. Please try again.');
+      } else if (error.message?.includes('duplicate key')) {
+        toast.error('Duplicate entry detected. Please try refreshing the page.');
+      } else {
+        toast.error('Failed to save course preview. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -273,6 +308,9 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Course Preview & Outcomes</DialogTitle>
+          <DialogDescription>
+            Add a preview video and define what students will learn and what skills they'll gain from this course.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-8">
@@ -303,6 +341,9 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
                   </span>
                 )}
               </div>
+              <p className="text-sm text-muted-foreground">
+                Upload a short video that gives students a preview of your course content.
+              </p>
             </div>
           </div>
 
@@ -340,6 +381,11 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
                   </Button>
                 </div>
               ))}
+              {learningOutcomes.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No learning outcomes added yet. Click "Add Learning Outcome" to get started.
+                </p>
+              )}
             </div>
           </div>
 
@@ -360,7 +406,7 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
 
             <div className="space-y-4">
               {skillOutcomes.map((skill, index) => (
-                <div key={index} className="p-4 border rounded-lg space-y-3">
+                <div key={index} className="p-4 border rounded-lg space-y-3 bg-muted/20">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Input
@@ -420,6 +466,11 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
                   />
                 </div>
               ))}
+              {skillOutcomes.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No skill outcomes added yet. Click "Add Skill Outcome" to define the skills students will gain.
+                </p>
+              )}
             </div>
           </div>
 
