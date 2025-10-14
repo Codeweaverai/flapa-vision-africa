@@ -1,7 +1,7 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { format } from 'date-fns';
-import { Calendar, MapPin, Clock, User, Ticket, Hash, Printer, Download, Music } from 'lucide-react';
+import { Calendar, MapPin, Clock, User, Ticket, Hash, Printer, Download } from 'lucide-react';
 import { useReactToPrint } from 'react-to-print';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -22,6 +22,7 @@ interface TicketProps {
         location: string;
         image_url?: string;
         description?: string;
+        event_type: string; // Added event_type
       };
       event_ticket: {
         name: string;
@@ -41,13 +42,21 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
     contentRef: ticketRef,
     pageStyle: `
       @page {
-        size: auto;
-        margin: 0mm;
+        size: A4;
+        margin: 15mm;
       }
       @media print {
         body {
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
+          background: white !important;
+        }
+        .ticket-container {
+          width: 100% !important;
+          max-width: none !important;
+          margin: 0 auto !important;
+          box-shadow: none !important;
+          border: 1px solid #e5e7eb !important;
         }
       }
     `,
@@ -57,34 +66,62 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
     if (!ticketRef.current) return;
 
     const input = ticketRef.current;
-    const scale = 2; // Increase scale for better quality
+    const scale = 2;
 
     html2canvas(input, {
       scale,
       useCORS: true,
       logging: false,
       allowTaint: true,
+      width: input.scrollWidth,
+      height: input.scrollHeight,
     }).then((canvas) => {
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgWidth = 210; // A4 width in mm
-      const pageHeight = 295; // A4 height in mm
+      const imgWidth = 180; // Reduced to fit A4 with margins
+      const pageHeight = 275; // Reduced for margins
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       let heightLeft = imgHeight;
-      let position = 0;
+      let position = 10;
 
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      pdf.addImage(imgData, 'PNG', 15, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
 
       while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
+        position = heightLeft - imgHeight + 10;
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        pdf.addImage(imgData, 'PNG', 15, position, imgWidth, imgHeight);
         heightLeft -= pageHeight;
       }
 
       pdf.save(`${event.title}_${ticket.ticket_code}.pdf`);
     });
+  };
+
+  // Format event type for display
+  const formatEventType = (eventType: string) => {
+    return eventType
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  // Get appropriate gradient based on event type
+  const getHeaderGradient = (eventType: string) => {
+    const gradients = {
+      'webinar': 'from-orange-500 to-amber-600',
+      'conference': 'from-blue-500 to-indigo-600',
+      'workshop': 'from-green-500 to-emerald-600',
+      'concert': 'from-purple-500 to-pink-600',
+      'meetup': 'from-cyan-500 to-blue-600',
+      'seminar': 'from-violet-500 to-purple-600',
+      'training': 'from-teal-500 to-green-600',
+      'festival': 'from-rose-500 to-red-600',
+      'sports-events': 'from-red-500 to-orange-600',
+      'business-events': 'from-gray-600 to-gray-800',
+    };
+    
+    return gradients[eventType as keyof typeof gradients] || 'from-orange-500 to-amber-600';
   };
 
   return (
@@ -94,7 +131,7 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
         <div className="flex justify-center gap-4 mb-6">
           <button
             onClick={handlePrint}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
           >
             <Printer className="h-5 w-5" />
             Print Ticket
@@ -109,31 +146,33 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
         </div>
       )}
 
-      {/* New Ticket Design */}
+      {/* Enhanced Ticket Design */}
       <div 
         ref={ticketRef}
-        className="relative overflow-hidden bg-white rounded-2xl shadow-2xl border border-gray-200 max-w-md mx-auto"
+        className="relative overflow-hidden bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-2xl mx-auto print:max-w-none print:shadow-none"
+        style={{ minHeight: '500px' }}
       >
         {/* Perforation on the right side */}
-        <div className="absolute top-0 right-0 h-full w-6 flex flex-col items-center justify-around z-10">
+        <div className="absolute top-0 right-0 h-full w-6 flex flex-col items-center justify-around z-10 print:hidden">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="w-4 h-4 bg-gray-100 rounded-full shadow-inner" />
           ))}
         </div>
 
-        {/* Header with gradient */}
-        <div className="relative bg-gradient-to-r from-red-500 to-pink-600 text-white p-6">
+        {/* Header with dynamic gradient */}
+        <div className={`relative bg-gradient-to-r ${getHeaderGradient(event.event_type)} text-white p-6 print:bg-gradient-to-r print:from-orange-500 print:to-amber-600`}>
           <div className="absolute inset-0 bg-black bg-opacity-10"></div>
           <div className="relative z-10 text-center">
-            <h1 className="text-2xl font-black tracking-wider mb-1">TICKET</h1>
-            <h2 className="text-lg font-medium tracking-widest">MUSIC EVENT</h2>
+            <h1 className="text-2xl font-black tracking-wider mb-1">EVENT TICKET</h1>
+            <h2 className="text-lg font-medium tracking-widest">
+              {formatEventType(event.event_type).toUpperCase()}
+            </h2>
             
-            {/* Music icons */}
+            {/* Decorative elements */}
             <div className="flex justify-center gap-3 mt-3">
-              <Music className="h-5 w-5 text-white" />
-              <div className="h-5 w-5 rounded-full border-2 border-white"></div>
-              <div className="h-5 w-5 transform rotate-45 border-2 border-white"></div>
-              <div className="h-5 w-5 border-2 border-white"></div>
+              <div className="w-2 h-2 bg-white rounded-full opacity-60"></div>
+              <div className="w-2 h-2 bg-white rounded-full opacity-60"></div>
+              <div className="w-2 h-2 bg-white rounded-full opacity-60"></div>
             </div>
           </div>
         </div>
@@ -142,7 +181,7 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
         <div className="p-6">
           {/* Event Title */}
           <div className="text-center mb-6">
-            <h2 className="text-xl font-black text-gray-900 relative pb-3 after:content-[''] after:absolute after:bottom-0 after:left-1/4 after:w-1/2 after:h-1 after:bg-gradient-to-r after:from-red-500 after:to-pink-600 after:rounded">
+            <h2 className="text-xl font-black text-gray-900 relative pb-3 after:content-[''] after:absolute after:bottom-0 after:left-1/4 after:w-1/2 after:h-1 after:bg-gradient-to-r after:from-orange-500 after:to-amber-600 after:rounded print:after:bg-gradient-to-r print:after:from-orange-500 print:after:to-amber-600">
               {event.title}
             </h2>
           </div>
@@ -151,7 +190,9 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
           <div className="space-y-4 mb-6">
             <div className="flex justify-between pb-2 border-b border-dashed border-gray-300">
               <span className="font-semibold text-gray-600">Name:</span>
-              <span className="font-semibold text-gray-900">{ticket.ticket_holder_name}</span>
+              <span className="font-semibold text-gray-900 text-right max-w-[60%]">
+                {ticket.ticket_holder_name}
+              </span>
             </div>
             <div className="flex justify-between pb-2 border-b border-dashed border-gray-300">
               <span className="font-semibold text-gray-600">Date:</span>
@@ -167,41 +208,61 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
             </div>
             <div className="flex justify-between pb-2 border-b border-dashed border-gray-300">
               <span className="font-semibold text-gray-600">Venue:</span>
-              <span className="font-semibold text-gray-900 text-right max-w-[60%]">{event.location}</span>
+              <span className="font-semibold text-gray-900 text-right max-w-[60%]">
+                {event.location}
+              </span>
             </div>
             <div className="flex justify-between pb-2 border-b border-dashed border-gray-300">
               <span className="font-semibold text-gray-600">Ticket Code:</span>
-              <span className="font-semibold text-gray-900">{ticket.ticket_code}</span>
+              <span className="font-semibold text-gray-900 font-mono">
+                {ticket.ticket_code}
+              </span>
             </div>
             <div className="flex justify-between pb-2 border-b border-dashed border-gray-300">
               <span className="font-semibold text-gray-600">Booking Code:</span>
-              <span className="font-semibold text-gray-900">{ticket.booking.booking_code}</span>
+              <span className="font-semibold text-gray-900 font-mono">
+                {ticket.booking.booking_code}
+              </span>
             </div>
             <div className="flex justify-between pb-2 border-b border-dashed border-gray-300">
               <span className="font-semibold text-gray-600">Ticket Type:</span>
-              <span className="font-semibold text-gray-900">{eventTicket.name}</span>
+              <span className="font-semibold text-gray-900">
+                {eventTicket.name}
+              </span>
             </div>
           </div>
 
           {/* QR Code Section */}
           <div className="text-center mb-6">
-            <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-5 shadow-inner border border-gray-200">
-              <div className="bg-gradient-to-br from-gray-800 to-gray-900 w-48 h-48 mx-auto rounded-lg flex items-center justify-center text-white font-bold relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
-                <div className="text-center z-10">
-                  <div className="text-lg mb-2">QR CODE</div>
-                  <div className="text-xs">Scan for entry</div>
-                </div>
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-5 shadow-inner border border-gray-200 print:bg-gray-50">
+              <div className="bg-white p-4 rounded-lg mx-auto w-48 h-48 flex items-center justify-center border border-gray-300">
+                <QRCodeSVG 
+                  value={ticket.qr_code_data}
+                  size={160}
+                  level="M"
+                  includeMargin={false}
+                  bgColor="#FFFFFF"
+                  fgColor="#000000"
+                />
               </div>
-              <p className="font-bold text-red-500 text-lg mt-3 tracking-wider">SCAN HERE</p>
+              <p className="font-bold text-orange-500 text-lg mt-3 tracking-wider print:text-orange-600">
+                SCAN HERE
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Present QR code at event entrance
+              </p>
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-5 text-center border-t-2 border-dashed border-gray-300">
-          <p className="font-bold text-red-500 mb-2">BRING YOUR VALID ID CARD</p>
-          <p className="font-semibold text-blue-600 text-sm mb-2">Powered by SkillPulse Innovations Limited</p>
+        <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-5 text-center border-t-2 border-dashed border-gray-300 print:bg-gray-50">
+          <p className="font-bold text-orange-500 mb-2 print:text-orange-600">
+            BRING YOUR VALID ID CARD
+          </p>
+          <p className="font-semibold text-blue-600 text-sm mb-2 print:text-blue-700">
+            Powered by SkillPulse Innovations Limited
+          </p>
           <p className="text-xs text-gray-500 leading-tight">
             This ticket is non-transferable and non-refundable. Management reserves the right to refuse admission. Lost or stolen tickets will not be replaced.
           </p>
@@ -223,6 +284,7 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
               body {
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
+                background: white !important;
               }
             }
           `}
