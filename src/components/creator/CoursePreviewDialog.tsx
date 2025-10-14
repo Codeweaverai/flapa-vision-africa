@@ -1,11 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Trash2, Upload, Play } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Trash2, Upload, Play, Star } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
@@ -36,6 +36,15 @@ interface LearningOutcome {
   order_index: number;
 }
 
+interface SkillOutcome {
+  id?: string;
+  skill_name: string;
+  skill_description: string;
+  skill_level: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  order_index: number;
+  is_core_skill: boolean;
+}
+
 const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
   open,
   onOpenChange,
@@ -45,6 +54,7 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [learningOutcomes, setLearningOutcomes] = useState<LearningOutcome[]>([]);
+  const [skillOutcomes, setSkillOutcomes] = useState<SkillOutcome[]>([]);
   const [previewVideoUrl, setPreviewVideoUrl] = useState('');
   const [videoFile, setVideoFile] = useState<File | null>(null);
 
@@ -68,6 +78,15 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
 
       if (outcomesError) throw outcomesError;
 
+      // Load skill outcomes
+      const { data: skills, error: skillsError } = await supabase
+        .from('course_skill_outcomes')
+        .select('*')
+        .eq('course_id', course.id)
+        .order('order_index');
+
+      if (skillsError) throw skillsError;
+
       // Load preview video
       const { data: preview, error: previewError } = await supabase
         .from('course_previews')
@@ -78,6 +97,7 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
       if (previewError && previewError.code !== 'PGRST116') throw previewError;
 
       setLearningOutcomes(outcomes || []);
+      setSkillOutcomes(skills || []);
       setPreviewVideoUrl(preview?.preview_video_url || '');
     } catch (error) {
       console.error('Error loading data:', error);
@@ -87,6 +107,7 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
     }
   };
 
+  // Learning Outcomes Functions
   const addLearningOutcome = () => {
     setLearningOutcomes([
       ...learningOutcomes,
@@ -102,6 +123,30 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
 
   const removeLearningOutcome = (index: number) => {
     setLearningOutcomes(learningOutcomes.filter((_, i) => i !== index));
+  };
+
+  // Skill Outcomes Functions
+  const addSkillOutcome = () => {
+    setSkillOutcomes([
+      ...skillOutcomes,
+      { 
+        skill_name: '', 
+        skill_description: '', 
+        skill_level: 'intermediate', 
+        order_index: skillOutcomes.length,
+        is_core_skill: true 
+      }
+    ]);
+  };
+
+  const updateSkillOutcome = (index: number, field: keyof SkillOutcome, value: any) => {
+    const updated = [...skillOutcomes];
+    updated[index] = { ...updated[index], [field]: value };
+    setSkillOutcomes(updated);
+  };
+
+  const removeSkillOutcome = (index: number) => {
+    setSkillOutcomes(skillOutcomes.filter((_, i) => i !== index));
   };
 
   const handleVideoUpload = async () => {
@@ -182,7 +227,35 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
         }
       }
 
-      toast.success('Course preview updated successfully!');
+      // Delete existing skill outcomes
+      await supabase
+        .from('course_skill_outcomes')
+        .delete()
+        .eq('course_id', course.id);
+
+      // Save skill outcomes
+      if (skillOutcomes.length > 0) {
+        const skillsToSave = skillOutcomes
+          .filter(skill => skill.skill_name.trim())
+          .map((skill, index) => ({
+            course_id: course.id,
+            skill_name: skill.skill_name.trim(),
+            skill_description: skill.skill_description.trim(),
+            skill_level: skill.skill_level,
+            order_index: index,
+            is_core_skill: skill.is_core_skill
+          }));
+
+        if (skillsToSave.length > 0) {
+          const { error: skillsError } = await supabase
+            .from('course_skill_outcomes')
+            .insert(skillsToSave);
+
+          if (skillsError) throw skillsError;
+        }
+      }
+
+      toast.success('Course preview and outcomes updated successfully!');
       onOpenChange(false);
       await onPreviewAdded();
     } catch (error) {
@@ -197,12 +270,12 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Course Preview & Learning Outcomes</DialogTitle>
+          <DialogTitle>Course Preview & Outcomes</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* Video Upload Section */}
           <div>
             <Label className="text-base font-medium">Preview Video</Label>
@@ -244,7 +317,7 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
                 onClick={addLearningOutcome}
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Add Outcome
+                Add Learning Outcome
               </Button>
             </div>
 
@@ -270,8 +343,88 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
             </div>
           </div>
 
+          {/* Skill Outcomes Section */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <Label className="text-base font-medium">Skills You'll Gain</Label>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={addSkillOutcome}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Skill Outcome
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              {skillOutcomes.map((skill, index) => (
+                <div key={index} className="p-4 border rounded-lg space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={skill.skill_name}
+                        onChange={(e) => updateSkillOutcome(index, 'skill_name', e.target.value)}
+                        placeholder="Skill name (e.g., Python Programming)"
+                        className="w-64"
+                      />
+                      <Select
+                        value={skill.skill_level}
+                        onValueChange={(value: 'beginner' | 'intermediate' | 'advanced' | 'expert') => 
+                          updateSkillOutcome(index, 'skill_level', value)
+                        }
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="beginner">Beginner</SelectItem>
+                          <SelectItem value="intermediate">Intermediate</SelectItem>
+                          <SelectItem value="advanced">Advanced</SelectItem>
+                          <SelectItem value="expert">Expert</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id={`core-skill-${index}`}
+                          checked={skill.is_core_skill}
+                          onChange={(e) => updateSkillOutcome(index, 'is_core_skill', e.target.checked)}
+                          className="w-4 h-4"
+                        />
+                        <Label htmlFor={`core-skill-${index}`} className="text-sm flex items-center gap-1">
+                          <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                          Core Skill
+                        </Label>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeSkillOutcome(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <Textarea
+                    value={skill.skill_description}
+                    onChange={(e) => updateSkillOutcome(index, 'skill_description', e.target.value)}
+                    placeholder="Describe what students will be able to do with this skill..."
+                    className="resize-none"
+                    rows={2}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Action Buttons */}
-          <div className="flex justify-end gap-2 pt-4">
+          <div className="flex justify-end gap-2 pt-4 border-t">
             <Button 
               variant="outline" 
               onClick={() => onOpenChange(false)}
@@ -282,8 +435,9 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
             <Button 
               onClick={handleSave}
               disabled={loading || uploading}
+              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
             >
-              {loading || uploading ? 'Saving...' : 'Save Preview'}
+              {loading || uploading ? 'Saving...' : 'Save All Changes'}
             </Button>
           </div>
         </div>
