@@ -189,7 +189,7 @@ const Navbar = () => {
     { name: 'About Us', path: '/about' },
     { name: 'My Learning', path: '/my-courses' },
     { name: 'Community', path: '/community' },
-    { name: 'Help Center', path: '/help' },
+    { name: 'My Events', path: '/my-events' },
     { name: 'Become a Creator', path: '/become-creator' },
   
   ];
@@ -297,8 +297,8 @@ const Navbar = () => {
                   <DropdownMenuItem onClick={() => navigate('/wishlist')} className="text-sm">
                     My Wishlist
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/gift-cards')} className="text-sm">
-                   Buy Gift Cards
+                  <DropdownMenuItem onClick={() => navigate('/my-events')} className="text-sm">
+                   My Events 
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate('/explore-courses')} className="text-sm">
