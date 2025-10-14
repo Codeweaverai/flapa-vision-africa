@@ -88,7 +88,7 @@ const CheckoutPage = () => {
   });
   
   const totalAmountUSD = items.reduce((total, item) => total + (item.price * item.quantity), 0);
-  const TAX_RATE = 0.04;
+  const TAX_RATE = 0.015; // 1.5% tax
   const PROCESSING_FEE_RATE = 0.029; // 2.9% processing fee
   const taxAmountUSD = totalAmountUSD * TAX_RATE;
   
@@ -682,7 +682,7 @@ const CheckoutPage = () => {
                     )}
                     
                     <div className="flex justify-between text-slate-700">
-                      <span>Tax (4%)</span>
+                      <span>Tax</span>
                       <PriceDisplay amount={convertedAmounts.tax} originalCurrency={currentCurrency as any} />
                     </div>
 
