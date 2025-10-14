@@ -392,7 +392,7 @@ const CheckoutPage = () => {
                               {item.itemName}
                             </h4>
                             <div className="flex items-center gap-2 mt-2">
-                              <Badge className="bg-gradient-to-r from-orange-500/10 to-purple-600/10 text-orange-700 border-orange-200">
+                              <Badge className="bg-gradient-to-r from-orange-500/10 to-purple-600/10 text-white border-orange-200">
                                 {item.itemType === 'course' || item.itemType === 'gift_course' ? 'Course' : 
                                  item.itemType === 'event_ticket' || item.itemType === 'gift_event' ? 'Event Ticket' :
                                  item.itemType === 'gift_card' ? 'Gift Card' : 
