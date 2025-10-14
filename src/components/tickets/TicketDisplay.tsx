@@ -78,19 +78,19 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
     }).then((canvas) => {
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgWidth = 180;
+      const imgWidth = 160;
       const pageHeight = 275;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       let heightLeft = imgHeight;
       let position = 10;
 
-      pdf.addImage(imgData, 'PNG', 15, position, imgWidth, imgHeight);
+      pdf.addImage(imgData, 'PNG', 20, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
 
       while (heightLeft >= 0) {
         position = heightLeft - imgHeight + 10;
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 15, position, imgWidth, imgHeight);
+        pdf.addImage(imgData, 'PNG', 20, position, imgWidth, imgHeight);
         heightLeft -= pageHeight;
       }
 
@@ -124,7 +124,8 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
         <div className="flex justify-center gap-4 mb-6">
           <button
             onClick={handlePrint}
-            className="flex items-center gap-2 px-6 py-3 bg-orange-500 text-white rounded-lg shadow-md hover:bg-orange-600 transition-all duration-300"
+            className="flex items-center gap-2 px-6 py-3 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
+            style={{ backgroundColor: '#FFAC1C' }}
           >
             <Printer className="h-5 w-5" />
             Print Ticket
@@ -142,8 +143,8 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
       {/* Enhanced Ticket Design */}
       <div 
         ref={ticketRef}
-        className="relative overflow-hidden bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-2xl mx-auto print:max-w-none print:shadow-none"
-        style={{ minHeight: '500px' }}
+        className="relative overflow-hidden bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-md mx-auto print:max-w-none print:shadow-none"
+        style={{ minHeight: '480px' }}
       >
         {/* Perforation on the right side */}
         <div className="absolute top-0 right-0 h-full w-6 flex flex-col items-center justify-around z-10 print:hidden">
@@ -152,19 +153,22 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
           ))}
         </div>
 
-        {/* Header with solid orange background */}
-        <div className="relative bg-orange-500 text-white p-6 print:bg-orange-500">
+        {/* Header with bright orange background */}
+        <div 
+          className="relative text-white p-5 print:bg-[#FFAC1C]"
+          style={{ backgroundColor: '#FFAC1C' }}
+        >
           <div className="relative z-10 text-center">
-            <div className="flex items-center justify-center gap-3 mb-2">
-              <Ticket className="h-6 w-6 text-white" />
-              <h1 className="text-2xl font-black tracking-wider">EVENT TICKET</h1>
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <Ticket className="h-5 w-5 text-white" />
+              <h1 className="text-xl font-black tracking-wider">EVENT TICKET</h1>
             </div>
-            <h2 className="text-lg font-medium tracking-widest">
+            <h2 className="text-base font-medium tracking-widest">
               {formattedEventType.toUpperCase()}
             </h2>
             
             {/* Decorative elements */}
-            <div className="flex justify-center gap-3 mt-3">
+            <div className="flex justify-center gap-2 mt-2">
               <div className="w-1 h-1 bg-white rounded-full opacity-60"></div>
               <div className="w-1 h-1 bg-white rounded-full opacity-60"></div>
               <div className="w-1 h-1 bg-white rounded-full opacity-60"></div>
@@ -173,74 +177,83 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
         </div>
 
         {/* Ticket Body */}
-        <div className="p-6">
+        <div className="p-5">
           {/* Event Title */}
-          <div className="text-center mb-6">
-            <h2 className="text-xl font-black text-gray-900 relative pb-3 after:content-[''] after:absolute after:bottom-0 after:left-1/4 after:w-1/2 after:h-1 after:bg-orange-500 after:rounded print:after:bg-orange-500">
+          <div className="text-center mb-4">
+            <h2 
+              className="text-lg font-black text-gray-900 relative pb-2"
+              style={{ 
+                borderBottom: '2px solid #FFAC1C',
+                paddingBottom: '8px'
+              }}
+            >
               {event.title}
             </h2>
           </div>
 
           {/* Ticket Details */}
-          <div className="space-y-4 mb-6">
+          <div className="space-y-3 mb-4">
             <div className="flex justify-between pb-2 border-b border-dashed border-gray-300">
-              <span className="font-semibold text-gray-600">Name:</span>
-              <span className="font-semibold text-gray-900 text-right max-w-[60%]">
+              <span className="font-semibold text-gray-600 text-sm">Name:</span>
+              <span className="font-semibold text-gray-900 text-right max-w-[55%] text-sm">
                 {ticket.ticket_holder_name}
               </span>
             </div>
             <div className="flex justify-between pb-2 border-b border-dashed border-gray-300">
-              <span className="font-semibold text-gray-600">Date:</span>
-              <span className="font-semibold text-gray-900">
+              <span className="font-semibold text-gray-600 text-sm">Date:</span>
+              <span className="font-semibold text-gray-900 text-sm">
                 {format(new Date(event.start_time), 'MMMM d, yyyy')}
               </span>
             </div>
             <div className="flex justify-between pb-2 border-b border-dashed border-gray-300">
-              <span className="font-semibold text-gray-600">Time:</span>
-              <span className="font-semibold text-gray-900">
+              <span className="font-semibold text-gray-600 text-sm">Time:</span>
+              <span className="font-semibold text-gray-900 text-sm">
                 {format(new Date(event.start_time), 'h:mm a')} - {format(new Date(event.end_time), 'h:mm a')}
               </span>
             </div>
             <div className="flex justify-between pb-2 border-b border-dashed border-gray-300">
-              <span className="font-semibold text-gray-600">Venue:</span>
-              <span className="font-semibold text-gray-900 text-right max-w-[60%]">
+              <span className="font-semibold text-gray-600 text-sm">Venue:</span>
+              <span className="font-semibold text-gray-900 text-right max-w-[55%] text-sm">
                 {event.location}
               </span>
             </div>
             <div className="flex justify-between pb-2 border-b border-dashed border-gray-300">
-              <span className="font-semibold text-gray-600">Ticket Code:</span>
-              <span className="font-semibold text-gray-900 font-mono">
+              <span className="font-semibold text-gray-600 text-sm">Ticket Code:</span>
+              <span className="font-semibold text-gray-900 font-mono text-sm">
                 {ticket.ticket_code}
               </span>
             </div>
             <div className="flex justify-between pb-2 border-b border-dashed border-gray-300">
-              <span className="font-semibold text-gray-600">Booking Code:</span>
-              <span className="font-semibold text-gray-900 font-mono">
+              <span className="font-semibold text-gray-600 text-sm">Booking Code:</span>
+              <span className="font-semibold text-gray-900 font-mono text-sm">
                 {ticket.booking.booking_code}
               </span>
             </div>
             <div className="flex justify-between pb-2 border-b border-dashed border-gray-300">
-              <span className="font-semibold text-gray-600">Ticket Type:</span>
-              <span className="font-semibold text-gray-900">
+              <span className="font-semibold text-gray-600 text-sm">Ticket Type:</span>
+              <span className="font-semibold text-gray-900 text-sm">
                 {eventTicket.name}
               </span>
             </div>
           </div>
 
           {/* QR Code Section */}
-          <div className="text-center mb-6">
-            <div className="bg-gray-50 rounded-xl p-5 border border-gray-200 print:bg-gray-50">
-              <div className="bg-white p-4 rounded-lg mx-auto w-48 h-48 flex items-center justify-center border border-gray-300">
+          <div className="text-center mb-4">
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 print:bg-gray-50">
+              <div className="bg-white p-3 rounded-lg mx-auto w-40 h-40 flex items-center justify-center border border-gray-300">
                 <QRCodeSVG 
                   value={ticket.qr_code_data}
-                  size={160}
+                  size={140}
                   level="M"
                   includeMargin={false}
                   bgColor="#FFFFFF"
                   fgColor="#000000"
                 />
               </div>
-              <p className="font-bold text-orange-500 text-lg mt-3 tracking-wider print:text-orange-600">
+              <p 
+                className="font-bold text-lg mt-2 tracking-wider"
+                style={{ color: '#FFAC1C' }}
+              >
                 SCAN HERE
               </p>
               <p className="text-xs text-gray-500 mt-1">
@@ -251,11 +264,14 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
         </div>
 
         {/* Footer - Simplified */}
-        <div className="bg-gray-50 p-5 text-center border-t-2 border-dashed border-gray-300 print:bg-gray-50">
-          <p className="font-bold text-orange-500 mb-2 print:text-orange-600">
+        <div className="bg-gray-50 p-4 text-center border-t-2 border-dashed border-gray-300 print:bg-gray-50">
+          <p 
+            className="font-bold mb-1 text-sm"
+            style={{ color: '#FFAC1C' }}
+          >
             BRING YOUR VALID ID CARD
           </p>
-          <p className="font-semibold text-blue-600 text-sm print:text-blue-700">
+          <p className="font-semibold text-blue-600 text-xs">
             Powered by SkillPulse Innovations Limited
           </p>
         </div>
