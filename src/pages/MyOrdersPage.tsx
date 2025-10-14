@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
-import { Calendar, MapPin, Download, Eye, Ticket, BookOpen, Printer, X, FileText, QrCode, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, MapPin, Download, Eye, Ticket, BookOpen, Printer, X, FileText, QrCode, ChevronLeft, ChevronRight, Heart } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
@@ -122,6 +122,53 @@ interface TicketData {
   booking_id?: string;
   ticket_status?: string;
 }
+
+// Pulse Loading Component
+const PulseLoading = () => {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+      <Layout>
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex flex-col items-center justify-center min-h-96">
+            {/* Pulse Animation Container */}
+            <div className="relative w-40 h-40 flex items-center justify-center mb-8">
+              {/* Outer Pulse Circle */}
+              <div className="absolute w-40 h-40 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 animate-ping" />
+              
+              {/* Middle Pulse Circle */}
+              <div className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-orange-500/30 to-purple-600/30 animate-pulse" />
+              
+              {/* Inner Pulse Circle */}
+              <div className="absolute w-24 h-24 rounded-full bg-gradient-to-r from-orange-500/40 to-purple-600/40 animate-pulse" />
+              
+              {/* Center Icon */}
+              <div className="absolute w-16 h-16 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center shadow-lg">
+                <Ticket className="h-8 w-8 text-white" />
+              </div>
+            </div>
+
+            {/* Loading Text */}
+            <div className="text-center space-y-2">
+              <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                Loading Your Orders
+              </h3>
+              <p className="text-muted-foreground text-lg">
+                Gathering your order history...
+              </p>
+            </div>
+
+            {/* Progress Dots */}
+            <div className="flex space-x-2 mt-6">
+              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-3 h-3 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      </Layout>
+    </div>
+  );
+};
 
 // Helper functions
 const safeCurrency = (value: string | null | undefined): CurrencyCode => {
@@ -399,6 +446,11 @@ const MyOrdersPage = () => {
       setLoading(false);
     }
   };
+
+  // Use the PulseLoading component instead of simple spinner
+  if (loading) {
+    return <PulseLoading />;
+  }
 
   const getStatusBadge = (status: string) => {
     const statusMap = {
@@ -891,25 +943,27 @@ const MyOrdersPage = () => {
     `;
   };
 
+  // Calculate tax and totals for receipt
+  const calculateReceiptTotals = (order: Order, type: 'event' | 'course' | 'gift') => {
+    const filteredItems = order.order_items.filter(item => {
+      if (type === 'event') return item.item_type === 'event' || item.item_type === 'event_ticket';
+      if (type === 'course') return item.item_type === 'course';
+      if (type === 'gift') return item.item_type === 'gift_card';
+      return true;
+    });
+    
+    const subtotal = filteredItems.reduce((sum, item) => sum + safeNumber(item.total_price), 0);
+    const taxRate = 0.15; // 15% tax
+    const taxAmount = subtotal * taxRate;
+    const total = subtotal + taxAmount;
+    
+    return { subtotal, taxAmount, total, filteredItems };
+  };
+
   const handlePrintReceipt = () => {
     if (!selectedOrder) return;
     
-    // Filter items based on selectedType
-    const getFilteredItems = () => {
-      switch (selectedType) {
-        case 'event':
-          return selectedOrder.order_items.filter(item => item.item_type === 'event' || item.item_type === 'event_ticket');
-        case 'course':
-          return selectedOrder.order_items.filter(item => item.item_type === 'course');
-        case 'gift':
-          return selectedOrder.order_items.filter(item => item.item_type === 'gift_card');
-        default:
-          return selectedOrder.order_items;
-      }
-    };
-    
-    const filteredItems = getFilteredItems();
-    const subtotal = filteredItems.reduce((sum, item) => sum + safeNumber(item.total_price), 0);
+    const { subtotal, taxAmount, total, filteredItems } = calculateReceiptTotals(selectedOrder, selectedType);
     
     const receiptHTML = `
       <!DOCTYPE html>
@@ -917,153 +971,403 @@ const MyOrdersPage = () => {
       <head>
         <title>Receipt - Order #${selectedOrder.id.slice(0, 8)}</title>
         <style>
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+          
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          
           body { 
-            font-family: Arial, sans-serif; 
+            font-family: 'Inter', sans-serif; 
             margin: 0; 
-            padding: 20px; 
-            background: linear-gradient(135deg, #f97316 0%, #a855f7 100%);
+            padding: 40px 20px; 
+            background: linear-gradient(135deg, #fef7ed 0%, #faf5ff 100%);
             min-height: 100vh;
           }
+          
           .receipt-container {
             max-width: 600px;
             margin: 0 auto;
             background: white;
-            border-radius: 12px;
-            padding: 30px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
           }
+          
+          .receipt-watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 120px;
+            font-weight: 900;
+            color: rgba(249, 115, 22, 0.03);
+            z-index: 0;
+            white-space: nowrap;
+          }
+          
           .receipt-header {
             text-align: center;
-            margin-bottom: 30px;
-            padding-bottom: 20px;
+            margin-bottom: 40px;
+            padding-bottom: 30px;
             border-bottom: 2px solid #f97316;
+            position: relative;
+            z-index: 1;
           }
-          .receipt-title {
-            font-size: 28px;
-            font-weight: bold;
+          
+          .company-logo {
+            font-size: 32px;
+            font-weight: 800;
             background: linear-gradient(135deg, #f97316, #a855f7);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 10px;
+            letter-spacing: -1px;
           }
+          
+          .company-subtitle {
+            color: #6b7280;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 20px;
+          }
+          
+          .receipt-title {
+            font-size: 36px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #f97316, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+            letter-spacing: -1px;
+          }
+          
+          .order-type-badge {
+            background: linear-gradient(135deg, #f97316, #a855f7);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            display: inline-block;
+            margin-bottom: 15px;
+          }
+          
           .order-info {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 30px;
-            padding: 20px;
+            gap: 25px;
+            margin-bottom: 40px;
+            padding: 30px;
             background: linear-gradient(135deg, #fef7ed, #faf5ff);
-            border-radius: 8px;
+            border-radius: 16px;
+            border: 1px solid rgba(249, 115, 22, 0.1);
+            position: relative;
+            z-index: 1;
           }
+          
           .info-item {
-            margin-bottom: 10px;
+            margin-bottom: 12px;
           }
+          
           .info-label {
-            font-weight: bold;
+            font-weight: 600;
             color: #7c2d12;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
           }
+          
+          .info-value {
+            color: #1f2937;
+            font-size: 15px;
+            font-weight: 500;
+          }
+          
+          .items-section {
+            margin-bottom: 30px;
+            position: relative;
+            z-index: 1;
+          }
+          
+          .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f97316;
+          }
+          
           .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
           }
-          .items-table th,
-          .items-table td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #e5e7eb;
-          }
+          
           .items-table th {
             background: linear-gradient(135deg, #f97316, #a855f7);
             color: white;
+            padding: 16px 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
           }
+          
+          .items-table td {
+            padding: 14px 12px;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 14px;
+          }
+          
+          .items-table tr:last-child td {
+            border-bottom: none;
+          }
+          
+          .items-table tr:hover {
+            background: #fafafa;
+          }
+          
           .total-section {
-            text-align: right;
-            padding: 20px;
             background: linear-gradient(135deg, #fef7ed, #faf5ff);
-            border-radius: 8px;
-            margin-top: 20px;
+            padding: 30px;
+            border-radius: 16px;
+            border: 1px solid rgba(249, 115, 22, 0.1);
+            margin-top: 30px;
+            position: relative;
+            z-index: 1;
           }
+          
+          .total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            font-size: 15px;
+          }
+          
+          .total-label {
+            color: #6b7280;
+            font-weight: 500;
+          }
+          
+          .total-value {
+            color: #1f2937;
+            font-weight: 600;
+          }
+          
           .total-amount {
-            font-size: 24px;
-            font-weight: bold;
+            font-size: 28px;
+            font-weight: 800;
             color: #f97316;
+            margin-top: 10px;
+            padding-top: 15px;
+            border-top: 2px dashed #e5e7eb;
           }
+          
+          .tax-breakdown {
+            background: rgba(255,255,255,0.7);
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+            border: 1px solid rgba(0,0,0,0.05);
+          }
+          
+          .tax-title {
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 10px;
+            font-size: 14px;
+          }
+          
+          .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid #e5e7eb;
+            color: #6b7280;
+            font-size: 12px;
+            position: relative;
+            z-index: 1;
+          }
+          
+          .thank-you {
+            font-weight: 600;
+            color: #f97316;
+            margin-bottom: 10px;
+            font-size: 16px;
+          }
+          
           @media print {
-            body { background: white; }
-            .receipt-container { box-shadow: none; }
+            body { 
+              background: white !important;
+              padding: 0;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            
+            .receipt-container { 
+              box-shadow: none;
+              border: 1px solid #e5e7eb;
+              margin: 0;
+              max-width: none;
+            }
           }
         </style>
       </head>
       <body>
         <div class="receipt-container">
+          <div class="receipt-watermark">SKILLPULSE</div>
+          
           <div class="receipt-header">
-            <div class="receipt-title">RECEIPT</div>
-            <p>Order #${selectedOrder.id.slice(0, 8).toUpperCase()} - ${selectedType.toUpperCase()}</p>
+            <div class="company-logo">SkillPulse Innovations Limited</div>
+            <div class="company-subtitle">Elevating Skills, Empowering Futures</div>
+            <div class="receipt-title">PAYMENT RECEIPT</div>
+            <div class="order-type-badge">${selectedType.toUpperCase()} ORDER</div>
           </div>
           
           <div class="order-info">
             <div>
               <div class="info-item">
-                <span class="info-label">Date:</span><br>
-                ${format(new Date(selectedOrder.created_at), 'PPP')}
+                <div class="info-label">Order Date</div>
+                <div class="info-value">${format(new Date(selectedOrder.created_at), 'PPPP')}</div>
               </div>
               <div class="info-item">
-                <span class="info-label">Customer:</span><br>
-                ${selectedOrder.user_name || selectedOrder.email}
+                <div class="info-label">Order Number</div>
+                <div class="info-value">#${selectedOrder.id.slice(0, 8).toUpperCase()}</div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Customer</div>
+                <div class="info-value">${selectedOrder.user_name || selectedOrder.email}</div>
               </div>
             </div>
             <div>
               <div class="info-item">
-                <span class="info-label">Payment Method:</span><br>
-                ${selectedOrder.payment_method}
+                <div class="info-label">Payment Method</div>
+                <div class="info-value">${selectedOrder.payment_method || 'Credit Card'}</div>
               </div>
               <div class="info-item">
-                <span class="info-label">Status:</span><br>
-                ${selectedOrder.payment_status.toUpperCase()}
+                <div class="info-label">Payment Status</div>
+                <div class="info-value">
+                  <span style="color: #16a34a; font-weight: 600;">${selectedOrder.payment_status.toUpperCase()}</span>
+                </div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Currency</div>
+                <div class="info-value">${safeCurrency(selectedOrder.currency)}</div>
               </div>
             </div>
           </div>
 
-          <table class="items-table">
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>Qty</th>
-                <th>Unit Price</th>
-                <th>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${filteredItems.map(item => `
+          <div class="items-section">
+            <h3 class="section-title">Order Items</h3>
+            <table class="items-table">
+              <thead>
                 <tr>
-                  <td>${item.item_name}</td>
-                  <td>${item.quantity}</td>
-                  <td>$${safeNumber(item.unit_price).toFixed(2)}</td>
-                  <td>$${safeNumber(item.total_price).toFixed(2)}</td>
+                  <th>Item Description</th>
+                  <th>Qty</th>
+                  <th>Unit Price</th>
+                  <th>Amount</th>
                 </tr>
-              `).join('')}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                ${filteredItems.map(item => `
+                  <tr>
+                    <td>
+                      <div style="font-weight: 600; color: #1f2937;">${item.item_name}</div>
+                      <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">${item.item_type.replace('_', ' ').toUpperCase()}</div>
+                    </td>
+                    <td>${item.quantity}</td>
+                    <td>$${safeNumber(item.unit_price).toFixed(2)}</td>
+                    <td style="font-weight: 600; color: #f97316;">$${safeNumber(item.total_price).toFixed(2)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
 
-          ${selectedType === 'gift' && selectedOrder.gift_cards ? `
-            <div>
-              <h4>Gift Cards:</h4>
+          ${selectedType === 'gift' && selectedOrder.gift_cards && selectedOrder.gift_cards.length > 0 ? `
+            <div class="items-section">
+              <h3 class="section-title">Gift Card Details</h3>
               ${selectedOrder.gift_cards.map(gift => `
-                <div style="margin-bottom: 15px; padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px;">
-                  <p><strong>Code:</strong> ${obfuscateGiftCode(gift.gift_card_code)}</p>
-                  <p><strong>Amount:</strong> $${safeNumber(gift.amount).toFixed(2)}</p>
-                  <p><strong>Recipient:</strong> ${gift.recipient_name} (${gift.recipient_email})</p>
-                  <p><strong>Status:</strong> ${gift.status.toUpperCase()}</p>
-                  <p><strong>Expires:</strong> ${format(new Date(gift.expires_at), 'PPP')}</p>
+                <div style="background: #f8fafc; padding: 20px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #e2e8f0;">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                      <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Gift Card Code</div>
+                      <div style="font-family: monospace; font-weight: 600; color: #1f2937;">${obfuscateGiftCode(gift.gift_card_code)}</div>
+                    </div>
+                    <div>
+                      <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Amount</div>
+                      <div style="font-weight: 600; color: #f97316;">$${safeNumber(gift.amount).toFixed(2)}</div>
+                    </div>
+                    <div>
+                      <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Recipient</div>
+                      <div style="font-weight: 500; color: #1f2937;">${gift.recipient_name}</div>
+                      <div style="font-size: 12px; color: #6b7280;">${gift.recipient_email}</div>
+                    </div>
+                    <div>
+                      <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Expires</div>
+                      <div style="font-weight: 500; color: #1f2937;">${format(new Date(gift.expires_at), 'PPP')}</div>
+                    </div>
+                  </div>
+                  ${gift.personal_message ? `
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed #e2e8f0;">
+                      <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Personal Message</div>
+                      <div style="font-style: italic; color: #475569;">"${gift.personal_message}"</div>
+                    </div>
+                  ` : ''}
                 </div>
               `).join('')}
             </div>
           ` : ''}
 
           <div class="total-section">
-            <div class="total-amount">
-              Total: $${subtotal.toFixed(2)}
+            <h3 class="section-title" style="border-bottom: none; margin-bottom: 0;">Payment Summary</h3>
+            
+            <div class="total-row">
+              <span class="total-label">Subtotal</span>
+              <span class="total-value">$${subtotal.toFixed(2)}</span>
+            </div>
+            
+            <div class="total-row">
+              <span class="total-label">Tax (15%)</span>
+              <span class="total-value">$${taxAmount.toFixed(2)}</span>
+            </div>
+            
+            <div class="total-row total-amount">
+              <span>Total Amount</span>
+              <span>$${total.toFixed(2)}</span>
+            </div>
+            
+            <div class="tax-breakdown">
+              <div class="tax-title">Tax Breakdown</div>
+              <div style="font-size: 13px; color: #6b7280; line-height: 1.5;">
+                This receipt includes 15% Value Added Tax (VAT) as required by law. 
+                Tax registration number: VAT-${selectedOrder.id.slice(0, 8).toUpperCase()}-SL
+              </div>
+            </div>
+          </div>
+
+          <div class="footer">
+            <div class="thank-you">Thank you for your business!</div>
+            <div style="margin-bottom: 15px;">
+              SkillPulse Innovations Limited • support@skillpulse.com<br>
+              +1 (555) 123-4567 • www.skillpulse.com
+            </div>
+            <div>
+              This receipt is computer generated and does not require a physical signature.<br>
+              For questions about this receipt, please contact our support team.
             </div>
           </div>
         </div>
@@ -1075,7 +1379,10 @@ const MyOrdersPage = () => {
     if (printWindow) {
       printWindow.document.write(receiptHTML);
       printWindow.document.close();
-      printWindow.print();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
     }
   };
 
@@ -1083,16 +1390,6 @@ const MyOrdersPage = () => {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-
-  if (loading) {
-    return (
-      <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
-        </div>
-      </Layout>
-    );
-  }
 
   return (
     <Layout>
@@ -1112,13 +1409,13 @@ const MyOrdersPage = () => {
                   <p className="text-gray-600 mb-6">You haven't made any purchases yet.</p>
                   <div className="flex gap-4 justify-center">
                     <Link to="/events">
-                      <Button className="bg-gradient-to-r from-orange-500 to-red-600">
+                      <Button className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
                         <Ticket className="h-4 w-4 mr-2" />
                         Browse Events
                       </Button>
                     </Link>
                     <Link to="/courses">
-                      <Button variant="outline" className="border-purple-300 text-purple-700">
+                      <Button variant="outline" className="border-purple-300 text-purple-700 hover:bg-purple-50">
                         <BookOpen className="h-4 w-4 mr-2" />
                         Browse Courses
                       </Button>
@@ -1528,7 +1825,7 @@ const MyOrdersPage = () => {
           </div>
         </Modal>
 
-        {/* Receipt Modal */}
+        {/* Enhanced Receipt Modal */}
         <Modal 
           isOpen={showReceiptModal}
           onClose={() => setShowReceiptModal(false)}
