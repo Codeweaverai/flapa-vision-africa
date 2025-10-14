@@ -29,7 +29,9 @@ import {
   Shield,
   Lock,
   ArrowRight,
-  Building
+  Building,
+  AlertCircle,
+  Info
 } from 'lucide-react';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import MobileMoneyPaymentDialog from '@/components/payment/MobileMoneyPaymentDialog';
@@ -72,12 +74,14 @@ const CheckoutPage = () => {
   const [convertedAmounts, setConvertedAmounts] = useState<{
     total: number;
     tax: number;
+    processingFee: number;
     final: number;
     discount: number;
     giftCardDiscount: number;
   }>({
     total: 0,
     tax: 0,
+    processingFee: 0,
     final: 0,
     discount: 0,
     giftCardDiscount: 0
@@ -85,9 +89,15 @@ const CheckoutPage = () => {
   
   const totalAmountUSD = items.reduce((total, item) => total + (item.price * item.quantity), 0);
   const TAX_RATE = 0.04;
+  const PROCESSING_FEE_RATE = 0.029; // 2.9% processing fee
   const taxAmountUSD = totalAmountUSD * TAX_RATE;
+  
+  // Calculate processing fee on the amount after discounts but before tax
+  const amountAfterDiscountsUSD = totalAmountUSD - discount - giftCardDiscount;
+  const processingFeeUSD = amountAfterDiscountsUSD * PROCESSING_FEE_RATE;
+  
   const finalAmountBeforeDiscountsUSD = totalAmountUSD + taxAmountUSD;
-  const finalAmountUSD = finalAmountBeforeDiscountsUSD - discount - giftCardDiscount;
+  const finalAmountUSD = amountAfterDiscountsUSD + taxAmountUSD + processingFeeUSD;
 
   // Automatically set payment method to 'free' when amount is 0
   useEffect(() => {
@@ -108,18 +118,20 @@ const CheckoutPage = () => {
   useEffect(() => {
     const convertAmounts = async () => {
       try {
-        const [convertedTotal, convertedTax, convertedDiscount, convertedGiftCardDiscount] = await Promise.all([
+        const [convertedTotal, convertedTax, convertedProcessingFee, convertedDiscount, convertedGiftCardDiscount] = await Promise.all([
           convertPrice(totalAmountUSD, 'USD'),
           convertPrice(taxAmountUSD, 'USD'),
+          convertPrice(processingFeeUSD, 'USD'),
           convertPrice(discount, 'USD'),
           convertPrice(giftCardDiscount, 'USD')
         ]);
         
-        const convertedFinal = convertedTotal + convertedTax - convertedDiscount - convertedGiftCardDiscount;
+        const convertedFinal = convertedTotal + convertedTax + convertedProcessingFee - convertedDiscount - convertedGiftCardDiscount;
         
         setConvertedAmounts({
           total: convertedTotal,
           tax: convertedTax,
+          processingFee: convertedProcessingFee,
           final: convertedFinal,
           discount: convertedDiscount,
           giftCardDiscount: convertedGiftCardDiscount
@@ -129,6 +141,7 @@ const CheckoutPage = () => {
         setConvertedAmounts({
           total: totalAmountUSD,
           tax: taxAmountUSD,
+          processingFee: processingFeeUSD,
           final: finalAmountUSD,
           discount: discount,
           giftCardDiscount: giftCardDiscount
@@ -137,7 +150,7 @@ const CheckoutPage = () => {
     };
 
     convertAmounts();
-  }, [totalAmountUSD, taxAmountUSD, finalAmountUSD, discount, giftCardDiscount, convertPrice, currentCurrency]);
+  }, [totalAmountUSD, taxAmountUSD, processingFeeUSD, finalAmountUSD, discount, giftCardDiscount, convertPrice, currentCurrency]);
 
   const applyPromoCode = async () => {
     if (!promoCode.trim()) return;
@@ -270,6 +283,9 @@ const CheckoutPage = () => {
         checkoutData.promo_code = promoCode;
         checkoutData.promo_discount = discount;
       }
+
+      // Add processing fee info
+      checkoutData.processing_fee = processingFeeUSD;
 
       if (paymentMethod === 'free') {
         // Handle free purchase (gift card covers full amount)
@@ -666,8 +682,22 @@ const CheckoutPage = () => {
                     )}
                     
                     <div className="flex justify-between text-slate-700">
-                      <span>Tax</span>
+                      <span>Tax (4%)</span>
                       <PriceDisplay amount={convertedAmounts.tax} originalCurrency={currentCurrency as any} />
+                    </div>
+
+                    {/* Processing Fee */}
+                    <div className="flex justify-between text-slate-700">
+                      <div className="flex items-center gap-2">
+                        <span>Processing Fee (2.9%)</span>
+                        <div className="group relative">
+                          <Info className="h-3 w-3 text-slate-400 cursor-help" />
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none w-48 text-center z-10">
+                            Payment processing fee charged by payment providers
+                          </div>
+                        </div>
+                      </div>
+                      <PriceDisplay amount={convertedAmounts.processingFee} originalCurrency={currentCurrency as any} />
                     </div>
                     
                     <Separator className="bg-slate-200" />
@@ -694,6 +724,19 @@ const CheckoutPage = () => {
                     )}
                   </CardContent>
                 </Card>
+
+                {/* Processing Fee Notice */}
+                {finalAmountUSD > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                      <div className="text-sm text-amber-800">
+                        <p className="font-medium mb-1">Processing Fee Notice</p>
+                        <p>A 2.9% processing fee is applied to cover payment gateway costs. This fee ensures secure and reliable payment processing.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Enhanced Checkout Button */}
                 <Button
@@ -778,6 +821,7 @@ const CheckoutPage = () => {
             }))}
             discount={convertedAmounts.discount + convertedAmounts.giftCardDiscount}
             taxAmount={convertedAmounts.tax}
+            processingFee={convertedAmounts.processingFee}
             promoCode={promoCode}
             giftCardCode={appliedGiftCard?.code}
           />
@@ -812,6 +856,7 @@ const CheckoutPage = () => {
             }))}
             discount={convertedAmounts.discount + convertedAmounts.giftCardDiscount}
             taxAmount={convertedAmounts.tax}
+            processingFee={convertedAmounts.processingFee}
             promoCode={promoCode}
             giftCardCode={appliedGiftCard?.code}
           />
