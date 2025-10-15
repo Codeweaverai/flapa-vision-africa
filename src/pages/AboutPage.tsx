@@ -236,9 +236,8 @@ const AboutPage = () => {
                 </CardHeader>
                 <CardContent>
                   <p className="text-lg mb-8 leading-relaxed text-center opacity-95">
-                    We envision a world where geographical boundaries don't limit educational 
-                    opportunities, and where every individual has the tools to become both 
-                    a lifelong learner and an impactful teacher.
+                    "We envision a world where geography is no barrier to growth—a global ecosystem where lifelong learners accelerate their careers through skills, 
+                    and impactful creators build communities through courses and live experiences."
                   </p>
                   <div className="text-center">
                     <Button
