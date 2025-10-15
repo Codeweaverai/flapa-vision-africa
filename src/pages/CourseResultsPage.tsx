@@ -270,6 +270,16 @@ const CourseResultsPage = () => {
     }
   };
 
+  const getInitials = (name: string) => {
+    if (!name) return 'SI';
+    return name
+      .split(' ')
+      .map(part => part.charAt(0))
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
   const getSkillLevelColor = (level: string) => {
     switch (level?.toLowerCase()) {
       case 'beginner':
@@ -294,14 +304,18 @@ const CourseResultsPage = () => {
 
     // Get creator name
     const creatorName = certificate.creator_id ? await fetchCreatorName(certificate.creator_id) : 'SkillPulse Instructor';
+    const creatorInitials = getInitials(creatorName);
 
     // Get skills for this course - FIXED: Add null check
     const skills = certificate.course_id ? (courseSkills[certificate.course_id] || []) : [];
     const coreSkills = skills.filter(skill => skill.is_core_skill);
-    const displayedSkills = coreSkills.length > 0 ? coreSkills : skills.slice(0, 6);
+    const displayedSkills = coreSkills.length > 0 ? coreSkills : skills.slice(0, 4);
 
     // QR Code data
     const verificationUrl = `https://skillpulse.cloud/verify?code=${certificate.verification_code}`;
+
+    // Base64 signature for Founder & CEO (placeholder - you can replace with actual signature)
+    const founderSignature = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjgwIiB2aWV3Qm94PSIwIDAgMjAwIDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0yMCA0MEMyMCAyNiAxNCAyMCAyMCAyMEMyNiAyMCAzMCAyNiAzMCA0MEMzMCA1NCAyNiA2MCAyMCA2MEMxNCA2MCAxMCA1NCAxMCA0MEMxMCAyNiAxNCAyMCAyMCAyMFoiIGZpbGw9IiM2YTExY2IiLz48cGF0aCBkPSJNNzAgNDBDNzAgMjYgNjQgMjAgNzAgMjBDNzYgMjAgODAgMjYgODAgNDBDODAgNTQgNzYgNjAgNzAgNjBDNjQgNjAgNjAgNTQgNjAgNDBDNjAgMjYgNjQgMjAgNzAgMjBaIiBmaWxsPSIjZmY3ZTVmIi8+PHBhdGggZD0iTTEyMCA0MEMxMjAgMjYgMTE0IDIwIDEyMCAyMEMxMjYgMjAgMTMwIDI2IDEzMCA0MEMxMzAgNTQgMTI2IDYwIDEyMCA2MEMxMTQgNjAgMTEwIDU0IDExMCA0MEMxMTAgMjYgMTE0IDIwIDEyMCAyMFoiIGZpbGw9IiM2YTExY2IiLz48cGF0aCBkPSJNMTcwIDQwQzE3MCAyNiAxNjQgMjAgMTcwIDIwQzE3NiAyMCAxODAgMjYgMTgwIDQwQzE4MCA1NCAxNzYgNjAgMTcwIDYwQzE2NCA2MCAxNjAgNTQgMTYwIDQwQzE2MCAyNiAxNjQgMjAgMTcwIDIwWiIgZmlsbD0iI2ZmN2U1ZiIvPjwvc3ZnPg==";
 
     return `
     <!DOCTYPE html>
@@ -326,12 +340,16 @@ const CourseResultsPage = () => {
                 min-height: 100vh;
                 background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
                 padding: 20px;
+                margin: 0;
             }
             
             @media print {
                 body {
                     background: white !important;
                     padding: 0 !important;
+                    margin: 0 !important;
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
                 }
                 
                 .certificate-container {
@@ -339,11 +357,18 @@ const CourseResultsPage = () => {
                     border: 1px solid #ddd !important;
                     margin: 0 !important;
                     width: 100% !important;
-                    height: auto !important;
+                    height: 100vh !important;
+                    page-break-after: avoid !important;
+                    page-break-inside: avoid !important;
                 }
                 
                 .no-print {
                     display: none !important;
+                }
+                
+                @page {
+                    margin: 0;
+                    size: A4 portrait;
                 }
             }
             
@@ -361,13 +386,14 @@ const CourseResultsPage = () => {
             
             .certificate-header {
                 background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
-                padding: 25px 40px;
+                padding: 20px 40px;
                 color: white;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
                 position: relative;
                 overflow: hidden;
+                min-height: 100px;
             }
             
             .header-pattern {
@@ -421,38 +447,39 @@ const CourseResultsPage = () => {
             }
             
             .certificate-content {
-                padding: 50px 60px;
+                padding: 30px 50px;
                 flex: 1;
                 display: flex;
                 flex-direction: column;
-                justify-content: center;
+                justify-content: space-between;
                 position: relative;
+                min-height: calc(1123px - 100px);
             }
             
             .certificate-title {
-                font-size: 36px;
+                font-size: 32px;
                 font-weight: 300;
                 color: #333;
                 text-align: center;
-                margin-bottom: 15px;
+                margin-bottom: 10px;
                 letter-spacing: 2px;
             }
             
             .subtitle {
-                font-size: 18px;
+                font-size: 16px;
                 color: #666;
                 text-align: center;
-                margin-bottom: 40px;
+                margin-bottom: 20px;
                 font-weight: 400;
             }
             
             .recipient-name {
-                font-size: 48px;
+                font-size: 42px;
                 font-weight: 600;
                 color: #333;
                 text-align: center;
-                margin: 30px 0;
-                padding: 20px 0;
+                margin: 20px 0;
+                padding: 15px 0;
                 background: linear-gradient(90deg, rgba(255,126,95,0.1), rgba(106,17,203,0.1));
                 border-radius: 8px;
                 position: relative;
@@ -462,7 +489,7 @@ const CourseResultsPage = () => {
                 content: "";
                 position: absolute;
                 height: 3px;
-                width: 100px;
+                width: 80px;
                 background: linear-gradient(90deg, #ff7e5f, #6a11cb);
                 top: 0;
             }
@@ -473,51 +500,53 @@ const CourseResultsPage = () => {
             }
             
             .message {
-                font-size: 18px;
+                font-size: 16px;
                 color: #555;
-                line-height: 1.6;
+                line-height: 1.5;
                 text-align: center;
                 max-width: 700px;
-                margin: 0 auto 40px;
+                margin: 0 auto 25px;
             }
             
             .course-details {
                 background: #f8f9fa;
                 border-radius: 8px;
-                padding: 25px;
-                margin: 30px 0;
+                padding: 20px;
+                margin: 20px 0;
                 border-left: 4px solid #6a11cb;
             }
             
             .course-title {
-                font-size: 22px;
+                font-size: 20px;
                 font-weight: 600;
                 color: #333;
-                margin-bottom: 10px;
+                margin-bottom: 8px;
+                text-align: center;
             }
             
             .course-info {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
-                gap: 15px;
-                margin-top: 15px;
+                gap: 12px;
+                margin-top: 12px;
             }
             
             .info-item {
                 display: flex;
                 align-items: center;
-                gap: 10px;
+                gap: 8px;
+                font-size: 14px;
             }
             
             .info-item i {
                 color: #6a11cb;
-                font-size: 18px;
+                font-size: 16px;
             }
             
             .info-label {
                 font-weight: 600;
                 color: #555;
-                min-width: 120px;
+                min-width: 100px;
             }
             
             .info-value {
@@ -525,14 +554,14 @@ const CourseResultsPage = () => {
             }
             
             .skills-section {
-                margin: 25px 0;
+                margin: 20px 0;
             }
             
             .skills-title {
-                font-size: 20px;
+                font-size: 18px;
                 font-weight: 600;
                 color: #333;
-                margin-bottom: 15px;
+                margin-bottom: 12px;
                 text-align: center;
             }
             
@@ -540,33 +569,34 @@ const CourseResultsPage = () => {
                 display: flex;
                 flex-wrap: wrap;
                 justify-content: center;
-                gap: 12px;
+                gap: 8px;
             }
             
             .skill-tag {
                 background: linear-gradient(135deg, #ff7e5f, #6a11cb);
                 color: white;
-                padding: 8px 16px;
-                border-radius: 20px;
-                font-size: 14px;
+                padding: 6px 12px;
+                border-radius: 16px;
+                font-size: 12px;
                 font-weight: 500;
                 display: flex;
                 align-items: center;
-                gap: 6px;
+                gap: 4px;
             }
             
             .skill-level {
-                font-size: 10px;
+                font-size: 9px;
                 background: rgba(255, 255, 255, 0.3);
                 padding: 2px 6px;
-                border-radius: 10px;
+                border-radius: 8px;
                 text-transform: uppercase;
             }
             
             .signature-area {
                 display: flex;
                 justify-content: space-between;
-                margin-top: 40px;
+                margin-top: 25px;
+                align-items: flex-end;
             }
             
             .signature {
@@ -574,40 +604,65 @@ const CourseResultsPage = () => {
                 width: 45%;
             }
             
+            .signature-image {
+                height: 60px;
+                margin-bottom: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            
             .signature-line {
-                width: 200px;
+                width: 180px;
                 height: 1px;
                 background: #333;
-                margin: 0 auto 10px;
+                margin: 0 auto 8px;
             }
             
             .signature-name {
                 font-weight: 600;
                 color: #333;
-                margin-bottom: 5px;
-                font-size: 18px;
+                margin-bottom: 4px;
+                font-size: 16px;
             }
             
             .signature-title {
-                font-size: 14px;
+                font-size: 12px;
                 color: #666;
+                line-height: 1.3;
+            }
+            
+            .initials-signature {
+                width: 120px;
+                height: 50px;
+                background: linear-gradient(135deg, #6a11cb, #2575fc);
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-size: 20px;
+                font-weight: bold;
+                margin: 0 auto 8px;
+                border: 2px solid #6a11cb;
             }
             
             .certificate-footer {
                 background: #f8f9fa;
-                padding: 20px 40px;
+                padding: 15px 40px;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
                 border-top: 1px solid #eaeaea;
+                margin-top: auto;
             }
             
             .verification {
                 display: flex;
                 align-items: center;
-                gap: 10px;
+                gap: 8px;
                 color: #666;
-                font-size: 14px;
+                font-size: 12px;
             }
             
             .verification i {
@@ -616,12 +671,12 @@ const CourseResultsPage = () => {
             
             .social-links {
                 display: flex;
-                gap: 15px;
+                gap: 12px;
             }
             
             .social-links a {
                 color: #666;
-                font-size: 18px;
+                font-size: 16px;
                 transition: color 0.3s;
             }
             
@@ -634,7 +689,7 @@ const CourseResultsPage = () => {
                 top: 50%;
                 left: 50%;
                 transform: translate(-50%, -50%) rotate(-45deg);
-                font-size: 120px;
+                font-size: 100px;
                 font-weight: 900;
                 color: rgba(106, 17, 203, 0.05);
                 z-index: 0;
@@ -648,68 +703,90 @@ const CourseResultsPage = () => {
             }
             
             .decoration-1 {
-                top: 50px;
-                left: 50px;
-                width: 80px;
-                height: 80px;
+                top: 40px;
+                left: 40px;
+                width: 60px;
+                height: 60px;
                 border-radius: 50%;
                 background: linear-gradient(135deg, rgba(255,126,95,0.1), rgba(106,17,203,0.1));
             }
             
             .decoration-2 {
-                bottom: 50px;
-                right: 50px;
-                width: 100px;
-                height: 100px;
+                bottom: 40px;
+                right: 40px;
+                width: 80px;
+                height: 80px;
                 border-radius: 50%;
                 background: linear-gradient(135deg, rgba(106,17,203,0.1), rgba(255,126,95,0.1));
             }
             
             .badge {
                 position: absolute;
-                top: 40px;
-                right: 60px;
-                width: 80px;
-                height: 80px;
+                top: 30px;
+                right: 50px;
+                width: 70px;
+                height: 70px;
                 background: linear-gradient(135deg, #ff7e5f, #6a11cb);
                 border-radius: 50%;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 color: white;
-                font-size: 32px;
+                font-size: 28px;
                 box-shadow: 0 5px 15px rgba(106, 17, 203, 0.3);
                 z-index: 1;
             }
             
             .achievement-text {
                 text-align: center;
-                margin-top: 10px;
+                margin-top: 8px;
                 color: #6a11cb;
                 font-weight: 600;
-                font-size: 16px;
+                font-size: 14px;
             }
             
             .company-name {
                 text-align: center;
-                margin-top: 20px;
-                font-size: 20px;
+                margin-top: 15px;
+                font-size: 18px;
                 font-weight: 600;
                 color: #333;
             }
             
             .qr-section {
-                text-align: center;
-                margin: 20px 0;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                gap: 30px;
+                margin: 15px 0;
             }
             
             .qr-container {
                 background: white;
-                padding: 15px;
+                padding: 12px;
                 border-radius: 8px;
                 display: inline-block;
                 box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
                 border: 1px solid #eaeaea;
+            }
+            
+            .qr-code {
+                width: 100px;
+                height: 100px;
+            }
+            
+            .signature-container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+            }
+            
+            .signature-separator {
+                width: 2px;
+                height: 80px;
+                background: linear-gradient(to bottom, #ff7e5f, #6a11cb);
+                margin: 0 20px;
             }
             
             @media (max-width: 850px) {
@@ -719,15 +796,15 @@ const CourseResultsPage = () => {
                 }
                 
                 .certificate-content {
-                    padding: 30px 20px;
+                    padding: 20px;
                 }
                 
                 .recipient-name {
-                    font-size: 36px;
+                    font-size: 32px;
                 }
                 
                 .certificate-title {
-                    font-size: 28px;
+                    font-size: 24px;
                 }
                 
                 .course-info {
@@ -736,19 +813,30 @@ const CourseResultsPage = () => {
                 
                 .signature-area {
                     flex-direction: column;
-                    gap: 20px;
+                    gap: 15px;
                 }
                 
                 .signature {
                     width: 100%;
                 }
+                
+                .qr-section {
+                    flex-direction: column;
+                    gap: 15px;
+                }
+                
+                .signature-separator {
+                    width: 80px;
+                    height: 2px;
+                    margin: 10px 0;
+                }
             }
             
             @media (max-width: 480px) {
                 .certificate-header {
-                    padding: 20px;
+                    padding: 15px;
                     flex-direction: column;
-                    gap: 15px;
+                    gap: 10px;
                     text-align: center;
                 }
                 
@@ -757,12 +845,12 @@ const CourseResultsPage = () => {
                 }
                 
                 .recipient-name {
-                    font-size: 28px;
-                    padding: 15px 0;
+                    font-size: 24px;
+                    padding: 10px 0;
                 }
                 
                 .certificate-title {
-                    font-size: 24px;
+                    font-size: 20px;
                 }
                 
                 .course-details {
@@ -770,12 +858,12 @@ const CourseResultsPage = () => {
                 }
                 
                 .skills-list {
-                    gap: 8px;
+                    gap: 6px;
                 }
                 
                 .skill-tag {
-                    font-size: 12px;
-                    padding: 6px 12px;
+                    font-size: 10px;
+                    padding: 4px 8px;
                 }
             }
         </style>
@@ -873,42 +961,39 @@ const CourseResultsPage = () => {
                             Critical Thinking
                             <span class="skill-level">Advanced</span>
                         </div>
-                        <div class="skill-tag">
-                            <i class="fas fa-bolt"></i>
-                            Problem Solving
-                            <span class="skill-level">Expert</span>
-                        </div>
                     </div>
                 </div>
                 `}
                 
                 <div class="qr-section">
-                    <div class="qr-container">
-                        <!-- QR Code will be generated by JavaScript -->
-                        <div id="qr-code" style="width: 120px; height: 120px;"></div>
-                    </div>
-                    <div style="font-size: 12px; color: #666; margin-top: 8px;">
-                        Scan to verify this certificate
-                    </div>
-                </div>
-                
-                <div class="achievement-text">For Excellence in Professional Development & Skill Mastery</div>
-                
-                <div class="signature-area">
-                    <div class="signature">
+                    <div class="signature-container">
+                        <div class="signature-image">
+                            <img src="${founderSignature}" alt="Founder Signature" style="height: 50px;" />
+                        </div>
                         <div class="signature-line"></div>
                         <div class="signature-name">Mbolela Pule</div>
-                        <div class="signature-title">Director of Learning</div>
+                        <div class="signature-title">Founder & CEO</div>
                         <div class="signature-title">SkillPulse Innovations Limited</div>
                     </div>
                     
-                    <div class="signature">
+                    <div class="signature-separator"></div>
+                    
+                    <div class="qr-container">
+                        <div id="qr-code" class="qr-code"></div>
+                    </div>
+                    
+                    <div class="signature-separator"></div>
+                    
+                    <div class="signature-container">
+                        <div class="initials-signature">${creatorInitials}</div>
                         <div class="signature-line"></div>
                         <div class="signature-name">${creatorName}</div>
                         <div class="signature-title">Course Instructor</div>
                         <div class="signature-title">SkillPulse Academy</div>
                     </div>
                 </div>
+                
+                <div class="achievement-text">For Excellence in Professional Development & Skill Mastery</div>
                 
                 <div class="company-name">SkillPulse Innovations Limited</div>
             </div>
@@ -938,20 +1023,22 @@ const CourseResultsPage = () => {
                 if (typeof QRCode !== 'undefined') {
                     new QRCode(qrContainer, {
                         text: verificationUrl,
-                        width: 120,
-                        height: 120,
+                        width: 100,
+                        height: 100,
                         colorDark: "#1f2937",
                         colorLight: "#ffffff",
                         correctLevel: QRCode.CorrectLevel.M
                     });
                 } else {
-                    qrContainer.innerHTML = '<div style="width: 120px; height: 120px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #6b7280; text-align: center;">QR Code<br>Not Available</div>';
+                    qrContainer.innerHTML = '<div style="width: 100px; height: 100px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #6b7280; text-align: center;">QR Code<br>Not Available</div>';
                 }
             });
             
             // Auto-print when opened in print view
             if (window.location.search.includes('print=true')) {
-                window.print();
+                setTimeout(() => {
+                    window.print();
+                }, 1000);
             }
         </script>
     </body>
@@ -995,28 +1082,6 @@ const CourseResultsPage = () => {
     if (newWindow) {
       newWindow.document.write(html);
       newWindow.document.close();
-    }
-  };
-
-  const downloadCertificate = async (certificate: Certificate) => {
-    try {
-      const certificateHTML = await generateCertificateHTML(certificate);
-      
-      // Create a blob and download link
-      const blob = new Blob([certificateHTML], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `certificate-${certificate.verification_code}.html`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      toast.success('Certificate downloaded successfully!');
-    } catch (error) {
-      console.error('Error downloading certificate:', error);
-      toast.error('Failed to download certificate');
     }
   };
 
