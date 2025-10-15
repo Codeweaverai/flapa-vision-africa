@@ -958,7 +958,7 @@ const CourseResultsPage = () => {
                         </div>
                         <div class="skill-tag">
                             <i class="fas fa-bolt"></i>
-                            Critical Thinking
+                            Professinal Competence 
                             <span class="skill-level">Advanced</span>
                         </div>
                     </div>
@@ -989,7 +989,7 @@ const CourseResultsPage = () => {
                         <div class="signature-line"></div>
                         <div class="signature-name">${creatorName}</div>
                         <div class="signature-title">Course Instructor</div>
-                        <div class="signature-title">SkillPulse Academy</div>
+                        <div class="signature-title">SkillPulse Learning</div>
                     </div>
                 </div>
                 
