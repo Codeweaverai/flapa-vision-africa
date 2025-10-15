@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Bell, Check, MessageCircle, Users, BookOpen, Calendar } from 'lucide-react';
+import { Bell, Check, MessageCircle, Users, BookOpen, Calendar, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { Notification, fetchUserNotifications, markAllNotificationsAsRead, markNotificationAsRead } from '@/services/communityService';
 import { supabase } from '@/lib/supabaseClient';
@@ -15,6 +15,7 @@ const NotificationsPage = () => {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hoveredNotification, setHoveredNotification] = useState<string | null>(null);
 
   // Redirect to login if not authenticated
   if (!user) {
@@ -191,12 +192,14 @@ const NotificationsPage = () => {
                 {notifications.map((notification) => (
                   <Card 
                     key={notification.id} 
-                    className={`rounded-2xl shadow-lg border-0 transition-all duration-300 hover:shadow-xl cursor-pointer transform hover:-translate-y-1 ${
+                    className={`rounded-2xl shadow-lg border-0 transition-all duration-300 hover:shadow-xl cursor-pointer transform hover:-translate-y-1 relative group ${
                       !notification.is_read 
                         ? 'bg-gradient-to-r from-orange-50 to-purple-50 border-l-4 border-l-orange-500' 
                         : 'bg-white/80 backdrop-blur-sm'
                     }`}
                     onClick={() => handleNotificationClick(notification)}
+                    onMouseEnter={() => setHoveredNotification(notification.id)}
+                    onMouseLeave={() => setHoveredNotification(null)}
                   >
                     <CardContent className="p-6">
                       <div className="flex items-start gap-4">
@@ -222,26 +225,79 @@ const NotificationsPage = () => {
                           </div>
                         </div>
                         
+                        {/* Optional Mark as Read Button - Shows on Hover */}
                         {!notification.is_read && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleMarkAsRead(notification.id);
-                            }}
-                            className="opacity-70 hover:opacity-100 hover:bg-white/50 rounded-xl p-2 transition-all duration-200"
-                          >
-                            <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center">
-                              <Check className="h-4 w-4 text-white" />
-                            </div>
-                            <span className="sr-only">Mark as read</span>
-                          </Button>
+                          <div className={`flex items-center gap-2 transition-all duration-300 ${
+                            hoveredNotification === notification.id 
+                              ? 'opacity-100 translate-x-0' 
+                              : 'opacity-0 translate-x-2'
+                          }`}>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMarkAsRead(notification.id);
+                              }}
+                              className="hover:bg-white/50 rounded-xl p-2 transition-all duration-200 border border-orange-200"
+                              title="Mark as read"
+                            >
+                              <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center">
+                                <Eye className="h-4 w-4 text-white" />
+                              </div>
+                            </Button>
+                            
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMarkAsRead(notification.id);
+                              }}
+                              className="hover:bg-white/50 rounded-xl p-2 transition-all duration-200"
+                              title="Mark as read"
+                            >
+                              <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center">
+                                <Check className="h-4 w-4 text-white" />
+                              </div>
+                            </Button>
+                          </div>
                         )}
                         
-                        {notification.is_read && (
-                          <div className="w-2 h-2 rounded-full bg-green-500 opacity-70 mt-2"></div>
+                        {/* Always visible status indicator */}
+                        {!notification.is_read ? (
+                          <div className="w-3 h-3 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 mt-2 flex-shrink-0 shadow-md"></div>
+                        ) : (
+                          <div className="w-2 h-2 rounded-full bg-green-500 opacity-70 mt-2 flex-shrink-0"></div>
                         )}
+                      </div>
+                      
+                      {/* Optional quick action bar that appears on hover */}
+                      <div className={`flex justify-end gap-2 mt-3 pt-3 border-t border-gray-100 transition-all duration-300 ${
+                        hoveredNotification === notification.id && !notification.is_read
+                          ? 'opacity-100 translate-y-0' 
+                          : 'opacity-0 -translate-y-2 h-0 mt-0 pt-0 overflow-hidden'
+                      }`}>
+                        <Button 
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMarkAsRead(notification.id);
+                          }}
+                          className="text-xs bg-white/80 hover:bg-white border-orange-200 text-orange-600 hover:text-orange-700"
+                        >
+                          <Check className="h-3 w-3 mr-1" />
+                          Mark Read
+                        </Button>
+                        <Button 
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate('/community')}
+                          className="text-xs bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0"
+                        >
+                          View in Community
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
