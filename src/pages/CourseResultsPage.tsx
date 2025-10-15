@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,10 +22,14 @@ import {
   Users,
   Clock,
   Heart,
-  Zap
+  Zap,
+  Printer
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
+import { useReactToPrint } from 'react-to-print';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 // Pulse Loading Component
 const PulseLoading = () => {
@@ -111,6 +115,841 @@ interface CourseSkill {
   order_index: number;
   is_core_skill: boolean;
 }
+
+// Certificate Display Component
+const CertificateDisplay: React.FC<{ certificate: Certificate; courseSkills: Record<string, CourseSkill[]> }> = ({ 
+  certificate, 
+  courseSkills 
+}) => {
+  const { user } = useAuth();
+  const certificateRef = useRef<HTMLDivElement>(null);
+  const [creatorName, setCreatorName] = useState('SkillPulse Instructor');
+  const [creatorInitials, setCreatorInitials] = useState('SI');
+
+  useEffect(() => {
+    const fetchCreatorData = async () => {
+      if (certificate.creator_id) {
+        const name = await fetchCreatorName(certificate.creator_id);
+        setCreatorName(name);
+        setCreatorInitials(getInitials(name));
+      }
+    };
+    fetchCreatorData();
+  }, [certificate.creator_id]);
+
+  const fetchCreatorName = async (creatorId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', creatorId)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching creator name:', error);
+        return 'SkillPulse Instructor';
+      }
+      
+      return data?.full_name || 'SkillPulse Instructor';
+    } catch (error) {
+      console.error('Error fetching creator name:', error);
+      return 'SkillPulse Instructor';
+    }
+  };
+
+  const getInitials = (name: string) => {
+    if (!name) return 'SI';
+    return name
+      .split(' ')
+      .map(part => part.charAt(0))
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const handlePrint = useReactToPrint({
+    contentRef: certificateRef,
+    pageStyle: `
+      @page {
+        size: A4;
+        margin: 0;
+      }
+      @media print {
+        body {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+          background: white !important;
+          margin: 0;
+          padding: 0;
+        }
+        .certificate-container {
+          width: 100% !important;
+          height: 100vh !important;
+          margin: 0 !important;
+          box-shadow: none !important;
+          border: none !important;
+          border-radius: 0 !important;
+        }
+        .no-print {
+          display: none !important;
+        }
+        .qr-section {
+          display: flex !important;
+          justify-content: center !important;
+          align-items: center !important;
+          gap: 30px !important;
+        }
+        .signature-container {
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: center !important;
+        }
+      }
+    `,
+  });
+
+  const downloadPdfCertificate = () => {
+    if (!certificateRef.current) return;
+
+    const input = certificateRef.current;
+    const scale = 2;
+
+    html2canvas(input, {
+      scale,
+      useCORS: true,
+      logging: false,
+      allowTaint: true,
+      width: input.scrollWidth,
+      height: input.scrollHeight,
+      backgroundColor: '#ffffff'
+    }).then((canvas) => {
+      const imgData = canvas.toDataURL('image/png', 1.0);
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210; // A4 width in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      pdf.save(`certificate-${certificate.verification_code}.pdf`);
+    });
+  };
+
+  const currentDate = new Date(certificate.issue_date).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  // Get skills for this course
+  const skills = certificate.course_id ? (courseSkills[certificate.course_id] || []) : [];
+  const coreSkills = skills.filter(skill => skill.is_core_skill);
+  const displayedSkills = coreSkills.length > 0 ? coreSkills : skills.slice(0, 4);
+
+  // QR Code data
+  const verificationUrl = `https://skillpulse.cloud/verify?code=${certificate.verification_code}`;
+
+  // Founder signature URL
+  const founderSignatureUrl = "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/signature.png";
+
+  return (
+    <div className="certificate-display">
+      {/* Action buttons */}
+      <div className="flex justify-center gap-4 mb-6 no-print">
+        <Button
+          onClick={handlePrint}
+          className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl"
+        >
+          <Printer className="h-4 w-4" />
+          Print Certificate
+        </Button>
+        <Button
+          onClick={downloadPdfCertificate}
+          className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl"
+        >
+          <Download className="h-4 w-4" />
+          Download PDF
+        </Button>
+      </div>
+
+      {/* Certificate */}
+      <div 
+        ref={certificateRef}
+        className="certificate-container"
+        style={{
+          width: '794px',
+          height: '1123px',
+          background: 'white',
+          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.15)',
+          borderRadius: '8px',
+          overflow: 'hidden',
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          margin: '0 auto'
+        }}
+      >
+        <div className="certificate-header">
+          <div className="header-pattern"></div>
+          <div className="logo">
+            <div className="logo-icon">
+              <i className="fas fa-bolt"></i>
+            </div>
+            <div className="logo-text">SkillPulse</div>
+          </div>
+          <div className="header-right">
+            <div className="certificate-id">Certificate ID: {certificate.verification_code}</div>
+            <div className="issue-date">Issued on: {currentDate}</div>
+          </div>
+        </div>
+        
+        <div className="certificate-content">
+          <div className="watermark">SKILLPULSE</div>
+          
+          <div className="decoration decoration-1"></div>
+          <div className="decoration decoration-2"></div>
+          
+          <div className="badge">
+            <i className="fas fa-award"></i>
+          </div>
+          
+          <h1 className="certificate-title">CERTIFICATE OF COMPLETION</h1>
+          <p className="subtitle">This certificate is awarded to</p>
+          
+          <div className="recipient-name">{user?.user_metadata?.full_name || 'Student'}</div>
+          
+          <p className="message">
+            has successfully completed the course requirements and demonstrated proficiency in the following skills:
+          </p>
+          
+          <div className="course-details">
+            <div className="course-title">{certificate.course_title}</div>
+            <div className="course-info">
+              <div className="info-item">
+                <i className="far fa-clock"></i>
+                <span className="info-label">Duration:</span>
+                <span className="info-value">Self-Paced Learning</span>
+              </div>
+              <div className="info-item">
+                <i className="fas fa-chart-line"></i>
+                <span className="info-label">Level:</span>
+                <span className="info-value">Professional</span>
+              </div>
+              <div className="info-item">
+                <i className="fas fa-trophy"></i>
+                <span className="info-label">Status:</span>
+                <span className="info-value">Successfully Completed</span>
+              </div>
+              <div className="info-item">
+                <i className="far fa-calendar-alt"></i>
+                <span className="info-label">Completion Date:</span>
+                <span className="info-value">{currentDate}</span>
+              </div>
+            </div>
+          </div>
+          
+          {displayedSkills.length > 0 ? (
+            <div className="skills-section">
+              <div className="skills-title">Skills Demonstrated</div>
+              <div className="skills-list">
+                {displayedSkills.map((skill) => (
+                  <div key={skill.id} className="skill-tag">
+                    <i className="fas fa-bolt"></i>
+                    {skill.skill_name}
+                    <span className="skill-level">{skill.skill_level}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="skills-section">
+              <div className="skills-title">Skills Demonstrated</div>
+              <div className="skills-list">
+                <div className="skill-tag">
+                  <i className="fas fa-bolt"></i>
+                  Professional Knowledge
+                  <span className="skill-level">Advanced</span>
+                </div>
+                <div className="skill-tag">
+                  <i className="fas fa-bolt"></i>
+                  Practical Application
+                  <span className="skill-level">Intermediate</span>
+                </div>
+                <div className="skill-tag">
+                  <i className="fas fa-bolt"></i>
+                  Professional Competence 
+                  <span className="skill-level">Advanced</span>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <div className="qr-section">
+            <div className="signature-container">
+              <div className="signature-image">
+                <img 
+                  src={founderSignatureUrl} 
+                  alt="Founder Signature" 
+                  style={{ 
+                    height: '70px', 
+                    maxWidth: '200px',
+                    marginBottom: '5px'
+                  }} 
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                  }} 
+                />
+              </div>
+              <div className="signature-line" style={{ marginTop: '5px' }}></div>
+              <div className="signature-name">Mbolela Pule</div>
+              <div className="signature-title">Founder & CEO</div>
+              <div className="signature-title">SkillPulse Innovations Limited</div>
+            </div>
+            
+            <div className="signature-separator"></div>
+            
+            <div className="qr-container">
+              <QRCodeSVG 
+                value={verificationUrl}
+                size={100}
+                level="M"
+                includeMargin={false}
+                bgColor="#FFFFFF"
+                fgColor="#000000"
+              />
+            </div>
+            
+            <div className="signature-separator"></div>
+            
+            <div className="signature-container">
+              <div className="initials-display">{creatorInitials}</div>
+              <div className="zigzag-line"></div>
+              <div className="signature-name">{creatorName}</div>
+              <div className="signature-title">Course Instructor</div>
+              <div className="signature-title">SkillPulse Learning</div>
+            </div>
+          </div>
+          
+          <div className="achievement-text">For Excellence in Professional Development & Skill Mastery</div>
+          
+          <div className="company-name">SkillPulse Innovations Limited</div>
+        </div>
+        
+        <div className="certificate-footer">
+          <div className="verification">
+            <i className="fas fa-shield-alt"></i>
+            <span>Verify this certificate at: skillpulse.cloud/verify/{certificate.verification_code}</span>
+          </div>
+          
+          <div className="social-links no-print">
+            <a href="#"><i className="fab fa-linkedin"></i></a>
+            <a href="#"><i className="fab fa-twitter"></i></a>
+            <a href="#"><i className="fab fa-facebook"></i></a>
+          </div>
+        </div>
+      </div>
+
+      <style jsx>{`
+        .certificate-display {
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .certificate-header {
+          background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+          padding: 20px 40px;
+          color: white;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          position: relative;
+          overflow: hidden;
+          min-height: 100px;
+        }
+
+        .header-pattern {
+          position: absolute;
+          top: 0;
+          right: 0;
+          width: 200px;
+          height: 100%;
+          background: rgba(255, 255, 255, 0.1);
+          clip-path: polygon(100% 0, 100% 100%, 0 100%, 30% 0);
+        }
+
+        .logo {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          z-index: 2;
+        }
+
+        .logo-icon {
+          font-size: 28px;
+          background: rgba(255, 255, 255, 0.2);
+          width: 50px;
+          height: 50px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .logo-text {
+          font-size: 24px;
+          font-weight: 700;
+          letter-spacing: 1px;
+        }
+
+        .header-right {
+          text-align: right;
+          z-index: 2;
+        }
+
+        .certificate-id {
+          font-size: 14px;
+          opacity: 0.9;
+          margin-bottom: 5px;
+        }
+
+        .issue-date {
+          font-size: 14px;
+          opacity: 0.9;
+        }
+
+        .certificate-content {
+          padding: 30px 50px;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          position: relative;
+          min-height: calc(1123px - 100px);
+        }
+
+        .certificate-title {
+          font-size: 32px;
+          font-weight: 300;
+          color: #333;
+          text-align: center;
+          margin-bottom: 10px;
+          letter-spacing: 2px;
+        }
+
+        .subtitle {
+          font-size: 16px;
+          color: #666;
+          text-align: center;
+          margin-bottom: 20px;
+          font-weight: 400;
+        }
+
+        .recipient-name {
+          font-size: 42px;
+          font-weight: 600;
+          color: #333;
+          text-align: center;
+          margin: 20px 0;
+          padding: 15px 0;
+          background: linear-gradient(90deg, rgba(255,126,95,0.1), rgba(106,17,203,0.1));
+          border-radius: 8px;
+          position: relative;
+        }
+
+        .recipient-name:before, .recipient-name:after {
+          content: "";
+          position: absolute;
+          height: 3px;
+          width: 80px;
+          background: linear-gradient(90deg, #ff7e5f, #6a11cb);
+          top: 0;
+        }
+
+        .recipient-name:after {
+          top: auto;
+          bottom: 0;
+        }
+
+        .message {
+          font-size: 16px;
+          color: #555;
+          line-height: 1.5;
+          text-align: center;
+          max-width: 700px;
+          margin: 0 auto 25px;
+        }
+
+        .course-details {
+          background: #f8f9fa;
+          border-radius: 8px;
+          padding: 20px;
+          margin: 20px 0;
+          border-left: 4px solid #6a11cb;
+        }
+
+        .course-title {
+          font-size: 20px;
+          font-weight: 600;
+          color: #333;
+          margin-bottom: 8px;
+          text-align: center;
+        }
+
+        .course-info {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+          margin-top: 12px;
+        }
+
+        .info-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 14px;
+        }
+
+        .info-item i {
+          color: #6a11cb;
+          font-size: 16px;
+        }
+
+        .info-label {
+          font-weight: 600;
+          color: #555;
+          min-width: 100px;
+        }
+
+        .info-value {
+          color: #333;
+        }
+
+        .skills-section {
+          margin: 20px 0;
+        }
+
+        .skills-title {
+          font-size: 18px;
+          font-weight: 600;
+          color: #333;
+          margin-bottom: 12px;
+          text-align: center;
+        }
+
+        .skills-list {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 8px;
+        }
+
+        .skill-tag {
+          background: linear-gradient(135deg, #ff7e5f, #6a11cb);
+          color: white;
+          padding: 6px 12px;
+          border-radius: 16px;
+          font-size: 12px;
+          font-weight: 500;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .skill-level {
+          font-size: 9px;
+          background: rgba(255, 255, 255, 0.3);
+          padding: 2px 6px;
+          border-radius: 8px;
+          text-transform: uppercase;
+        }
+
+        .signature-area {
+          display: flex;
+          justify-content: space-between;
+          margin-top: 25px;
+          align-items: flex-end;
+        }
+
+        .signature {
+          text-align: center;
+          width: 45%;
+        }
+
+        .signature-image {
+          height: 70px;
+          margin-bottom: 5px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .signature-line {
+          width: 180px;
+          height: 1px;
+          background: #333;
+          margin: 5px auto 8px;
+        }
+
+        .zigzag-line {
+          width: 150px;
+          height: 20px;
+          margin: 0 auto 8px;
+          background: linear-gradient(135deg, transparent 49%, #333 50%, transparent 51%),
+                      linear-gradient(45deg, transparent 49%, #333 50%, transparent 51%);
+          background-size: 10px 10px;
+          background-repeat: repeat-x;
+        }
+
+        .signature-name {
+          font-weight: 600;
+          color: #333;
+          margin-bottom: 4px;
+          font-size: 16px;
+        }
+
+        .signature-title {
+          font-size: 12px;
+          color: #666;
+          line-height: 1.3;
+        }
+
+        .initials-display {
+          font-size: 24px;
+          font-weight: bold;
+          color: #333;
+          margin-bottom: 8px;
+          font-family: 'Brush Script MT', cursive;
+          letter-spacing: 2px;
+        }
+
+        .certificate-footer {
+          background: #f8f9fa;
+          padding: 15px 40px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-top: 1px solid #eaeaea;
+          margin-top: auto;
+        }
+
+        .verification {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: #666;
+          font-size: 12px;
+        }
+
+        .verification i {
+          color: #6a11cb;
+        }
+
+        .social-links {
+          display: flex;
+          gap: 12px;
+        }
+
+        .social-links a {
+          color: #666;
+          font-size: 16px;
+          transition: color 0.3s;
+        }
+
+        .social-links a:hover {
+          color: #6a11cb;
+        }
+
+        .watermark {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%) rotate(-45deg);
+          font-size: 100px;
+          font-weight: 900;
+          color: rgba(106, 17, 203, 0.05);
+          z-index: 0;
+          white-space: nowrap;
+          pointer-events: none;
+        }
+
+        .decoration {
+          position: absolute;
+          z-index: 0;
+        }
+
+        .decoration-1 {
+          top: 40px;
+          left: 40px;
+          width: 60px;
+          height: 60px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, rgba(255,126,95,0.1), rgba(106,17,203,0.1));
+        }
+
+        .decoration-2 {
+          bottom: 40px;
+          right: 40px;
+          width: 80px;
+          height: 80px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, rgba(106,17,203,0.1), rgba(255,126,95,0.1));
+        }
+
+        .badge {
+          position: absolute;
+          top: 30px;
+          right: 50px;
+          width: 70px;
+          height: 70px;
+          background: linear-gradient(135deg, #ff7e5f, #6a11cb);
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-size: 28px;
+          box-shadow: 0 5px 15px rgba(106, 17, 203, 0.3);
+          z-index: 1;
+        }
+
+        .achievement-text {
+          text-align: center;
+          margin-top: 8px;
+          color: #6a11cb;
+          font-weight: 600;
+          font-size: 14px;
+        }
+
+        .company-name {
+          text-align: center;
+          margin-top: 15px;
+          font-size: 18px;
+          font-weight: 600;
+          color: #333;
+        }
+
+        .qr-section {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 30px;
+          margin: 15px 0;
+        }
+
+        .qr-container {
+          background: white;
+          padding: 12px;
+          border-radius: 8px;
+          display: inline-block;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+          border: 1px solid #eaeaea;
+        }
+
+        .qr-code {
+          width: 100px;
+          height: 100px;
+        }
+
+        .signature-container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 5px;
+          width: 200px;
+        }
+
+        .signature-separator {
+          width: 2px;
+          height: 80px;
+          background: linear-gradient(to bottom, #ff7e5f, #6a11cb);
+          margin: 0 20px;
+        }
+
+        @media (max-width: 850px) {
+          .certificate-container {
+            width: 100%;
+            height: auto;
+          }
+          
+          .certificate-content {
+            padding: 20px;
+          }
+          
+          .recipient-name {
+            font-size: 32px;
+          }
+          
+          .certificate-title {
+            font-size: 24px;
+          }
+          
+          .course-info {
+            grid-template-columns: 1fr;
+          }
+          
+          .signature-area {
+            flex-direction: column;
+            gap: 15px;
+          }
+          
+          .signature {
+            width: 100%;
+          }
+          
+          .qr-section {
+            flex-direction: column;
+            gap: 15px;
+          }
+          
+          .signature-separator {
+            width: 80px;
+            height: 2px;
+            margin: 10px 0;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .certificate-header {
+            padding: 15px;
+            flex-direction: column;
+            gap: 10px;
+            text-align: center;
+          }
+          
+          .header-right {
+            text-align: center;
+          }
+          
+          .recipient-name {
+            font-size: 24px;
+            padding: 10px 0;
+          }
+          
+          .certificate-title {
+            font-size: 20px;
+          }
+          
+          .course-details {
+            padding: 15px;
+          }
+          
+          .skills-list {
+            gap: 6px;
+          }
+          
+          .skill-tag {
+            font-size: 10px;
+            padding: 4px 8px;
+          }
+        }
+
+        @media print {
+          .no-print {
+            display: none !important;
+          }
+        }
+      `}</style>
+    </div>
+  );
+};
 
 const CourseResultsPage = () => {
   const { user } = useAuth();
@@ -250,36 +1089,6 @@ const CourseResultsPage = () => {
     }
   };
 
-  const fetchCreatorName = async (creatorId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', creatorId)
-        .single();
-      
-      if (error) {
-        console.error('Error fetching creator name:', error);
-        return 'SkillPulse Instructor';
-      }
-      
-      return data?.full_name || 'SkillPulse Instructor';
-    } catch (error) {
-      console.error('Error fetching creator name:', error);
-      return 'SkillPulse Instructor';
-    }
-  };
-
-  const getInitials = (name: string) => {
-    if (!name) return 'SI';
-    return name
-      .split(' ')
-      .map(part => part.charAt(0))
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
   const getSkillLevelColor = (level: string) => {
     switch (level?.toLowerCase()) {
       case 'beginner':
@@ -295,820 +1104,9 @@ const CourseResultsPage = () => {
     }
   };
 
-  const generateCertificateHTML = async (certificate: Certificate) => {
-    const currentDate = new Date(certificate.issue_date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-
-    // Get creator name
-    const creatorName = certificate.creator_id ? await fetchCreatorName(certificate.creator_id) : 'SkillPulse Instructor';
-    const creatorInitials = getInitials(creatorName);
-
-    // Get skills for this course - FIXED: Add null check
-    const skills = certificate.course_id ? (courseSkills[certificate.course_id] || []) : [];
-    const coreSkills = skills.filter(skill => skill.is_core_skill);
-    const displayedSkills = coreSkills.length > 0 ? coreSkills : skills.slice(0, 4);
-
-    // QR Code data
-    const verificationUrl = `https://skillpulse.cloud/verify?code=${certificate.verification_code}`;
-
-    // Founder signature URL
-    const founderSignatureUrl = "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/signature.png";
-
-    return `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>SkillPulse Course Completion Certificate</title>
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-        <style>
-            * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            }
-            
-            body {
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                min-height: 100vh;
-                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-                padding: 20px;
-                margin: 0;
-            }
-            
-            @media print {
-                body {
-                    background: white !important;
-                    padding: 0 !important;
-                    margin: 0 !important;
-                    -webkit-print-color-adjust: exact !important;
-                    print-color-adjust: exact !important;
-                    width: 100% !important;
-                    height: 100% !important;
-                }
-                
-                .certificate-container {
-                    box-shadow: none !important;
-                    border: 1px solid #ddd !important;
-                    margin: 0 auto !important;
-                    width: 100% !important;
-                    height: 100vh !important;
-                    page-break-after: avoid !important;
-                    page-break-inside: avoid !important;
-                    position: relative !important;
-                }
-                
-                .no-print {
-                    display: none !important;
-                }
-                
-                .certificate-content {
-                    padding: 30px 50px !important;
-                }
-                
-                .qr-section {
-                    display: flex !important;
-                    justify-content: center !important;
-                    align-items: center !important;
-                    gap: 30px !important;
-                    margin: 15px 0 !important;
-                }
-                
-                .signature-container {
-                    display: flex !important;
-                    flex-direction: column !important;
-                    align-items: center !important;
-                }
-                
-                @page {
-                    margin: 0;
-                    size: A4 portrait;
-                }
-            }
-            
-            .certificate-container {
-                width: 794px;
-                height: 1123px;
-                background: white;
-                box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
-                border-radius: 8px;
-                overflow: hidden;
-                position: relative;
-                display: flex;
-                flex-direction: column;
-            }
-            
-            .certificate-header {
-                background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
-                padding: 20px 40px;
-                color: white;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                position: relative;
-                overflow: hidden;
-                min-height: 100px;
-            }
-            
-            .header-pattern {
-                position: absolute;
-                top: 0;
-                right: 0;
-                width: 200px;
-                height: 100%;
-                background: rgba(255, 255, 255, 0.1);
-                clip-path: polygon(100% 0, 100% 100%, 0 100%, 30% 0);
-            }
-            
-            .logo {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                z-index: 2;
-            }
-            
-            .logo-icon {
-                font-size: 28px;
-                background: rgba(255, 255, 255, 0.2);
-                width: 50px;
-                height: 50px;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-            
-            .logo-text {
-                font-size: 24px;
-                font-weight: 700;
-                letter-spacing: 1px;
-            }
-            
-            .header-right {
-                text-align: right;
-                z-index: 2;
-            }
-            
-            .certificate-id {
-                font-size: 14px;
-                opacity: 0.9;
-                margin-bottom: 5px;
-            }
-            
-            .issue-date {
-                font-size: 14px;
-                opacity: 0.9;
-            }
-            
-            .certificate-content {
-                padding: 30px 50px;
-                flex: 1;
-                display: flex;
-                flex-direction: column;
-                justify-content: space-between;
-                position: relative;
-                min-height: calc(1123px - 100px);
-            }
-            
-            .certificate-title {
-                font-size: 32px;
-                font-weight: 300;
-                color: #333;
-                text-align: center;
-                margin-bottom: 10px;
-                letter-spacing: 2px;
-            }
-            
-            .subtitle {
-                font-size: 16px;
-                color: #666;
-                text-align: center;
-                margin-bottom: 20px;
-                font-weight: 400;
-            }
-            
-            .recipient-name {
-                font-size: 42px;
-                font-weight: 600;
-                color: #333;
-                text-align: center;
-                margin: 20px 0;
-                padding: 15px 0;
-                background: linear-gradient(90deg, rgba(255,126,95,0.1), rgba(106,17,203,0.1));
-                border-radius: 8px;
-                position: relative;
-            }
-            
-            .recipient-name:before, .recipient-name:after {
-                content: "";
-                position: absolute;
-                height: 3px;
-                width: 80px;
-                background: linear-gradient(90deg, #ff7e5f, #6a11cb);
-                top: 0;
-            }
-            
-            .recipient-name:after {
-                top: auto;
-                bottom: 0;
-            }
-            
-            .message {
-                font-size: 16px;
-                color: #555;
-                line-height: 1.5;
-                text-align: center;
-                max-width: 700px;
-                margin: 0 auto 25px;
-            }
-            
-            .course-details {
-                background: #f8f9fa;
-                border-radius: 8px;
-                padding: 20px;
-                margin: 20px 0;
-                border-left: 4px solid #6a11cb;
-            }
-            
-            .course-title {
-                font-size: 20px;
-                font-weight: 600;
-                color: #333;
-                margin-bottom: 8px;
-                text-align: center;
-            }
-            
-            .course-info {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 12px;
-                margin-top: 12px;
-            }
-            
-            .info-item {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                font-size: 14px;
-            }
-            
-            .info-item i {
-                color: #6a11cb;
-                font-size: 16px;
-            }
-            
-            .info-label {
-                font-weight: 600;
-                color: #555;
-                min-width: 100px;
-            }
-            
-            .info-value {
-                color: #333;
-            }
-            
-            .skills-section {
-                margin: 20px 0;
-            }
-            
-            .skills-title {
-                font-size: 18px;
-                font-weight: 600;
-                color: #333;
-                margin-bottom: 12px;
-                text-align: center;
-            }
-            
-            .skills-list {
-                display: flex;
-                flex-wrap: wrap;
-                justify-content: center;
-                gap: 8px;
-            }
-            
-            .skill-tag {
-                background: linear-gradient(135deg, #ff7e5f, #6a11cb);
-                color: white;
-                padding: 6px 12px;
-                border-radius: 16px;
-                font-size: 12px;
-                font-weight: 500;
-                display: flex;
-                align-items: center;
-                gap: 4px;
-            }
-            
-            .skill-level {
-                font-size: 9px;
-                background: rgba(255, 255, 255, 0.3);
-                padding: 2px 6px;
-                border-radius: 8px;
-                text-transform: uppercase;
-            }
-            
-            .signature-area {
-                display: flex;
-                justify-content: space-between;
-                margin-top: 25px;
-                align-items: flex-end;
-            }
-            
-            .signature {
-                text-align: center;
-                width: 45%;
-            }
-            
-            .signature-image {
-                height: 60px;
-                margin-bottom: 8px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-            
-            .signature-line {
-                width: 180px;
-                height: 1px;
-                background: #333;
-                margin: 0 auto 8px;
-            }
-            
-            .zigzag-line {
-                width: 150px;
-                height: 20px;
-                margin: 0 auto 8px;
-                background: linear-gradient(135deg, transparent 49%, #333 50%, transparent 51%),
-                            linear-gradient(45deg, transparent 49%, #333 50%, transparent 51%);
-                background-size: 10px 10px;
-                background-repeat: repeat-x;
-            }
-            
-            .signature-name {
-                font-weight: 600;
-                color: #333;
-                margin-bottom: 4px;
-                font-size: 16px;
-            }
-            
-            .signature-title {
-                font-size: 12px;
-                color: #666;
-                line-height: 1.3;
-            }
-            
-            .initials-display {
-                font-size: 24px;
-                font-weight: bold;
-                color: #333;
-                margin-bottom: 8px;
-                font-family: 'Brush Script MT', cursive;
-                letter-spacing: 2px;
-            }
-            
-            .certificate-footer {
-                background: #f8f9fa;
-                padding: 15px 40px;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                border-top: 1px solid #eaeaea;
-                margin-top: auto;
-            }
-            
-            .verification {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                color: #666;
-                font-size: 12px;
-            }
-            
-            .verification i {
-                color: #6a11cb;
-            }
-            
-            .social-links {
-                display: flex;
-                gap: 12px;
-            }
-            
-            .social-links a {
-                color: #666;
-                font-size: 16px;
-                transition: color 0.3s;
-            }
-            
-            .social-links a:hover {
-                color: #6a11cb;
-            }
-            
-            .watermark {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%) rotate(-45deg);
-                font-size: 100px;
-                font-weight: 900;
-                color: rgba(106, 17, 203, 0.05);
-                z-index: 0;
-                white-space: nowrap;
-                pointer-events: none;
-            }
-            
-            .decoration {
-                position: absolute;
-                z-index: 0;
-            }
-            
-            .decoration-1 {
-                top: 40px;
-                left: 40px;
-                width: 60px;
-                height: 60px;
-                border-radius: 50%;
-                background: linear-gradient(135deg, rgba(255,126,95,0.1), rgba(106,17,203,0.1));
-            }
-            
-            .decoration-2 {
-                bottom: 40px;
-                right: 40px;
-                width: 80px;
-                height: 80px;
-                border-radius: 50%;
-                background: linear-gradient(135deg, rgba(106,17,203,0.1), rgba(255,126,95,0.1));
-            }
-            
-            .badge {
-                position: absolute;
-                top: 30px;
-                right: 50px;
-                width: 70px;
-                height: 70px;
-                background: linear-gradient(135deg, #ff7e5f, #6a11cb);
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: white;
-                font-size: 28px;
-                box-shadow: 0 5px 15px rgba(106, 17, 203, 0.3);
-                z-index: 1;
-            }
-            
-            .achievement-text {
-                text-align: center;
-                margin-top: 8px;
-                color: #6a11cb;
-                font-weight: 600;
-                font-size: 14px;
-            }
-            
-            .company-name {
-                text-align: center;
-                margin-top: 15px;
-                font-size: 18px;
-                font-weight: 600;
-                color: #333;
-            }
-            
-            .qr-section {
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                gap: 30px;
-                margin: 15px 0;
-            }
-            
-            .qr-container {
-                background: white;
-                padding: 12px;
-                border-radius: 8px;
-                display: inline-block;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                border: 1px solid #eaeaea;
-            }
-            
-            .qr-code {
-                width: 100px;
-                height: 100px;
-            }
-            
-            .signature-container {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 10px;
-                width: 200px;
-            }
-            
-            .signature-separator {
-                width: 2px;
-                height: 80px;
-                background: linear-gradient(to bottom, #ff7e5f, #6a11cb);
-                margin: 0 20px;
-            }
-            
-            @media (max-width: 850px) {
-                .certificate-container {
-                    width: 100%;
-                    height: auto;
-                }
-                
-                .certificate-content {
-                    padding: 20px;
-                }
-                
-                .recipient-name {
-                    font-size: 32px;
-                }
-                
-                .certificate-title {
-                    font-size: 24px;
-                }
-                
-                .course-info {
-                    grid-template-columns: 1fr;
-                }
-                
-                .signature-area {
-                    flex-direction: column;
-                    gap: 15px;
-                }
-                
-                .signature {
-                    width: 100%;
-                }
-                
-                .qr-section {
-                    flex-direction: column;
-                    gap: 15px;
-                }
-                
-                .signature-separator {
-                    width: 80px;
-                    height: 2px;
-                    margin: 10px 0;
-                }
-            }
-            
-            @media (max-width: 480px) {
-                .certificate-header {
-                    padding: 15px;
-                    flex-direction: column;
-                    gap: 10px;
-                    text-align: center;
-                }
-                
-                .header-right {
-                    text-align: center;
-                }
-                
-                .recipient-name {
-                    font-size: 24px;
-                    padding: 10px 0;
-                }
-                
-                .certificate-title {
-                    font-size: 20px;
-                }
-                
-                .course-details {
-                    padding: 15px;
-                }
-                
-                .skills-list {
-                    gap: 6px;
-                }
-                
-                .skill-tag {
-                    font-size: 10px;
-                    padding: 4px 8px;
-                }
-            }
-        </style>
-    </head>
-    <body>
-        <div class="certificate-container">
-            <div class="certificate-header">
-                <div class="header-pattern"></div>
-                <div class="logo">
-                    <div class="logo-icon">
-                        <i class="fas fa-bolt"></i>
-                    </div>
-                    <div class="logo-text">SkillPulse</div>
-                </div>
-                <div class="header-right">
-                    <div class="certificate-id">Certificate ID: ${certificate.verification_code}</div>
-                    <div class="issue-date">Issued on: ${currentDate}</div>
-                </div>
-            </div>
-            
-            <div class="certificate-content">
-                <div class="watermark">SKILLPULSE</div>
-                
-                <div class="decoration decoration-1"></div>
-                <div class="decoration decoration-2"></div>
-                
-                <div class="badge">
-                    <i class="fas fa-award"></i>
-                </div>
-                
-                <h1 class="certificate-title">CERTIFICATE OF COMPLETION</h1>
-                <p class="subtitle">This certificate is awarded to</p>
-                
-                <div class="recipient-name">${user?.user_metadata?.full_name || 'Student'}</div>
-                
-                <p class="message">
-                    has successfully completed the course requirements and demonstrated proficiency in the following skills:
-                </p>
-                
-                <div class="course-details">
-                    <div class="course-title">${certificate.course_title}</div>
-                    <div class="course-info">
-                        <div class="info-item">
-                            <i class="far fa-clock"></i>
-                            <span class="info-label">Duration:</span>
-                            <span class="info-value">Self-Paced Learning</span>
-                        </div>
-                        <div class="info-item">
-                            <i class="fas fa-chart-line"></i>
-                            <span class="info-label">Level:</span>
-                            <span class="info-value">Professional</span>
-                        </div>
-                        <div class="info-item">
-                            <i class="fas fa-trophy"></i>
-                            <span class="info-label">Status:</span>
-                            <span class="info-value">Successfully Completed</span>
-                        </div>
-                        <div class="info-item">
-                            <i class="far fa-calendar-alt"></i>
-                            <span class="info-label">Completion Date:</span>
-                            <span class="info-value">${currentDate}</span>
-                        </div>
-                    </div>
-                </div>
-                
-                ${displayedSkills.length > 0 ? `
-                <div class="skills-section">
-                    <div class="skills-title">Skills Demonstrated</div>
-                    <div class="skills-list">
-                        ${displayedSkills.map(skill => `
-                            <div class="skill-tag">
-                                <i class="fas fa-bolt"></i>
-                                ${skill.skill_name}
-                                <span class="skill-level">${skill.skill_level}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-                ` : `
-                <div class="skills-section">
-                    <div class="skills-title">Skills Demonstrated</div>
-                    <div class="skills-list">
-                        <div class="skill-tag">
-                            <i class="fas fa-bolt"></i>
-                            Professional Knowledge
-                            <span class="skill-level">Advanced</span>
-                        </div>
-                        <div class="skill-tag">
-                            <i class="fas fa-bolt"></i>
-                            Practical Application
-                            <span class="skill-level">Intermediate</span>
-                        </div>
-                        <div class="skill-tag">
-                            <i class="fas fa-bolt"></i>
-                            Professional Competence 
-                            <span class="skill-level">Advanced</span>
-                        </div>
-                    </div>
-                </div>
-                `}
-                
-                <div class="qr-section">
-                    <div class="signature-container">
-                        <div class="signature-image">
-                            <img src="${founderSignatureUrl}" alt="Founder Signature" style="height: 50px; max-width: 180px;" onerror="this.style.display='none'" />
-                        </div>
-                        <div class="signature-line"></div>
-                        <div class="signature-name">Mbolela Pule</div>
-                        <div class="signature-title">Founder & CEO</div>
-                        <div class="signature-title">SkillPulse Innovations Limited</div>
-                    </div>
-                    
-                    <div class="signature-separator"></div>
-                    
-                    <div class="qr-container">
-                        <div id="qr-code" class="qr-code"></div>
-                    </div>
-                    
-                    <div class="signature-separator"></div>
-                    
-                    <div class="signature-container">
-                        <div class="initials-display">${creatorInitials}</div>
-                        <div class="zigzag-line"></div>
-                        <div class="signature-name">${creatorName}</div>
-                        <div class="signature-title">Course Instructor</div>
-                        <div class="signature-title">SkillPulse Learning</div>
-                    </div>
-                </div>
-                
-                <div class="achievement-text">For Excellence in Professional Development & Skill Mastery</div>
-                
-                <div class="company-name">SkillPulse Innovations Limited</div>
-            </div>
-            
-            <div class="certificate-footer">
-                <div class="verification">
-                    <i class="fas fa-shield-alt"></i>
-                    <span>Verify this certificate at: skillpulse.cloud/verify/${certificate.verification_code}</span>
-                </div>
-                
-                <div class="social-links no-print">
-                    <a href="#"><i class="fab fa-linkedin"></i></a>
-                    <a href="#"><i class="fab fa-twitter"></i></a>
-                    <a href="#"><i class="fab fa-facebook"></i></a>
-                </div>
-            </div>
-        </div>
-        
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-        <script>
-            // Generate QR Code after page loads
-            window.addEventListener('load', function() {
-                const qrContainer = document.getElementById('qr-code');
-                const verificationUrl = '${verificationUrl}';
-                
-                // Create QR Code using qrcode.js library
-                if (typeof QRCode !== 'undefined') {
-                    new QRCode(qrContainer, {
-                        text: verificationUrl,
-                        width: 100,
-                        height: 100,
-                        colorDark: "#1f2937",
-                        colorLight: "#ffffff",
-                        correctLevel: QRCode.CorrectLevel.M
-                    });
-                } else {
-                    qrContainer.innerHTML = '<div style="width: 100px; height: 100px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #6b7280; text-align: center;">QR Code<br>Not Available</div>';
-                }
-            });
-            
-            // Auto-print when opened in print view
-            if (window.location.search.includes('print=true')) {
-                setTimeout(() => {
-                    window.print();
-                }, 1000);
-            }
-        </script>
-    </body>
-    </html>
-    `;
-  };
-
-  const printCertificate = async (certificate: Certificate) => {
-    try {
-      const certificateHTML = await generateCertificateHTML(certificate);
-      
-      // Create a new window for printing
-      const printWindow = window.open('', '_blank', 'width=900,height=700');
-      
-      if (!printWindow) {
-        toast.error('Please allow popups to print the certificate');
-        return;
-      }
-      
-      printWindow.document.write(certificateHTML);
-      printWindow.document.close();
-      
-      // Wait for content to load then print
-      printWindow.onload = () => {
-        setTimeout(() => {
-          printWindow.print();
-          // Don't close immediately to allow user to see print dialog
-        }, 1000);
-      };
-      
-      toast.success('Certificate is ready to print!');
-    } catch (error) {
-      console.error('Error printing certificate:', error);
-      toast.error('Failed to print certificate');
-    }
-  };
-
-  const viewCertificate = async (certificate: Certificate) => {
-    const html = await generateCertificateHTML(certificate);
-    const newWindow = window.open('', '_blank', 'width=900,height=800');
-    if (newWindow) {
-      newWindow.document.write(html);
-      newWindow.document.close();
-    }
+  const viewCertificate = (certificate: Certificate) => {
+    setSelectedCertificate(certificate);
+    setShowCertificateModal(true);
   };
 
   // Use the PulseLoading component
@@ -1341,14 +1339,6 @@ const CourseResultsPage = () => {
                                 >
                                   View
                                 </Button>
-                                <Button
-                                  onClick={() => printCertificate(certificate)}
-                                  size="sm"
-                                  className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl"
-                                >
-                                  <Download className="h-4 w-4 mr-2" />
-                                  Print
-                                </Button>
                               </div>
                             </div>
                           </div>
@@ -1400,6 +1390,24 @@ const CourseResultsPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Certificate Modal */}
+      <Dialog open={showCertificateModal} onOpenChange={setShowCertificateModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>Certificate - {selectedCertificate?.course_title}</DialogTitle>
+            <DialogDescription>
+              View and download your course completion certificate
+            </DialogDescription>
+          </DialogHeader>
+          {selectedCertificate && (
+            <CertificateDisplay 
+              certificate={selectedCertificate} 
+              courseSkills={courseSkills} 
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 };
