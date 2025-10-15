@@ -261,7 +261,7 @@ const Navbar = () => {
                 variant="ghost" 
                 size="icon" 
                 className="relative hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 transition-all duration-200"
-                onClick={() => navigate('/community?tab=notifications')}
+                onClick={() => navigate('/notifications')}
               >
                 <Bell className="h-5 w-5 text-gray-600" />
                 {unreadNotifications > 0 && (
