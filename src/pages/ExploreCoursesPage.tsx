@@ -1,4 +1,4 @@
-the explorecourses page is loading to footers  from the layoutcomponent > Please FIX THAT . Main all the design and FUNCTIONALITY BUT JUST FIX THAT :  import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -506,7 +506,7 @@ const ExploreCoursesPage = () => {
                           {course.summary}
                         </p>
                       )}
-                    </CardContent>
+                    </CardHeader>
 
                     <CardContent className="space-y-4">
                       <div className="grid grid-cols-2 gap-4 text-sm">
