@@ -389,7 +389,7 @@ const CertificateDisplay: React.FC<{ certificate: Certificate; courseSkills: Rec
                   src={founderSignatureUrl} 
                   alt="Founder Signature" 
                   style={{ 
-                    height: '120px', 
+                    height: '150px', 
                     maxWidth: '200px',
                     marginBottom: '5px'
                   }} 
