@@ -22,8 +22,7 @@ import {
   Users,
   Clock,
   Heart,
-  Zap,
-  Printer
+  Zap
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
@@ -204,6 +203,17 @@ const CertificateDisplay: React.FC<{ certificate: Certificate; courseSkills: Rec
           flex-direction: column !important;
           align-items: center !important;
         }
+        .skills-list {
+          display: flex !important;
+          flex-wrap: wrap !important;
+          justify-content: center !important;
+          gap: 8px !important;
+        }
+        .skill-tag {
+          display: flex !important;
+          align-items: center !important;
+          gap: 4px !important;
+        }
       }
     `,
   });
@@ -252,15 +262,8 @@ const CertificateDisplay: React.FC<{ certificate: Certificate; courseSkills: Rec
 
   return (
     <div className="certificate-display">
-      {/* Action buttons */}
+      {/* Action buttons - Only Download PDF remains */}
       <div className="flex justify-center gap-4 mb-6 no-print">
-        <Button
-          onClick={handlePrint}
-          className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl"
-        >
-          <Printer className="h-4 w-4" />
-          Print Certificate
-        </Button>
         <Button
           onClick={downloadPdfCertificate}
           className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl"
@@ -291,7 +294,10 @@ const CertificateDisplay: React.FC<{ certificate: Certificate; courseSkills: Rec
           <div className="header-pattern"></div>
           <div className="logo">
             <div className="logo-icon">
-              <i className="fas fa-bolt"></i>
+              {/* SkillPulse icon - using the original icon */}
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             </div>
             <div className="logo-text">SkillPulse</div>
           </div>
@@ -308,7 +314,11 @@ const CertificateDisplay: React.FC<{ certificate: Certificate; courseSkills: Rec
           <div className="decoration decoration-2"></div>
           
           <div className="badge">
-            <i className="fas fa-award"></i>
+            {/* Ribbon icon inside the circle - made visible */}
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 15C15.866 15 19 11.866 19 8C19 4.13401 15.866 1 12 1C8.13401 1 5 4.13401 5 8C5 11.866 8.13401 15 12 15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M8.21 13.89L7 23L12 20L17 23L15.79 13.88" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </div>
           
           <h1 className="certificate-title">CERTIFICATE OF COMPLETION</h1>
@@ -324,22 +334,37 @@ const CertificateDisplay: React.FC<{ certificate: Certificate; courseSkills: Rec
             <div className="course-title">{certificate.course_title}</div>
             <div className="course-info">
               <div className="info-item">
-                <i className="far fa-clock"></i>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                  <polyline points="12 6 12 12 16 14" stroke="currentColor" strokeWidth="2"/>
+                </svg>
                 <span className="info-label">Duration:</span>
                 <span className="info-value">Self-Paced Learning</span>
               </div>
               <div className="info-item">
-                <i className="fas fa-chart-line"></i>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M18 20V10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M12 20V4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M6 20V14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
                 <span className="info-label">Level:</span>
                 <span className="info-value">Professional</span>
               </div>
               <div className="info-item">
-                <i className="fas fa-trophy"></i>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 15C15.866 15 19 11.866 19 8C19 4.13401 15.866 1 12 1C8.13401 1 5 4.13401 5 8C5 11.866 8.13401 15 12 15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M8.21 13.89L7 23L12 20L17 23L15.79 13.88" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
                 <span className="info-label">Status:</span>
                 <span className="info-value">Successfully Completed</span>
               </div>
               <div className="info-item">
-                <i className="far fa-calendar-alt"></i>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2"/>
+                  <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" strokeWidth="2"/>
+                  <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" strokeWidth="2"/>
+                  <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" strokeWidth="2"/>
+                </svg>
                 <span className="info-label">Completion Date:</span>
                 <span className="info-value">{currentDate}</span>
               </div>
@@ -352,7 +377,9 @@ const CertificateDisplay: React.FC<{ certificate: Certificate; courseSkills: Rec
               <div className="skills-list">
                 {displayedSkills.map((skill) => (
                   <div key={skill.id} className="skill-tag">
-                    <i className="fas fa-bolt"></i>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                     {skill.skill_name}
                     <span className="skill-level">{skill.skill_level}</span>
                   </div>
@@ -364,17 +391,23 @@ const CertificateDisplay: React.FC<{ certificate: Certificate; courseSkills: Rec
               <div className="skills-title">Skills Demonstrated</div>
               <div className="skills-list">
                 <div className="skill-tag">
-                  <i className="fas fa-bolt"></i>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
                   Professional Knowledge
                   <span className="skill-level">Advanced</span>
                 </div>
                 <div className="skill-tag">
-                  <i className="fas fa-bolt"></i>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
                   Practical Application
                   <span className="skill-level">Intermediate</span>
                 </div>
                 <div className="skill-tag">
-                  <i className="fas fa-bolt"></i>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
                   Professional Competence 
                   <span className="skill-level">Advanced</span>
                 </div>
@@ -436,14 +469,30 @@ const CertificateDisplay: React.FC<{ certificate: Certificate; courseSkills: Rec
         
         <div className="certificate-footer">
           <div className="verification">
-            <i className="fas fa-shield-alt"></i>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
             <span>Verify this certificate at: skillpulse.cloud/verify/{certificate.verification_code}</span>
           </div>
           
           <div className="social-links no-print">
-            <a href="#"><i className="fab fa-linkedin"></i></a>
-            <a href="#"><i className="fab fa-twitter"></i></a>
-            <a href="#"><i className="fab fa-facebook"></i></a>
+            <a href="#">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" stroke="currentColor" strokeWidth="2"/>
+                <rect x="2" y="9" width="4" height="12" stroke="currentColor" strokeWidth="2"/>
+                <circle cx="4" cy="4" r="2" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+            </a>
+            <a href="#">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+            </a>
+            <a href="#">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+            </a>
           </div>
         </div>
       </div>
@@ -607,9 +656,9 @@ const CertificateDisplay: React.FC<{ certificate: Certificate; courseSkills: Rec
           font-size: 14px;
         }
 
-        .info-item i {
+        .info-item svg {
           color: #6a11cb;
-          font-size: 16px;
+          flex-shrink: 0;
         }
 
         .info-label {
@@ -651,6 +700,7 @@ const CertificateDisplay: React.FC<{ certificate: Certificate; courseSkills: Rec
           display: flex;
           align-items: center;
           gap: 4px;
+          white-space: nowrap;
         }
 
         .skill-level {
@@ -659,6 +709,7 @@ const CertificateDisplay: React.FC<{ certificate: Certificate; courseSkills: Rec
           padding: 2px 6px;
           border-radius: 8px;
           text-transform: uppercase;
+          margin-left: 4px;
         }
 
         .signature-area {
@@ -738,8 +789,9 @@ const CertificateDisplay: React.FC<{ certificate: Certificate; courseSkills: Rec
           font-size: 12px;
         }
 
-        .verification i {
+        .verification svg {
           color: #6a11cb;
+          flex-shrink: 0;
         }
 
         .social-links {
@@ -944,6 +996,20 @@ const CertificateDisplay: React.FC<{ certificate: Certificate; courseSkills: Rec
         @media print {
           .no-print {
             display: none !important;
+          }
+          
+          .skills-list {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            justify-content: center !important;
+            gap: 8px !important;
+          }
+          
+          .skill-tag {
+            display: flex !important;
+            align-items: center !important;
+            gap: 4px !important;
+            white-space: nowrap !important;
           }
         }
       `}</style>
