@@ -22,7 +22,8 @@ import {
   Share2,
   BarChart3,
   GraduationCap,
-  ThumbsUp
+  ThumbsUp,
+  Zap
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import CourseReviews from '@/components/course/CourseReviews';
@@ -80,6 +81,14 @@ interface Course {
     outcome: string;
     order_index: number;
   }>;
+  course_skill_outcomes: Array<{
+    id: string;
+    skill_name: string;
+    skill_description?: string;
+    skill_level: string;
+    order_index: number;
+    is_core_skill: boolean;
+  }>;
   course_reviews: Array<{
     id: string;
     rating: number;
@@ -106,6 +115,94 @@ interface CreatorProfile {
   total_students?: number;
   total_reviews?: number;
 }
+
+// Skills to be Gained Component
+const SkillsToBeGained = ({ skills }: { skills: Course['course_skill_outcomes'] }) => {
+  if (!skills || skills.length === 0) {
+    return null;
+  }
+
+  const getSkillLevelColor = (level: string) => {
+    switch (level?.toLowerCase()) {
+      case 'beginner':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'intermediate':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'advanced':
+        return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'expert':
+        return 'bg-red-100 text-red-800 border-red-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getSkillLevelIcon = (level: string) => {
+    switch (level?.toLowerCase()) {
+      case 'beginner':
+        return <div className="w-2 h-2 rounded-full bg-green-500" />;
+      case 'intermediate':
+        return <div className="w-2 h-2 rounded-full bg-blue-500" />;
+      case 'advanced':
+        return <div className="w-2 h-2 rounded-full bg-purple-500" />;
+      case 'expert':
+        return <div className="w-2 h-2 rounded-full bg-red-500" />;
+      default:
+        return <div className="w-2 h-2 rounded-full bg-gray-500" />;
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <h4 className="font-semibold text-gray-900 text-sm mb-3">Skills You'll Gain</h4>
+      <div className="space-y-3">
+        {skills
+          .sort((a, b) => a.order_index - b.order_index)
+          .map((skill) => (
+            <div 
+              key={skill.id}
+              className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 p-3 transition-all duration-200 hover:shadow-md"
+            >
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                  <h5 className="font-medium text-gray-900 text-sm leading-tight">
+                    {skill.skill_name}
+                  </h5>
+                </div>
+                {skill.is_core_skill && (
+                  <Badge 
+                    variant="outline" 
+                    className="text-xs bg-yellow-50 text-yellow-700 border-yellow-200"
+                  >
+                    Core
+                  </Badge>
+                )}
+              </div>
+              
+              {skill.skill_description && (
+                <p className="text-gray-600 text-xs mb-2 leading-relaxed">
+                  {skill.skill_description}
+                </p>
+              )}
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {getSkillLevelIcon(skill.skill_level)}
+                  <Badge 
+                    variant="outline" 
+                    className={`text-xs ${getSkillLevelColor(skill.skill_level)}`}
+                  >
+                    {skill.skill_level || 'Intermediate'}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          ))}
+      </div>
+    </div>
+  );
+};
 
 // Social Share Icons Component
 const SocialShareIcons = ({ courseTitle, courseUrl }: { courseTitle: string; courseUrl: string }) => {
@@ -394,6 +491,7 @@ const CourseDetailPage = () => {
         previewResult,
         modulesResult,
         outcomesResult,
+        skillsResult,
         reviewsResult,
         enrollmentsResult
       ] = await Promise.allSettled([
@@ -435,6 +533,13 @@ const CourseDetailPage = () => {
         supabase
           .from('course_learning_outcomes')
           .select('id, outcome, order_index')
+          .eq('course_id', id)
+          .order('order_index', { ascending: true }),
+
+        // Skill outcomes
+        supabase
+          .from('course_skill_outcomes')
+          .select('id, skill_name, skill_description, skill_level, order_index, is_core_skill')
           .eq('course_id', id)
           .order('order_index', { ascending: true }),
 
@@ -480,6 +585,10 @@ const CourseDetailPage = () => {
       const outcomesData = outcomesResult.status === 'fulfilled' && !outcomesResult.value.error ? 
         outcomesResult.value.data : [];
 
+      // Process skills data
+      const skillsData = skillsResult.status === 'fulfilled' && !skillsResult.value.error ? 
+        skillsResult.value.data : [];
+
       // Process enrollments data
       const enrollmentsData = enrollmentsResult.status === 'fulfilled' && !enrollmentsResult.value.error ? 
         enrollmentsResult.value.data : [];
@@ -512,6 +621,7 @@ const CourseDetailPage = () => {
         course_preview: previewData,
         course_modules: modulesData,
         course_learning_outcomes: outcomesData,
+        course_skill_outcomes: skillsData,
         course_reviews: reviewsWithProfiles,
         course_enrollments: enrollmentsData
       };
@@ -1086,7 +1196,7 @@ const CourseDetailPage = () => {
                     {/* View Profile Button */}
                     <Button 
                       className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 font-semibold py-2"
-                      onClick={() => navigate(`/creator/profile/${creator.id}`)}
+                      onClick={() => navigate(`/creator/profile/${creatorProfile.id}`)}
                     >
                       View Profile
                     </Button>
@@ -1127,7 +1237,7 @@ const CourseDetailPage = () => {
                     )}
                   </div>
                   
-                  {/* Wishlist Button - FIXED DUPLICATE */}
+                  {/* Wishlist Button */}
                   {!isEnrolled && (
                     <div className="mt-6 pt-6 border-t border-gray-200">
                       <WishlistButton
@@ -1141,12 +1251,19 @@ const CourseDetailPage = () => {
                     </div>
                   )}
 
-                  {/* Social Share Icons - ALWAYS SHOWN */}
+                  {/* Social Share Icons */}
                   <div className="mt-6 pt-6 border-t border-gray-200">
                     <SocialShareIcons courseTitle={course.title} courseUrl={courseUrl} />
                   </div>
 
-                  {/* FAQ Section - ALWAYS SHOWN */}
+                  {/* Skills to be Gained Section */}
+                  {course.course_skill_outcomes && course.course_skill_outcomes.length > 0 && (
+                    <div className="mt-6 pt-6 border-t border-gray-200">
+                      <SkillsToBeGained skills={course.course_skill_outcomes} />
+                    </div>
+                  )}
+
+                  {/* FAQ Section */}
                   <div className="mt-6 pt-6 border-t border-gray-200">
                     <FAQSection />
                   </div>
