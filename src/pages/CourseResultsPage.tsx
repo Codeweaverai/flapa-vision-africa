@@ -314,8 +314,8 @@ const CourseResultsPage = () => {
     // QR Code data
     const verificationUrl = `https://skillpulse.cloud/verify?code=${certificate.verification_code}`;
 
-    // Base64 signature for Founder & CEO (placeholder - you can replace with actual signature)
-    const founderSignature = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjgwIiB2aWV3Qm94PSIwIDAgMjAwIDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0yMCA0MEMyMCAyNiAxNCAyMCAyMCAyMEMyNiAyMCAzMCAyNiAzMCA0MEMzMCA1NCAyNiA2MCAyMCA2MEMxNCA2MCAxMCA1NCAxMCA0MEMxMCAyNiAxNCAyMCAyMCAyMFoiIGZpbGw9IiM2YTExY2IiLz48cGF0aCBkPSJNNzAgNDBDNzAgMjYgNjQgMjAgNzAgMjBDNzYgMjAgODAgMjYgODAgNDBDODAgNTQgNzYgNjAgNzAgNjBDNjQgNjAgNjAgNTQgNjAgNDBDNjAgMjYgNjQgMjAgNzAgMjBaIiBmaWxsPSIjZmY3ZTVmIi8+PHBhdGggZD0iTTEyMCA0MEMxMjAgMjYgMTE0IDIwIDEyMCAyMEMxMjYgMjAgMTMwIDI2IDEzMCA0MEMxMzAgNTQgMTI2IDYwIDEyMCA2MEMxMTQgNjAgMTEwIDU0IDExMCA0MEMxMTAgMjYgMTE0IDIwIDEyMCAyMFoiIGZpbGw9IiM2YTExY2IiLz48cGF0aCBkPSJNMTcwIDQwQzE3MCAyNiAxNjQgMjAgMTcwIDIwQzE3NiAyMCAxODAgMjYgMTgwIDQwQzE4MCA1NCAxNzYgNjAgMTcwIDYwQzE2NCA2MCAxNjAgNTQgMTYwIDQwQzE2MCAyNiAxNjQgMjAgMTcwIDIwWiIgZmlsbD0iI2ZmN2U1ZiIvPjwvc3ZnPg==";
+    // Founder signature URL
+    const founderSignatureUrl = "https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/signature.png";
 
     return `
     <!DOCTYPE html>
@@ -350,20 +350,41 @@ const CourseResultsPage = () => {
                     margin: 0 !important;
                     -webkit-print-color-adjust: exact !important;
                     print-color-adjust: exact !important;
+                    width: 100% !important;
+                    height: 100% !important;
                 }
                 
                 .certificate-container {
                     box-shadow: none !important;
                     border: 1px solid #ddd !important;
-                    margin: 0 !important;
+                    margin: 0 auto !important;
                     width: 100% !important;
                     height: 100vh !important;
                     page-break-after: avoid !important;
                     page-break-inside: avoid !important;
+                    position: relative !important;
                 }
                 
                 .no-print {
                     display: none !important;
+                }
+                
+                .certificate-content {
+                    padding: 30px 50px !important;
+                }
+                
+                .qr-section {
+                    display: flex !important;
+                    justify-content: center !important;
+                    align-items: center !important;
+                    gap: 30px !important;
+                    margin: 15px 0 !important;
+                }
+                
+                .signature-container {
+                    display: flex !important;
+                    flex-direction: column !important;
+                    align-items: center !important;
                 }
                 
                 @page {
@@ -373,8 +394,8 @@ const CourseResultsPage = () => {
             }
             
             .certificate-container {
-                width: 794px; /* A4 width in pixels */
-                height: 1123px; /* A4 height in pixels */
+                width: 794px;
+                height: 1123px;
                 background: white;
                 box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
                 border-radius: 8px;
@@ -619,6 +640,16 @@ const CourseResultsPage = () => {
                 margin: 0 auto 8px;
             }
             
+            .zigzag-line {
+                width: 150px;
+                height: 20px;
+                margin: 0 auto 8px;
+                background: linear-gradient(135deg, transparent 49%, #333 50%, transparent 51%),
+                            linear-gradient(45deg, transparent 49%, #333 50%, transparent 51%);
+                background-size: 10px 10px;
+                background-repeat: repeat-x;
+            }
+            
             .signature-name {
                 font-weight: 600;
                 color: #333;
@@ -632,19 +663,13 @@ const CourseResultsPage = () => {
                 line-height: 1.3;
             }
             
-            .initials-signature {
-                width: 120px;
-                height: 50px;
-                background: linear-gradient(135deg, #6a11cb, #2575fc);
-                border-radius: 8px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: white;
-                font-size: 20px;
+            .initials-display {
+                font-size: 24px;
                 font-weight: bold;
-                margin: 0 auto 8px;
-                border: 2px solid #6a11cb;
+                color: #333;
+                margin-bottom: 8px;
+                font-family: 'Brush Script MT', cursive;
+                letter-spacing: 2px;
             }
             
             .certificate-footer {
@@ -780,6 +805,7 @@ const CourseResultsPage = () => {
                 flex-direction: column;
                 align-items: center;
                 gap: 10px;
+                width: 200px;
             }
             
             .signature-separator {
@@ -958,7 +984,7 @@ const CourseResultsPage = () => {
                         </div>
                         <div class="skill-tag">
                             <i class="fas fa-bolt"></i>
-                            Professinal Competence 
+                            Professional Competence 
                             <span class="skill-level">Advanced</span>
                         </div>
                     </div>
@@ -968,7 +994,7 @@ const CourseResultsPage = () => {
                 <div class="qr-section">
                     <div class="signature-container">
                         <div class="signature-image">
-                            <img src="${founderSignature}" alt="Founder Signature" style="height: 50px;" />
+                            <img src="${founderSignatureUrl}" alt="Founder Signature" style="height: 50px; max-width: 180px;" onerror="this.style.display='none'" />
                         </div>
                         <div class="signature-line"></div>
                         <div class="signature-name">Mbolela Pule</div>
@@ -985,8 +1011,8 @@ const CourseResultsPage = () => {
                     <div class="signature-separator"></div>
                     
                     <div class="signature-container">
-                        <div class="initials-signature">${creatorInitials}</div>
-                        <div class="signature-line"></div>
+                        <div class="initials-display">${creatorInitials}</div>
+                        <div class="zigzag-line"></div>
                         <div class="signature-name">${creatorName}</div>
                         <div class="signature-title">Course Instructor</div>
                         <div class="signature-title">SkillPulse Learning</div>
