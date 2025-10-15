@@ -21,7 +21,8 @@ import {
   BookOpen,
   Users,
   Clock,
-  Heart
+  Heart,
+  Zap
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
@@ -99,6 +100,16 @@ interface Certificate {
   pdf_url?: string;
   course_title?: string;
   creator_id?: string;
+  course_id?: string;
+}
+
+interface CourseSkill {
+  id: string;
+  skill_name: string;
+  skill_description?: string;
+  skill_level: string;
+  order_index: number;
+  is_core_skill: boolean;
 }
 
 const CourseResultsPage = () => {
@@ -109,6 +120,7 @@ const CourseResultsPage = () => {
   const [loading, setLoading] = useState(true);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
   const [selectedCertificate, setSelectedCertificate] = useState<Certificate | null>(null);
+  const [courseSkills, setCourseSkills] = useState<Record<string, CourseSkill[]>>({});
 
   useEffect(() => {
     if (!user) {
@@ -197,11 +209,36 @@ const CourseResultsPage = () => {
               issue_date: cert.issue_date,
               pdf_url: cert.pdf_url || undefined,
               course_title: enrollment?.courses?.title || 'Course Certificate',
-              creator_id: enrollment?.courses?.creator_id
+              creator_id: enrollment?.courses?.creator_id,
+              course_id: enrollment?.course_id
             };
           }) || [];
           
           setCertificates(transformedCertificates);
+
+          // Fetch skills for each course with certificates
+          const courseIds = transformedCertificates
+            .map(cert => cert.course_id)
+            .filter(Boolean) as string[];
+          
+          if (courseIds.length > 0) {
+            const { data: skillsData, error: skillsError } = await supabase
+              .from('course_skill_outcomes')
+              .select('*')
+              .in('course_id', courseIds)
+              .order('order_index', { ascending: true });
+
+            if (!skillsError && skillsData) {
+              const skillsByCourse: Record<string, CourseSkill[]> = {};
+              skillsData.forEach(skill => {
+                if (!skillsByCourse[skill.course_id]) {
+                  skillsByCourse[skill.course_id] = [];
+                }
+                skillsByCourse[skill.course_id].push(skill);
+              });
+              setCourseSkills(skillsByCourse);
+            }
+          }
         }
       }
 
@@ -233,6 +270,21 @@ const CourseResultsPage = () => {
     }
   };
 
+  const getSkillLevelColor = (level: string) => {
+    switch (level?.toLowerCase()) {
+      case 'beginner':
+        return 'bg-green-500 text-white';
+      case 'intermediate':
+        return 'bg-blue-500 text-white';
+      case 'advanced':
+        return 'bg-purple-500 text-white';
+      case 'expert':
+        return 'bg-red-500 text-white';
+      default:
+        return 'bg-gray-500 text-white';
+    }
+  };
+
   const generateCertificateHTML = async (certificate: Certificate) => {
     const currentDate = new Date(certificate.issue_date).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -242,6 +294,11 @@ const CourseResultsPage = () => {
 
     // Get creator name
     const creatorName = certificate.creator_id ? await fetchCreatorName(certificate.creator_id) : 'SkillPulse Instructor';
+
+    // Get skills for this course
+    const skills = certificate.course_id ? courseSkills[certificate.course_id] : [];
+    const coreSkills = skills.filter(skill => skill.is_core_skill);
+    const displayedSkills = coreSkills.length > 0 ? coreSkills : skills.slice(0, 6);
 
     // QR Code data
     const verificationUrl = `https://skillpulse.cloud/verify?code=${certificate.verification_code}`;
@@ -269,6 +326,25 @@ const CourseResultsPage = () => {
                 min-height: 100vh;
                 background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
                 padding: 20px;
+            }
+            
+            @media print {
+                body {
+                    background: white !important;
+                    padding: 0 !important;
+                }
+                
+                .certificate-container {
+                    box-shadow: none !important;
+                    border: 1px solid #ddd !important;
+                    margin: 0 !important;
+                    width: 100% !important;
+                    height: auto !important;
+                }
+                
+                .no-print {
+                    display: none !important;
+                }
             }
             
             .certificate-container {
@@ -474,6 +550,17 @@ const CourseResultsPage = () => {
                 border-radius: 20px;
                 font-size: 14px;
                 font-weight: 500;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+            
+            .skill-level {
+                font-size: 10px;
+                background: rgba(255, 255, 255, 0.3);
+                padding: 2px 6px;
+                border-radius: 10px;
+                text-transform: uppercase;
             }
             
             .signature-area {
@@ -646,6 +733,50 @@ const CourseResultsPage = () => {
                 .course-info {
                     grid-template-columns: 1fr;
                 }
+                
+                .signature-area {
+                    flex-direction: column;
+                    gap: 20px;
+                }
+                
+                .signature {
+                    width: 100%;
+                }
+            }
+            
+            @media (max-width: 480px) {
+                .certificate-header {
+                    padding: 20px;
+                    flex-direction: column;
+                    gap: 15px;
+                    text-align: center;
+                }
+                
+                .header-right {
+                    text-align: center;
+                }
+                
+                .recipient-name {
+                    font-size: 28px;
+                    padding: 15px 0;
+                }
+                
+                .certificate-title {
+                    font-size: 24px;
+                }
+                
+                .course-details {
+                    padding: 15px;
+                }
+                
+                .skills-list {
+                    gap: 8px;
+                }
+                
+                .skill-tag {
+                    font-size: 12px;
+                    padding: 6px 12px;
+                }
             }
         </style>
     </head>
@@ -710,15 +841,46 @@ const CourseResultsPage = () => {
                     </div>
                 </div>
                 
+                ${displayedSkills.length > 0 ? `
                 <div class="skills-section">
                     <div class="skills-title">Skills Demonstrated</div>
                     <div class="skills-list">
-                        <div class="skill-tag">Professional Knowledge</div>
-                        <div class="skill-tag">Practical Application</div>
-                        <div class="skill-tag">Critical Thinking</div>
-                        <div class="skill-tag">Problem Solving</div>
+                        ${displayedSkills.map(skill => `
+                            <div class="skill-tag">
+                                <i class="fas fa-bolt"></i>
+                                ${skill.skill_name}
+                                <span class="skill-level">${skill.skill_level}</span>
+                            </div>
+                        `).join('')}
                     </div>
                 </div>
+                ` : `
+                <div class="skills-section">
+                    <div class="skills-title">Skills Demonstrated</div>
+                    <div class="skills-list">
+                        <div class="skill-tag">
+                            <i class="fas fa-bolt"></i>
+                            Professional Knowledge
+                            <span class="skill-level">Advanced</span>
+                        </div>
+                        <div class="skill-tag">
+                            <i class="fas fa-bolt"></i>
+                            Practical Application
+                            <span class="skill-level">Intermediate</span>
+                        </div>
+                        <div class="skill-tag">
+                            <i class="fas fa-bolt"></i>
+                            Critical Thinking
+                            <span class="skill-level">Advanced</span>
+                        </div>
+                        <div class="skill-tag">
+                            <i class="fas fa-bolt"></i>
+                            Problem Solving
+                            <span class="skill-level">Expert</span>
+                        </div>
+                    </div>
+                </div>
+                `}
                 
                 <div class="qr-section">
                     <div class="qr-container">
@@ -757,7 +919,7 @@ const CourseResultsPage = () => {
                     <span>Verify this certificate at: skillpulse.cloud/verify/${certificate.verification_code}</span>
                 </div>
                 
-                <div class="social-links">
+                <div class="social-links no-print">
                     <a href="#"><i class="fab fa-linkedin"></i></a>
                     <a href="#"><i class="fab fa-twitter"></i></a>
                     <a href="#"><i class="fab fa-facebook"></i></a>
@@ -786,6 +948,11 @@ const CourseResultsPage = () => {
                     qrContainer.innerHTML = '<div style="width: 120px; height: 120px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #6b7280; text-align: center;">QR Code<br>Not Available</div>';
                 }
             });
+            
+            // Auto-print when opened in print view
+            if (window.location.search.includes('print=true')) {
+                window.print();
+            }
         </script>
     </body>
     </html>
@@ -811,7 +978,7 @@ const CourseResultsPage = () => {
       printWindow.onload = () => {
         setTimeout(() => {
           printWindow.print();
-          printWindow.close();
+          // Don't close immediately to allow user to see print dialog
         }, 1000);
       };
       
@@ -828,6 +995,28 @@ const CourseResultsPage = () => {
     if (newWindow) {
       newWindow.document.write(html);
       newWindow.document.close();
+    }
+  };
+
+  const downloadCertificate = async (certificate: Certificate) => {
+    try {
+      const certificateHTML = await generateCertificateHTML(certificate);
+      
+      // Create a blob and download link
+      const blob = new Blob([certificateHTML], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `certificate-${certificate.verification_code}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast.success('Certificate downloaded successfully!');
+    } catch (error) {
+      console.error('Error downloading certificate:', error);
+      toast.error('Failed to download certificate');
     }
   };
 
@@ -1006,53 +1195,73 @@ const CourseResultsPage = () => {
                   </CardHeader>
                   <CardContent className="p-6 space-y-6">
                     {certificates.length > 0 ? (
-                      certificates.map((certificate) => (
-                        <div
-                          key={certificate.id}
-                          className="p-6 rounded-xl bg-gradient-to-r from-orange-50 to-purple-50 border border-orange-200 hover:shadow-lg transition-all duration-300"
-                        >
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="flex items-start gap-4 flex-1">
-                              <div className="bg-gradient-to-r from-orange-500 to-purple-600 rounded-full p-3">
-                                <Award className="h-6 w-6 text-white" />
+                      certificates.map((certificate) => {
+                        const skills = certificate.course_id ? courseSkills[certificate.course_id] : [];
+                        const coreSkills = skills.filter(skill => skill.is_core_skill);
+                        const displayedSkills = coreSkills.length > 0 ? coreSkills : skills.slice(0, 4);
+                        
+                        return (
+                          <div
+                            key={certificate.id}
+                            className="p-6 rounded-xl bg-gradient-to-r from-orange-50 to-purple-50 border border-orange-200 hover:shadow-lg transition-all duration-300"
+                          >
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex items-start gap-4 flex-1">
+                                <div className="bg-gradient-to-r from-orange-500 to-purple-600 rounded-full p-3">
+                                  <Award className="h-6 w-6 text-white" />
+                                </div>
+                                <div className="flex-1">
+                                  <h3 className="font-semibold text-lg text-gray-900 mb-1">
+                                    {certificate.course_title}
+                                  </h3>
+                                  <p className="text-sm text-gray-600">
+                                    Verification Code: <span className="font-mono text-orange-600">{certificate.verification_code}</span>
+                                  </p>
+                                  {displayedSkills.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 mt-2">
+                                      {displayedSkills.map((skill) => (
+                                        <Badge 
+                                          key={skill.id}
+                                          variant="outline"
+                                          className={`text-xs ${getSkillLevelColor(skill.skill_level)} border-transparent`}
+                                        >
+                                          <Zap className="h-3 w-3 mr-1" />
+                                          {skill.skill_name}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                              <div className="flex-1">
-                                <h3 className="font-semibold text-lg text-gray-900 mb-1">
-                                  {certificate.course_title}
-                                </h3>
-                                <p className="text-sm text-gray-600">
-                                  Verification Code: <span className="font-mono text-orange-600">{certificate.verification_code}</span>
-                                </p>
+                            </div>
+                            
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 text-sm text-gray-500">
+                                <Calendar className="h-4 w-4" />
+                                Issued on {new Date(certificate.issue_date).toLocaleDateString()}
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  onClick={() => viewCertificate(certificate)}
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-orange-300 text-orange-700 hover:bg-orange-50 hover:border-orange-400"
+                                >
+                                  View
+                                </Button>
+                                <Button
+                                  onClick={() => printCertificate(certificate)}
+                                  size="sm"
+                                  className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl"
+                                >
+                                  <Download className="h-4 w-4 mr-2" />
+                                  Print
+                                </Button>
                               </div>
                             </div>
                           </div>
-                          
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-sm text-gray-500">
-                              <Calendar className="h-4 w-4" />
-                              Issued on {new Date(certificate.issue_date).toLocaleDateString()}
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                onClick={() => viewCertificate(certificate)}
-                                size="sm"
-                                variant="outline"
-                                className="border-orange-300 text-orange-700 hover:bg-orange-50 hover:border-orange-400"
-                              >
-                                View
-                              </Button>
-                              <Button
-                                onClick={() => printCertificate(certificate)}
-                                size="sm"
-                                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl"
-                              >
-                                <Download className="h-4 w-4 mr-2" />
-                                Download
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      ))
+                        );
+                      })
                     ) : (
                       <div className="text-center py-12">
                         <GraduationCap className="h-16 w-16 mx-auto mb-4 text-gray-400" />
