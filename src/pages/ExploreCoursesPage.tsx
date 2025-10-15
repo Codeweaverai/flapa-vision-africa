@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+the explorecourses page is loading to footers  from the layoutcomponent > Please FIX THAT . Main all the design and FUNCTIONALITY BUT JUST FIX THAT :  import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -70,49 +70,43 @@ const COURSE_CATEGORIES = [
   { value: 'digital marketing', label: 'Digital Marketing', icon: BarChart3, color: 'from-green-500 to-green-600' }
 ];
 
-// Pulse Loading Component
+// Fixed Pulse Loading Component - Removed Layout wrapper
 const PulseLoading = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-orange-50">
-      <Layout>
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex flex-col items-center justify-center min-h-96">
-            {/* Pulse Animation Container */}
-            <div className="relative w-40 h-40 flex items-center justify-center mb-8">
-              {/* Outer Pulse Circle */}
-              <div className="absolute w-40 h-40 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 animate-ping" />
-              
-              {/* Middle Pulse Circle */}
-              <div className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-orange-500/30 to-purple-600/30 animate-pulse" />
-              
-              {/* Inner Pulse Circle */}
-              <div className="absolute w-24 h-24 rounded-full bg-gradient-to-r from-orange-500/40 to-purple-600/40 animate-pulse" />
-              
-              {/* Center Icon */}
-              <div className="absolute w-16 h-16 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center shadow-lg">
-                <BookOpen className="h-8 w-8 text-white" />
-              </div>
-            </div>
-
-            {/* Loading Text */}
-            <div className="text-center space-y-2">
-              <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
-                Loading Amazing Courses
-              </h3>
-              <p className="text-muted-foreground text-lg">
-                Discovering the best learning experiences for you...
-              </p>
-            </div>
-
-            {/* Progress Dots */}
-            <div className="flex space-x-2 mt-6">
-              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-3 h-3 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
-          </div>
+    <div className="flex flex-col items-center justify-center min-h-96 py-12">
+      {/* Pulse Animation Container */}
+      <div className="relative w-40 h-40 flex items-center justify-center mb-8">
+        {/* Outer Pulse Circle */}
+        <div className="absolute w-40 h-40 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 animate-ping" />
+        
+        {/* Middle Pulse Circle */}
+        <div className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-orange-500/30 to-purple-600/30 animate-pulse" />
+        
+        {/* Inner Pulse Circle */}
+        <div className="absolute w-24 h-24 rounded-full bg-gradient-to-r from-orange-500/40 to-purple-600/40 animate-pulse" />
+        
+        {/* Center Icon */}
+        <div className="absolute w-16 h-16 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center shadow-lg">
+          <BookOpen className="h-8 w-8 text-white" />
         </div>
-      </Layout>
+      </div>
+
+      {/* Loading Text */}
+      <div className="text-center space-y-2">
+        <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+          Loading Amazing Courses
+        </h3>
+        <p className="text-muted-foreground text-lg">
+          Discovering the best learning experiences for you...
+        </p>
+      </div>
+
+      {/* Progress Dots */}
+      <div className="flex space-x-2 mt-6">
+        <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+        <div className="w-3 h-3 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+        <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+      </div>
     </div>
   );
 };
@@ -512,7 +506,7 @@ const ExploreCoursesPage = () => {
                           {course.summary}
                         </p>
                       )}
-                    </CardHeader>
+                    </CardContent>
 
                     <CardContent className="space-y-4">
                       <div className="grid grid-cols-2 gap-4 text-sm">
