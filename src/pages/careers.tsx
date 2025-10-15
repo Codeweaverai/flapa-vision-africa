@@ -114,7 +114,7 @@ const CareersPage = () => {
 
   const testimonials = [
     {
-      name: "Sarah Mwaba",
+      name: "Sarah ",
       role: "Tech Educator",
       content: "SkillPulse has transformed how I share my knowledge. I've reached over 5,000 students worldwide!",
       rating: 5,
@@ -183,7 +183,7 @@ const CareersPage = () => {
                     View Open Positions <ArrowRight className="ml-2 h-5 w-5" />
                   </a>
                 </Button>
-                <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-2 border-white text-white hover:bg-white hover:text-purple-600 transition-all duration-300 backdrop-blur-sm" asChild>
+                <Button size="lg" variant="secondary" className="text-lg px-8 py-6 border-2 border-white text-white hover:bg-white hover:text-purple-600 transition-all duration-300 backdrop-blur-sm" asChild>
                   <Link to="/learn-our-culture">
                     <PlayCircle className="mr-2 h-5 w-5" />
                     Learn About Our Culture
