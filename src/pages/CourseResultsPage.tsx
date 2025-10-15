@@ -295,8 +295,8 @@ const CourseResultsPage = () => {
     // Get creator name
     const creatorName = certificate.creator_id ? await fetchCreatorName(certificate.creator_id) : 'SkillPulse Instructor';
 
-    // Get skills for this course
-    const skills = certificate.course_id ? courseSkills[certificate.course_id] : [];
+    // Get skills for this course - FIXED: Add null check
+    const skills = certificate.course_id ? (courseSkills[certificate.course_id] || []) : [];
     const coreSkills = skills.filter(skill => skill.is_core_skill);
     const displayedSkills = coreSkills.length > 0 ? coreSkills : skills.slice(0, 6);
 
@@ -1196,7 +1196,8 @@ const CourseResultsPage = () => {
                   <CardContent className="p-6 space-y-6">
                     {certificates.length > 0 ? (
                       certificates.map((certificate) => {
-                        const skills = certificate.course_id ? courseSkills[certificate.course_id] : [];
+                        // FIXED: Add null check for courseSkills[certificate.course_id]
+                        const skills = certificate.course_id ? (courseSkills[certificate.course_id] || []) : [];
                         const coreSkills = skills.filter(skill => skill.is_core_skill);
                         const displayedSkills = coreSkills.length > 0 ? coreSkills : skills.slice(0, 4);
                         
