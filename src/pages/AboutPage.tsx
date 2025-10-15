@@ -210,9 +210,8 @@ const AboutPage = () => {
                 </CardHeader>
                 <CardContent>
                   <p className="text-lg text-gray-700 mb-8 leading-relaxed text-center">
-                    To create an inclusive platform where knowledge knows no boundaries, 
-                    empowering both learners and creators to achieve their full potential 
-                    through accessible, high-quality education and event experiences.
+                    "To be the leading skills ecosystem, where learners master in-demand skills through immersive courses 
+                    and events, and creators monetize their expertise across every format."
                   </p>
                   <div className="space-y-4">
                     {features.map((feature, index) => (
