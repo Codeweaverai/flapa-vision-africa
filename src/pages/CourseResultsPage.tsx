@@ -885,7 +885,7 @@ const CourseResultsPage = () => {
             </div>
             
             <div class="certificate-content">
-                <div class="watermark">SKILLPULSE INNOVATIONS</div>
+                <div class="watermark">SKILLPULSE</div>
                 
                 <div class="decoration decoration-1"></div>
                 <div class="decoration decoration-2"></div>
