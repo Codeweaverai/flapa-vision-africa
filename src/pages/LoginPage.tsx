@@ -1,24 +1,38 @@
 
 import React, { useState, useEffect } from 'react';
-import { Navigate, Link, useNavigate } from 'react-router-dom';
+import { Navigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Loader2, Mail, Lock } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useNavigate } from 'react-router-dom';
+import { 
+  Card,
+  CardHeader,
+  CardFooter,
+  CardTitle,
+  CardDescription,
+  CardContent
+} from '@/components/ui/card';
+import { Loader2, Mail, Lock, User } from 'lucide-react';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/lib/supabaseClient';
 
-const LoginPage = () => {
-  const { user, loading, signIn } = useAuth();
+const AuthPage = () => {
+  const { user, loading, signIn, signUp, otpRequired } = useAuth();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [username, setUsername] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [authSuccess, setAuthSuccess] = useState(false);
   const navigate = useNavigate();
+
+  const redirectParam = searchParams.get('redirect');
 
   useEffect(() => {
     // Load from localStorage if available (for convenience)
@@ -28,8 +42,40 @@ const LoginPage = () => {
     }
   }, []);
 
-  // Redirect if already authenticated
-  if (!loading && user) {
+  // Handle post-authentication redirect
+  useEffect(() => {
+    if (!loading && user && !otpRequired && authSuccess) {
+      console.log('User authenticated and OTP completed, redirecting...');
+      const invitationToken = sessionStorage.getItem('invitation_token');
+      
+      if (redirectParam === 'accept-invite' && invitationToken) {
+        // Redirect back to invitation acceptance with the stored token
+        navigate(`/accept-invite?token=${invitationToken}`);
+        return;
+      }
+      
+      // Default redirect for authenticated users
+      navigate('/account');
+    }
+  }, [user, loading, redirectParam, navigate, otpRequired, authSuccess]);
+
+  // Show loading while OTP is being processed
+  if (user && otpRequired) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-500 to-pink-500 flex justify-center items-center">
+        <div className="text-center text-white">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Email Verification Required</h2>
+          <p className="text-orange-100">
+            Please check your email and complete the verification process.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect if already authenticated and no OTP required
+  if (!loading && user && !otpRequired && !redirectParam) {
     return <Navigate to="/account" />;
   }
 
@@ -37,6 +83,7 @@ const LoginPage = () => {
     e.preventDefault();
     setIsSubmitting(true);
     setErrorMessage(null);
+    setAuthSuccess(false);
     
     // Save email for convenience
     if (email) {
@@ -44,9 +91,11 @@ const LoginPage = () => {
     }
     
     try {
+      console.log('AuthPage: Attempting sign in');
       await signIn(email, password);
-      toast.success('Successfully signed in!');
-      navigate('/account');
+      console.log('AuthPage: Sign in successful');
+      setAuthSuccess(true);
+      // OTP check and redirection will be handled by useEffect
     } catch (error: any) {
       console.error('Sign in error:', error);
       setErrorMessage(error.message || 'Failed to sign in. Please check your credentials.');
@@ -55,19 +104,74 @@ const LoginPage = () => {
     }
   };
 
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    setAuthSuccess(false);
+    
+    // Validate inputs
+    if (!fullName || !username || !email || !password) {
+      setErrorMessage('All fields are required');
+      setIsSubmitting(false);
+      return;
+    }
+    
+    if (password.length < 6) {
+      setErrorMessage('Password must be at least 6 characters');
+      setIsSubmitting(false);
+      return;
+    }
+    
+    // Additional username validation
+    if (username.length < 3) {
+      setErrorMessage('Username must be at least 3 characters');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      setErrorMessage('Username can only contain letters, numbers, and underscores');
+      setIsSubmitting(false);
+      return;
+    }
+    
+    // Save email for convenience
+    localStorage.setItem('lastAuthEmail', email);
+    
+    try {
+      console.log('AuthPage: Attempting sign up');
+      await signUp(email, password, { full_name: fullName, username });
+      console.log('AuthPage: Sign up successful');
+      setAuthSuccess(true);
+      // OTP check and redirection will be handled by useEffect
+    } catch (error: any) {
+      console.error('Sign up error:', error);
+      setErrorMessage(error.message || 'Failed to sign up. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleGoogleSignIn = async () => {
     setIsSubmitting(true);
     setErrorMessage(null);
+    setAuthSuccess(false);
     
     try {
+      const redirectUrl = redirectParam === 'accept-invite' 
+        ? `${window.location.origin}/accept-invite`
+        : `${window.location.origin}/account`;
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/account`
+          redirectTo: redirectUrl
         }
       });
       
       if (error) throw error;
+      console.log('Google sign in initiated');
     } catch (error: any) {
       console.error('Google sign in error:', error);
       setErrorMessage(error.message || 'Failed to sign in with Google.');
@@ -77,13 +181,13 @@ const LoginPage = () => {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-500 to-pink-500 flex justify-center items-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
-        </div>
-      </Layout>
+      <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-500 to-pink-500 flex justify-center items-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+      </div>
     );
   }
+
+  const isInvitationFlow = redirectParam === 'accept-invite';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-500 to-pink-500 flex">
@@ -97,27 +201,32 @@ const LoginPage = () => {
         <div className="absolute inset-0 bg-gradient-to-r from-orange-500/20 to-purple-600/20 rounded-r-3xl"></div>
       </div>
 
-      {/* Right Side - Login Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
-        <div className="w-full max-w-md">
-          <div className="mb-8 text-center">
-            <Link to="/" className="text-3xl font-bold text-white inline-block mb-4 hover:text-orange-200 transition-colors">
-              SkillPulse Events & Professional Skills Marketplace
-            </Link>
-            <h1 className="text-4xl font-bold mb-2 text-white drop-shadow-lg">Welcome Back</h1>
-            <p className="text-orange-100">Sign in to your account</p>
-          </div>
+      {/* Right Side - Auth Form */}
+<div className="w-full lg:w-1/2 flex items-center justify-center p-8">
+  <div className="w-full max-w-md">
+    <div className="mb-8 text-center">
+      <Link to="/" className="inline-block mb-4 hover:opacity-90 transition-opacity">
+        <img 
+          src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/Screenshot_2025-08-05_155641-removebg-preview.png" 
+          alt="SkillPulse Logo"
+          className="h-[200px] mx-auto" // Adjust height (h-16) as needed to fit your design
+        />
+      </Link>
+      <h1 className="text-4xl font-bold mb-2 text-white drop-shadow-lg">
+        {isInvitationFlow ? 'Join Workplace' : ''}
+      </h1>
+      <p className="text-orange-100">
+        {isInvitationFlow 
+          ? 'Sign in to accept your workplace invitation' 
+          : 'Sign in to your account or create a new one'
+        }
+      </p>
+    </div>
           
           <Card className="backdrop-blur-md bg-white/20 border-0 shadow-2xl rounded-2xl">
-            <CardHeader className="text-center">
-              <CardTitle className="text-2xl text-white">Login</CardTitle>
-              <CardDescription className="text-orange-100">
-                Enter your email and password to access your account
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="p-6">
               {errorMessage && (
-                <Alert variant="destructive" className="bg-red-500/20 border-red-300 backdrop-blur-sm">
+                <Alert variant="destructive" className="bg-red-500/20 border-red-300 backdrop-blur-sm mb-6">
                   <AlertDescription className="text-white">{errorMessage}</AlertDescription>
                 </Alert>
               )}
@@ -127,7 +236,7 @@ const LoginPage = () => {
                 onClick={handleGoogleSignIn}
                 disabled={isSubmitting}
                 variant="outline"
-                className="w-full bg-white/90 hover:bg-white text-gray-700 border-0 shadow-lg rounded-xl h-12 font-medium"
+                className="w-full bg-white/90 hover:bg-white text-gray-700 border-0 shadow-lg rounded-xl h-12 font-medium mb-6"
               >
                 <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -138,7 +247,7 @@ const LoginPage = () => {
                 Continue with Google
               </Button>
 
-              <div className="relative">
+              <div className="relative mb-6">
                 <div className="absolute inset-0 flex items-center">
                   <span className="w-full border-t border-orange-200/50" />
                 </div>
@@ -149,60 +258,173 @@ const LoginPage = () => {
                 </div>
               </div>
 
-              <form onSubmit={handleSignIn} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-white font-medium">Email</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-200 h-5 w-5" />
-                    <Input 
-                      id="email" 
-                      type="email" 
-                      placeholder="your.email@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      autoComplete="email"
-                      className="pl-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-white font-medium">Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-200 h-5 w-5" />
-                    <Input 
-                      id="password" 
-                      type="password" 
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      autoComplete="current-password"
-                      className="pl-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
-                    />
-                  </div>
-                </div>
-                <Button 
-                  type="submit" 
-                  className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 border-0 rounded-xl h-12 font-medium shadow-lg text-white" 
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Signing In...
-                    </>
-                  ) : (
-                    'Sign In'
-                  )}
-                </Button>
-              </form>
-
-              <div className="text-center text-sm">
-                <span className="text-orange-100">Don't have an account? </span>
-                <Link to="/register" className="text-white font-medium hover:text-orange-200 transition-colors">
-                  Register here
-                </Link>
+              <Tabs defaultValue="login" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 bg-white/20 backdrop-blur-sm border-0 rounded-xl mb-6">
+                  <TabsTrigger 
+                    value="login" 
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-lg"
+                  >
+                    Login
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="register"
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-lg"
+                  >
+                    Register
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="login">
+                  <form onSubmit={handleSignIn} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-white font-medium">Email</Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-200 h-5 w-5" />
+                        <Input 
+                          id="email" 
+                          type="email" 
+                          placeholder="your.email@example.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          required
+                          autoComplete="email"
+                          className="pl-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="password" className="text-white font-medium">Password</Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-200 h-5 w-5" />
+                        <Input 
+                          id="password" 
+                          type="password" 
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          required
+                          autoComplete="current-password"
+                          className="pl-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
+                        />
+                      </div>
+                    </div>
+                    <Button 
+                      type="submit" 
+                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 border-0 rounded-xl h-12 font-medium shadow-lg text-white" 
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Signing In...
+                        </>
+                      ) : (
+                        'Sign In'
+                      )}
+                    </Button>
+                    {/* 👇 Forgot password link below the button */}
+                  <div className="text-center">
+                 <Link
+                to="/forgot-password"
+              className="text-sm text-orange-100 hover:text-white underline"
+              >
+               Forgot your password?
+               </Link>
               </div>
+                  </form>
+                </TabsContent>
+                
+                <TabsContent value="register">
+                  <form onSubmit={handleSignUp} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="fullName" className="text-white font-medium">Full Name</Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-200 h-5 w-5" />
+                        <Input 
+                          id="fullName" 
+                          placeholder="John Doe"
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          required
+                          className="pl-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="username" className="text-white font-medium">Username</Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-200 h-5 w-5" />
+                        <Input 
+                          id="username" 
+                          placeholder="johndoe"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          required
+                          className="pl-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
+                        />
+                      </div>
+                      <p className="text-xs text-orange-100">
+                        Username must be at least 3 characters and can only contain letters, numbers, and underscores
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="emailRegister" className="text-white font-medium">Email</Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-200 h-5 w-5" />
+                        <Input 
+                          id="emailRegister" 
+                          type="email" 
+                          placeholder="your.email@example.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          required
+                          autoComplete="email"
+                          className="pl-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="passwordRegister" className="text-white font-medium">Password</Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-200 h-5 w-5" />
+                        <Input 
+                          id="passwordRegister" 
+                          type="password" 
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          required
+                          autoComplete="new-password"
+                          minLength={8}
+                          className="pl-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
+                        />
+                      </div>
+                      <p className="text-xs text-orange-100">Password must be at least 8 characters</p>
+                    </div>
+                    <Button 
+                      type="submit" 
+                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 border-0 rounded-xl h-12 font-medium shadow-lg text-white" 
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Creating Account...
+                        </>
+                      ) : (
+                        'Create Account'
+                      )}
+                    </Button>
+                     {/* 👇 Forgot password link below the button */}
+                  <div className="text-center">
+                 <Link
+                to="/forgot-password"
+              className="text-sm text-orange-100 hover:text-white underline"
+              >
+               Forgot your password?
+               </Link>
+              </div>
+                  </form>
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         </div>
@@ -211,4 +433,4 @@ const LoginPage = () => {
   );
 };
 
-export default LoginPage;
+export default AuthPage;
