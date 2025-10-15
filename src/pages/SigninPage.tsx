@@ -1,302 +1,436 @@
 
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabaseClient';
+import { Navigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import Layout from '@/components/layout/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { 
+  Card,
+  CardHeader,
+  CardFooter,
+  CardTitle,
+  CardDescription,
+  CardContent
+} from '@/components/ui/card';
+import { Loader2, Mail, Lock, User } from 'lucide-react';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { supabase } from '@/lib/supabaseClient';
 
-const SigninPage = () => {
-  const { user } = useAuth();
+const AuthPage = () => {
+  const { user, loading, signIn, signUp, otpRequired } = useAuth();
+  const [searchParams] = useSearchParams();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [username, setUsername] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [authSuccess, setAuthSuccess] = useState(false);
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  
-  const [loginData, setLoginData] = useState({
-    email: '',
-    password: ''
-  });
 
-  const [signupData, setSignupData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    fullName: ''
-  });
+  const redirectParam = searchParams.get('redirect');
 
   useEffect(() => {
-    if (user) {
-      navigate('/', { replace: true });
+    // Load from localStorage if available (for convenience)
+    const savedEmail = localStorage.getItem('lastAuthEmail');
+    if (savedEmail) {
+      setEmail(savedEmail);
     }
-  }, [user, navigate]);
+  }, []);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: loginData.email,
-        password: loginData.password,
-      });
-
-      if (error) {
-        if (error.message.includes('Invalid login credentials')) {
-          toast.error('Invalid email or password');
-        } else {
-          toast.error(error.message);
-        }
+  // Handle post-authentication redirect
+  useEffect(() => {
+    if (!loading && user && !otpRequired && authSuccess) {
+      console.log('User authenticated and OTP completed, redirecting...');
+      const invitationToken = sessionStorage.getItem('invitation_token');
+      
+      if (redirectParam === 'accept-invite' && invitationToken) {
+        // Redirect back to invitation acceptance with the stored token
+        navigate(`/accept-invite?token=${invitationToken}`);
         return;
       }
-
-      toast.success('Welcome back!');
-      navigate('/', { replace: true });
-    } catch (error) {
-      console.error('Login error:', error);
-      toast.error('An unexpected error occurred');
-    } finally {
-      setLoading(false);
+      
+      // Default redirect for authenticated users
+      navigate('/account');
     }
-  };
+  }, [user, loading, redirectParam, navigate, otpRequired, authSuccess]);
 
-  const handleSignup = async (e: React.FormEvent) => {
+  // Show loading while OTP is being processed
+  if (user && otpRequired) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-500 to-pink-500 flex justify-center items-center">
+        <div className="text-center text-white">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Email Verification Required</h2>
+          <p className="text-orange-100">
+            Please check your email and complete the verification process.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect if already authenticated and no OTP required
+  if (!loading && user && !otpRequired && !redirectParam) {
+    return <Navigate to="/account" />;
+  }
+
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    setAuthSuccess(false);
     
-    if (signupData.password !== signupData.confirmPassword) {
-      toast.error('Passwords do not match');
-      return;
+    // Save email for convenience
+    if (email) {
+      localStorage.setItem('lastAuthEmail', email);
     }
-
-    if (signupData.password.length < 6) {
-      toast.error('Password must be at least 6 characters');
-      return;
-    }
-
-    setLoading(true);
-
+    
     try {
-      const { error } = await supabase.auth.signUp({
-        email: signupData.email,
-        password: signupData.password,
+      console.log('AuthPage: Attempting sign in');
+      await signIn(email, password);
+      console.log('AuthPage: Sign in successful');
+      setAuthSuccess(true);
+      // OTP check and redirection will be handled by useEffect
+    } catch (error: any) {
+      console.error('Sign in error:', error);
+      setErrorMessage(error.message || 'Failed to sign in. Please check your credentials.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    setAuthSuccess(false);
+    
+    // Validate inputs
+    if (!fullName || !username || !email || !password) {
+      setErrorMessage('All fields are required');
+      setIsSubmitting(false);
+      return;
+    }
+    
+    if (password.length < 6) {
+      setErrorMessage('Password must be at least 6 characters');
+      setIsSubmitting(false);
+      return;
+    }
+    
+    // Additional username validation
+    if (username.length < 3) {
+      setErrorMessage('Username must be at least 3 characters');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      setErrorMessage('Username can only contain letters, numbers, and underscores');
+      setIsSubmitting(false);
+      return;
+    }
+    
+    // Save email for convenience
+    localStorage.setItem('lastAuthEmail', email);
+    
+    try {
+      console.log('AuthPage: Attempting sign up');
+      await signUp(email, password, { full_name: fullName, username });
+      console.log('AuthPage: Sign up successful');
+      setAuthSuccess(true);
+      // OTP check and redirection will be handled by useEffect
+    } catch (error: any) {
+      console.error('Sign up error:', error);
+      setErrorMessage(error.message || 'Failed to sign up. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    setAuthSuccess(false);
+    
+    try {
+      const redirectUrl = redirectParam === 'accept-invite' 
+        ? `${window.location.origin}/accept-invite`
+        : `${window.location.origin}/account`;
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
         options: {
-          data: {
-            full_name: signupData.fullName,
-          }
+          redirectTo: redirectUrl
         }
       });
-
-      if (error) {
-        if (error.message.includes('already registered')) {
-          toast.error('An account with this email already exists');
-        } else {
-          toast.error(error.message);
-        }
-        return;
-      }
-
-      toast.success('Account created successfully! Please check your email to verify your account.');
-    } catch (error) {
-      console.error('Signup error:', error);
-      toast.error('An unexpected error occurred');
-    } finally {
-      setLoading(false);
+      
+      if (error) throw error;
+      console.log('Google sign in initiated');
+    } catch (error: any) {
+      console.error('Google sign in error:', error);
+      setErrorMessage(error.message || 'Failed to sign in with Google.');
+      setIsSubmitting(false);
     }
   };
 
-  const handleLoginChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setLoginData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }));
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-500 to-pink-500 flex justify-center items-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+      </div>
+    );
+  }
 
-  const handleSignupChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSignupData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }));
-  };
+  const isInvitationFlow = redirectParam === 'accept-invite';
 
   return (
-    <div className="min-h-screen bg-light-purple">
-      <Layout>
-        <div className="container mx-auto px-4 py-16">
-          <div className="max-w-md mx-auto">
-            <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold mb-2">Welcome to SkillPulse</h1>
-              <p className="text-muted-foreground">Sign in to access your learning journey</p>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-500 to-pink-500 flex">
+      {/* Left Side - Image */}
+      <div className="hidden lg:flex lg:w-1/2 relative">
+        <img 
+          src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//2330.jpg"
+          alt="Learning illustration"
+          className="w-full h-full object-cover rounded-r-3xl shadow-2xl"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-orange-500/20 to-purple-600/20 rounded-r-3xl"></div>
+      </div>
 
-            <Card>
-              <CardHeader>
-                <Tabs defaultValue="login" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="login">Sign In</TabsTrigger>
-                    <TabsTrigger value="signup">Sign Up</TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="login">
-                    <CardTitle className="text-center mb-6">Sign In</CardTitle>
-                    <form onSubmit={handleLogin} className="space-y-4">
-                      <div>
-                        <Label htmlFor="email">Email</Label>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                          <Input
-                            id="email"
-                            name="email"
-                            type="email"
-                            placeholder="Enter your email"
-                            value={loginData.email}
-                            onChange={handleLoginChange}
-                            className="pl-10"
-                            required
-                          />
-                        </div>
+      {/* Right Side - Auth Form */}
+<div className="w-full lg:w-1/2 flex items-center justify-center p-8">
+  <div className="w-full max-w-md">
+    <div className="mb-8 text-center">
+      <Link to="/" className="inline-block mb-4 hover:opacity-90 transition-opacity">
+        <img 
+          src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/Screenshot_2025-08-05_155641-removebg-preview.png" 
+          alt="SkillPulse Logo"
+          className="h-[200px] mx-auto" // Adjust height (h-16) as needed to fit your design
+        />
+      </Link>
+      <h1 className="text-4xl font-bold mb-2 text-white drop-shadow-lg">
+        {isInvitationFlow ? 'Join Workplace' : ''}
+      </h1>
+      <p className="text-orange-100">
+        {isInvitationFlow 
+          ? 'Sign in to accept your workplace invitation' 
+          : 'Sign in to your account or create a new one'
+        }
+      </p>
+    </div>
+          
+          <Card className="backdrop-blur-md bg-white/20 border-0 shadow-2xl rounded-2xl">
+            <CardContent className="p-6">
+              {errorMessage && (
+                <Alert variant="destructive" className="bg-red-500/20 border-red-300 backdrop-blur-sm mb-6">
+                  <AlertDescription className="text-white">{errorMessage}</AlertDescription>
+                </Alert>
+              )}
+
+              {/* Google Sign In Button */}
+              <Button 
+                onClick={handleGoogleSignIn}
+                disabled={isSubmitting}
+                variant="outline"
+                className="w-full bg-white/90 hover:bg-white text-gray-700 border-0 shadow-lg rounded-xl h-12 font-medium mb-6"
+              >
+                <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Continue with Google
+              </Button>
+
+              <div className="relative mb-6">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-orange-200/50" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-gradient-to-r from-orange-500 to-purple-600 px-3 py-1 rounded-full text-white text-sm font-medium">
+                    Or continue with email
+                  </span>
+                </div>
+              </div>
+
+              <Tabs defaultValue="login" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 bg-white/20 backdrop-blur-sm border-0 rounded-xl mb-6">
+                  <TabsTrigger 
+                    value="login" 
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-lg"
+                  >
+                    Login
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="register"
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-lg"
+                  >
+                    Register
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="login">
+                  <form onSubmit={handleSignIn} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-white font-medium">Email</Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-200 h-5 w-5" />
+                        <Input 
+                          id="email" 
+                          type="email" 
+                          placeholder="your.email@example.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          required
+                          autoComplete="email"
+                          className="pl-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
+                        />
                       </div>
-                      
-                      <div>
-                        <Label htmlFor="password">Password</Label>
-                        <div className="relative">
-                          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                          <Input
-                            id="password"
-                            name="password"
-                            type={showPassword ? "text" : "password"}
-                            placeholder="Enter your password"
-                            value={loginData.password}
-                            onChange={handleLoginChange}
-                            className="pl-10 pr-10"
-                            required
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
-                          >
-                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </button>
-                        </div>
-                      </div>
-
-                      <Button type="submit" className="w-full" disabled={loading}>
-                        {loading ? 'Signing In...' : 'Sign In'}
-                      </Button>
-                    </form>
-
-                    <div className="text-center mt-4">
-                      <Link to="/forgot-password" className="text-sm text-primary hover:underline">
-                        Forgot your password?
-                      </Link>
                     </div>
-                  </TabsContent>
-
-                  <TabsContent value="signup">
-                    <CardTitle className="text-center mb-6">Create Account</CardTitle>
-                    <form onSubmit={handleSignup} className="space-y-4">
-                      <div>
-                        <Label htmlFor="fullName">Full Name</Label>
-                        <div className="relative">
-                          <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                          <Input
-                            id="fullName"
-                            name="fullName"
-                            type="text"
-                            placeholder="Enter your full name"
-                            value={signupData.fullName}
-                            onChange={handleSignupChange}
-                            className="pl-10"
-                            required
-                          />
-                        </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="password" className="text-white font-medium">Password</Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-200 h-5 w-5" />
+                        <Input 
+                          id="password" 
+                          type="password" 
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          required
+                          autoComplete="current-password"
+                          className="pl-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
+                        />
                       </div>
-
-                      <div>
-                        <Label htmlFor="signupEmail">Email</Label>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                          <Input
-                            id="signupEmail"
-                            name="email"
-                            type="email"
-                            placeholder="Enter your email"
-                            value={signupData.email}
-                            onChange={handleSignupChange}
-                            className="pl-10"
-                            required
-                          />
-                        </div>
+                    </div>
+                    <Button 
+                      type="submit" 
+                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 border-0 rounded-xl h-12 font-medium shadow-lg text-white" 
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Signing In...
+                        </>
+                      ) : (
+                        'Sign In'
+                      )}
+                    </Button>
+                    {/* 👇 Forgot password link below the button */}
+                  <div className="text-center">
+                 <Link
+                to="/forgot-password"
+              className="text-sm text-orange-100 hover:text-white underline"
+              >
+               Forgot your password?
+               </Link>
+              </div>
+                  </form>
+                </TabsContent>
+                
+                <TabsContent value="register">
+                  <form onSubmit={handleSignUp} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="fullName" className="text-white font-medium">Full Name</Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-200 h-5 w-5" />
+                        <Input 
+                          id="fullName" 
+                          placeholder="John Doe"
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          required
+                          className="pl-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
+                        />
                       </div>
-                      
-                      <div>
-                        <Label htmlFor="signupPassword">Password</Label>
-                        <div className="relative">
-                          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                          <Input
-                            id="signupPassword"
-                            name="password"
-                            type={showPassword ? "text" : "password"}
-                            placeholder="Create a password"
-                            value={signupData.password}
-                            onChange={handleSignupChange}
-                            className="pl-10 pr-10"
-                            required
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
-                          >
-                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </button>
-                        </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="username" className="text-white font-medium">Username</Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-200 h-5 w-5" />
+                        <Input 
+                          id="username" 
+                          placeholder="johndoe"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          required
+                          className="pl-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
+                        />
                       </div>
-
-                      <div>
-                        <Label htmlFor="confirmPassword">Confirm Password</Label>
-                        <div className="relative">
-                          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                          <Input
-                            id="confirmPassword"
-                            name="confirmPassword"
-                            type={showPassword ? "text" : "password"}
-                            placeholder="Confirm your password"
-                            value={signupData.confirmPassword}
-                            onChange={handleSignupChange}
-                            className="pl-10"
-                            required
-                          />
-                        </div>
+                      <p className="text-xs text-orange-100">
+                        Username must be at least 3 characters and can only contain letters, numbers, and underscores
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="emailRegister" className="text-white font-medium">Email</Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-200 h-5 w-5" />
+                        <Input 
+                          id="emailRegister" 
+                          type="email" 
+                          placeholder="your.email@example.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          required
+                          autoComplete="email"
+                          className="pl-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
+                        />
                       </div>
-
-                      <Button type="submit" className="w-full" disabled={loading}>
-                        {loading ? 'Creating Account...' : 'Create Account'}
-                      </Button>
-                    </form>
-                  </TabsContent>
-                </Tabs>
-              </CardHeader>
-            </Card>
-
-            <div className="text-center mt-6">
-              <p className="text-sm text-muted-foreground">
-                By continuing, you agree to our{' '}
-                <Link to="/terms" className="text-primary hover:underline">Terms of Service</Link>
-                {' '}and{' '}
-                <Link to="/privacy" className="text-primary hover:underline">Privacy Policy</Link>
-              </p>
-            </div>
-          </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="passwordRegister" className="text-white font-medium">Password</Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-200 h-5 w-5" />
+                        <Input 
+                          id="passwordRegister" 
+                          type="password" 
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          required
+                          autoComplete="new-password"
+                          minLength={8}
+                          className="pl-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
+                        />
+                      </div>
+                      <p className="text-xs text-orange-100">Password must be at least 8 characters</p>
+                    </div>
+                    <Button 
+                      type="submit" 
+                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 border-0 rounded-xl h-12 font-medium shadow-lg text-white" 
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Creating Account...
+                        </>
+                      ) : (
+                        'Create Account'
+                      )}
+                    </Button>
+                     {/* 👇 Forgot password link below the button */}
+                  <div className="text-center">
+                 <Link
+                to="/forgot-password"
+              className="text-sm text-orange-100 hover:text-white underline"
+              >
+               Forgot your password?
+               </Link>
+              </div>
+                  </form>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
         </div>
-      </Layout>
+      </div>
     </div>
   );
 };
 
-export default SigninPage;
+export default AuthPage;
