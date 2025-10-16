@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Rocket, BookOpen, Calendar, Users, BarChart, Settings, DollarSign, Building2, Activity } from 'lucide-react';
+import { Rocket, BookOpen, Calendar, Users, BarChart, Settings, DollarSign, Building2, Activity, Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -135,6 +135,24 @@ const CreatorLayout = ({ children, title }: CreatorLayoutProps) => {
                   <h2 className="text-xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
                     Creator Portal
                   </h2>
+                </div>
+                
+                {/* Quick Actions */}
+                <div className="mb-4 space-y-2">
+                  <Button
+                    onClick={() => navigate('/creator/courses/create-with-ai')}
+                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+                  >
+                    <Bot className="h-4 w-4 mr-2" />
+                    Create with AI 🤖
+                  </Button>
+                  <Button
+                    onClick={() => navigate('/creator/courses/create')}
+                    className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white font-semibold rounded-lg hover:from-orange-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+                  >
+                    <BookOpen className="h-4 w-4 mr-2" />
+                    Create Course
+                  </Button>
                 </div>
                 
                 <nav className="space-y-1">
