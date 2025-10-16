@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Plus, BookOpen, Edit, Trash2, Eye, Users, DollarSign, Clock, Star, Play, Percent, Video } from 'lucide-react';
+import { Plus, BookOpen, Edit, Trash2, Eye, Users, DollarSign, Clock, Star, Play, Percent, Video, Bot } from 'lucide-react';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
@@ -30,6 +29,8 @@ interface Course {
   category: string;
   difficulty_level: string;
   created_at: string;
+  average_rating?: number;
+  review_count?: number;
 }
 
 const CreatorCourses = () => {
@@ -87,7 +88,34 @@ const CreatorCourses = () => {
         index === self.findIndex(c => c.id === course.id)
       );
 
-      setCourses(uniqueCourses);
+      // Fetch review data for all courses
+      const coursesWithReviews = await Promise.all(
+        uniqueCourses.map(async (course) => {
+          const { data: reviews, error: reviewError } = await supabase
+            .from('course_reviews')
+            .select('rating')
+            .eq('course_id', course.id);
+
+          if (reviewError) {
+            console.error('Error fetching reviews for course:', course.id, reviewError);
+            return { ...course, average_rating: 0, review_count: 0 };
+          }
+
+          if (reviews && reviews.length > 0) {
+            const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
+            const averageRating = totalRating / reviews.length;
+            return {
+              ...course,
+              average_rating: Math.round(averageRating * 10) / 10, // Round to 1 decimal
+              review_count: reviews.length
+            };
+          }
+
+          return { ...course, average_rating: 0, review_count: 0 };
+        })
+      );
+
+      setCourses(coursesWithReviews);
     } catch (error) {
       console.error('Error loading courses:', error);
       toast.error('Failed to load courses');
@@ -139,6 +167,10 @@ const CreatorCourses = () => {
     setPreviewDialogOpen(true);
   };
 
+  const handleCreateWithAI = () => {
+    navigate('/creator/courses/create-with-ai');
+  };
+
   const filteredCourses = courses.filter(course =>
     course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     course.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -167,13 +199,22 @@ const CreatorCourses = () => {
         <div>
           <p className="text-gray-600">Create and manage your online courses</p>
         </div>
-        <Button
-          onClick={() => navigate('/creator/courses/create')}
-          className="bg-gradient-to-r from-orange-400 to-purple-500 text-white hover:opacity-90"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Create Course
-        </Button>
+        <div className="flex gap-3">
+          <Button
+            onClick={handleCreateWithAI}
+            className="bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:opacity-90"
+          >
+            <Bot className="h-4 w-4 mr-2" />
+            Create with AI 🤖
+          </Button>
+          <Button
+            onClick={() => navigate('/creator/courses/create')}
+            className="bg-gradient-to-r from-orange-400 to-purple-500 text-white hover:opacity-90"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create Course
+          </Button>
+        </div>
       </div>
 
       <div className="mb-6">
@@ -196,10 +237,16 @@ const CreatorCourses = () => {
               {searchTerm ? 'No courses match your search criteria.' : 'Create your first course to get started'}
             </p>
             {!searchTerm && (
-              <Button onClick={() => navigate('/creator/courses/create')}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create First Course
-              </Button>
+              <div className="flex gap-3">
+                <Button onClick={handleCreateWithAI} variant="outline">
+                  <Bot className="h-4 w-4 mr-2" />
+                  Create with AI
+                </Button>
+                <Button onClick={() => navigate('/creator/courses/create')}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Manually
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -258,16 +305,19 @@ const CreatorCourses = () => {
                       <Clock className="h-4 w-4" />
                       <span>{Math.ceil((course.duration_minutes || 0) / 60)}h</span>
                     </div>
-                   <div className="flex items-center gap-1">
-  {course.is_free ? (
-    <span>Free</span>
-  ) : (
-    <PriceDisplay amount={course.price} originalCurrency="USD" />
-  )}
-</div>
                     <div className="flex items-center gap-1">
-                      <Star className="h-4 w-4 fill-current text-yellow-400" />
-                      <span>4.8</span>
+                      {course.is_free ? (
+                        <span>Free</span>
+                      ) : (
+                        <PriceDisplay amount={course.price} originalCurrency="USD" />
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Star className={`h-4 w-4 ${course.average_rating ? 'fill-current text-yellow-400' : 'text-gray-300'}`} />
+                      <span>
+                        {course.average_rating ? course.average_rating : '0.0'}
+                        {course.review_count ? ` (${course.review_count})` : ''}
+                      </span>
                     </div>
                   </div>
 
