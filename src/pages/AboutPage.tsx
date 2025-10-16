@@ -4,7 +4,7 @@ import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Users, Award, Globe, Zap, Heart, Target, CheckCircle, ArrowRight, Linkedin, Twitter, Mail, Play, Star, TrendingUp, BookOpen, Shield, Quote } from 'lucide-react';
+import { Users, Award, Globe, Zap, Heart, Target, CheckCircle, ArrowRight, Linkedin, Twitter, Mail, Play, Star, TrendingUp, BookOpen, Shield, Quote, Building, Calendar, Rocket } from 'lucide-react';
 import YouTubeModal from '@/components/video/YouTubeModal';
 
 const AboutPage = () => {
@@ -48,6 +48,36 @@ const AboutPage = () => {
     "Industry-recognized certificate programs",
     "Advanced progress tracking & analytics",
     "24/7 community support network"
+  ];
+
+  const companyTrack = [
+    {
+      icon: Building,
+      title: "Corporate Structure",
+      items: [
+        { label: "Parent Company", value: "FlapaBay Group" },
+        { label: "Legal Entity", value: "SkillPulse Innovations Limited" },
+        { label: "Entity Type", value: "Subsidiary" }
+      ]
+    },
+    {
+      icon: Calendar,
+      title: "Company Timeline",
+      items: [
+        { label: "Founded", value: "2024" },
+        { label: "Incorporated", value: "2025" },
+        { label: "Status", value: "Rapid Growth Phase" }
+      ]
+    },
+    {
+      icon: Rocket,
+      title: "Core Focus",
+      items: [
+        { label: "Primary Mission", value: "Skills Ecosystem" },
+        { label: "Target Audience", value: "Learners & Creators" },
+        { label: "Key Offerings", value: "Courses & Events" }
+      ]
+    }
   ];
 
   const teamMembers = [
@@ -253,6 +283,76 @@ const AboutPage = () => {
           </div>
         </section>
 
+        {/* Company Track Sheet Section */}
+        <section className="py-20 relative z-10">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                Corporate Foundation
+              </h2>
+              <p className="text-xl text-gray-700 max-w-2xl mx-auto">
+                Building Africa's premier skills ecosystem on a solid corporate framework
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+              {companyTrack.map((track, index) => {
+                const IconComponent = track.icon;
+                return (
+                  <Card key={index} className="bg-white/90 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300 group overflow-hidden">
+                    <CardHeader className="pb-4">
+                      <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-4 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300">
+                        <IconComponent className="h-6 w-6" />
+                      </div>
+                      <CardTitle className="text-xl font-bold text-center bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                        {track.title}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {track.items.map((item, itemIndex) => (
+                          <div key={itemIndex} className="flex justify-between items-center p-3 rounded-lg bg-gradient-to-r from-orange-50 to-purple-50 group-hover:from-orange-100 group-hover:to-purple-100 transition-all duration-300">
+                            <span className="text-sm font-medium text-gray-600">{item.label}</span>
+                            <Badge variant="secondary" className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 font-semibold">
+                              {item.value}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+
+            {/* Corporate Identity Badge */}
+            <div className="mt-12 text-center">
+              <Card className="bg-gradient-to-r from-orange-500 to-purple-600 border-0 shadow-2xl max-w-2xl mx-auto">
+                <CardContent className="p-8 text-white">
+                  <div className="flex items-center justify-center gap-4 mb-4">
+                    <Building className="h-8 w-8" />
+                    <Star className="h-8 w-8" />
+                    <Rocket className="h-8 w-8" />
+                  </div>
+                  <h3 className="text-2xl font-bold mb-2">SkillPulse Innovations Limited</h3>
+                  <p className="text-white/90 mb-4">A Subsidiary of FlapaBay Group</p>
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center text-sm">
+                    <Badge variant="secondary" className="bg-white/20 text-white border-0 backdrop-blur-sm">
+                      Founded: 2024
+                    </Badge>
+                    <Badge variant="secondary" className="bg-white/20 text-white border-0 backdrop-blur-sm">
+                      Incorporated: 2025
+                    </Badge>
+                    <Badge variant="secondary" className="bg-white/20 text-white border-0 backdrop-blur-sm">
+                      Focus: Skills Ecosystem
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </section>
+
         {/* Values Section */}
         <section className="py-20 bg-white/50 backdrop-blur-sm relative z-10">
           <div className="container mx-auto px-4">
@@ -392,81 +492,40 @@ const AboutPage = () => {
         </section>
 
         {/* Impact Hero Section */}
-<section className="py-20 relative z-10">
-  <div className="container mx-auto px-4">
-    <div className="relative rounded-3xl overflow-hidden shadow-2xl">
-      {/* Background Image with Gradient Overlay */}
-      <div className="relative h-[500px] md:h-[600px] lg:h-[700px] overflow-hidden">
-        <img 
-          src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/citizen-amazed-by-city-buildings.jpg"
-          alt="Skill Development in Africa"
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-orange-600/80 to-purple-600/80"></div>
-        
-        {/* Content */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center text-white max-w-4xl mx-auto px-6">
-            <Quote className="h-12 w-12 mx-auto mb-6 text-white/80" />
-            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
-              Revolutionizing Skill Development
-              <span className="block text-white/90 mt-2">Across Africa</span>
-            </h2>
-            <p className="text-lg md:text-xl lg:text-2xl mb-8 max-w-3xl mx-auto leading-relaxed">
-              "SkillPulse is bridging the digital divide by making quality education accessible 
-              to every African youth. We're not just teaching skills—we're building the next 
-              generation of innovators, creators, and leaders who will transform our continent."
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button 
-                size="lg"
-                className="bg-white text-orange-600 hover:bg-white/90 font-semibold px-8 py-4 rounded-xl text-lg transition-all duration-300 hover:scale-105"
-              >
-                Join the Movement
-              </Button>
-              
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-      </div>
-   </section>
-
-
-        {/* Video Section */}
         <section className="py-20 relative z-10">
           <div className="container mx-auto px-4">
-            <div className="text-center mb-12">
-              <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                Experience SkillPulse
-              </h2>
-              <p className="text-xl text-gray-700 max-w-2xl mx-auto">
-                See how we're revolutionizing education and empowering creators in our platform demo.
-              </p>
-            </div>
-            
-            <div className="max-w-4xl mx-auto">
-              <div className="relative group cursor-pointer" onClick={() => setShowVideo(true)}>
-                <div className="relative overflow-hidden rounded-2xl shadow-2xl bg-gradient-to-br from-orange-500 to-purple-600 p-1">
-                  <div className="bg-black rounded-xl overflow-hidden">
-                    <div className="aspect-video bg-gradient-to-br from-orange-900/20 to-purple-900/20 flex items-center justify-center relative">
-                      <img 
-                        src="https://img.youtube.com/vi/B8ay-17oP_0/maxresdefault.jpg" 
-                        alt="SkillPulse Demo Video"
-                        className="w-full h-full object-cover opacity-80 group-hover:opacity-60 transition-opacity duration-300"
-                      />
-                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center group-hover:bg-black/20 transition-all duration-300">
-                        <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-8 rounded-full shadow-2xl group-hover:scale-110 transition-transform duration-300">
-                          <Play className="h-16 w-16 text-white ml-1" fill="white" />
-                        </div>
-                      </div>
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+              {/* Background Image with Gradient Overlay */}
+              <div className="relative h-[500px] md:h-[600px] lg:h-[700px] overflow-hidden">
+                <img 
+                  src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/citizen-amazed-by-city-buildings.jpg"
+                  alt="Skill Development in Africa"
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-orange-600/80 to-purple-600/80"></div>
+                
+                {/* Content */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center text-white max-w-4xl mx-auto px-6">
+                    <Quote className="h-12 w-12 mx-auto mb-6 text-white/80" />
+                    <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
+                      Revolutionizing Skill Development
+                      <span className="block text-white/90 mt-2">Across Africa</span>
+                    </h2>
+                    <p className="text-lg md:text-xl lg:text-2xl mb-8 max-w-3xl mx-auto leading-relaxed">
+                      "SkillPulse is bridging the digital divide by making quality education accessible 
+                      to every African youth. We're not just teaching skills—we're building the next 
+                      generation of innovators, creators, and leaders who will transform our continent."
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                      <Button 
+                        size="lg"
+                        className="bg-white text-orange-600 hover:bg-white/90 font-semibold px-8 py-4 rounded-xl text-lg transition-all duration-300 hover:scale-105"
+                      >
+                        Join the Movement
+                      </Button>
                     </div>
                   </div>
-                </div>
-                <div className="absolute -bottom-4 -right-4 bg-gradient-to-r from-orange-500 to-purple-600 text-white p-4 rounded-2xl shadow-xl">
-                  <div className="font-bold text-sm">Watch Demo</div>
-                  <div className="text-xs opacity-90">2:30 minutes</div>
                 </div>
               </div>
             </div>
