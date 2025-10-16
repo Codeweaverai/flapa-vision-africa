@@ -75,6 +75,7 @@ import CreatorSettings from '@/pages/creator/CreatorSettings';
 import CreatorAttendeeManagement from '@/pages/creator/CreatorAttendeeManagement';
 import CreatorWorkplaces from '@/pages/creator/CreatorWorkplaces';
 import CreatorRecentActivities from '@/pages/creator/CreatorRecentActivities';
+import CreatorCourseCreateWithAI from '@/pages/creator/CreatorCourseCreateWithAI';
 
 // Import workplace pages
 import AcceptInvitePage from '@/pages/AcceptInvitePage';
@@ -256,6 +257,7 @@ function App() {
                   <Route path="/creator/events/:id/speakers" element={<ProtectedRoute><CreatorEventSpeakers /></ProtectedRoute>} />
                   <Route path="/creator/events/:id/tickets" element={<ProtectedRoute><CreatorEventTickets /></ProtectedRoute>} />
                   <Route path="/creator/workplaces" element={<ProtectedRoute><CreatorWorkplaces /></ProtectedRoute>} />
+                  <Route path="/creator/courses/create-with-ai" element={<ProtectedRoute><CreatorCourseCreateWithAI /></ProtectedRoute>} />
                   <Route path="/creator/analytics" element={<ProtectedRoute><CreatorAnalytics /></ProtectedRoute>} />
                   <Route path="/creator/payments" element={<ProtectedRoute><CreatorPayments /></ProtectedRoute>} />
                   <Route path="/creator/promo-codes" element={<ProtectedRoute><CreatorPromoCodes /></ProtectedRoute>} />
