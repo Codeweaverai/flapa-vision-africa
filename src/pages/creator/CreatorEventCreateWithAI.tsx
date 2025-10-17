@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +11,55 @@ import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
+
+// Custom hook for real-time progress tracking
+const useAIProgress = (progressId: string | null) => {
+  const [progress, setProgress] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!progressId) return;
+
+    const subscription = supabase
+      .channel('ai-progress')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'ai_generation_progress',
+          filter: `id=eq.${progressId}`
+        },
+        (payload) => {
+          setProgress(payload.new);
+          setLoading(false);
+        }
+      )
+      .subscribe();
+
+    // Fetch initial progress
+    const fetchProgress = async () => {
+      const { data } = await supabase
+        .from('ai_generation_progress')
+        .select('*')
+        .eq('id', progressId)
+        .single();
+      
+      if (data) {
+        setProgress(data);
+      }
+      setLoading(false);
+    };
+
+    fetchProgress();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [progressId]);
+
+  return { progress, loading };
+};
 
 const CreatorEventCreateWithAI = () => {
   const navigate = useNavigate();
@@ -28,10 +77,10 @@ const CreatorEventCreateWithAI = () => {
   });
   const [proposal, setProposal] = useState<any>(null);
   const [proposalId, setProposalId] = useState<string | null>(null);
-  const [creationProgress, setCreationProgress] = useState({
-    percentage: 0,
-    step: 'Initializing...'
-  });
+  const [progressId, setProgressId] = useState<string | null>(null);
+  
+  // Use the progress tracking hook
+  const { progress: realTimeProgress, loading: progressLoading } = useAIProgress(progressId);
 
   const handleInputChange = (field: string, value: string) => {
     setEventData(prev => ({
@@ -93,12 +142,6 @@ Please generate a detailed event proposal with agenda, speakers, and tickets.`;
 
     setLoading(true);
     setStep('creating');
-    
-    // Reset progress
-    setCreationProgress({
-      percentage: 0,
-      step: 'Initializing Manager Agent...'
-    });
 
     try {
       const { data, error } = await supabase.functions.invoke('generate-event', {
@@ -132,6 +175,7 @@ Please generate a detailed event proposal with agenda, speakers, and tickets.`;
       }
     } finally {
       setLoading(false);
+      setProgressId(null);
     }
   };
 
@@ -168,18 +212,29 @@ Please generate a detailed event proposal with agenda, speakers, and tickets.`;
   const gradientTextClass = "bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent";
   const gradientHoverClass = "hover:from-orange-600 hover:to-purple-700";
 
-  const progressSteps = [
-    { percentage: 10, step: 'Structure Generation', description: 'Creating event framework and details' },
-    { percentage: 30, step: 'Agenda Creation', description: 'Building comprehensive event schedule' },
-    { percentage: 50, step: 'Speaker Research', description: 'Generating speaker profiles with bios' },
-    { percentage: 70, step: 'Ticket Setup', description: 'Creating optimal ticket types and pricing' },
-    { percentage: 95, step: 'Final Assembly', description: 'Combining all components' },
-    { percentage: 98, step: 'Database Save', description: 'Saving to database' },
-    { percentage: 100, step: 'Completed', description: 'Event ready!' }
-  ];
+  // Use real-time progress data if available, otherwise fallback to static progress
+  const currentProgress = realTimeProgress ? {
+    percentage: realTimeProgress.progress_percentage,
+    step: realTimeProgress.current_step,
+    agentActivity: realTimeProgress.agent_activity
+  } : {
+    percentage: 0,
+    step: 'Initializing...',
+    agentActivity: null
+  };
 
-  const getCurrentProgressStep = () => {
-    return progressSteps.find(step => step.percentage <= creationProgress.percentage) || progressSteps[0];
+  const getAgentStatus = (agent: string) => {
+    if (!currentProgress.agentActivity) return 'pending';
+    return currentProgress.agentActivity[agent] || 'pending';
+  };
+
+  const getAgentStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'bg-green-500';
+      case 'active': return 'bg-orange-500 animate-pulse';
+      case 'error': return 'bg-red-500';
+      default: return 'bg-gray-300';
+    }
   };
 
   return (
@@ -479,7 +534,7 @@ Please generate a detailed event proposal with agenda, speakers, and tickets.`;
           </Card>
         )}
 
-        {/* Step 4: Creating Event */}
+        {/* Step 4: Creating Event with Real-time Progress */}
         {step === 'creating' && (
           <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
             <CardHeader className="text-center pb-4">
@@ -495,12 +550,12 @@ Please generate a detailed event proposal with agenda, speakers, and tickets.`;
               <div className="space-y-2">
                 <div className="flex justify-between text-sm text-gray-600">
                   <span>Progress</span>
-                  <span>{creationProgress.percentage}%</span>
+                  <span>{currentProgress.percentage}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-3">
                   <div 
                     className="bg-gradient-to-r from-orange-500 to-purple-600 h-3 rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${creationProgress.percentage}%` }}
+                    style={{ width: `${currentProgress.percentage}%` }}
                   ></div>
                 </div>
               </div>
@@ -511,8 +566,7 @@ Please generate a detailed event proposal with agenda, speakers, and tickets.`;
                   <Bot className="h-5 w-5 text-orange-500" />
                   <h4 className="font-semibold text-gray-800">Current Step</h4>
                 </div>
-                <p className="text-lg font-medium text-gray-900">{getCurrentProgressStep().step}</p>
-                <p className="text-sm text-gray-600 mt-1">{getCurrentProgressStep().description}</p>
+                <p className="text-lg font-medium text-gray-900">{currentProgress.step}</p>
               </div>
 
               {/* Agent Activity */}
@@ -522,41 +576,15 @@ Please generate a detailed event proposal with agenda, speakers, and tickets.`;
                   AI Agent Activity
                 </h5>
                 <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                      <span>Manager Agent</span>
+                  {['manager', 'structure', 'agenda', 'speaker', 'ticket'].map((agent) => (
+                    <div key={agent} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
+                      <div className="flex items-center space-x-2">
+                        <div className={`w-2 h-2 rounded-full ${getAgentStatusColor(getAgentStatus(agent))}`}></div>
+                        <span className="capitalize">{agent} Agent</span>
+                      </div>
+                      <span className="text-xs text-gray-500 capitalize">{getAgentStatus(agent)}</span>
                     </div>
-                    <span className="text-xs text-gray-500">Coordinating</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
-                      <span>Structure Agent</span>
-                    </div>
-                    <span className="text-xs text-gray-500">Active</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                      <span>Agenda Agent</span>
-                    </div>
-                    <span className="text-xs text-gray-500">Pending</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                      <span>Speaker Agent</span>
-                    </div>
-                    <span className="text-xs text-gray-500">Pending</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                      <span>Ticket Agent</span>
-                    </div>
-                    <span className="text-xs text-gray-500">Pending</span>
-                  </div>
+                  ))}
                 </div>
               </div>
 
