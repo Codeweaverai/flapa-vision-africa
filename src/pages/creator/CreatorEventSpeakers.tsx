@@ -9,11 +9,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ArrowLeft, Plus, Edit, Trash2, User, Linkedin, Twitter, Globe, MoreVertical } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, User, Linkedin, Twitter, Globe, MoreVertical, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
-import { supabase } from '@/lib/supabaseClient';
-import ImageUpload from '@/components/ui/image-upload';
+import { supabase } from '@/integrations/supabase/client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,6 +52,7 @@ const CreatorEventSpeakers = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSpeaker, setEditingSpeaker] = useState<KeynoteSpeaker | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     role: 'keynote',
@@ -124,6 +124,46 @@ const CreatorEventSpeakers = () => {
     } catch (error) {
       console.error('Error loading speakers:', error);
       toast.error('Failed to load speakers');
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB');
+      return;
+    }
+
+    setUploadingImage(true);
+    
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `speaker-${Date.now()}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('speaker-images')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('speaker-images')
+        .getPublicUrl(fileName);
+
+      setFormData(prev => ({ ...prev, image_url: publicUrl }));
+      toast.success('Image uploaded successfully');
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast.error('Failed to upload image');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -278,17 +318,13 @@ const CreatorEventSpeakers = () => {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextareaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleRoleChange = (value: string) => {
     setFormData(prev => ({ ...prev, role: value }));
-  };
-
-  const handleImageUpload = (imageUrl: string) => {
-    setFormData(prev => ({ ...prev, image_url: imageUrl }));
   };
 
   const getRoleDisplayName = (role: string) => {
@@ -316,11 +352,17 @@ const CreatorEventSpeakers = () => {
     }
   };
 
+  // Function to truncate text with ellipsis
+  const truncateText = (text: string, maxLength: number = 40) => {
+    if (!text) return '';
+    return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
+  };
+
   if (loading) {
     return (
       <CreatorLayout title="Event Speakers">
         <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
         </div>
       </CreatorLayout>
     );
@@ -329,8 +371,11 @@ const CreatorEventSpeakers = () => {
   return (
     <CreatorLayout title="Event Speakers & Performers">
       <div className="mb-6">
-        <Button variant="outline" onClick={() => navigate('/creator/events')}
-          className="mb-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white hover:text-white/90 transition-all duration-300 shadow-lg hover:shadow-xl">
+        <Button 
+          variant="outline" 
+          onClick={() => navigate('/creator/events')}
+          className="mb-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white hover:text-white/90 transition-all duration-300 shadow-lg hover:shadow-xl"
+        >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Events
         </Button>
@@ -338,13 +383,17 @@ const CreatorEventSpeakers = () => {
 
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">Event Speakers & Performers</h2>
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+            Event Speakers & Performers
+          </h2>
           <p className="text-gray-600 mt-1">Manage all participants for your event</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={handleAddSpeaker}
-              className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg">
+            <Button 
+              onClick={handleAddSpeaker}
+              className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg"
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add Participant
             </Button>
@@ -359,10 +408,37 @@ const CreatorEventSpeakers = () => {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <ImageUpload
-                onImageUpload={handleImageUpload}
-                currentImage={formData.image_url}
-              />
+              {/* Image Upload Section */}
+              <div>
+                <Label htmlFor="image" className="text-gray-700 font-medium">Speaker Photo</Label>
+                <div className="flex items-center gap-4 mt-2">
+                  <Input
+                    id="image"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={uploadingImage}
+                    className="hidden"
+                  />
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => document.getElementById('image')?.click()}
+                    disabled={uploadingImage}
+                    className="border-orange-300 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    {uploadingImage ? 'Uploading...' : 'Upload Photo'}
+                  </Button>
+                  {formData.image_url && (
+                    <img 
+                      src={formData.image_url} 
+                      alt="Speaker preview" 
+                      className="h-12 w-12 object-cover rounded-full border-2 border-purple-200"
+                    />
+                  )}
+                </div>
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -484,13 +560,15 @@ const CreatorEventSpeakers = () => {
                   variant="outline" 
                   onClick={() => setDialogOpen(false)}
                   disabled={submitting}
-                  className="border-gray-300 text-gray-700 hover:bg-gray-50">
+                  className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                >
                   Cancel
                 </Button>
                 <Button 
                   type="submit" 
                   disabled={submitting || !formData.name.trim()}
-                  className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed">
+                  className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   {submitting ? (
                     <span className="flex items-center">
                       <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -517,8 +595,10 @@ const CreatorEventSpeakers = () => {
             <p className="text-gray-600 mb-6 text-lg max-w-md">
               Add speakers, performers, artists, or panelists to showcase your event's talent
             </p>
-            <Button onClick={handleAddSpeaker}
-              className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg px-8 py-3 text-lg">
+            <Button 
+              onClick={handleAddSpeaker}
+              className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg px-8 py-3 text-lg"
+            >
               <Plus className="h-5 w-5 mr-2" />
               Add First Participant
             </Button>
@@ -530,20 +610,24 @@ const CreatorEventSpeakers = () => {
             <Card key={speaker.id} className="group border border-gray-200 hover:shadow-xl transition-all duration-300 hover:scale-[1.02] overflow-hidden">
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-14 w-14 border-2 border-white shadow-lg">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Avatar className="h-14 w-14 border-2 border-white shadow-lg flex-shrink-0">
                       <AvatarImage src={speaker.image_url} alt={speaker.name} />
                       <AvatarFallback className="bg-gradient-to-br from-orange-400 to-purple-600 text-white font-semibold text-lg">
                         {speaker.name.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <CardTitle className="text-lg font-bold text-gray-900 truncate">{speaker.name}</CardTitle>
+                      <CardTitle className="text-lg font-bold text-gray-900 truncate">
+                        {speaker.name}
+                      </CardTitle>
                       <div className="flex flex-wrap items-center gap-2 mt-1">
                         {speaker.title && (
-                          <p className="text-sm text-gray-600 truncate">{speaker.title}</p>
+                          <p className="text-sm text-gray-600 truncate" title={speaker.title}>
+                            {truncateText(speaker.title, 35)}
+                          </p>
                         )}
-                        <Badge className={`text-xs px-2 py-1 ${getRoleColor(speaker.role)}`}>
+                        <Badge className={`text-xs px-2 py-1 ${getRoleColor(speaker.role)} flex-shrink-0`}>
                           <span className="mr-1">{getRoleIcon(speaker.role)}</span>
                           {getRoleDisplayName(speaker.role)}
                         </Badge>
@@ -552,12 +636,19 @@ const CreatorEventSpeakers = () => {
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <MoreVertical className="h-4 w-4" />
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-r from-orange-500/10 to-purple-600/10 hover:from-orange-500/20 hover:to-purple-600/20"
+                      >
+                        <MoreVertical className="h-4 w-4 text-orange-600" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleEditSpeaker(speaker)}>
+                      <DropdownMenuItem 
+                        onClick={() => handleEditSpeaker(speaker)}
+                        className="text-orange-600 focus:text-orange-600"
+                      >
                         <Edit className="h-4 w-4 mr-2" />
                         Edit
                       </DropdownMenuItem>
@@ -580,13 +671,15 @@ const CreatorEventSpeakers = () => {
                        speaker.role === 'artist' ? 'Artistic Focus' : 'Topic'}
                     </p>
                     <p className="text-sm text-purple-700 bg-purple-50 rounded-lg px-3 py-2 border border-purple-100">
-                      {speaker.speaking_topic}
+                      {truncateText(speaker.speaking_topic, 60)}
                     </p>
                   </div>
                 )}
                 {speaker.bio && (
                   <div className="mb-4">
-                    <p className="text-sm text-gray-600 line-clamp-3 leading-relaxed">{speaker.bio}</p>
+                    <p className="text-sm text-gray-600 line-clamp-3 leading-relaxed">
+                      {truncateText(speaker.bio, 120)}
+                    </p>
                   </div>
                 )}
                 
@@ -597,7 +690,7 @@ const CreatorEventSpeakers = () => {
                       variant="outline" 
                       size="sm" 
                       asChild 
-                      className="h-8 px-2 border-blue-200 hover:bg-blue-50 text-blue-600"
+                      className="h-8 px-2 border-orange-200 hover:bg-orange-50 text-orange-600"
                     >
                       <a href={speaker.linkedin_url} target="_blank" rel="noopener noreferrer">
                         <Linkedin className="h-3 w-3" />
@@ -609,7 +702,7 @@ const CreatorEventSpeakers = () => {
                       variant="outline" 
                       size="sm" 
                       asChild 
-                      className="h-8 px-2 border-sky-200 hover:bg-sky-50 text-sky-500"
+                      className="h-8 px-2 border-purple-200 hover:bg-purple-50 text-purple-600"
                     >
                       <a href={speaker.twitter_url} target="_blank" rel="noopener noreferrer">
                         <Twitter className="h-3 w-3" />
