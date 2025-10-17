@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Bot, Sparkles, Calendar, Clock, Users, Zap, CheckCircle, ArrowRight, Play, Star, MapPin, Ticket, Mic } from 'lucide-react';
+import { Bot, Sparkles, Calendar, Clock, Users, Zap, CheckCircle, ArrowRight, Play, Star, MapPin, Ticket, Mic, Plus, X, User, Music, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
@@ -61,6 +61,16 @@ const useAIProgress = (progressId: string | null) => {
   return { progress, loading };
 };
 
+interface SpeakerInput {
+  id: string;
+  name: string;
+  role: 'keynote' | 'performer' | 'artist' | 'panelist';
+  linkedinUrl: string;
+  twitterUrl: string;
+  websiteUrl: string;
+  expertise: string;
+}
+
 const CreatorEventCreateWithAI = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -73,8 +83,22 @@ const CreatorEventCreateWithAI = () => {
     targetAudience: '',
     duration: '',
     location: '',
-    keyTopics: ''
+    keyTopics: '',
+    maxPrice: '25' // Default max price
   });
+  
+  const [speakers, setSpeakers] = useState<SpeakerInput[]>([
+    {
+      id: '1',
+      name: '',
+      role: 'keynote',
+      linkedinUrl: '',
+      twitterUrl: '',
+      websiteUrl: '',
+      expertise: ''
+    }
+  ]);
+  
   const [proposal, setProposal] = useState<any>(null);
   const [proposalId, setProposalId] = useState<string | null>(null);
   const [progressId, setProgressId] = useState<string | null>(null);
@@ -89,9 +113,53 @@ const CreatorEventCreateWithAI = () => {
     }));
   };
 
+  const addSpeaker = () => {
+    setSpeakers(prev => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        name: '',
+        role: 'keynote',
+        linkedinUrl: '',
+        twitterUrl: '',
+        websiteUrl: '',
+        expertise: ''
+      }
+    ]);
+  };
+
+  const removeSpeaker = (id: string) => {
+    if (speakers.length > 1) {
+      setSpeakers(prev => prev.filter(speaker => speaker.id !== id));
+    }
+  };
+
+  const updateSpeaker = (id: string, field: string, value: string) => {
+    setSpeakers(prev => prev.map(speaker => 
+      speaker.id === id ? { ...speaker, [field]: value } : speaker
+    ));
+  };
+
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case 'keynote': return <Mic className="h-4 w-4" />;
+      case 'performer': return <Music className="h-4 w-4" />;
+      case 'artist': return <Camera className="h-4 w-4" />;
+      case 'panelist': return <Users className="h-4 w-4" />;
+      default: return <User className="h-4 w-4" />;
+    }
+  };
+
   const generateProposal = async () => {
     if (!eventData.title.trim() || !eventData.description.trim()) {
       toast.error('Please provide at least an event title and description');
+      return;
+    }
+
+    // Validate speakers
+    const validSpeakers = speakers.filter(s => s.name.trim() !== '');
+    if (validSpeakers.length === 0) {
+      toast.error('Please add at least one speaker or performer');
       return;
     }
 
@@ -99,6 +167,10 @@ const CreatorEventCreateWithAI = () => {
     setStep('generating');
 
     try {
+      const speakerDetails = validSpeakers.map(speaker => 
+        `Name: ${speaker.name}, Role: ${speaker.role}, Expertise: ${speaker.expertise}, LinkedIn: ${speaker.linkedinUrl || 'Not provided'}, Twitter: ${speaker.twitterUrl || 'Not provided'}, Website: ${speaker.websiteUrl || 'Not provided'}`
+      ).join('\n');
+
       const prompt = `Create a comprehensive event about: ${eventData.title}
       
 Description: ${eventData.description}
@@ -107,8 +179,12 @@ Target Audience: ${eventData.targetAudience}
 Duration: ${eventData.duration}
 Location: ${eventData.location}
 Key Topics: ${eventData.keyTopics}
+Maximum Ticket Price: $${eventData.maxPrice}
 
-Please generate a detailed event proposal with agenda, speakers, and tickets.`;
+SPECIFIC SPEAKERS/PERFORMERS TO RESEARCH AND INCLUDE:
+${speakerDetails}
+
+Please generate a detailed event proposal with agenda, speaker profiles based on the provided names and links, and tickets. Ensure ticket prices are between $3 and $${eventData.maxPrice}.`;
 
       const { data, error } = await supabase.functions.invoke('generate-event', {
         body: {
@@ -192,13 +268,13 @@ Please generate a detailed event proposal with agenda, speakers, and tickets.`;
     },
     {
       icon: <Mic className="h-5 w-5" />,
-      title: "Speaker Profiles",
-      description: "Realistic speakers with bios and social links"
+      title: "Specific Speaker Research",
+      description: "Research real speakers based on your inputs"
     },
     {
       icon: <Ticket className="h-5 w-5" />,
-      title: "Smart Ticketing",
-      description: "Multiple ticket types with optimal pricing"
+      title: "Affordable Pricing",
+      description: "Ticket prices optimized between $3-$40"
     }
   ];
 
@@ -206,6 +282,13 @@ Please generate a detailed event proposal with agenda, speakers, and tickets.`;
     'webinar', 'conferences', 'live-music', 'sports-events', 'night-life',
     'concerts', 'comedy-shows', 'business-events', 'wellness-events', 'summit',
     'workshops', 'festivals', 'tech-meetups', 'cultural-events'
+  ];
+
+  const speakerRoles = [
+    { value: 'keynote', label: 'Keynote Speaker', icon: <Mic className="h-4 w-4" /> },
+    { value: 'performer', label: 'Music Performer', icon: <Music className="h-4 w-4" /> },
+    { value: 'artist', label: 'Visual Artist', icon: <Camera className="h-4 w-4" /> },
+    { value: 'panelist', label: 'Panelist', icon: <Users className="h-4 w-4" /> }
   ];
 
   const gradientClass = "bg-gradient-to-r from-orange-500 to-purple-600";
@@ -279,7 +362,7 @@ Please generate a detailed event proposal with agenda, speakers, and tickets.`;
                 Describe Your Event
               </CardTitle>
               <CardDescription className="text-lg">
-                Provide some details about the event you want to create
+                Provide details about your event and specific speakers/performers
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -358,20 +441,145 @@ Please generate a detailed event proposal with agenda, speakers, and tickets.`;
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="keyTopics" className="text-base font-semibold">Key Topics/Themes</Label>
+                  <Label htmlFor="maxPrice" className="text-base font-semibold">Maximum Ticket Price ($3-$40)</Label>
                   <Input
-                    id="keyTopics"
-                    placeholder="e.g., AI, Innovation, Sustainability"
-                    value={eventData.keyTopics}
-                    onChange={(e) => handleInputChange('keyTopics', e.target.value)}
+                    id="maxPrice"
+                    type="number"
+                    min="3"
+                    max="40"
+                    placeholder="25"
+                    value={eventData.maxPrice}
+                    onChange={(e) => handleInputChange('maxPrice', e.target.value)}
                     className="border-2 focus:border-orange-300 transition-colors"
                   />
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="keyTopics" className="text-base font-semibold">Key Topics/Themes</Label>
+                <Input
+                  id="keyTopics"
+                  placeholder="e.g., AI, Innovation, Sustainability"
+                  value={eventData.keyTopics}
+                  onChange={(e) => handleInputChange('keyTopics', e.target.value)}
+                  className="border-2 focus:border-orange-300 transition-colors"
+                />
+              </div>
+
+              {/* Speakers/Performers Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-semibold">Speakers & Performers *</Label>
+                  <Button
+                    type="button"
+                    onClick={addSpeaker}
+                    variant="outline"
+                    size="sm"
+                    className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Speaker
+                  </Button>
+                </div>
+                
+                <div className="space-y-4">
+                  {speakers.map((speaker, index) => (
+                    <Card key={speaker.id} className="border-2 border-orange-100 bg-orange-50/50">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center space-x-2">
+                            {getRoleIcon(speaker.role)}
+                            <span className="font-medium text-sm text-orange-800">
+                              {speakerRoles.find(r => r.value === speaker.role)?.label}
+                            </span>
+                          </div>
+                          {speakers.length > 1 && (
+                            <Button
+                              type="button"
+                              onClick={() => removeSpeaker(speaker.id)}
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium">Full Name *</Label>
+                            <Input
+                              placeholder="e.g., Elon Musk, Taylor Swift"
+                              value={speaker.name}
+                              onChange={(e) => updateSpeaker(speaker.id, 'name', e.target.value)}
+                              className="border-orange-200 focus:border-orange-400"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium">Role</Label>
+                            <select
+                              value={speaker.role}
+                              onChange={(e) => updateSpeaker(speaker.id, 'role', e.target.value)}
+                              className="w-full px-3 py-2 border border-orange-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            >
+                              {speakerRoles.map(role => (
+                                <option key={role.value} value={role.value}>
+                                  {role.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2 mb-4">
+                          <Label className="text-sm font-medium">Expertise/Specialization</Label>
+                          <Input
+                            placeholder="e.g., AI Research, Pop Music, Digital Art"
+                            value={speaker.expertise}
+                            onChange={(e) => updateSpeaker(speaker.id, 'expertise', e.target.value)}
+                            className="border-orange-200 focus:border-orange-400"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium">LinkedIn URL</Label>
+                            <Input
+                              placeholder="https://linkedin.com/in/..."
+                              value={speaker.linkedinUrl}
+                              onChange={(e) => updateSpeaker(speaker.id, 'linkedinUrl', e.target.value)}
+                              className="border-orange-200 focus:border-orange-400"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium">Twitter URL</Label>
+                            <Input
+                              placeholder="https://twitter.com/..."
+                              value={speaker.twitterUrl}
+                              onChange={(e) => updateSpeaker(speaker.id, 'twitterUrl', e.target.value)}
+                              className="border-orange-200 focus:border-orange-400"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium">Website/Portfolio</Label>
+                            <Input
+                              placeholder="https://example.com"
+                              value={speaker.websiteUrl}
+                              onChange={(e) => updateSpeaker(speaker.id, 'websiteUrl', e.target.value)}
+                              className="border-orange-200 focus:border-orange-400"
+                            />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
               <Button
                 onClick={generateProposal}
-                disabled={loading || !eventData.title.trim() || !eventData.description.trim()}
+                disabled={loading || !eventData.title.trim() || !eventData.description.trim() || speakers.every(s => !s.name.trim())}
                 className={`w-full ${gradientClass} text-white font-semibold py-3 rounded-lg ${gradientHoverClass} transition-all duration-200 shadow-lg hover:shadow-xl`}
               >
                 <Bot className="h-5 w-5 mr-2" />
@@ -489,11 +697,11 @@ Please generate a detailed event proposal with agenda, speakers, and tickets.`;
                   </div>
                   <div className="flex items-center space-x-2">
                     <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span>Speaker profiles with bios</span>
+                    <span>Specific speaker research</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span>Multiple ticket types</span>
+                    <span>Affordable pricing ($3-$40)</span>
                   </div>
                 </div>
               </div>
