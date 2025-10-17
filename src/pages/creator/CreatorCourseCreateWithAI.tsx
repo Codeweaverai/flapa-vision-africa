@@ -27,6 +27,10 @@ const CreatorCourseCreateWithAI = () => {
   });
   const [proposal, setProposal] = useState<any>(null);
   const [proposalId, setProposalId] = useState<string | null>(null);
+  const [creationProgress, setCreationProgress] = useState({
+    percentage: 0,
+    step: 'Initializing...'
+  });
 
   const handleInputChange = (field: string, value: string) => {
     setCourseData(prev => ({
@@ -67,7 +71,7 @@ Please generate a detailed course proposal with modules, lessons, and learning o
 
       if (data.success) {
         setProposal(data.proposal);
-        setProposalId(data.proposal_id); // Store the proposal ID for full course creation
+        setProposalId(data.proposal_id);
         setStep('proposal');
         toast.success('Course proposal generated successfully!');
       } else {
@@ -87,20 +91,26 @@ Please generate a detailed course proposal with modules, lessons, and learning o
 
     setLoading(true);
     setStep('creating');
+    
+    // Reset progress
+    setCreationProgress({
+      percentage: 0,
+      step: 'Initializing Manager Agent...'
+    });
 
     try {
       const { data, error } = await supabase.functions.invoke('generate-course', {
         body: {
           creator_id: user?.id,
           action: 'generate_full_course',
-          proposal_id: proposalId // Use the stored proposal ID
+          proposal_id: proposalId
         }
       });
 
       if (error) throw error;
 
       if (data.success) {
-        toast.success('Course created successfully!');
+        toast.success('Course created successfully with AI Agents!');
         navigate(`/creator/courses/${data.course_id}/content`);
       } else {
         throw new Error(data.error || 'Failed to create course');
@@ -126,18 +136,18 @@ Please generate a detailed course proposal with modules, lessons, and learning o
   const features = [
     {
       icon: <Zap className="h-5 w-5" />,
-      title: "Instant Course Structure",
-      description: "AI generates comprehensive modules and lessons"
+      title: "AI Manager Agent",
+      description: "Intelligent coordination of specialized AI agents"
     },
     {
       icon: <BookOpen className="h-5 w-5" />,
       title: "Complete Content",
-      description: "Includes video scripts, quizzes, and learning materials"
+      description: "Includes video scripts, 3 quizzes per module, and 15 exam questions"
     },
     {
       icon: <Clock className="h-5 w-5" />,
-      title: "Save Time",
-      description: "Create production-ready courses in minutes"
+      title: "Optimized Process",
+      description: "Faster generation with improved reliability"
     },
     {
       icon: <Users className="h-5 w-5" />,
@@ -150,6 +160,22 @@ Please generate a detailed course proposal with modules, lessons, and learning o
   const gradientClass = "bg-gradient-to-r from-orange-500 to-purple-600";
   const gradientTextClass = "bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent";
   const gradientHoverClass = "hover:from-orange-600 hover:to-purple-700";
+
+  // Progress steps for course creation
+  const progressSteps = [
+    { percentage: 10, step: 'Structure Generation', description: 'Creating course modules and lessons' },
+    { percentage: 30, step: 'Content Generation', description: 'Generating detailed lesson content' },
+    { percentage: 50, step: 'Quiz Creation', description: 'Creating 3 quizzes per module' },
+    { percentage: 70, step: 'Transcript Generation', description: 'Creating video transcripts' },
+    { percentage: 85, step: 'Final Exam', description: 'Creating 15 exam questions' },
+    { percentage: 95, step: 'Final Assembly', description: 'Combining all components' },
+    { percentage: 98, step: 'Database Save', description: 'Saving to database' },
+    { percentage: 100, step: 'Completed', description: 'Course ready!' }
+  ];
+
+  const getCurrentProgressStep = () => {
+    return progressSteps.find(step => step.percentage <= creationProgress.percentage) || progressSteps[0];
+  };
 
   return (
     <CreatorLayout title="Create Course with AI">
@@ -166,7 +192,7 @@ Please generate a detailed course proposal with modules, lessons, and learning o
             AI Course Creator
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Let our AI assistant create a complete, production-ready course for you in minutes
+            Let our AI Manager Agent create a complete, production-ready course for you
           </p>
         </div>
 
@@ -418,6 +444,32 @@ Please generate a detailed course proposal with modules, lessons, and learning o
                 ))}
               </div>
 
+              {/* AI Agent Features */}
+              <div className="bg-gradient-to-r from-purple-50 to-orange-50 rounded-lg p-4 border border-purple-200">
+                <h4 className="font-semibold text-lg mb-3 flex items-center">
+                  <Bot className="h-5 w-5 mr-2 text-purple-500" />
+                  AI Agent System Features
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span>Manager Agent coordination</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span>3 quizzes per module</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span>15 final exam questions</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span>Automatic retry on failures</span>
+                  </div>
+                </div>
+              </div>
+
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-gray-200">
                 <Button
@@ -443,7 +495,8 @@ Please generate a detailed course proposal with modules, lessons, and learning o
                     </>
                   ) : (
                     <>
-                      Create Full Course
+                      <Bot className="h-4 w-4 mr-2" />
+                      Create with AI Agents
                       <ArrowRight className="h-4 w-4 ml-2" />
                     </>
                   )}
@@ -455,34 +508,97 @@ Please generate a detailed course proposal with modules, lessons, and learning o
 
         {/* Step 4: Creating Course */}
         {step === 'creating' && (
-          <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm text-center">
-            <CardContent className="pt-12 pb-12">
-              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto mb-6"></div>
-              <h3 className="text-xl font-semibold mb-2 text-gray-800">Creating Your Course</h3>
-              <p className="text-gray-600 mb-6">
-                This may take a few minutes. We're generating:
-              </p>
-              <div className="space-y-3 text-sm text-gray-600 max-w-md mx-auto">
-                <div className="flex items-center justify-center p-3 bg-orange-50 rounded-lg">
-                  <CheckCircle className="h-4 w-4 text-green-500 mr-3" />
-                  <span>Course structure and metadata</span>
+          <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
+            <CardHeader className="text-center pb-4">
+              <CardTitle className={`text-2xl font-bold ${gradientTextClass}`}>
+                Creating Your Course with AI Agents
+              </CardTitle>
+              <CardDescription className="text-lg">
+                Our Manager Agent is coordinating specialized AI agents to build your course
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Progress Bar */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Progress</span>
+                  <span>{creationProgress.percentage}%</span>
                 </div>
-                <div className="flex items-center justify-center p-3 bg-orange-50 rounded-lg">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-500 mr-3"></div>
-                  <span>Lesson content and video transcripts</span>
-                </div>
-                <div className="flex items-center justify-center p-3 bg-orange-50 rounded-lg">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-500 mr-3"></div>
-                  <span>Quizzes and assessments</span>
-                </div>
-                <div className="flex items-center justify-center p-3 bg-orange-50 rounded-lg">
-                  <Star className="h-4 w-4 text-purple-500 mr-3" />
-                  <span>Final exam preparation</span>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div 
+                    className="bg-gradient-to-r from-orange-500 to-purple-600 h-3 rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${creationProgress.percentage}%` }}
+                  ></div>
                 </div>
               </div>
-              <p className="text-xs text-gray-400 mt-6">
-                Please don't close this window while we create your amazing course!
-              </p>
+
+              {/* Current Step */}
+              <div className="text-center p-4 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg border border-orange-200">
+                <div className="flex items-center justify-center space-x-2 mb-2">
+                  <Bot className="h-5 w-5 text-orange-500" />
+                  <h4 className="font-semibold text-gray-800">Current Step</h4>
+                </div>
+                <p className="text-lg font-medium text-gray-900">{getCurrentProgressStep().step}</p>
+                <p className="text-sm text-gray-600 mt-1">{getCurrentProgressStep().description}</p>
+              </div>
+
+              {/* Agent Activity */}
+              <div className="space-y-3">
+                <h5 className="font-semibold text-gray-800 flex items-center">
+                  <Sparkles className="h-4 w-4 mr-2 text-purple-500" />
+                  AI Agent Activity
+                </h5>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <span>Manager Agent</span>
+                    </div>
+                    <span className="text-xs text-gray-500">Coordinating</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                      <span>Structure Agent</span>
+                    </div>
+                    <span className="text-xs text-gray-500">Completed</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                      <span>Content Agent</span>
+                    </div>
+                    <span className="text-xs text-gray-500">Completed</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                      <span>Quiz Agent</span>
+                    </div>
+                    <span className="text-xs text-gray-500">Active</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                      <span>Transcript Agent</span>
+                    </div>
+                    <span className="text-xs text-gray-500">Pending</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                      <span>Exam Agent</span>
+                    </div>
+                    <span className="text-xs text-gray-500">Pending</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-center pt-4">
+                <p className="text-sm text-gray-500">
+                  This usually takes 2-3 minutes. Please don't close this window.
+                </p>
+              </div>
             </CardContent>
           </Card>
         )}
