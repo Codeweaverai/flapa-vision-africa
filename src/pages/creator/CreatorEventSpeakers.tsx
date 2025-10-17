@@ -7,11 +7,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Plus, Edit, Trash2, User } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ArrowLeft, Plus, Edit, Trash2, User, Linkedin, Twitter, Globe, MoreVertical } from 'lucide-react';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
 import ImageUpload from '@/components/ui/image-upload';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface KeynoteSpeaker {
   id: string;
@@ -30,10 +38,10 @@ interface KeynoteSpeaker {
 }
 
 const roleOptions = [
-  { value: 'keynote', label: 'Keynote Speaker' },
-  { value: 'panelist', label: 'Panelist' },
-  { value: 'performer', label: 'Performer' },
-  { value: 'artist', label: 'Artist' }
+  { value: 'keynote', label: 'Keynote Speaker', color: 'bg-purple-100 text-purple-800 border-purple-200' },
+  { value: 'panelist', label: 'Panelist', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+  { value: 'performer', label: 'Performer', color: 'bg-orange-100 text-orange-800 border-orange-200' },
+  { value: 'artist', label: 'Artist', color: 'bg-green-100 text-green-800 border-green-200' }
 ];
 
 const CreatorEventSpeakers = () => {
@@ -289,17 +297,22 @@ const CreatorEventSpeakers = () => {
   };
 
   const getRoleColor = (role: string) => {
+    const roleOption = roleOptions.find(opt => opt.value === role);
+    return roleOption ? roleOption.color : 'bg-gray-100 text-gray-800 border-gray-200';
+  };
+
+  const getRoleIcon = (role: string) => {
     switch (role) {
       case 'keynote':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
+        return '🎤';
       case 'panelist':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
+        return '💬';
       case 'performer':
-        return 'bg-orange-100 text-orange-800 border-orange-200';
+        return '🎭';
       case 'artist':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return '🎨';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return '👤';
     }
   };
 
@@ -324,7 +337,10 @@ const CreatorEventSpeakers = () => {
       </div>
 
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">Event Speakers & Performers</h2>
+        <div>
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">Event Speakers & Performers</h2>
+          <p className="text-gray-600 mt-1">Manage all participants for your event</p>
+        </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={handleAddSpeaker}
@@ -492,18 +508,18 @@ const CreatorEventSpeakers = () => {
       </div>
 
       {speakers.length === 0 ? (
-        <Card className="border-dashed border-2 border-gray-200">
-          <CardContent className="pt-8 pb-10 flex flex-col items-center justify-center text-center">
+        <Card className="border-dashed border-2 border-gray-200 bg-gradient-to-br from-orange-50 to-purple-50">
+          <CardContent className="pt-12 pb-12 flex flex-col items-center justify-center text-center">
             <div className="mb-4 rounded-full bg-gradient-to-br from-orange-100 to-purple-100 p-6">
-              <User className="h-8 w-8 text-purple-600" />
+              <User className="h-12 w-12 text-purple-600" />
             </div>
-            <CardTitle className="mb-2 text-gray-800">No participants yet</CardTitle>
-            <p className="text-gray-600 mb-6">
-              Add speakers, performers, artists, or panelists for your event
+            <CardTitle className="mb-2 text-2xl font-bold text-gray-800">No participants yet</CardTitle>
+            <p className="text-gray-600 mb-6 text-lg max-w-md">
+              Add speakers, performers, artists, or panelists to showcase your event's talent
             </p>
             <Button onClick={handleAddSpeaker}
-              className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg">
-              <Plus className="h-4 w-4 mr-2" />
+              className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg px-8 py-3 text-lg">
+              <Plus className="h-5 w-5 mr-2" />
               Add First Participant
             </Button>
           </CardContent>
@@ -511,81 +527,104 @@ const CreatorEventSpeakers = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {speakers.map((speaker) => (
-            <Card key={speaker.id} className="border border-gray-200 hover:shadow-lg transition-shadow duration-200">
-              <CardHeader className="pb-4">
+            <Card key={speaker.id} className="group border border-gray-200 hover:shadow-xl transition-all duration-300 hover:scale-[1.02] overflow-hidden">
+              <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-3">
-                    {speaker.image_url ? (
-                      <img
-                        src={speaker.image_url}
-                        alt={speaker.name}
-                        className="w-12 h-12 rounded-full object-cover border-2 border-purple-200"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center text-white font-semibold">
-                        {speaker.name.charAt(0)}
-                      </div>
-                    )}
-                    <div>
-                      <CardTitle className="text-lg text-gray-800">{speaker.name}</CardTitle>
-                      <div className="flex items-center gap-2">
+                    <Avatar className="h-14 w-14 border-2 border-white shadow-lg">
+                      <AvatarImage src={speaker.image_url} alt={speaker.name} />
+                      <AvatarFallback className="bg-gradient-to-br from-orange-400 to-purple-600 text-white font-semibold text-lg">
+                        {speaker.name.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-lg font-bold text-gray-900 truncate">{speaker.name}</CardTitle>
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
                         {speaker.title && (
-                          <p className="text-sm text-gray-600">{speaker.title}</p>
+                          <p className="text-sm text-gray-600 truncate">{speaker.title}</p>
                         )}
-                        <span className={`text-xs px-2 py-1 rounded-full border ${getRoleColor(speaker.role)}`}>
+                        <Badge className={`text-xs px-2 py-1 ${getRoleColor(speaker.role)}`}>
+                          <span className="mr-1">{getRoleIcon(speaker.role)}</span>
                           {getRoleDisplayName(speaker.role)}
-                        </span>
+                        </Badge>
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleEditSpeaker(speaker)}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => handleDeleteSpeaker(speaker.id)}
+                        className="text-red-600 focus:text-red-600"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {speaker.speaking_topic && (
+                  <div className="mb-3">
+                    <p className="text-sm font-semibold text-gray-700 mb-1">
+                      {speaker.role === 'performer' ? 'Performance' : 
+                       speaker.role === 'artist' ? 'Artistic Focus' : 'Topic'}
+                    </p>
+                    <p className="text-sm text-purple-700 bg-purple-50 rounded-lg px-3 py-2 border border-purple-100">
+                      {speaker.speaking_topic}
+                    </p>
+                  </div>
+                )}
+                {speaker.bio && (
+                  <div className="mb-4">
+                    <p className="text-sm text-gray-600 line-clamp-3 leading-relaxed">{speaker.bio}</p>
+                  </div>
+                )}
+                
+                {/* Social Links */}
+                <div className="flex gap-2">
+                  {speaker.linkedin_url && (
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      onClick={() => handleEditSpeaker(speaker)}
-                      className="border-gray-300 hover:bg-gray-50">
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700"
-                      onClick={() => handleDeleteSpeaker(speaker.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {speaker.speaking_topic && (
-                  <p className="text-sm font-medium mb-2 text-purple-700">
-                    {speaker.role === 'performer' ? 'Performance: ' : 
-                     speaker.role === 'artist' ? 'Focus: ' : 'Topic: '}
-                    {speaker.speaking_topic}
-                  </p>
-                )}
-                {speaker.bio && (
-                  <p className="text-sm text-gray-600 line-clamp-3 mb-3">{speaker.bio}</p>
-                )}
-                <div className="flex gap-2 flex-wrap">
-                  {speaker.linkedin_url && (
-                    <Button variant="outline" size="sm" asChild className="text-xs border-orange-300 text-orange-700 hover:bg-orange-50">
+                      asChild 
+                      className="h-8 px-2 border-blue-200 hover:bg-blue-50 text-blue-600"
+                    >
                       <a href={speaker.linkedin_url} target="_blank" rel="noopener noreferrer">
-                        LinkedIn
+                        <Linkedin className="h-3 w-3" />
                       </a>
                     </Button>
                   )}
                   {speaker.twitter_url && (
-                    <Button variant="outline" size="sm" asChild className="text-xs border-purple-300 text-purple-700 hover:bg-purple-50">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      asChild 
+                      className="h-8 px-2 border-sky-200 hover:bg-sky-50 text-sky-500"
+                    >
                       <a href={speaker.twitter_url} target="_blank" rel="noopener noreferrer">
-                        Twitter
+                        <Twitter className="h-3 w-3" />
                       </a>
                     </Button>
                   )}
                   {speaker.website_url && (
-                    <Button variant="outline" size="sm" asChild className="text-xs border-gray-300 text-gray-700 hover:bg-gray-50">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      asChild 
+                      className="h-8 px-2 border-gray-200 hover:bg-gray-50 text-gray-600"
+                    >
                       <a href={speaker.website_url} target="_blank" rel="noopener noreferrer">
-                        Website
+                        <Globe className="h-3 w-3" />
                       </a>
                     </Button>
                   )}
