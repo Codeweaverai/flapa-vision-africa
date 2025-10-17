@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { RefreshCw, Activity as ActivityIcon, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import CreatorLayout from '@/components/layout/CreatorLayout';
+import CreatorLayout from '@/components/creator/CreatorLayout';
 import ActivityItem from '@/components/creator/ActivityItem';
 import ActivityFilters from '@/components/creator/ActivityFilters';
 import {
@@ -124,28 +124,23 @@ const CreatorRecentActivities: React.FC = () => {
     }
   }, [user?.id]);
 
-  if (!user) {
+  if (loading) {
     return (
-      <CreatorLayout>
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">Please log in to view your activities.</p>
+      <CreatorLayout title="Recent Activities">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
       </CreatorLayout>
     );
   }
 
   return (
-    <CreatorLayout>
-      <div className="space-y-6 bg-white p-6 rounded-lg">
+    <CreatorLayout title="Recent Activities">
+      <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
-              Recent Activities
-            </h1>
-            <p className="text-gray-600 mt-2">
-              Track your recent course enrollments, event bookings, payments, and more
-            </p>
+            <p className="text-gray-600">Track your recent course enrollments, event bookings, payments, and more</p>
           </div>
           <Button 
             onClick={handleRefresh}
