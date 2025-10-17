@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Plus, Edit, Trash2, User } from 'lucide-react';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
@@ -16,6 +17,7 @@ interface KeynoteSpeaker {
   id: string;
   event_id: string;
   name: string;
+  role: string;
   title?: string;
   bio?: string;
   image_url?: string;
@@ -27,8 +29,14 @@ interface KeynoteSpeaker {
   user_id?: string;
 }
 
+const roleOptions = [
+  { value: 'keynote', label: 'Keynote Speaker' },
+  { value: 'panelist', label: 'Panelist' },
+  { value: 'performer', label: 'Performer' },
+  { value: 'artist', label: 'Artist' }
+];
+
 const CreatorEventSpeakers = () => {
-  // Fixed: Using 'id' parameter to match route
   const { id: eventId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [speakers, setSpeakers] = useState<KeynoteSpeaker[]>([]);
@@ -39,6 +47,7 @@ const CreatorEventSpeakers = () => {
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
+    role: 'keynote',
     title: '',
     bio: '',
     image_url: '',
@@ -114,6 +123,7 @@ const CreatorEventSpeakers = () => {
     setEditingSpeaker(null);
     setFormData({
       name: '',
+      role: 'keynote',
       title: '',
       bio: '',
       image_url: '',
@@ -129,6 +139,7 @@ const CreatorEventSpeakers = () => {
     setEditingSpeaker(speaker);
     setFormData({
       name: speaker.name,
+      role: speaker.role || 'keynote',
       title: speaker.title || '',
       bio: speaker.bio || '',
       image_url: speaker.image_url || '',
@@ -150,7 +161,7 @@ const CreatorEventSpeakers = () => {
     }
 
     if (!formData.name.trim()) {
-      toast.error('Speaker name is required');
+      toast.error('Name is required');
       return;
     }
 
@@ -177,6 +188,7 @@ const CreatorEventSpeakers = () => {
 
       const speakerData = {
         name: formData.name.trim(),
+        role: formData.role,
         title: formData.title.trim() || null,
         bio: formData.bio.trim() || null,
         image_url: formData.image_url || null,
@@ -218,6 +230,7 @@ const CreatorEventSpeakers = () => {
       setDialogOpen(false);
       setFormData({
         name: '',
+        role: 'keynote',
         title: '',
         bio: '',
         image_url: '',
@@ -262,8 +275,32 @@ const CreatorEventSpeakers = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleRoleChange = (value: string) => {
+    setFormData(prev => ({ ...prev, role: value }));
+  };
+
   const handleImageUpload = (imageUrl: string) => {
     setFormData(prev => ({ ...prev, image_url: imageUrl }));
+  };
+
+  const getRoleDisplayName = (role: string) => {
+    const roleOption = roleOptions.find(opt => opt.value === role);
+    return roleOption ? roleOption.label : role;
+  };
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'keynote':
+        return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'panelist':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'performer':
+        return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'artist':
+        return 'bg-green-100 text-green-800 border-green-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
   };
 
   if (loading) {
@@ -287,22 +324,22 @@ const CreatorEventSpeakers = () => {
       </div>
 
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">Event Speakers</h2>
+        <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">Event Speakers & Performers</h2>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={handleAddSpeaker}
               className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg">
               <Plus className="h-4 w-4 mr-2" />
-              Add Speaker
+              Add Participant
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle className="text-xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
-                {editingSpeaker ? 'Edit Speaker' : 'Add Speaker'}
+                {editingSpeaker ? 'Edit Participant' : 'Add Participant'}
               </DialogTitle>
               <DialogDescription className="text-gray-600">
-                {editingSpeaker ? 'Update the speaker information below.' : 'Add a new speaker to your event by filling out the form below.'}
+                {editingSpeaker ? 'Update the participant information below.' : 'Add a new participant to your event by filling out the form below.'}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -314,7 +351,7 @@ const CreatorEventSpeakers = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="name" className="text-gray-700 font-medium">
-                    Speaker Name *
+                    Name *
                   </Label>
                   <Input
                     id="name"
@@ -327,26 +364,51 @@ const CreatorEventSpeakers = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="title" className="text-gray-700 font-medium">Title/Position</Label>
-                  <Input
-                    id="title"
-                    name="title"
-                    value={formData.title}
-                    onChange={handleChange}
-                    placeholder="e.g. CEO, Tech Company"
-                    className="border-gray-200 focus:border-purple-500"
-                  />
+                  <Label htmlFor="role" className="text-gray-700 font-medium">
+                    Role *
+                  </Label>
+                  <Select value={formData.role} onValueChange={handleRoleChange}>
+                    <SelectTrigger className="border-gray-200 focus:border-purple-500">
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {roleOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
               <div>
-                <Label htmlFor="speaking_topic" className="text-gray-700 font-medium">Speaking Topic</Label>
+                <Label htmlFor="title" className="text-gray-700 font-medium">Title/Position</Label>
+                <Input
+                  id="title"
+                  name="title"
+                  value={formData.title}
+                  onChange={handleChange}
+                  placeholder="e.g. CEO, Tech Company or Band Name"
+                  className="border-gray-200 focus:border-purple-500"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="speaking_topic" className="text-gray-700 font-medium">
+                  {formData.role === 'performer' ? 'Performance Details' : 
+                   formData.role === 'artist' ? 'Artistic Focus' : 'Speaking Topic'}
+                </Label>
                 <Input
                   id="speaking_topic"
                   name="speaking_topic"
                   value={formData.speaking_topic}
                   onChange={handleChange}
-                  placeholder="What will they be speaking about?"
+                  placeholder={
+                    formData.role === 'performer' ? 'What will they be performing?' :
+                    formData.role === 'artist' ? 'What is their artistic focus?' :
+                    'What will they be speaking about?'
+                  }
                   className="border-gray-200 focus:border-orange-500"
                 />
               </div>
@@ -358,7 +420,7 @@ const CreatorEventSpeakers = () => {
                   name="bio"
                   value={formData.bio}
                   onChange={handleChange}
-                  placeholder="Brief biography..."
+                  placeholder="Brief biography or description..."
                   rows={3}
                   className="border-gray-200 focus:border-purple-500"
                 />
@@ -421,7 +483,7 @@ const CreatorEventSpeakers = () => {
                       </svg>
                       Processing...
                     </span>
-                  ) : editingSpeaker ? 'Update Speaker' : 'Create Speaker'}
+                  ) : editingSpeaker ? 'Update Participant' : 'Create Participant'}
                 </Button>
               </div>
             </form>
@@ -435,14 +497,14 @@ const CreatorEventSpeakers = () => {
             <div className="mb-4 rounded-full bg-gradient-to-br from-orange-100 to-purple-100 p-6">
               <User className="h-8 w-8 text-purple-600" />
             </div>
-            <CardTitle className="mb-2 text-gray-800">No speakers yet</CardTitle>
+            <CardTitle className="mb-2 text-gray-800">No participants yet</CardTitle>
             <p className="text-gray-600 mb-6">
-              Add keynote speakers for your event
+              Add speakers, performers, artists, or panelists for your event
             </p>
             <Button onClick={handleAddSpeaker}
               className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg">
               <Plus className="h-4 w-4 mr-2" />
-              Add First Speaker
+              Add First Participant
             </Button>
           </CardContent>
         </Card>
@@ -466,9 +528,14 @@ const CreatorEventSpeakers = () => {
                     )}
                     <div>
                       <CardTitle className="text-lg text-gray-800">{speaker.name}</CardTitle>
-                      {speaker.title && (
-                        <p className="text-sm text-gray-600">{speaker.title}</p>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {speaker.title && (
+                          <p className="text-sm text-gray-600">{speaker.title}</p>
+                        )}
+                        <span className={`text-xs px-2 py-1 rounded-full border ${getRoleColor(speaker.role)}`}>
+                          {getRoleDisplayName(speaker.role)}
+                        </span>
+                      </div>
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -491,7 +558,11 @@ const CreatorEventSpeakers = () => {
               </CardHeader>
               <CardContent>
                 {speaker.speaking_topic && (
-                  <p className="text-sm font-medium mb-2 text-purple-700">Topic: {speaker.speaking_topic}</p>
+                  <p className="text-sm font-medium mb-2 text-purple-700">
+                    {speaker.role === 'performer' ? 'Performance: ' : 
+                     speaker.role === 'artist' ? 'Focus: ' : 'Topic: '}
+                    {speaker.speaking_topic}
+                  </p>
                 )}
                 {speaker.bio && (
                   <p className="text-sm text-gray-600 line-clamp-3 mb-3">{speaker.bio}</p>
