@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Plus, Calendar, Edit, Trash2, Eye, Users, MapPin, Clock, Ticket, UserCheck, Settings, Play } from 'lucide-react';
+import { Plus, Calendar, Edit, Trash2, Eye, Users, MapPin, Clock, Ticket, UserCheck, Settings, Play, Bot } from 'lucide-react';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
@@ -161,13 +161,22 @@ const CreatorEvents = () => {
         <div>
           <p className="text-gray-600">Create and manage your events</p>
         </div>
-        <Button
-          onClick={() => navigate('/creator/events/create')}
-          className="bg-gradient-to-r from-orange-400 to-purple-500 text-white hover:opacity-90"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Create Event
-        </Button>
+        <div className="flex gap-3">
+          <Button
+            onClick={() => navigate('/creator/events/create-with-ai')}
+            className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90"
+          >
+            <Bot className="h-4 w-4 mr-2" />
+            Create with AI
+          </Button>
+          <Button
+            onClick={() => navigate('/creator/events/create')}
+            className="bg-gradient-to-r from-orange-400 to-purple-500 text-white hover:opacity-90"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create Event
+          </Button>
+        </div>
       </div>
 
       <div className="mb-6">
@@ -190,10 +199,19 @@ const CreatorEvents = () => {
               {searchTerm ? 'No events match your search criteria.' : 'Create your first event to get started'}
             </p>
             {!searchTerm && (
-              <Button onClick={() => navigate('/creator/events/create')}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create First Event
-              </Button>
+              <div className="flex gap-3">
+                <Button 
+                  onClick={() => navigate('/creator/events/create-with-ai')}
+                  className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90"
+                >
+                  <Bot className="h-4 w-4 mr-2" />
+                  Create with AI
+                </Button>
+                <Button onClick={() => navigate('/creator/events/create')}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Manually
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -209,7 +227,6 @@ const CreatorEvents = () => {
                       alt={event.title}
                       className="w-full h-48 object-cover"
                       onError={(e) => {
-                        // Add fallback if image fails to load
                         e.currentTarget.style.display = 'none';
                         e.currentTarget.nextElementSibling?.classList.remove('hidden');
                       }}
