@@ -30,7 +30,11 @@ import {
   MessageSquare,
   ExternalLink,
   Twitter,
-  ArrowRight
+  ArrowRight,
+  Mic,
+  Music,
+  Palette,
+  Users2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -107,6 +111,7 @@ interface AgendaItem {
 interface Speaker {
   id: string;
   name: string;
+  role: string;
   title: string;
   bio: string;
   image_url: string;
@@ -122,6 +127,38 @@ interface Profile {
   avatar_url: string;
   bio: string;
 }
+
+// Role Configuration
+const roleConfig = {
+  keynote: {
+    label: 'Keynote Speaker',
+    color: 'bg-purple-100 text-purple-800 border-purple-200',
+    icon: '🎤',
+    badgeColor: 'bg-purple-500',
+    iconComponent: Mic
+  },
+  panelist: {
+    label: 'Panelist',
+    color: 'bg-blue-100 text-blue-800 border-blue-200',
+    icon: '💬',
+    badgeColor: 'bg-blue-500',
+    iconComponent: Users2
+  },
+  performer: {
+    label: 'Performer',
+    color: 'bg-orange-100 text-orange-800 border-orange-200',
+    icon: '🎭',
+    badgeColor: 'bg-orange-500',
+    iconComponent: Music
+  },
+  artist: {
+    label: 'Artist',
+    color: 'bg-green-100 text-green-800 border-green-200',
+    icon: '🎨',
+    badgeColor: 'bg-green-500',
+    iconComponent: Palette
+  }
+};
 
 // Pulse Loading Component
 const PulseLoading = () => {
@@ -384,6 +421,23 @@ const EventDetailPage = () => {
     navigate(`/inbox?to=${creator.id}&subject=Regarding ${event?.title}`);
   };
 
+  const getRoleInfo = (role: string) => {
+    return roleConfig[role as keyof typeof roleConfig] || roleConfig.keynote;
+  };
+
+  const getRoleDisplayText = (role: string, speakingTopic: string) => {
+    switch (role) {
+      case 'performer':
+        return `🎭 Performance: ${speakingTopic}`;
+      case 'artist':
+        return `🎨 Artistic Focus: ${speakingTopic}`;
+      case 'panelist':
+        return `💬 Discussion: ${speakingTopic}`;
+      default:
+        return `🎤 Speaking on: ${speakingTopic}`;
+    }
+  };
+
   // Use the PulseLoading component
   if (loading) {
     return <PulseLoading />;
@@ -511,7 +565,7 @@ const EventDetailPage = () => {
                   <TabsList className="grid w-full grid-cols-4 bg-gradient-to-r from-orange-100 to-purple-100">
                     <TabsTrigger value="description">Description</TabsTrigger>
                     <TabsTrigger value="agenda">Agenda</TabsTrigger>
-                    <TabsTrigger value="speakers">Spotlight</TabsTrigger>
+                    <TabsTrigger value="spotlight">Spotlight</TabsTrigger>
                     <TabsTrigger value="reviews">Reviews</TabsTrigger>
                   </TabsList>
                   
@@ -524,20 +578,51 @@ const EventDetailPage = () => {
                   <TabsContent value="agenda" className="p-6">
                     {event.event_agenda && event.event_agenda.length > 0 ? (
                       <div className="space-y-4">
-                        {event.event_agenda.map((item) => (
-                          <div key={item.id} className="bg-gradient-to-r from-orange-50 to-purple-50 p-6 rounded-lg border">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Clock className="h-4 w-4 text-orange-600" />
-                              <span className="text-sm font-medium text-orange-700">
-                                {format(new Date(item.start_time), 'h:mm a')} - {format(new Date(item.end_time), 'h:mm a')}
-                              </span>
+                        {event.event_agenda.map((item) => {
+                          // Find speaker for this agenda item
+                          const speaker = event.keynote_speakers?.find(s => s.id === item.speaker_id);
+                          const roleInfo = speaker ? getRoleInfo(speaker.role) : null;
+                          
+                          return (
+                            <div key={item.id} className="bg-gradient-to-r from-orange-50 to-purple-50 p-6 rounded-lg border hover:shadow-md transition-shadow">
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-3">
+                                <div className="flex items-center gap-2">
+                                  <Clock className="h-4 w-4 text-orange-600" />
+                                  <span className="text-sm font-medium text-orange-700">
+                                    {format(new Date(item.start_time), 'h:mm a')} - {format(new Date(item.end_time), 'h:mm a')}
+                                  </span>
+                                </div>
+                                {roleInfo && speaker && (
+                                  <Badge className={`${roleInfo.color} text-xs`}>
+                                    <span className="mr-1">{roleInfo.icon}</span>
+                                    {roleInfo.label}
+                                  </Badge>
+                                )}
+                              </div>
+                              <h4 className="font-semibold text-gray-900 text-lg mb-2">{item.title}</h4>
+                              {speaker && (
+                                <div className="flex items-center gap-2 mb-2">
+                                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+                                    {speaker.name.charAt(0)}
+                                  </div>
+                                  <span className="text-sm text-gray-700 font-medium">{speaker.name}</span>
+                                  {speaker.title && (
+                                    <span className="text-sm text-gray-500">• {speaker.title}</span>
+                                  )}
+                                </div>
+                              )}
+                              {item.description && (
+                                <p className="text-sm text-gray-600 mt-2">{item.description}</p>
+                              )}
+                              {item.location && item.location !== 'Main Stage' && (
+                                <div className="flex items-center gap-1 mt-2 text-xs text-gray-500">
+                                  <MapPin className="h-3 w-3" />
+                                  {item.location}
+                                </div>
+                              )}
                             </div>
-                            <h4 className="font-semibold text-gray-900">{item.title}</h4>
-                            {item.description && (
-                              <p className="text-sm text-gray-600 mt-1">{item.description}</p>
-                            )}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : (
                       <div className="text-center text-gray-500 py-8">
@@ -547,77 +632,103 @@ const EventDetailPage = () => {
                     )}
                   </TabsContent>
 
-                  <TabsContent value="speakers" className="p-6">
+                  <TabsContent value="spotlight" className="p-6">
                     {event.keynote_speakers && event.keynote_speakers.length > 0 ? (
                       <div className="grid grid-cols-1 gap-6">
-                        {event.keynote_speakers.map((speaker) => (
-                          <div key={speaker.id} className="bg-gradient-to-r from-orange-50 to-purple-50 p-6 rounded-lg border">
-                            <div className="flex flex-col md:flex-row gap-6">
-                              {speaker.image_url && (
+                        {event.keynote_speakers.map((speaker) => {
+                          const roleInfo = getRoleInfo(speaker.role);
+                          const RoleIcon = roleInfo.iconComponent;
+                          
+                          return (
+                            <div key={speaker.id} className="bg-gradient-to-r from-orange-50 to-purple-50 p-6 rounded-lg border hover:shadow-lg transition-shadow duration-300">
+                              <div className="flex flex-col md:flex-row gap-6">
+                                {/* Speaker Image */}
                                 <div className="flex-shrink-0">
-                                  <img
-                                    src={speaker.image_url}
-                                    alt={speaker.name}
-                                    className="w-32 h-32 rounded-full object-cover mx-auto md:mx-0"
-                                  />
-                                </div>
-                              )}
-                              <div className="flex-1">
-                                <h4 className="text-xl font-bold text-gray-900 mb-2">{speaker.name}</h4>
-                                <p className="text-lg text-gray-700 mb-3">{speaker.title}</p>
-                                {speaker.speaking_topic && (
-                                  <div className="mb-4">
-                                    <span className="inline-block bg-gradient-to-r from-orange-500 to-purple-600 text-white px-3 py-1 rounded-full text-sm font-medium">
-                                      Speaking on: {speaker.speaking_topic}
-                                    </span>
+                                  <div className="relative">
+                                    {speaker.image_url ? (
+                                      <img
+                                        src={speaker.image_url}
+                                        alt={speaker.name}
+                                        className="w-32 h-32 rounded-full object-cover mx-auto md:mx-0 border-4 border-white shadow-lg"
+                                      />
+                                    ) : (
+                                      <div className="w-32 h-32 rounded-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center text-white font-bold text-2xl border-4 border-white shadow-lg mx-auto md:mx-0">
+                                        {speaker.name.charAt(0).toUpperCase()}
+                                      </div>
+                                    )}
+                                    {/* Role Badge */}
+                                    <div className={`absolute -top-2 -right-2 px-3 py-1 rounded-full text-xs font-medium border ${roleInfo.color} shadow-sm flex items-center gap-1`}>
+                                      <RoleIcon className="h-3 w-3" />
+                                      {roleInfo.label}
+                                    </div>
                                   </div>
-                                )}
-                                {speaker.bio && (
-                                  <p className="text-gray-600 mb-4 leading-relaxed">{speaker.bio}</p>
-                                )}
+                                </div>
                                 
-                                {/* Social Links */}
-                                <div className="flex gap-3">
-                                  {speaker.linkedin_url && (
-                                    <a 
-                                      href={speaker.linkedin_url} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer"
-                                      className="text-blue-600 hover:text-blue-800 transition-colors"
-                                    >
-                                      <Linkedin className="h-5 w-5" />
-                                    </a>
+                                {/* Speaker Details */}
+                                <div className="flex-1">
+                                  <h4 className="text-xl font-bold text-gray-900 mb-2">{speaker.name}</h4>
+                                  <p className="text-lg text-gray-700 mb-3">{speaker.title}</p>
+                                  
+                                  {/* Dynamic content based on role */}
+                                  {speaker.speaking_topic && (
+                                    <div className="mb-4">
+                                      <span className="inline-block bg-gradient-to-r from-orange-500 to-purple-600 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg">
+                                        {getRoleDisplayText(speaker.role, speaker.speaking_topic)}
+                                      </span>
+                                    </div>
                                   )}
-                                  {speaker.twitter_url && (
-                                    <a 
-                                      href={speaker.twitter_url} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer"
-                                      className="text-blue-400 hover:text-blue-600 transition-colors"
-                                    >
-                                      <Twitter className="h-5 w-5" />
-                                    </a>
+                                  
+                                  {speaker.bio && (
+                                    <p className="text-gray-600 mb-4 leading-relaxed">{speaker.bio}</p>
                                   )}
-                                  {speaker.website_url && (
-                                    <a 
-                                      href={speaker.website_url} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer"
-                                      className="text-gray-600 hover:text-gray-800 transition-colors"
-                                    >
-                                      <ExternalLink className="h-5 w-5" />
-                                    </a>
-                                  )}
+                                  
+                                  {/* Social Links */}
+                                  <div className="flex gap-3">
+                                    {speaker.linkedin_url && (
+                                      <a 
+                                        href={speaker.linkedin_url} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-800 transition-colors p-2 rounded-full bg-blue-50 hover:bg-blue-100"
+                                        title="LinkedIn"
+                                      >
+                                        <Linkedin className="h-5 w-5" />
+                                      </a>
+                                    )}
+                                    {speaker.twitter_url && (
+                                      <a 
+                                        href={speaker.twitter_url} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="text-blue-400 hover:text-blue-600 transition-colors p-2 rounded-full bg-sky-50 hover:bg-sky-100"
+                                        title="Twitter"
+                                      >
+                                        <Twitter className="h-5 w-5" />
+                                      </a>
+                                    )}
+                                    {speaker.website_url && (
+                                      <a 
+                                        href={speaker.website_url} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="text-gray-600 hover:text-gray-800 transition-colors p-2 rounded-full bg-gray-50 hover:bg-gray-100"
+                                        title="Website"
+                                      >
+                                        <ExternalLink className="h-5 w-5" />
+                                      </a>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : (
-                      <div className="text-center text-gray-500 py-8">
-                        <Users className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                        <p>No speakers announced yet</p>
+                      <div className="text-center text-gray-500 py-12">
+                        <Users className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                        <h3 className="text-xl font-semibold mb-2">No participants announced yet</h3>
+                        <p className="text-gray-600">Check back later for updates on speakers, performers, and panelists.</p>
                       </div>
                     )}
                   </TabsContent>
