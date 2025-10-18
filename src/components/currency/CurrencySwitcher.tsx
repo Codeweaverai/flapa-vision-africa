@@ -3,15 +3,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
+import ReactCountryFlag from "react-country-flag";
 import { SUPPORTED_CURRENCIES, CurrencyCode, COUNTRY_TO_CURRENCY } from '@/constants/currencies';
 import { currencyService } from '@/services/currencyService';
 import { toast } from 'sonner';
-import { Loader2, Globe, Check, ChevronDown, Sparkles } from 'lucide-react';
+import { Loader2, Globe, Check, ChevronDown, Sparkles, MapPin } from 'lucide-react';
 
-// Country code mapping for flags
+// Enhanced country code mapping for flags with fallbacks
 const CURRENCY_TO_COUNTRY: Record<CurrencyCode, string> = {
   USD: 'US',
-  EUR: 'EU', // European Union
+  EUR: 'FR', // Using France as primary Euro country
   GBP: 'GB',
   ZMW: 'ZM',
   NGN: 'NG',
@@ -190,20 +191,15 @@ const CurrencySwitcher: React.FC = () => {
     }
   };
 
-  // Get flag emoji or CDN flag URL
-  const getFlag = (currencyCode: CurrencyCode) => {
-    const countryCode = CURRENCY_TO_COUNTRY[currencyCode];
-    
-    // Option 1: Use emoji flags (no dependencies)
-    if (countryCode && countryCode.length === 2) {
-      return String.fromCodePoint(...[...countryCode.toUpperCase()].map(c => 0x1F1A5 + c.charCodeAt(0)));
-    }
-    
-    // Option 2: Use CDN flags (uncomment if you prefer this approach)
-    // return `https://flagcdn.com/24x18/${countryCode.toLowerCase()}.png`;
-    
-    // Fallback to currency emoji
-    return SUPPORTED_CURRENCIES[currencyCode]?.flag || '💵';
+  // Get country code for currency
+  const getCountryCode = (currencyCode: CurrencyCode): string => {
+    return CURRENCY_TO_COUNTRY[currencyCode] || 'US'; // Fallback to US
+  };
+
+  // Get primary country name (for multi-country currencies)
+  const getPrimaryCountry = (currencyCode: CurrencyCode): string => {
+    const currency = SUPPORTED_CURRENCIES[currencyCode];
+    return currency?.country.split('/')[0] || currency?.country || 'Unknown';
   };
 
   // Group currencies by region for better organization
@@ -223,16 +219,30 @@ const CurrencySwitcher: React.FC = () => {
       open={isOpen}
       onOpenChange={setIsOpen}
     >
-      <SelectTrigger className="w-32 h-9 text-sm border-2 border-orange-200/50 bg-white/90 backdrop-blur-sm shadow-lg hover:shadow-xl hover:border-orange-300 transition-all duration-300 rounded-xl">
+      <SelectTrigger className="w-34 h-10 text-sm border-2 border-orange-200/60 bg-white/95 backdrop-blur-sm shadow-lg hover:shadow-xl hover:border-orange-300 transition-all duration-300 rounded-xl group">
         <SelectValue>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {showLoading ? (
               <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
             ) : (
               <>
-                <span className="text-lg">{getFlag(currentCurrency)}</span>
+                <div className="relative">
+                  <ReactCountryFlag
+                    countryCode={getCountryCode(currentCurrency)}
+                    svg
+                    style={{
+                      width: '22px',
+                      height: '16px',
+                      borderRadius: '3px',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                      objectFit: 'cover',
+                    }}
+                    title={currentCurrency}
+                  />
+                  <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-white shadow-sm"></div>
+                </div>
                 <div className="flex flex-col items-start">
-                  <span className="font-semibold text-gray-800 text-sm leading-none">
+                  <span className="font-bold text-gray-800 text-sm leading-none">
                     {currentCurrency}
                   </span>
                   <span className="text-xs text-gray-500 leading-none mt-0.5">
@@ -241,41 +251,44 @@ const CurrencySwitcher: React.FC = () => {
                 </div>
               </>
             )}
-            <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform duration-300 group-hover:text-orange-500 ${isOpen ? 'rotate-180' : ''}`} />
           </div>
         </SelectValue>
       </SelectTrigger>
       <SelectContent 
         align="end" 
-        className="min-w-[280px] max-h-[400px] overflow-y-auto border-0 shadow-2xl rounded-2xl bg-white/95 backdrop-blur-sm"
+        className="min-w-[320px] max-h-[480px] overflow-y-auto border-0 shadow-2xl rounded-2xl bg-white/95 backdrop-blur-sm animate-in zoom-in-95"
         position="popper"
+        sideOffset={8}
       >
-        {/* Header */}
-        <div className="p-4 border-b border-gray-100">
+        {/* Header with Gradient */}
+        <div className="p-4 bg-gradient-to-r from-orange-500/5 to-purple-600/5 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-gradient-to-r from-orange-500 to-purple-600">
-              <Sparkles className="h-4 w-4 text-white" />
+            <div className="p-2 rounded-xl bg-gradient-to-r from-orange-500 to-purple-600 shadow-lg">
+              <Sparkles className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h3 className="font-semibold text-gray-800">Select Currency</h3>
-              <p className="text-xs text-gray-500">Choose your preferred currency</p>
+              <h3 className="font-bold text-gray-800 text-sm">Select Currency</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Choose your preferred currency for pricing</p>
             </div>
           </div>
         </div>
 
         {/* Major Currencies Section */}
-        <div className="p-3">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 px-2">
+        <div className="p-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 px-2 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
             Global Currencies
           </p>
-          <div className="space-y-1">
+          <div className="space-y-2">
             {majorCurrencies.map((code) => (
               <CurrencySelectItem 
                 key={code}
                 code={code}
                 currentCurrency={currentCurrency}
                 onSelect={handleCurrencyChange}
-                getFlag={getFlag}
+                getCountryCode={getCountryCode}
+                getPrimaryCountry={getPrimaryCountry}
                 isSelected={currentCurrency === code}
               />
             ))}
@@ -283,98 +296,171 @@ const CurrencySwitcher: React.FC = () => {
         </div>
 
         {/* African Currencies Section */}
-        <div className="p-3 border-t border-gray-100">
+        <div className="p-4 border-t border-gray-100 bg-gradient-to-br from-orange-50/30 to-purple-50/30">
           <div className="flex items-center gap-2 mb-3 px-2">
             <Globe className="h-4 w-4 text-orange-500" />
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
               African Currencies
             </p>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-2">
             {africanCurrencies.map((code) => (
               <CurrencySelectItem 
                 key={code}
                 code={code}
                 currentCurrency={currentCurrency}
                 onSelect={handleCurrencyChange}
-                getFlag={getFlag}
+                getCountryCode={getCountryCode}
+                getPrimaryCountry={getPrimaryCountry}
                 isSelected={currentCurrency === code}
               />
             ))}
           </div>
         </div>
 
-        {/* User Info Section */}
+        {/* User Detection Section */}
         {user && userCountry && (
-          <div className="p-3 border-t border-gray-100 bg-gradient-to-r from-orange-50 to-purple-50 rounded-b-2xl">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <p className="text-xs text-gray-600">
-                Detected from <span className="font-semibold">{userCountry}</span>
-              </p>
+          <div className="p-3 border-t border-gray-100 bg-gradient-to-r from-green-50 to-emerald-50 rounded-b-2xl">
+            <div className="flex items-center gap-2 text-xs">
+              <MapPin className="h-3 w-3 text-green-600" />
+              <span className="text-gray-600">
+                Detected from <span className="font-semibold text-green-700">{userCountry}</span>
+              </span>
             </div>
           </div>
         )}
+
+        {/* Quick Actions */}
+        <div className="p-3 border-t border-gray-100">
+          <div className="grid grid-cols-2 gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="text-xs h-8 border-orange-200 text-orange-600 hover:bg-orange-50"
+              onClick={() => handleCurrencyChange('USD')}
+            >
+              Set USD
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="text-xs h-8 border-purple-200 text-purple-600 hover:bg-purple-50"
+              onClick={() => handleCurrencyChange('EUR')}
+            >
+              Set EUR
+            </Button>
+          </div>
+        </div>
       </SelectContent>
     </Select>
   );
 };
 
-// Enhanced Currency Select Item Component
+// Enhanced Currency Select Item Component with ReactCountryFlag
 const CurrencySelectItem: React.FC<{
   code: CurrencyCode;
   currentCurrency: CurrencyCode;
   onSelect: (code: CurrencyCode) => void;
-  getFlag: (code: CurrencyCode) => string;
+  getCountryCode: (code: CurrencyCode) => string;
+  getPrimaryCountry: (code: CurrencyCode) => string;
   isSelected: boolean;
-}> = ({ code, currentCurrency, onSelect, getFlag, isSelected }) => {
+}> = ({ code, currentCurrency, onSelect, getCountryCode, getPrimaryCountry, isSelected }) => {
   const currency = SUPPORTED_CURRENCIES[code];
+  const countryCode = getCountryCode(code);
   
   return (
     <SelectItem 
       value={code}
       className={`
-        cursor-pointer py-3 px-4 rounded-xl transition-all duration-200 border-2
+        cursor-pointer py-3 px-4 rounded-xl transition-all duration-200 border-2 m-1
         ${isSelected 
-          ? 'bg-gradient-to-r from-orange-50 to-purple-50 border-orange-200 shadow-sm' 
-          : 'border-transparent hover:bg-gray-50 hover:border-gray-100'
+          ? 'bg-gradient-to-r from-orange-50 to-purple-50 border-orange-200 shadow-md' 
+          : 'border-transparent hover:bg-gray-50 hover:border-gray-100 hover:shadow-sm'
         }
+        focus:bg-orange-50 focus:border-orange-200
       `}
       onClick={() => onSelect(code)}
     >
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          {/* Flag */}
-          <span className="text-2xl flex-shrink-0">{getFlag(code)}</span>
+          {/* Country Flag with ReactCountryFlag */}
+          <div className="relative flex-shrink-0">
+            <ReactCountryFlag
+              countryCode={countryCode}
+              svg
+              style={{
+                width: '28px',
+                height: '21px',
+                borderRadius: '4px',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                objectFit: 'cover',
+              }}
+              title={getPrimaryCountry(code)}
+            />
+            {isSelected && (
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full border-2 border-white flex items-center justify-center shadow-lg">
+                <Check className="h-2.5 w-2.5 text-white" />
+              </div>
+            )}
+          </div>
           
           {/* Currency Info */}
           <div className="flex flex-col items-start flex-1 min-w-0">
             <div className="flex items-center gap-2 w-full">
-              <span className="font-semibold text-gray-800 text-sm truncate">
+              <span className="font-bold text-gray-800 text-sm">
                 {currency.code}
               </span>
+              <span className="text-xs font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
+                {currency.symbol}
+              </span>
               {isSelected && (
-                <div className="flex items-center gap-1 bg-gradient-to-r from-orange-500 to-purple-600 text-white px-2 py-0.5 rounded-full">
-                  <Check className="h-3 w-3" />
-                  <span className="text-xs font-medium">Active</span>
-                </div>
+                <span className="text-xs bg-gradient-to-r from-orange-500 to-purple-600 text-white px-2 py-0.5 rounded-full font-medium ml-auto">
+                  Active
+                </span>
               )}
             </div>
-            <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
-              <span className="font-mono">{currency.symbol}</span>
-              <span className="truncate">{currency.name}</span>
+            <div className="text-xs text-gray-500 mt-0.5 truncate w-full">
+              {currency.name}
             </div>
           </div>
         </div>
         
         {/* Country Name */}
-        <div className="text-right flex-shrink-0">
-          <span className="text-xs text-gray-400 font-medium">
-            {currency.country.split('/')[0]} {/* Show primary country */}
+        <div className="text-right flex-shrink-0 ml-3">
+          <span className="text-xs text-gray-400 font-medium whitespace-nowrap">
+            {getPrimaryCountry(code)}
           </span>
         </div>
       </div>
     </SelectItem>
+  );
+};
+
+// Simple Button component for the quick actions
+const Button: React.FC<{
+  variant?: 'outline' | 'ghost';
+  size?: 'sm' | 'md';
+  className?: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}> = ({ variant = 'outline', size = 'md', className = '', onClick, children }) => {
+  const baseClasses = 'inline-flex items-center justify-center rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2';
+  const variantClasses = {
+    outline: 'border bg-transparent hover:bg-accent',
+    ghost: 'border-0 hover:bg-accent',
+  };
+  const sizeClasses = {
+    sm: 'text-xs px-3',
+    md: 'text-sm px-4 py-2',
+  };
+
+  return (
+    <button
+      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+      onClick={onClick}
+    >
+      {children}
+    </button>
   );
 };
 
