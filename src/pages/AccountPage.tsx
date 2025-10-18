@@ -29,10 +29,15 @@ interface ProfileData {
   role: string;
 }
 
+interface UserStats {
+  courses_enrolled: number;
+  events_booked: number;
+}
+
 interface CreatorStats {
-  courses: number;
-  events: number;
-  students: number;
+  courses_created: number;
+  events_created: number;
+  total_students: number;
   total_earnings: number;
 }
 
@@ -102,18 +107,9 @@ const AccountPulseLoading = () => {
   );
 };
 
-// Language options
+// Single language option - English only
 const LANGUAGES = [
-  { code: 'en', name: 'English', nativeName: 'English' },
-  { code: 'es', name: 'Spanish', nativeName: 'Español' },
-  { code: 'fr', name: 'French', nativeName: 'Français' },
-  { code: 'de', name: 'German', nativeName: 'Deutsch' },
-  { code: 'it', name: 'Italian', nativeName: 'Italiano' },
-  { code: 'pt', name: 'Portuguese', nativeName: 'Português' },
-  { code: 'ru', name: 'Russian', nativeName: 'Русский' },
-  { code: 'ja', name: 'Japanese', nativeName: '日本語' },
-  { code: 'zh', name: 'Chinese', nativeName: '中文' },
-  { code: 'ar', name: 'Arabic', nativeName: 'العربية' },
+  { code: 'en', name: 'English', nativeName: 'English', flag: '🇺🇸' },
 ];
 
 // Quick Links data
@@ -134,10 +130,14 @@ const AccountPage = () => {
   const [saving, setSaving] = useState(false);
   const [enablingCreator, setEnablingCreator] = useState(false);
   const [savingPreferences, setSavingPreferences] = useState(false);
+  const [userStats, setUserStats] = useState<UserStats>({ 
+    courses_enrolled: 0, 
+    events_booked: 0 
+  });
   const [creatorStats, setCreatorStats] = useState<CreatorStats>({ 
-    courses: 0, 
-    events: 0, 
-    students: 0, 
+    courses_created: 0, 
+    events_created: 0, 
+    total_students: 0, 
     total_earnings: 0 
   });
   const [profile, setProfile] = useState<ProfileData>({
@@ -197,6 +197,9 @@ const AccountPage = () => {
             role: data.role || 'user'
           });
 
+          // Fetch user stats (courses enrolled and events booked)
+          await fetchUserStats(user.id);
+
           // Fetch creator stats if user is a creator
           if (data.is_creator) {
             await fetchCreatorStats(data.id);
@@ -215,21 +218,44 @@ const AccountPage = () => {
     fetchProfile();
   }, [user]);
 
+  const fetchUserStats = async (userId: string) => {
+    try {
+      // Fetch courses enrolled count
+      const { count: coursesEnrolled } = await supabase
+        .from('course_enrollments')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+
+      // Fetch events booked count
+      const { count: eventsBooked } = await supabase
+        .from('event_bookings')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+
+      setUserStats({
+        courses_enrolled: coursesEnrolled || 0,
+        events_booked: eventsBooked || 0
+      });
+    } catch (error) {
+      console.error('Error fetching user stats:', error);
+    }
+  };
+
   const fetchCreatorStats = async (userId: string) => {
     try {
-      // Fetch courses count
-      const { count: coursesCount } = await supabase
+      // Fetch courses created count
+      const { count: coursesCreated } = await supabase
         .from('courses')
         .select('*', { count: 'exact', head: true })
         .eq('creator_id', userId);
 
-      // Fetch events count
-      const { count: eventsCount } = await supabase
+      // Fetch events created count
+      const { count: eventsCreated } = await supabase
         .from('events')
         .select('*', { count: 'exact', head: true })
         .eq('creator_id', userId);
 
-      // Fetch total students (simplified - count unique enrollments across creator's courses)
+      // Fetch total students (count unique enrollments across creator's courses)
       const { data: enrollments } = await supabase
         .from('course_enrollments')
         .select('user_id')
@@ -244,9 +270,9 @@ const AccountPage = () => {
       const uniqueStudents = new Set(enrollments?.map(e => e.user_id)).size;
 
       setCreatorStats({
-        courses: coursesCount || 0,
-        events: eventsCount || 0,
-        students: uniqueStudents || 0,
+        courses_created: coursesCreated || 0,
+        events_created: eventsCreated || 0,
+        total_students: uniqueStudents || 0,
         total_earnings: 0 // You can implement earnings logic based on your payment system
       });
     } catch (error) {
@@ -504,15 +530,15 @@ const AccountPage = () => {
                       <div className="grid grid-cols-2 gap-4 text-center">
                         <div>
                           <div className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
-                            {creatorStats.courses}
+                            {userStats.courses_enrolled}
                           </div>
-                          <div className="text-xs text-gray-500">Courses</div>
+                          <div className="text-xs text-gray-500">Courses Enrolled</div>
                         </div>
                         <div>
                           <div className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
-                            {creatorStats.students}
+                            {userStats.events_booked}
                           </div>
-                          <div className="text-xs text-gray-500">Students</div>
+                          <div className="text-xs text-gray-500">Events Booked</div>
                         </div>
                       </div>
                     </div>
@@ -728,7 +754,7 @@ const AccountPage = () => {
                   </CardHeader>
                   
                   <CardContent className="space-y-6">
-                    {/* Language Preference */}
+                    {/* Language Preference - Single English Option */}
                     <div className="space-y-3">
                       <Label htmlFor="language" className="text-gray-700 font-medium flex items-center">
                         <Globe className="h-4 w-4 mr-2 text-orange-500" />
@@ -739,21 +765,29 @@ const AccountPage = () => {
                         onValueChange={(value) => setLanguagePreference(prev => ({ ...prev, language_code: value }))}
                       >
                         <SelectTrigger className="border-gray-200 shadow-sm focus:ring-2 focus:ring-orange-500/20">
-                          <SelectValue placeholder="Select language" />
+                          <SelectValue>
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">🇺🇸</span>
+                              <span>English</span>
+                            </div>
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {LANGUAGES.map((language) => (
                             <SelectItem key={language.code} value={language.code}>
-                              <div className="flex items-center">
-                                <span className="font-medium">{language.name}</span>
-                                <span className="text-gray-500 text-sm ml-2">({language.nativeName})</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">{language.flag}</span>
+                                <div>
+                                  <span className="font-medium">{language.name}</span>
+                                  <span className="text-gray-500 text-sm ml-2">({language.nativeName})</span>
+                                </div>
                               </div>
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-gray-500">
-                        This will affect the language of the interface and content
+                        Currently only English is supported. More languages coming soon!
                       </p>
                     </div>
 
@@ -777,8 +811,9 @@ const AccountPage = () => {
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <span className="text-gray-600">Language:</span>
-                          <div className="font-medium text-gray-800">
-                            {LANGUAGES.find(lang => lang.code === languagePreference.language_code)?.name || 'English'}
+                          <div className="font-medium text-gray-800 flex items-center gap-2">
+                            <span>🇺🇸</span>
+                            <span>English</span>
                           </div>
                         </div>
                         <div>
@@ -852,13 +887,13 @@ const AccountPage = () => {
                         <div className="grid grid-cols-2 gap-4">
                           <div className="bg-white/60 p-4 rounded-xl text-center shadow-lg">
                             <BookOpen className="h-8 w-8 mx-auto text-orange-500 mb-2" />
-                            <div className="text-2xl font-bold text-gray-800">{creatorStats.courses}</div>
-                            <div className="text-xs text-gray-600">Courses</div>
+                            <div className="text-2xl font-bold text-gray-800">{creatorStats.courses_created}</div>
+                            <div className="text-xs text-gray-600">Courses Created</div>
                           </div>
                           <div className="bg-white/60 p-4 rounded-xl text-center shadow-lg">
-                            <Users className="h-8 w-8 mx-auto text-purple-500 mb-2" />
-                            <div className="text-2xl font-bold text-gray-800">{creatorStats.students}</div>
-                            <div className="text-xs text-gray-600">Students</div>
+                            <Calendar className="h-8 w-8 mx-auto text-purple-500 mb-2" />
+                            <div className="text-2xl font-bold text-gray-800">{creatorStats.events_created}</div>
+                            <div className="text-xs text-gray-600">Events Created</div>
                           </div>
                         </div>
                       </div>
