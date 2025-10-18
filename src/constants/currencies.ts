@@ -1,4 +1,5 @@
 
+// src/constants/currencies.ts
 export const SUPPORTED_CURRENCIES = {
   // Major Currencies
   USD: { code: 'USD', symbol: '$', flag: '🇺🇸', name: 'US Dollar', country: 'United States' },
@@ -20,7 +21,7 @@ export const SUPPORTED_CURRENCIES = {
   MWK: { code: 'MWK', symbol: 'MK', flag: '🇲🇼', name: 'Malawian Kwacha', country: 'Malawi' },
   LSL: { code: 'LSL', symbol: 'L', flag: '🇱🇸', name: 'Lesotho Loti', country: 'Lesotho' },
   SLL: { code: 'SLL', symbol: 'Le', flag: '🇸🇱', name: 'Sierra Leonean Leone', country: 'Sierra Leone' },
-};
+} as const;
 
 export type CurrencyCode = keyof typeof SUPPORTED_CURRENCIES;
 
@@ -56,3 +57,6 @@ export const COUNTRY_TO_CURRENCY: Record<string, CurrencyCode> = {
   'LS': 'LSL',
   'SL': 'SLL',
 };
+
+// Default currency
+export const DEFAULT_CURRENCY: CurrencyCode = 'USD';
