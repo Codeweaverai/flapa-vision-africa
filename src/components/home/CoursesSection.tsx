@@ -107,7 +107,7 @@ const CoursesSection = () => {
       <section className="py-16 bg-gradient-to-br from-purple-50 to-orange-50">
         <div className="container mx-auto px-4">
           <div className="text-left mb-12">
-            <h2 className="text-2xl md:text-3xl font-bold mb-4 text-black">
+            <h2 className="text-xl md:text-2xl font-bold mb-4 text-black">
               Featured Courses
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl">
@@ -117,8 +117,8 @@ const CoursesSection = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(4)].map((_, index) => (
               <div key={index} className="animate-pulse">
-                <div className="bg-white rounded-2xl shadow-lg overflow-hidden h-96">
-                  <div className="bg-gray-300 h-48"></div>
+                <div className="bg-white rounded-2xl shadow-lg overflow-hidden h-[420px]">
+                  <div className="bg-gray-300 h-56"></div>
                   <div className="p-6 space-y-3">
                     <div className="h-4 bg-gray-300 rounded"></div>
                     <div className="h-4 bg-gray-300 rounded w-3/4"></div>
@@ -139,7 +139,7 @@ const CoursesSection = () => {
         {/* Header with Navigation Arrows */}
         <div className="flex items-end justify-between mb-12">
           <div className="text-left">
-            <h2 className="text-2xl md:text-3xl font-bold mb-4 text-black">
+            <h2 className="text-xl md:text-2xl font-bold mb-4 text-black">
               Featured Courses
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl">
@@ -183,9 +183,9 @@ const CoursesSection = () => {
                 key={`${course.id}-${index}`} 
                 className="flex-none w-80 snap-start" // 320px width for 4 cards in a row
               >
-                <Card className="group hover:shadow-2xl transition-all duration-500 bg-white/90 backdrop-blur-sm border-purple-100 hover:border-purple-300 overflow-hidden h-96 flex flex-col">
+                <Card className="group hover:shadow-2xl transition-all duration-500 bg-white/90 backdrop-blur-sm border-purple-100 hover:border-purple-300 overflow-hidden h-[420px] flex flex-col">
                   {/* Course Thumbnail with Video Icon - Increased Height */}
-                  <div className="relative h-70 overflow-hidden bg-gradient-to-br from-purple-400 to-orange-400">
+                  <div className="relative h-56 overflow-hidden bg-gradient-to-br from-purple-400 to-orange-400">
                     {course.thumbnail_url ? (
                       <img 
                         src={course.thumbnail_url} 
@@ -194,13 +194,13 @@ const CoursesSection = () => {
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-purple-400 to-orange-400 flex items-center justify-center">
-                        <BookOpen className="h-12 w-12 text-white opacity-90" />
+                        <BookOpen className="h-14 w-14 text-white opacity-90" />
                       </div>
                     )}
                     
                     {/* Animated Orange Video Icon - Always Visible */}
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="bg-orange-500/90 rounded-full p-3 shadow-lg animate-pulse-slow">
+                      <div className="bg-orange-500/90 rounded-full p-4 shadow-lg animate-pulse-slow">
                         <Play className="h-6 w-6 text-white fill-current" />
                       </div>
                     </div>
@@ -210,7 +210,7 @@ const CoursesSection = () => {
                       to={`/learning/course-detail/${course.id}`}
                       className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-all duration-300"
                     >
-                      <div className="bg-white rounded-full p-3 transform scale-110 group-hover:scale-100 transition-transform duration-300 shadow-xl">
+                      <div className="bg-white rounded-full p-4 transform scale-110 group-hover:scale-100 transition-transform duration-300 shadow-xl">
                         <Play className="h-7 w-7 text-orange-600 fill-current" />
                       </div>
                     </Link>
@@ -296,9 +296,9 @@ const CoursesSection = () => {
             ))}
           </div>
 
-          {/* Gradient Overlays for Better Scrolling Experience */}
-          <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-purple-50 to-transparent pointer-events-none"></div>
-          <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-purple-50 to-transparent pointer-events-none"></div>
+          {/* REMOVED: Gradient Overlays for Better Scrolling Experience */}
+          {/* <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-purple-50 to-transparent pointer-events-none"></div>
+          <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-purple-50 to-transparent pointer-events-none"></div> */}
         </div>
 
         {/* Explore All Courses Button */}
