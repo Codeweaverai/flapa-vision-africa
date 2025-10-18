@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { LayoutDashboard, ChevronRight, User, UserPlus, Settings, ExternalLink, BookOpen, Mail, Shield, Clock, Star, Users, Award, Globe, CreditCard } from 'lucide-react';
+import { LayoutDashboard, ChevronRight, User, UserPlus, Settings, ExternalLink, BookOpen, Mail, Shield, Clock, Star, Users, Award, Globe, CreditCard, FileText, Gift, MessageSquare, Calendar, ShoppingCart } from 'lucide-react';
 import ProfilePictureUpload from '@/components/user/ProfilePictureUpload';
 
 interface ProfileData {
@@ -125,6 +125,16 @@ const CURRENCIES = [
   { code: 'CNY', name: 'Chinese Yuan', symbol: '¥' },
   { code: 'INR', name: 'Indian Rupee', symbol: '₹' },
   { code: 'BRL', name: 'Brazilian Real', symbol: 'R$' },
+];
+
+// Quick Links data
+const QUICK_LINKS = [
+  { href: '/my-orders', label: 'My Orders', icon: ShoppingCart, color: 'text-blue-500' },
+  { href: '/inbox', label: 'My Inbox', icon: MessageSquare, color: 'text-green-500' },
+  { href: '/my-courses', label: 'My Courses', icon: BookOpen, color: 'text-orange-500' },
+  { href: '/my-events', label: 'My Events', icon: Calendar, color: 'text-purple-500' },
+  { href: '/community', label: 'Community', icon: Users, color: 'text-indigo-500' },
+  { href: '/gift-cards', label: 'Gift Cards', icon: Gift, color: 'text-pink-500' },
 ];
 
 const AccountPage = () => {
@@ -482,7 +492,7 @@ const AccountPage = () => {
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-            {/* Left Sidebar - Quick Stats */}
+            {/* Left Sidebar - Quick Stats & Links */}
             <div className="xl:col-span-1 space-y-6">
               {/* User Profile Card */}
               <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-2xl overflow-hidden">
@@ -528,6 +538,50 @@ const AccountPage = () => {
                       </div>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Quick Actions Card */}
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-2xl">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center text-gray-800">
+                    <Settings className="h-5 w-5 mr-2 text-purple-500" />
+                    Quick Actions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {QUICK_LINKS.map((link, index) => {
+                    const IconComponent = link.icon;
+                    return (
+                      <Button
+                        key={link.href}
+                        variant="outline"
+                        className="w-full justify-start h-12 bg-white/50 hover:bg-orange-50 border-orange-200 text-gray-700 hover:text-orange-600 transition-all duration-300 shadow-sm group"
+                        asChild
+                      >
+                        <a href={link.href}>
+                          <IconComponent className={`h-4 w-4 mr-3 ${link.color} group-hover:scale-110 transition-transform`} />
+                          {link.label}
+                          <ChevronRight className="h-4 w-4 ml-auto text-gray-400 group-hover:text-orange-500 transition-colors" />
+                        </a>
+                      </Button>
+                    );
+                  })}
+                  
+                  {/* Public Profile Link for Creators */}
+                  {profile.is_creator && (
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start h-12 bg-gradient-to-r from-orange-50 to-purple-50 border-purple-200 text-gray-700 hover:text-purple-600 transition-all duration-300 shadow-sm group mt-4"
+                      asChild
+                    >
+                      <a href={`/creator/profile/${user.id}`}>
+                        <ExternalLink className="h-4 w-4 mr-3 text-purple-500 group-hover:scale-110 transition-transform" />
+                        View Public Profile
+                        <ChevronRight className="h-4 w-4 ml-auto text-gray-400 group-hover:text-purple-500 transition-colors" />
+                      </a>
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
 
