@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
-import { LayoutDashboard, ChevronRight, User, UserPlus, Settings, ExternalLink, BookOpen } from 'lucide-react';
+import { LayoutDashboard, ChevronRight, User, UserPlus, Settings, ExternalLink, BookOpen, Mail, Shield, Clock, Star, Users, Award } from 'lucide-react';
 import ProfilePictureUpload from '@/components/user/ProfilePictureUpload';
 
 interface ProfileData {
@@ -28,69 +28,53 @@ interface ProfileData {
 interface CreatorStats {
   courses: number;
   events: number;
+  students: number;
+  total_earnings: number;
 }
 
-// Pulse Loading Component for Account Page
+// Enhanced Pulse Loading Component for Account Page
 const AccountPulseLoading = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-200 via-purple-200 to-orange-300">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-orange-50 to-purple-100">
       <Layout>
-        <div className="container mx-auto py-8 px-4 max-w-6xl">
+        <div className="container mx-auto py-8 px-4 max-w-7xl">
           <div className="flex flex-col items-center justify-center min-h-96">
-            {/* Pulse Animation Container */}
-            <div className="relative w-40 h-40 flex items-center justify-center mb-8">
-              {/* Outer Pulse Circle */}
-              <div className="absolute w-40 h-40 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 animate-ping" />
+            {/* Enhanced Pulse Animation Container */}
+            <div className="relative w-48 h-48 flex items-center justify-center mb-8">
+              {/* Outer Pulse Ring */}
+              <div className="absolute w-48 h-48 rounded-full bg-gradient-to-r from-orange-400/10 to-purple-600/10 animate-ping" />
               
-              {/* Middle Pulse Circle */}
-              <div className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-orange-500/30 to-purple-600/30 animate-pulse" />
+              {/* Middle Pulse Ring */}
+              <div className="absolute w-36 h-36 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 animate-pulse" />
               
-              {/* Inner Pulse Circle */}
-              <div className="absolute w-24 h-24 rounded-full bg-gradient-to-r from-orange-500/40 to-purple-600/40 animate-pulse" />
+              {/* Inner Pulse Ring */}
+              <div className="absolute w-24 h-24 rounded-full bg-gradient-to-r from-orange-500/30 to-purple-600/30 animate-pulse" />
               
-              {/* Center Icon */}
-              <div className="absolute w-16 h-16 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center shadow-lg">
-                <User className="h-8 w-8 text-white" />
+              {/* Center Icon with Gradient */}
+              <div className="absolute w-20 h-20 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center shadow-2xl ring-4 ring-white/50">
+                <User className="h-10 w-10 text-white" />
               </div>
             </div>
 
-            {/* Loading Text */}
-            <div className="text-center space-y-2">
-              <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+            {/* Enhanced Loading Text */}
+            <div className="text-center space-y-4">
+              <h3 className="text-3xl font-bold bg-gradient-to-r from-orange-500 via-purple-600 to-orange-500 bg-clip-text text-transparent animate-pulse">
                 Loading Your Profile
               </h3>
-              <p className="text-gray-700 text-lg">
+              <p className="text-gray-600 text-lg font-medium">
                 Getting your account information ready...
               </p>
             </div>
 
-            {/* Progress Dots */}
-            <div className="flex space-x-2 mt-6">
-              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-3 h-3 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+            {/* Enhanced Progress Dots */}
+            <div className="flex space-x-3 mt-8">
+              <div className="w-4 h-4 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 animate-bounce shadow-lg" style={{ animationDelay: '0ms' }} />
+              <div className="w-4 h-4 rounded-full bg-gradient-to-r from-purple-500 to-orange-500 animate-bounce shadow-lg" style={{ animationDelay: '150ms' }} />
+              <div className="w-4 h-4 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 animate-bounce shadow-lg" style={{ animationDelay: '300ms' }} />
             </div>
           </div>
         </div>
       </Layout>
-    </div>
-  );
-};
-
-// Alternative Minimal Loading
-const MinimalAccountLoading = () => {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-200 via-purple-200 to-orange-300 flex items-center justify-center">
-      <div className="text-center">
-        <div className="relative inline-block">
-          {/* Pulse Rings */}
-          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 animate-ping" />
-          <div className="relative w-20 h-20 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center shadow-lg">
-            <User className="h-10 w-10 text-white" />
-          </div>
-        </div>
-        <h3 className="mt-4 text-xl font-semibold text-gray-700">Loading your account...</h3>
-      </div>
     </div>
   );
 };
@@ -101,7 +85,12 @@ const AccountPage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [enablingCreator, setEnablingCreator] = useState(false);
-  const [creatorStats, setCreatorStats] = useState<CreatorStats>({ courses: 0, events: 0 });
+  const [creatorStats, setCreatorStats] = useState<CreatorStats>({ 
+    courses: 0, 
+    events: 0, 
+    students: 0, 
+    total_earnings: 0 
+  });
   const [profile, setProfile] = useState<ProfileData>({
     id: '',
     username: '',
@@ -171,9 +160,25 @@ const AccountPage = () => {
         .select('*', { count: 'exact', head: true })
         .eq('creator_id', userId);
 
+      // Fetch total students (simplified - count unique enrollments across creator's courses)
+      const { data: enrollments } = await supabase
+        .from('course_enrollments')
+        .select('user_id')
+        .in('course_id', 
+          await supabase
+            .from('courses')
+            .select('id')
+            .eq('creator_id', userId)
+            .then(({ data }) => data?.map(c => c.id) || [])
+        );
+
+      const uniqueStudents = new Set(enrollments?.map(e => e.user_id)).size;
+
       setCreatorStats({
         courses: coursesCount || 0,
-        events: eventsCount || 0
+        events: eventsCount || 0,
+        students: uniqueStudents || 0,
+        total_earnings: 0 // You can implement earnings logic based on your payment system
       });
     } catch (error) {
       console.error('Error fetching creator stats:', error);
@@ -231,6 +236,8 @@ const AccountPage = () => {
         avatar_url: url,
         avatar_storage_path: path
       }));
+      
+      toast.success('Profile picture updated successfully');
     } catch (error) {
       console.error('Error updating profile picture:', error);
       toast.error('Failed to update profile picture');
@@ -287,268 +294,378 @@ const AccountPage = () => {
     return <Navigate to="/auth" replace />;
   }
 
-  // Use the AccountPulseLoading component instead of the simple spinner
   if (loading) {
     return <AccountPulseLoading />;
-    // Alternatively, you can use the minimal version:
-    // return <MinimalAccountLoading />;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-200 via-purple-200 to-orange-300">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-orange-50 to-purple-100">
       <Layout>
-        <div className="container mx-auto py-8 px-4 max-w-6xl">
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold mb-4 text-white">My Account</h1>
-            <p className="text-xl text-black/80">
-              Manage your profile and account settings.
+        <div className="container mx-auto py-8 px-4 max-w-7xl">
+          {/* Enhanced Header Section */}
+          <div className="mb-12 text-center">
+            <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-orange-500 via-purple-600 to-orange-500 bg-clip-text text-transparent">
+              My Account
+            </h1>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Manage your profile, track your progress, and unlock creator features
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Profile Information Card */}
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle>Profile Information</CardTitle>
-                <CardDescription>Update your personal details and public information</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-6">
-                  <div className="flex flex-col md:flex-row gap-6">
-                    <div className="flex flex-col items-center space-y-4 md:w-1/3">
-                      <ProfilePictureUpload 
-                        currentImageUrl={profile.avatar_url} 
-                        username={profile.username}
-                        onUploadComplete={handleProfilePictureUpload}
-                      />
+          <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+            {/* Left Sidebar - Quick Stats */}
+            <div className="xl:col-span-1 space-y-6">
+              {/* User Profile Card */}
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-2xl overflow-hidden">
+                <CardContent className="p-6">
+                  <div className="flex flex-col items-center text-center space-y-4">
+                    <div className="relative">
+                      <Avatar className="h-24 w-24 ring-4 ring-white/80 shadow-2xl">
+                        <AvatarImage src={profile.avatar_url} />
+                        <AvatarFallback className="bg-gradient-to-r from-orange-500 to-purple-600 text-white text-xl font-bold">
+                          {getInitials(profile.full_name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="absolute -bottom-2 -right-2">
+                        <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xs px-2 py-1 rounded-full shadow-lg">
+                          <Shield className="h-3 w-3 inline mr-1" />
+                          Active
+                        </div>
+                      </div>
                     </div>
                     
-                    <div className="space-y-4 md:w-2/3">
-                      <div>
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                          id="email"
-                          value={user.email || ''}
-                          disabled
-                          className="bg-muted"
-                        />
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Your email cannot be changed
-                        </p>
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="username">Username</Label>
-                        <Input
-                          id="username"
-                          name="username"
-                          value={profile.username}
-                          onChange={handleChange}
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="full_name">Full Name</Label>
-                        <Input
-                          id="full_name"
-                          name="full_name"
-                          value={profile.full_name}
-                          onChange={handleChange}
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <h3 className="font-bold text-lg text-gray-800">{profile.full_name || 'User'}</h3>
+                      <p className="text-gray-600 text-sm">@{profile.username || 'username'}</p>
+                      <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 shadow-lg">
+                        {profile.is_creator ? '🎨 Creator' : '👤 Learner'}
+                      </Badge>
+                    </div>
                     
-                      <div>
-                        <Label htmlFor="bio">Bio</Label>
-                        <Textarea
-                          id="bio"
-                          name="bio"
-                          rows={4}
-                          value={profile.bio}
-                          onChange={handleChange}
-                        />
-                      </div>
-
-                      <div>
-                        <Label>Account Status</Label>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          <Badge variant="outline">
-                            {user?.email_confirmed_at ? 'Verified Email' : 'Unverified Email'}
-                          </Badge>
-                          <Badge
-                          className="bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 text-white"
-                          >
-                          {profile.is_creator ? 'Creator' : 'User'}
-                           </Badge>
-                          
-                          {profile.role && profile.role !== 'user' && (
-                            <Badge variant="outline">{profile.role}</Badge>
-                          )}
+                    <div className="w-full pt-4 border-t border-gray-200/50">
+                      <div className="grid grid-cols-2 gap-4 text-center">
+                        <div>
+                          <div className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                            {creatorStats.courses}
+                          </div>
+                          <div className="text-xs text-gray-500">Courses</div>
+                        </div>
+                        <div>
+                          <div className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                            {creatorStats.students}
+                          </div>
+                          <div className="text-xs text-gray-500">Students</div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-              <CardFooter className="flex justify-end">
-                <Button onClick={handleSave} disabled={saving || loading}
-                  className="bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </Button>
-              </CardFooter>
-            </Card>
-            
-            {/* Creator Dashboard Card */}
-            <div className="space-y-6">
-              <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <LayoutDashboard className="h-5 w-5 mr-2" />
-                    Creator Dashboard
-                  </CardTitle>
-                  {profile.is_creator ? (
-                    <CardDescription>
-                      Access your creator tools and manage your content
-                    </CardDescription>
-                  ) : (
-                    <CardDescription>
-                      Become a creator to publish courses and events
-                    </CardDescription>
-                  )}
-                </CardHeader>
-                
-                <CardContent>
-                  {profile.is_creator ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-4">
-                        <Avatar className="h-12 w-12">
-                          <AvatarImage src={profile.avatar_url} />
-                          <AvatarFallback>{getInitials(profile.full_name)}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-semibold">{profile.full_name}</p>
-                          <p className="text-sm text-muted-foreground">Creator</p>
-                        </div>
-                      </div>
-                      
-                      <p className="text-sm">
-                        Access your creator dashboard to manage your courses, events, and track 
-                        your performance.
-                      </p>
-                      
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="bg-background/50 p-3 rounded-lg text-center">
-                          <div className="text-2xl font-bold">{creatorStats.courses}</div>
-                          <div className="text-xs text-muted-foreground">Courses</div>
-                        </div>
-                        <div className="bg-background/50 p-3 rounded-lg text-center">
-                          <div className="text-2xl font-bold">{creatorStats.events}</div>
-                          <div className="text-xs text-muted-foreground">Events</div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex items-start gap-3">
-                        <User className="h-5 w-5 text-primary mt-1" />
-                        <div>
-                          <h4 className="font-medium">Create and Share</h4>
-                          <p className="text-sm text-muted-foreground">
-                            Publish courses and events to share your expertise
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-start gap-3">
-                        <UserPlus className="h-5 w-5 text-primary mt-1" />
-                        <div>
-                          <h4 className="font-medium">Build Your Audience</h4>
-                          <p className="text-sm text-muted-foreground">
-                            Connect with students and grow your following
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </CardContent>
-                
-                <CardFooter>
+              </Card>
+
+              {/* Account Status Card */}
+              <Card className="bg-gradient-to-br from-orange-500/10 to-purple-600/10 border-0 shadow-2xl backdrop-blur-sm">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center text-gray-800">
+                    <Shield className="h-5 w-5 mr-2 text-orange-500" />
+                    Account Status
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between p-3 bg-white/50 rounded-lg shadow-sm">
+                    <div className="flex items-center">
+                      <Mail className="h-4 w-4 mr-2 text-purple-500" />
+                      <span className="text-sm font-medium">Email</span>
+                    </div>
+                    <Badge variant={user?.email_confirmed_at ? "default" : "secondary"} 
+                      className={user?.email_confirmed_at ? "bg-green-500 text-white" : "bg-yellow-500 text-white"}>
+                      {user?.email_confirmed_at ? 'Verified' : 'Pending'}
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-3 bg-white/50 rounded-lg shadow-sm">
+                    <div className="flex items-center">
+                      <Award className="h-4 w-4 mr-2 text-orange-500" />
+                      <span className="text-sm font-medium">Role</span>
+                    </div>
+                    <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
+                      {profile.role || 'User'}
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-3 bg-white/50 rounded-lg shadow-sm">
+                    <div className="flex items-center">
+                      <Clock className="h-4 w-4 mr-2 text-purple-500" />
+                      <span className="text-sm font-medium">Member Since</span>
+                    </div>
+                    <span className="text-xs text-gray-500">
+                      {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'Recently'}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Main Content Area */}
+            <div className="xl:col-span-3 space-y-8">
+              {/* Profile Information Card */}
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-2xl">
+                <CardHeader className="pb-6">
+                  <CardTitle className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                    Profile Information
+                  </CardTitle>
+                  <CardDescription className="text-gray-600">
+                    Update your personal details and public information
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-8">
+                    <div className="flex flex-col lg:flex-row gap-8">
+                      {/* Profile Picture Upload Section */}
+                      <div className="flex flex-col items-center space-y-6 lg:w-1/3">
+                        <ProfilePictureUpload 
+                          currentImageUrl={profile.avatar_url} 
+                          username={profile.username}
+                          onUploadComplete={handleProfilePictureUpload}
+                        />
+                        <div className="text-center space-y-2">
+                          <h4 className="font-semibold text-gray-800">Profile Photo</h4>
+                          <p className="text-sm text-gray-500">
+                            Upload a clear photo to help others recognize you
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Form Fields */}
+                      <div className="space-y-6 lg:w-2/3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-2">
+                            <Label htmlFor="email" className="text-gray-700 font-medium">Email</Label>
+                            <Input
+                              id="email"
+                              value={user.email || ''}
+                              disabled
+                              className="bg-gray-50/80 border-gray-200 shadow-sm"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                              Your email cannot be changed
+                            </p>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="username" className="text-gray-700 font-medium">Username</Label>
+                            <Input
+                              id="username"
+                              name="username"
+                              value={profile.username}
+                              onChange={handleChange}
+                              className="border-gray-200 shadow-sm focus:ring-2 focus:ring-orange-500/20"
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="full_name" className="text-gray-700 font-medium">Full Name</Label>
+                          <Input
+                            id="full_name"
+                            name="full_name"
+                            value={profile.full_name}
+                            onChange={handleChange}
+                            className="border-gray-200 shadow-sm focus:ring-2 focus:ring-orange-500/20"
+                          />
+                        </div>
+                      
+                        <div className="space-y-2">
+                          <Label htmlFor="bio" className="text-gray-700 font-medium">Bio</Label>
+                          <Textarea
+                            id="bio"
+                            name="bio"
+                            rows={4}
+                            value={profile.bio}
+                            onChange={handleChange}
+                            placeholder="Tell us about yourself..."
+                            className="border-gray-200 shadow-sm focus:ring-2 focus:ring-orange-500/20 resize-none"
+                          />
+                          <p className="text-xs text-gray-500">
+                            Share your interests, expertise, or a brief introduction
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter className="flex justify-end border-t border-gray-200/50 pt-6">
                   <Button 
-                    className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700"
-                    onClick={profile.is_creator ? handleCreatorDashboardClick : handleEnableCreatorMode}
-                    disabled={enablingCreator}
+                    onClick={handleSave} 
+                    disabled={saving || loading}
+                    className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed px-8 py-2"
                   >
-                    {profile.is_creator ? (
+                    {saving ? (
                       <>
-                        Go to Creator Dashboard
-                        <ChevronRight className="h-4 w-4 ml-1" />
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Saving...
                       </>
                     ) : (
-                      <>
-                        {enablingCreator ? 'Enabling...' : 'Enable Creator Mode'}
-                        <ChevronRight className="h-4 w-4 ml-1" />
-                      </>
+                      'Save Changes'
                     )}
                   </Button>
                 </CardFooter>
               </Card>
 
-              {/* Quick Actions Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Settings className="h-5 w-5 mr-2" />
-                    Quick Actions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {profile.is_creator && (
-                    <Button variant="outline" className="w-full justify-start" asChild>
-                      <a href={`/creator/profile/${user.id}`}>
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        View Public Profile
+              {/* Creator Dashboard & Quick Actions Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Creator Dashboard Card */}
+                <Card className="bg-gradient-to-br from-orange-500/5 to-purple-600/10 border-0 shadow-2xl backdrop-blur-sm">
+                  <CardHeader>
+                    <CardTitle className="flex items-center text-gray-800">
+                      <LayoutDashboard className="h-6 w-6 mr-2 text-orange-500" />
+                      Creator Dashboard
+                    </CardTitle>
+                    {profile.is_creator ? (
+                      <CardDescription className="text-gray-600">
+                        Access your creator tools and manage your content
+                      </CardDescription>
+                    ) : (
+                      <CardDescription className="text-gray-600">
+                        Become a creator to publish courses and events
+                      </CardDescription>
+                    )}
+                  </CardHeader>
+                  
+                  <CardContent>
+                    {profile.is_creator ? (
+                      <div className="space-y-6">
+                        <div className="flex items-center gap-4 p-4 bg-white/50 rounded-xl shadow-sm">
+                          <Avatar className="h-14 w-14 ring-2 ring-white/80 shadow-lg">
+                            <AvatarImage src={profile.avatar_url} />
+                            <AvatarFallback className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
+                              {getInitials(profile.full_name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-bold text-gray-800">{profile.full_name}</p>
+                            <p className="text-sm text-gray-600">Verified Creator</p>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-white/60 p-4 rounded-xl text-center shadow-lg">
+                            <BookOpen className="h-8 w-8 mx-auto text-orange-500 mb-2" />
+                            <div className="text-2xl font-bold text-gray-800">{creatorStats.courses}</div>
+                            <div className="text-xs text-gray-600">Courses</div>
+                          </div>
+                          <div className="bg-white/60 p-4 rounded-xl text-center shadow-lg">
+                            <Users className="h-8 w-8 mx-auto text-purple-500 mb-2" />
+                            <div className="text-2xl font-bold text-gray-800">{creatorStats.students}</div>
+                            <div className="text-xs text-gray-600">Students</div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="flex items-start gap-4 p-4 bg-white/50 rounded-xl shadow-sm">
+                          <User className="h-6 w-6 text-orange-500 mt-1 flex-shrink-0" />
+                          <div>
+                            <h4 className="font-semibold text-gray-800">Create and Share</h4>
+                            <p className="text-sm text-gray-600 mt-1">
+                              Publish courses and events to share your expertise with the world
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-start gap-4 p-4 bg-white/50 rounded-xl shadow-sm">
+                          <UserPlus className="h-6 w-6 text-purple-500 mt-1 flex-shrink-0" />
+                          <div>
+                            <h4 className="font-semibold text-gray-800">Build Your Audience</h4>
+                            <p className="text-sm text-gray-600 mt-1">
+                              Connect with students and grow your professional following
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                  
+                  <CardFooter>
+                    <Button 
+                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 py-3 text-base font-semibold"
+                      onClick={profile.is_creator ? handleCreatorDashboardClick : handleEnableCreatorMode}
+                      disabled={enablingCreator}
+                    >
+                      {profile.is_creator ? (
+                        <>
+                          Go to Creator Dashboard
+                          <ChevronRight className="h-5 w-5 ml-2" />
+                        </>
+                      ) : (
+                        <>
+                          {enablingCreator ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                              Enabling...
+                            </>
+                          ) : (
+                            <>
+                              Enable Creator Mode
+                              <ChevronRight className="h-5 w-5 ml-2" />
+                            </>
+                          )}
+                        </>
+                      )}
+                    </Button>
+                  </CardFooter>
+                </Card>
+
+                {/* Quick Actions Card */}
+                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-2xl">
+                  <CardHeader>
+                    <CardTitle className="flex items-center text-gray-800">
+                      <Settings className="h-6 w-6 mr-2 text-purple-500" />
+                      Quick Actions
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {profile.is_creator && (
+                      <Button variant="outline" className="w-full justify-start h-12 bg-white/50 hover:bg-orange-50 border-orange-200 text-gray-700 hover:text-orange-600 transition-all duration-300 shadow-sm" asChild>
+                        <a href={`/creator/profile/${user.id}`}>
+                          <ExternalLink className="h-4 w-4 mr-3" />
+                          View Public Profile
+                          <ChevronRight className="h-4 w-4 ml-auto" />
+                        </a>
+                      </Button>
+                    )}
+                    <Button variant="outline" className="w-full justify-start h-12 bg-white/50 hover:bg-purple-50 border-purple-200 text-gray-700 hover:text-purple-600 transition-all duration-300 shadow-sm" asChild>
+                      <a href="/my-orders">
+                        My Orders
                         <ChevronRight className="h-4 w-4 ml-auto" />
                       </a>
                     </Button>
-                  )}
-                  <Button variant="outline" className="w-full justify-start" asChild>
-                    <a href="/my-orders">
-                      My Orders
-                      <ChevronRight className="h-4 w-4 ml-auto" />
-                    </a>
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start" asChild>
-                    <a href="/inbox">
-                      My Inbox
-                      <ChevronRight className="h-4 w-4 ml-auto" />
-                    </a>
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start" asChild>
-                    <a href="/my-courses">
-                      My Courses
-                      <ChevronRight className="h-4 w-4 ml-auto" />
-                    </a>
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start" asChild>
-                    <a href="/my-events">
-                      My Events
-                      <ChevronRight className="h-4 w-4 ml-auto" />
-                    </a>
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start" asChild>
-                    <a href="/community">
-                      Community
-                      <ChevronRight className="h-4 w-4 ml-auto" />
-                    </a>
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start" asChild>
-                    <a href="/gift-cards">
-                      Gift Card
-                      <ChevronRight className="h-4 w-4 ml-auto" />
-                    </a>
-                  </Button>
-                </CardContent>
-              </Card>
+                    <Button variant="outline" className="w-full justify-start h-12 bg-white/50 hover:bg-orange-50 border-orange-200 text-gray-700 hover:text-orange-600 transition-all duration-300 shadow-sm" asChild>
+                      <a href="/inbox">
+                        My Inbox
+                        <ChevronRight className="h-4 w-4 ml-auto" />
+                      </a>
+                    </Button>
+                    <Button variant="outline" className="w-full justify-start h-12 bg-white/50 hover:bg-purple-50 border-purple-200 text-gray-700 hover:text-purple-600 transition-all duration-300 shadow-sm" asChild>
+                      <a href="/my-courses">
+                        My Courses
+                        <ChevronRight className="h-4 w-4 ml-auto" />
+                      </a>
+                    </Button>
+                    <Button variant="outline" className="w-full justify-start h-12 bg-white/50 hover:bg-orange-50 border-orange-200 text-gray-700 hover:text-orange-600 transition-all duration-300 shadow-sm" asChild>
+                      <a href="/my-events">
+                        My Events
+                        <ChevronRight className="h-4 w-4 ml-auto" />
+                      </a>
+                    </Button>
+                    <Button variant="outline" className="w-full justify-start h-12 bg-white/50 hover:bg-purple-50 border-purple-200 text-gray-700 hover:text-purple-600 transition-all duration-300 shadow-sm" asChild>
+                      <a href="/community">
+                        Community
+                        <ChevronRight className="h-4 w-4 ml-auto" />
+                      </a>
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
         </div>
