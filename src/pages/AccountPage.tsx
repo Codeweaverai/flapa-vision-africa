@@ -10,8 +10,9 @@ import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { LayoutDashboard, ChevronRight, User, UserPlus, Settings, ExternalLink, BookOpen, Mail, Shield, Clock, Star, Users, Award } from 'lucide-react';
+import { LayoutDashboard, ChevronRight, User, UserPlus, Settings, ExternalLink, BookOpen, Mail, Shield, Clock, Star, Users, Award, Globe, CreditCard } from 'lucide-react';
 import ProfilePictureUpload from '@/components/user/ProfilePictureUpload';
 
 interface ProfileData {
@@ -30,6 +31,25 @@ interface CreatorStats {
   events: number;
   students: number;
   total_earnings: number;
+}
+
+interface LanguagePreference {
+  user_id: string;
+  language_code: string;
+  updated_at: string;
+  created_at: string;
+}
+
+interface CurrencyPreference {
+  id: string;
+  user_id: string;
+  default_currency: string;
+  country_code: string;
+  detected_by_ip: boolean;
+  ip_address: string;
+  device_currency: string;
+  created_at: string;
+  updated_at: string;
 }
 
 // Enhanced Pulse Loading Component for Account Page
@@ -79,12 +99,41 @@ const AccountPulseLoading = () => {
   );
 };
 
+// Language options
+const LANGUAGES = [
+  { code: 'en', name: 'English', nativeName: 'English' },
+  { code: 'es', name: 'Spanish', nativeName: 'Español' },
+  { code: 'fr', name: 'French', nativeName: 'Français' },
+  { code: 'de', name: 'German', nativeName: 'Deutsch' },
+  { code: 'it', name: 'Italian', nativeName: 'Italiano' },
+  { code: 'pt', name: 'Portuguese', nativeName: 'Português' },
+  { code: 'ru', name: 'Russian', nativeName: 'Русский' },
+  { code: 'ja', name: 'Japanese', nativeName: '日本語' },
+  { code: 'zh', name: 'Chinese', nativeName: '中文' },
+  { code: 'ar', name: 'Arabic', nativeName: 'العربية' },
+];
+
+// Currency options
+const CURRENCIES = [
+  { code: 'USD', name: 'US Dollar', symbol: '$' },
+  { code: 'EUR', name: 'Euro', symbol: '€' },
+  { code: 'GBP', name: 'British Pound', symbol: '£' },
+  { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
+  { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$' },
+  { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
+  { code: 'CHF', name: 'Swiss Franc', symbol: 'CHF' },
+  { code: 'CNY', name: 'Chinese Yuan', symbol: '¥' },
+  { code: 'INR', name: 'Indian Rupee', symbol: '₹' },
+  { code: 'BRL', name: 'Brazilian Real', symbol: 'R$' },
+];
+
 const AccountPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [enablingCreator, setEnablingCreator] = useState(false);
+  const [savingPreferences, setSavingPreferences] = useState(false);
   const [creatorStats, setCreatorStats] = useState<CreatorStats>({ 
     courses: 0, 
     events: 0, 
@@ -100,6 +149,23 @@ const AccountPage = () => {
     avatar_storage_path: null,
     is_creator: false,
     role: 'user'
+  });
+  const [languagePreference, setLanguagePreference] = useState<LanguagePreference>({
+    user_id: '',
+    language_code: 'en',
+    updated_at: '',
+    created_at: ''
+  });
+  const [currencyPreference, setCurrencyPreference] = useState<CurrencyPreference>({
+    id: '',
+    user_id: '',
+    default_currency: 'USD',
+    country_code: '',
+    detected_by_ip: false,
+    ip_address: '',
+    device_currency: '',
+    created_at: '',
+    updated_at: ''
   });
 
   useEffect(() => {
@@ -135,6 +201,9 @@ const AccountPage = () => {
           if (data.is_creator) {
             await fetchCreatorStats(data.id);
           }
+
+          // Fetch user preferences
+          await fetchUserPreferences(data.id);
         }
       } catch (error) {
         console.error('Error:', error);
@@ -185,6 +254,70 @@ const AccountPage = () => {
     }
   };
 
+  const fetchUserPreferences = async (userId: string) => {
+    try {
+      // Fetch language preference
+      const { data: languageData, error: languageError } = await supabase
+        .from('user_language_preferences')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (languageError && languageError.code !== 'PGRST116') {
+        console.error('Error fetching language preference:', languageError);
+      }
+
+      if (languageData) {
+        setLanguagePreference(languageData);
+      } else {
+        // Create default language preference if it doesn't exist
+        const { data: newLanguagePref } = await supabase
+          .from('user_language_preferences')
+          .insert({
+            user_id: userId,
+            language_code: 'en'
+          })
+          .select()
+          .single();
+
+        if (newLanguagePref) {
+          setLanguagePreference(newLanguagePref);
+        }
+      }
+
+      // Fetch currency preference
+      const { data: currencyData, error: currencyError } = await supabase
+        .from('user_currency_preferences')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (currencyError && currencyError.code !== 'PGRST116') {
+        console.error('Error fetching currency preference:', currencyError);
+      }
+
+      if (currencyData) {
+        setCurrencyPreference(currencyData);
+      } else {
+        // Create default currency preference if it doesn't exist
+        const { data: newCurrencyPref } = await supabase
+          .from('user_currency_preferences')
+          .insert({
+            user_id: userId,
+            default_currency: 'USD'
+          })
+          .select()
+          .single();
+
+        if (newCurrencyPref) {
+          setCurrencyPreference(newCurrencyPref);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user preferences:', error);
+    }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setProfile((prev) => ({ ...prev, [name]: value }));
@@ -212,6 +345,42 @@ const AccountPage = () => {
       toast.error('Failed to update profile');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSavePreferences = async () => {
+    if (!user) return;
+
+    setSavingPreferences(true);
+    try {
+      // Update language preference
+      const { error: languageError } = await supabase
+        .from('user_language_preferences')
+        .upsert({
+          user_id: user.id,
+          language_code: languagePreference.language_code,
+          updated_at: new Date().toISOString()
+        });
+
+      if (languageError) throw languageError;
+
+      // Update currency preference
+      const { error: currencyError } = await supabase
+        .from('user_currency_preferences')
+        .upsert({
+          user_id: user.id,
+          default_currency: currencyPreference.default_currency,
+          updated_at: new Date().toISOString()
+        });
+
+      if (currencyError) throw currencyError;
+
+      toast.success('Preferences updated successfully');
+    } catch (error) {
+      console.error('Error updating preferences:', error);
+      toast.error('Failed to update preferences');
+    } finally {
+      setSavingPreferences(false);
     }
   };
   
@@ -302,12 +471,12 @@ const AccountPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-orange-50 to-purple-100">
       <Layout>
         <div className="container mx-auto py-8 px-4 max-w-7xl">
-          {/* Enhanced Header Section */}
-          <div className="mb-12 text-center">
-            <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-orange-500 via-purple-600 to-orange-500 bg-clip-text text-transparent">
+          {/* Updated Header Section - Left Aligned */}
+          <div className="mb-12">
+            <h1 className="text-4xl font-bold mb-4 text-orange-500">
               My Account
             </h1>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            <p className="text-xl text-gray-600 max-w-3xl">
               Manage your profile, track your progress, and unlock creator features
             </p>
           </div>
@@ -511,8 +680,119 @@ const AccountPage = () => {
                 </CardFooter>
               </Card>
 
-              {/* Creator Dashboard & Quick Actions Grid */}
+              {/* Preferences & Creator Dashboard Grid */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Profile Settings Card */}
+                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-2xl">
+                  <CardHeader>
+                    <CardTitle className="flex items-center text-gray-800">
+                      <Settings className="h-6 w-6 mr-2 text-purple-500" />
+                      Profile Settings
+                    </CardTitle>
+                    <CardDescription className="text-gray-600">
+                      Customize your language and currency preferences
+                    </CardDescription>
+                  </CardHeader>
+                  
+                  <CardContent className="space-y-6">
+                    {/* Language Preference */}
+                    <div className="space-y-3">
+                      <Label htmlFor="language" className="text-gray-700 font-medium flex items-center">
+                        <Globe className="h-4 w-4 mr-2 text-orange-500" />
+                        Preferred Language
+                      </Label>
+                      <Select
+                        value={languagePreference.language_code}
+                        onValueChange={(value) => setLanguagePreference(prev => ({ ...prev, language_code: value }))}
+                      >
+                        <SelectTrigger className="border-gray-200 shadow-sm focus:ring-2 focus:ring-orange-500/20">
+                          <SelectValue placeholder="Select language" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LANGUAGES.map((language) => (
+                            <SelectItem key={language.code} value={language.code}>
+                              <div className="flex items-center">
+                                <span className="font-medium">{language.name}</span>
+                                <span className="text-gray-500 text-sm ml-2">({language.nativeName})</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-gray-500">
+                        This will affect the language of the interface and content
+                      </p>
+                    </div>
+
+                    {/* Currency Preference */}
+                    <div className="space-y-3">
+                      <Label htmlFor="currency" className="text-gray-700 font-medium flex items-center">
+                        <CreditCard className="h-4 w-4 mr-2 text-purple-500" />
+                        Preferred Currency
+                      </Label>
+                      <Select
+                        value={currencyPreference.default_currency}
+                        onValueChange={(value) => setCurrencyPreference(prev => ({ ...prev, default_currency: value }))}
+                      >
+                        <SelectTrigger className="border-gray-200 shadow-sm focus:ring-2 focus:ring-orange-500/20">
+                          <SelectValue placeholder="Select currency" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CURRENCIES.map((currency) => (
+                            <SelectItem key={currency.code} value={currency.code}>
+                              <div className="flex items-center justify-between w-full">
+                                <span className="font-medium">{currency.code}</span>
+                                <span className="text-gray-500 text-sm">
+                                  {currency.symbol} - {currency.name}
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-gray-500">
+                        Prices will be displayed in your selected currency
+                      </p>
+                    </div>
+
+                    {/* Current Settings Summary */}
+                    <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg border border-orange-200/50">
+                      <h4 className="font-semibold text-gray-800 mb-2">Current Settings</h4>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-600">Language:</span>
+                          <div className="font-medium text-gray-800">
+                            {LANGUAGES.find(lang => lang.code === languagePreference.language_code)?.name || 'English'}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Currency:</span>
+                          <div className="font-medium text-gray-800">
+                            {currencyPreference.default_currency}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                  
+                  <CardFooter>
+                    <Button 
+                      onClick={handleSavePreferences}
+                      disabled={savingPreferences}
+                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 py-3 text-base font-semibold"
+                    >
+                      {savingPreferences ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Saving Preferences...
+                        </>
+                      ) : (
+                        'Save Preferences'
+                      )}
+                    </Button>
+                  </CardFooter>
+                </Card>
+
                 {/* Creator Dashboard Card */}
                 <Card className="bg-gradient-to-br from-orange-500/5 to-purple-600/10 border-0 shadow-2xl backdrop-blur-sm">
                   <CardHeader>
@@ -613,57 +893,6 @@ const AccountPage = () => {
                       )}
                     </Button>
                   </CardFooter>
-                </Card>
-
-                {/* Quick Actions Card */}
-                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-2xl">
-                  <CardHeader>
-                    <CardTitle className="flex items-center text-gray-800">
-                      <Settings className="h-6 w-6 mr-2 text-purple-500" />
-                      Quick Actions
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {profile.is_creator && (
-                      <Button variant="outline" className="w-full justify-start h-12 bg-white/50 hover:bg-orange-50 border-orange-200 text-gray-700 hover:text-orange-600 transition-all duration-300 shadow-sm" asChild>
-                        <a href={`/creator/profile/${user.id}`}>
-                          <ExternalLink className="h-4 w-4 mr-3" />
-                          View Public Profile
-                          <ChevronRight className="h-4 w-4 ml-auto" />
-                        </a>
-                      </Button>
-                    )}
-                    <Button variant="outline" className="w-full justify-start h-12 bg-white/50 hover:bg-purple-50 border-purple-200 text-gray-700 hover:text-purple-600 transition-all duration-300 shadow-sm" asChild>
-                      <a href="/my-orders">
-                        My Orders
-                        <ChevronRight className="h-4 w-4 ml-auto" />
-                      </a>
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start h-12 bg-white/50 hover:bg-orange-50 border-orange-200 text-gray-700 hover:text-orange-600 transition-all duration-300 shadow-sm" asChild>
-                      <a href="/inbox">
-                        My Inbox
-                        <ChevronRight className="h-4 w-4 ml-auto" />
-                      </a>
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start h-12 bg-white/50 hover:bg-purple-50 border-purple-200 text-gray-700 hover:text-purple-600 transition-all duration-300 shadow-sm" asChild>
-                      <a href="/my-courses">
-                        My Courses
-                        <ChevronRight className="h-4 w-4 ml-auto" />
-                      </a>
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start h-12 bg-white/50 hover:bg-orange-50 border-orange-200 text-gray-700 hover:text-orange-600 transition-all duration-300 shadow-sm" asChild>
-                      <a href="/my-events">
-                        My Events
-                        <ChevronRight className="h-4 w-4 ml-auto" />
-                      </a>
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start h-12 bg-white/50 hover:bg-purple-50 border-purple-200 text-gray-700 hover:text-purple-600 transition-all duration-300 shadow-sm" asChild>
-                      <a href="/community">
-                        Community
-                        <ChevronRight className="h-4 w-4 ml-auto" />
-                      </a>
-                    </Button>
-                  </CardContent>
                 </Card>
               </div>
             </div>
