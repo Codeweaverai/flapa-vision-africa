@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { BookOpen, Clock, Users, Star, Play } from 'lucide-react';
+import { BookOpen, Clock, Users, Star, Play, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import WishlistButton from '@/components/wishlist/WishlistButton';
@@ -84,12 +84,30 @@ const CoursesSection = () => {
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
 
+  const scrollLeft = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({
+        left: -320,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  const scrollRight = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({
+        left: 320,
+        behavior: 'smooth'
+      });
+    }
+  };
+
   if (loading) {
     return (
       <section className="py-16 bg-gradient-to-br from-purple-50 to-orange-50">
         <div className="container mx-auto px-4">
           <div className="text-left mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 bg-gradient-to-r from-purple-600 to-orange-500 bg-clip-text text-transparent">
+            <h2 className="text-2xl md:text-3xl font-bold mb-4 text-black">
               Featured Courses
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl">
@@ -100,7 +118,7 @@ const CoursesSection = () => {
             {[...Array(4)].map((_, index) => (
               <div key={index} className="animate-pulse">
                 <div className="bg-white rounded-2xl shadow-lg overflow-hidden h-96">
-                  <div className="bg-gray-300 h-40"></div>
+                  <div className="bg-gray-300 h-48"></div>
                   <div className="p-6 space-y-3">
                     <div className="h-4 bg-gray-300 rounded"></div>
                     <div className="h-4 bg-gray-300 rounded w-3/4"></div>
@@ -118,14 +136,36 @@ const CoursesSection = () => {
   return (
     <section className="py-16 bg-gradient-to-br from-purple-50 to-orange-50">
       <div className="container mx-auto px-4">
-        {/* Header - Left Aligned */}
-        <div className="text-left mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4 bg-gradient-to-r from-purple-600 to-orange-500 bg-clip-text text-transparent">
-            Featured Courses
-          </h2>
-          <p className="text-lg text-gray-600 max-w-2xl">
-            Discover high-quality courses designed to accelerate your learning journey
-          </p>
+        {/* Header with Navigation Arrows */}
+        <div className="flex items-end justify-between mb-12">
+          <div className="text-left">
+            <h2 className="text-2xl md:text-3xl font-bold mb-4 text-black">
+              Featured Courses
+            </h2>
+            <p className="text-lg text-gray-600 max-w-2xl">
+              Discover high-quality courses designed to accelerate your learning journey
+            </p>
+          </div>
+          
+          {/* Navigation Arrows */}
+          <div className="flex items-center space-x-3">
+            <Button
+              onClick={scrollLeft}
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 rounded-full border-gray-300 hover:border-purple-400 hover:bg-purple-50 transition-all duration-300 shadow-sm"
+            >
+              <ChevronLeft className="h-5 w-5 text-gray-600 hover:text-purple-600" />
+            </Button>
+            <Button
+              onClick={scrollRight}
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 rounded-full border-gray-300 hover:border-orange-400 hover:bg-orange-50 transition-all duration-300 shadow-sm"
+            >
+              <ChevronRight className="h-5 w-5 text-gray-600 hover:text-orange-600" />
+            </Button>
+          </div>
         </div>
 
         {/* Horizontal Scrolling Container */}
@@ -144,8 +184,8 @@ const CoursesSection = () => {
                 className="flex-none w-80 snap-start" // 320px width for 4 cards in a row
               >
                 <Card className="group hover:shadow-2xl transition-all duration-500 bg-white/90 backdrop-blur-sm border-purple-100 hover:border-purple-300 overflow-hidden h-96 flex flex-col">
-                  {/* Course Thumbnail with Video Icon */}
-                  <div className="relative h-40 overflow-hidden bg-gradient-to-br from-purple-400 to-orange-400">
+                  {/* Course Thumbnail with Video Icon - Increased Height */}
+                  <div className="relative h-48 overflow-hidden bg-gradient-to-br from-purple-400 to-orange-400">
                     {course.thumbnail_url ? (
                       <img 
                         src={course.thumbnail_url} 
@@ -154,14 +194,14 @@ const CoursesSection = () => {
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-purple-400 to-orange-400 flex items-center justify-center">
-                        <BookOpen className="h-10 w-10 text-white opacity-90" />
+                        <BookOpen className="h-12 w-12 text-white opacity-90" />
                       </div>
                     )}
                     
                     {/* Animated Orange Video Icon - Always Visible */}
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div className="bg-orange-500/90 rounded-full p-3 shadow-lg animate-pulse-slow">
-                        <Play className="h-5 w-5 text-white fill-current" />
+                        <Play className="h-6 w-6 text-white fill-current" />
                       </div>
                     </div>
 
@@ -171,7 +211,7 @@ const CoursesSection = () => {
                       className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-all duration-300"
                     >
                       <div className="bg-white rounded-full p-3 transform scale-110 group-hover:scale-100 transition-transform duration-300 shadow-xl">
-                        <Play className="h-6 w-6 text-orange-600 fill-current" />
+                        <Play className="h-7 w-7 text-orange-600 fill-current" />
                       </div>
                     </Link>
 
