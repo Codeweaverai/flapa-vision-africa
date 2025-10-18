@@ -185,7 +185,7 @@ const CoursesSection = () => {
               >
                 <Card className="group hover:shadow-2xl transition-all duration-500 bg-white/90 backdrop-blur-sm border-purple-100 hover:border-purple-300 overflow-hidden h-96 flex flex-col">
                   {/* Course Thumbnail with Video Icon - Increased Height */}
-                  <div className="relative h-60 overflow-hidden bg-gradient-to-br from-purple-400 to-orange-400">
+                  <div className="relative h-70 overflow-hidden bg-gradient-to-br from-purple-400 to-orange-400">
                     {course.thumbnail_url ? (
                       <img 
                         src={course.thumbnail_url} 
