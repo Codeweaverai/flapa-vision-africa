@@ -14,6 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { LayoutDashboard, ChevronRight, User, UserPlus, Settings, ExternalLink, BookOpen, Mail, Shield, Clock, Star, Users, Award, Globe, CreditCard, FileText, Gift, MessageSquare, Calendar, ShoppingCart } from 'lucide-react';
 import ProfilePictureUpload from '@/components/user/ProfilePictureUpload';
+import CurrencySwitcher from '@/components/currency/CurrencySwitcher';
+import { useCurrency } from '@/contexts/CurrencyContext';
+import { SUPPORTED_CURRENCIES, CurrencyCode } from '@/constants/currencies';
 
 interface ProfileData {
   id: string;
@@ -113,20 +116,6 @@ const LANGUAGES = [
   { code: 'ar', name: 'Arabic', nativeName: 'العربية' },
 ];
 
-// Currency options
-const CURRENCIES = [
-  { code: 'USD', name: 'US Dollar', symbol: '$' },
-  { code: 'EUR', name: 'Euro', symbol: '€' },
-  { code: 'GBP', name: 'British Pound', symbol: '£' },
-  { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
-  { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$' },
-  { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
-  { code: 'CHF', name: 'Swiss Franc', symbol: 'CHF' },
-  { code: 'CNY', name: 'Chinese Yuan', symbol: '¥' },
-  { code: 'INR', name: 'Indian Rupee', symbol: '₹' },
-  { code: 'BRL', name: 'Brazilian Real', symbol: 'R$' },
-];
-
 // Quick Links data
 const QUICK_LINKS = [
   { href: '/my-orders', label: 'My Orders', icon: ShoppingCart, color: 'text-blue-500' },
@@ -139,6 +128,7 @@ const QUICK_LINKS = [
 
 const AccountPage = () => {
   const { user } = useAuth();
+  const { currentCurrency, formatPrice } = useCurrency();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -373,17 +363,6 @@ const AccountPage = () => {
         });
 
       if (languageError) throw languageError;
-
-      // Update currency preference
-      const { error: currencyError } = await supabase
-        .from('user_currency_preferences')
-        .upsert({
-          user_id: user.id,
-          default_currency: currencyPreference.default_currency,
-          updated_at: new Date().toISOString()
-        });
-
-      if (currencyError) throw currencyError;
 
       toast.success('Preferences updated successfully');
     } catch (error) {
@@ -778,32 +757,15 @@ const AccountPage = () => {
                       </p>
                     </div>
 
-                    {/* Currency Preference */}
+                    {/* Currency Preference - Now using CurrencySwitcher */}
                     <div className="space-y-3">
                       <Label htmlFor="currency" className="text-gray-700 font-medium flex items-center">
                         <CreditCard className="h-4 w-4 mr-2 text-purple-500" />
                         Preferred Currency
                       </Label>
-                      <Select
-                        value={currencyPreference.default_currency}
-                        onValueChange={(value) => setCurrencyPreference(prev => ({ ...prev, default_currency: value }))}
-                      >
-                        <SelectTrigger className="border-gray-200 shadow-sm focus:ring-2 focus:ring-orange-500/20">
-                          <SelectValue placeholder="Select currency" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CURRENCIES.map((currency) => (
-                            <SelectItem key={currency.code} value={currency.code}>
-                              <div className="flex items-center justify-between w-full">
-                                <span className="font-medium">{currency.code}</span>
-                                <span className="text-gray-500 text-sm">
-                                  {currency.symbol} - {currency.name}
-                                </span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="border border-gray-200 rounded-lg p-2 bg-white shadow-sm">
+                        <CurrencySwitcher />
+                      </div>
                       <p className="text-xs text-gray-500">
                         Prices will be displayed in your selected currency
                       </p>
@@ -821,9 +783,15 @@ const AccountPage = () => {
                         </div>
                         <div>
                           <span className="text-gray-600">Currency:</span>
-                          <div className="font-medium text-gray-800">
-                            {currencyPreference.default_currency}
+                          <div className="font-medium text-gray-800 flex items-center gap-2">
+                            <span>{SUPPORTED_CURRENCIES[currentCurrency as CurrencyCode]?.flag}</span>
+                            <span>{currentCurrency} - {SUPPORTED_CURRENCIES[currentCurrency as CurrencyCode]?.name}</span>
                           </div>
+                        </div>
+                      </div>
+                      <div className="mt-3 pt-3 border-t border-orange-200/30">
+                        <div className="text-xs text-gray-600">
+                          <strong>Example price:</strong> {formatPrice(49.99)}
                         </div>
                       </div>
                     </div>
@@ -841,7 +809,7 @@ const AccountPage = () => {
                           Saving Preferences...
                         </>
                       ) : (
-                        'Save Preferences'
+                        'Save Language Preference'
                       )}
                     </Button>
                   </CardFooter>
