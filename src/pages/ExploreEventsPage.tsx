@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Calendar, MapPin, DollarSign, Users, Star, Filter, Search, 
   ChevronDown, Heart, Zap, Music, Mic, Gamepad2, Utensils, 
   Camera, Mountain, Martini, Theater, GraduationCap, Ticket,
   Plane, Lightbulb, Microscope, Castle, Car, Beaker, Building2,
-  Dumbbell, Palmtree, BookOpen
+  Dumbbell, Palmtree, BookOpen, ChevronLeft, ChevronRight, Play
 } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -136,6 +136,12 @@ const ExploreEventsPage = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [sortBy, setSortBy] = useState('upcoming');
   const [displayCount, setDisplayCount] = useState(EVENTS_PER_PAGE);
+  const categoryScrollRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to top on component mount
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   useEffect(() => {
     fetchEvents();
@@ -294,6 +300,24 @@ const ExploreEventsPage = () => {
     }
   };
 
+  const scrollCategoryLeft = () => {
+    if (categoryScrollRef.current) {
+      categoryScrollRef.current.scrollBy({
+        left: -200,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  const scrollCategoryRight = () => {
+    if (categoryScrollRef.current) {
+      categoryScrollRef.current.scrollBy({
+        left: 200,
+        behavior: 'smooth'
+      });
+    }
+  };
+
   const renderStarRating = (rating: number) => {
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 >= 0.5;
@@ -353,29 +377,61 @@ const ExploreEventsPage = () => {
             </p>
           </div>
 
-          {/* Category Quick Filters */}
+          {/* Enhanced Category Quick Filters with Horizontal Scroll and Arrows */}
           <div className="mb-12">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-900">Browse Categories</h2>
-              <div className="text-sm text-gray-600">
-                {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''} found
+              <div className="flex items-center space-x-3">
+                <Button
+                  onClick={scrollCategoryLeft}
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10 rounded-full border-gray-300 hover:border-purple-400 hover:bg-purple-50 transition-all duration-300 shadow-sm"
+                >
+                  <ChevronLeft className="h-5 w-5 text-gray-600 hover:text-purple-600" />
+                </Button>
+                <Button
+                  onClick={scrollCategoryRight}
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10 rounded-full border-gray-300 hover:border-orange-400 hover:bg-orange-50 transition-all duration-300 shadow-sm"
+                >
+                  <ChevronRight className="h-5 w-5 text-gray-600 hover:text-orange-600" />
+                </Button>
               </div>
             </div>
-            <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
+            <div 
+              ref={categoryScrollRef}
+              className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory"
+              style={{
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none'
+              }}
+            >
               {EVENT_CATEGORIES.map((category) => {
                 const IconComponent = category.icon;
                 return (
                   <button
                     key={category.value}
                     onClick={() => setFilterType(category.value)}
-                    className={`flex items-center gap-2 px-4 py-3 rounded-xl font-medium transition-all duration-300 flex-shrink-0 ${
+                    className={`flex flex-col items-center gap-3 p-6 rounded-2xl font-medium transition-all duration-300 flex-shrink-0 w-40 snap-start ${
                       filterType === category.value
-                        ? `bg-gradient-to-r ${category.color} text-white shadow-lg transform scale-105`
-                        : 'bg-white/80 text-gray-700 hover:bg-white hover:shadow-md border border-gray-200/50'
+                        ? `bg-gradient-to-r ${category.color} text-white shadow-2xl transform scale-105`
+                        : 'bg-white/80 text-gray-700 hover:bg-white hover:shadow-xl border border-gray-200/50 hover:border-gray-300'
                     }`}
                   >
-                    <IconComponent className="h-4 w-4" />
-                    {category.label}
+                    <div className={`p-3 rounded-xl ${
+                      filterType === category.value 
+                        ? 'bg-white/20' 
+                        : 'bg-gray-100/80'
+                    }`}>
+                      <IconComponent className={`h-6 w-6 ${
+                        filterType === category.value ? 'text-white' : `text-${category.color.split('-')[1]}-500`
+                      }`} />
+                    </div>
+                    <span className="text-sm font-semibold text-center leading-tight">
+                      {category.label}
+                    </span>
                   </button>
                 );
               })}
@@ -470,8 +526,13 @@ const ExploreEventsPage = () => {
                             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                           />
                         ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-orange-200 via-purple-200 to-pink-300 flex items-center justify-center">
-                            <Calendar className="h-12 w-12 text-white drop-shadow-lg" />
+                          <div className="w-full h-full bg-gradient-to-br from-orange-200 via-purple-200 to-pink-300 flex items-center justify-center group-hover:from-orange-300 group-hover:to-purple-300 transition-all duration-500">
+                            {/* Animated Event Icon - Always Visible */}
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="bg-gradient-to-r from-orange-500 to-purple-600 rounded-full p-4 shadow-lg animate-pulse-slow">
+                                <Calendar className="h-8 w-8 text-white" />
+                              </div>
+                            </div>
                           </div>
                         )}
                         
@@ -609,6 +670,29 @@ const ExploreEventsPage = () => {
           )}
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes pulse-slow {
+          0%, 100% { opacity: 0.9; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.05); }
+        }
+        .animate-pulse-slow {
+          animation: pulse-slow 2s ease-in-out infinite;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .snap-x {
+          scroll-snap-type: x mandatory;
+        }
+        .snap-start {
+          scroll-snap-align: start;
+        }
+      `}</style>
     </Layout>
   );
 };
