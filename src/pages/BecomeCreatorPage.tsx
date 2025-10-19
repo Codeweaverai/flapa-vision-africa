@@ -13,7 +13,10 @@ import {
   TrendingUp,
   Globe,
   Shield,
-  Heart
+  Heart,
+  Bot,
+  Zap,
+  Clock
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import YouTubeModal from '@/components/video/YouTubeModal';
@@ -235,6 +238,199 @@ const BecomeCreatorPage = () => {
                   </CardContent>
                 </Card>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* AI Creator Tools Section */}
+        <section className="py-20 bg-gradient-to-br from-orange-50 to-purple-50">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-16">
+              <Badge className="mb-4 bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 px-6 py-2 text-lg">
+                <Sparkles className="h-4 w-4 mr-2" />
+                AI-Powered Creation
+              </Badge>
+              <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                Creator AI Tools
+              </h2>
+              <p className="text-xl text-gray-700 max-w-3xl mx-auto">
+                Supercharge your content creation with our multi-agentic AI systems that simplify 
+                event and course creation with just one click.
+              </p>
+            </div>
+
+            <div className="grid lg:grid-cols-2 gap-12 max-w-6xl mx-auto">
+              {/* AI Event Creator Card */}
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300 group overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-purple-600/5 group-hover:from-orange-500/10 group-hover:to-purple-600/10 transition-all duration-300"></div>
+                <CardHeader className="text-center pb-4 relative z-10">
+                  <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-4 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300">
+                    <Bot className="h-8 w-8" />
+                  </div>
+                  <CardTitle className="text-2xl mb-2">AI Event Creator</CardTitle>
+                  <CardDescription className="text-lg text-gray-600">
+                    Multi-agentic system that builds complete, production-ready events
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="relative z-10">
+                  <div className="space-y-4">
+                    <div className="flex items-start space-x-3">
+                      <div className="bg-green-100 p-1 rounded-full mt-1">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-800">Intelligent Agent Coordination</h4>
+                        <p className="text-gray-600 text-sm">Manager Agent coordinates specialized AI agents for optimal results</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start space-x-3">
+                      <div className="bg-green-100 p-1 rounded-full mt-1">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-800">Real Speaker Research</h4>
+                        <p className="text-gray-600 text-sm">Researches and profiles specific speakers based on your inputs</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start space-x-3">
+                      <div className="bg-green-100 p-1 rounded-full mt-1">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-800">Complete Event Structure</h4>
+                        <p className="text-gray-600 text-sm">Generates detailed agenda, tickets, and marketing materials</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start space-x-3">
+                      <div className="bg-green-100 p-1 rounded-full mt-1">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-800">Smart Pricing</h4>
+                        <p className="text-gray-600 text-sm">Automatically sets affordable ticket prices ($3-$40 range)</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 p-4 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg border border-orange-200">
+                    <h5 className="font-semibold text-gray-800 mb-2 flex items-center">
+                      <Zap className="h-4 w-4 mr-2 text-orange-500" />
+                      Productivity Boost
+                    </h5>
+                    <p className="text-sm text-gray-600">
+                      Save 10+ hours per event with automated research, planning, and content creation
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* AI Course Creator Card */}
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300 group overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-purple-600/5 group-hover:from-orange-500/10 group-hover:to-purple-600/10 transition-all duration-300"></div>
+                <CardHeader className="text-center pb-4 relative z-10">
+                  <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-4 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300">
+                    <BookOpen className="h-8 w-8" />
+                  </div>
+                  <CardTitle className="text-2xl mb-2">AI Course Creator</CardTitle>
+                  <CardDescription className="text-lg text-gray-600">
+                    Comprehensive course generation with quizzes, exams, and transcripts
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="relative z-10">
+                  <div className="space-y-4">
+                    <div className="flex items-start space-x-3">
+                      <div className="bg-green-100 p-1 rounded-full mt-1">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-800">Complete Content Generation</h4>
+                        <p className="text-gray-600 text-sm">Creates modules, lessons, video scripts, and assessments</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start space-x-3">
+                      <div className="bg-green-100 p-1 rounded-full mt-1">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-800">Automated Assessments</h4>
+                        <p className="text-gray-600 text-sm">Generates 3 quizzes per module + 15 final exam questions</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start space-x-3">
+                      <div className="bg-green-100 p-1 rounded-full mt-1">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-800">Video Transcripts</h4>
+                        <p className="text-gray-600 text-sm">Automatically creates detailed transcripts for all video content</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start space-x-3">
+                      <div className="bg-green-100 p-1 rounded-full mt-1">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-800">Optimized Structure</h4>
+                        <p className="text-gray-600 text-sm">Intelligently organizes content for maximum student engagement</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 p-4 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg border border-purple-200">
+                    <h5 className="font-semibold text-gray-800 mb-2 flex items-center">
+                      <Zap className="h-4 w-4 mr-2 text-purple-500" />
+                      Productivity Boost
+                    </h5>
+                    <p className="text-sm text-gray-600">
+                      Save 20+ hours per course with automated content creation and assessment generation
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* How AI Tools Work Section */}
+            <div className="mt-16 text-center">
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-8 max-w-4xl mx-auto border border-orange-200 shadow-lg">
+                <h3 className="text-2xl font-bold mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                  How Our AI Tools Boost Your Productivity
+                </h3>
+                <div className="grid md:grid-cols-3 gap-6">
+                  <div className="text-center">
+                    <div className="bg-gradient-to-r from-orange-500 to-purple-600 w-12 h-12 rounded-full flex items-center justify-center text-white mx-auto mb-4">
+                      <Clock className="h-6 w-6" />
+                    </div>
+                    <h4 className="font-semibold text-gray-800 mb-2">Save Time</h4>
+                    <p className="text-gray-600 text-sm">Reduce content creation time by 80% with automated generation</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="bg-gradient-to-r from-orange-500 to-purple-600 w-12 h-12 rounded-full flex items-center justify-center text-white mx-auto mb-4">
+                      <Sparkles className="h-6 w-6" />
+                    </div>
+                    <h4 className="font-semibold text-gray-800 mb-2">Enhance Quality</h4>
+                    <p className="text-gray-600 text-sm">Professional-grade content with consistent structure and depth</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="bg-gradient-to-r from-orange-500 to-purple-600 w-12 h-12 rounded-full flex items-center justify-center text-white mx-auto mb-4">
+                      <Users className="h-6 w-6" />
+                    </div>
+                    <h4 className="font-semibold text-gray-800 mb-2">Scale Faster</h4>
+                    <p className="text-gray-600 text-sm">Launch multiple courses and events simultaneously</p>
+                  </div>
+                </div>
+                
+                <div className="mt-8">
+                  <Button asChild className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-semibold px-8 py-3 rounded-xl shadow-lg">
+                    <Link to="/auth">Access AI Tools in Dashboard</Link>
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </section>
