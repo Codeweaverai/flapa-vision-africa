@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { LayoutDashboard, ChevronRight, User, UserPlus, Settings, ExternalLink, BookOpen, Mail, Shield, Clock, Star, Users, Award, Globe, CreditCard, FileText, Gift, MessageSquare, Calendar, ShoppingCart } from 'lucide-react';
+import { LayoutDashboard, ChevronRight, User, UserPlus, Settings, ExternalLink, Heart, BookOpen, Mail, Shield, Clock, Star, Users, Award, Globe, CreditCard, FileText, Gift, MessageSquare, Calendar, ShoppingCart } from 'lucide-react';
 import ProfilePictureUpload from '@/components/user/ProfilePictureUpload';
 import CurrencySwitcher from '@/components/currency/CurrencySwitcher';
 import { useCurrency } from '@/contexts/CurrencyContext';
@@ -119,7 +119,7 @@ const QUICK_LINKS = [
   { href: '/my-courses', label: 'My Courses', icon: BookOpen, color: 'text-orange-500' },
   { href: '/my-events', label: 'My Events', icon: Calendar, color: 'text-purple-500' },
   { href: '/community', label: 'Community', icon: Users, color: 'text-indigo-500' },
-  { href: '/gift-cards', label: 'Gift Cards', icon: Gift, color: 'text-pink-500' },
+  { href: '/wishlist', label: 'Wishlist', icon: Heart, color: 'text-pink-500' },
 ];
 
 const AccountPage = () => {
