@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, Clock, Users, Star, Play, BookOpen, Calendar, MapPin } from 'lucide-react';
+import { TrendingUp, Clock, Users, Star, Play, BookOpen, Calendar, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import PriceDisplay from '@/components/currency/PriceDisplay';
@@ -40,6 +40,7 @@ interface Event {
 const TrendingNowSection = () => {
   const [trendingContent, setTrendingContent] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchTrendingContent = async () => {
@@ -116,6 +117,9 @@ const TrendingNowSection = () => {
     fetchTrendingContent();
   }, []);
 
+  // Create infinite scroll effect by duplicating content
+  const duplicatedContent = [...trendingContent, ...trendingContent, ...trendingContent];
+
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
@@ -137,29 +141,60 @@ const TrendingNowSection = () => {
     });
   };
 
+  const scrollLeft = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({
+        left: -320,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  const scrollRight = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({
+        left: 320,
+        behavior: 'smooth'
+      });
+    }
+  };
+
   if (loading) {
     return (
       <section className="py-16 bg-gradient-to-br from-orange-50 to-purple-50">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <TrendingUp className="h-8 w-8 text-orange-500" />
-              <h2 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                Trending Now
-              </h2>
+          {/* Header with Navigation Arrows Skeleton */}
+          <div className="flex items-end justify-between mb-12">
+            <div className="text-center md:text-left">
+              <div className="flex items-center justify-center md:justify-start gap-2 mb-4">
+                <TrendingUp className="h-8 w-8 text-orange-500" />
+                <h2 className="text-2xl md:text-3xl font-bold text-black">
+                  Trending Now
+                </h2>
+              </div>
+              <p className="text-lg text-gray-600 max-w-2xl">
+                Discover the most popular courses and events that learners are choosing right now
+              </p>
             </div>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Discover the most popular courses and events that learners are choosing right now
-            </p>
+            <div className="hidden md:flex items-center space-x-3">
+              <div className="h-10 w-10 bg-gray-300 rounded-full animate-pulse"></div>
+              <div className="h-10 w-10 bg-gray-300 rounded-full animate-pulse"></div>
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {[...Array(10)].map((_, index) => (
-              <div key={index} className="animate-pulse">
-                <div className="bg-white rounded-xl shadow-lg overflow-hidden h-80">
-                  <div className="bg-gray-300 h-32"></div>
-                  <div className="p-4 space-y-2">
+
+          <div className="flex space-x-6 pb-6">
+            {[...Array(4)].map((_, index) => (
+              <div key={index} className="flex-none w-80 animate-pulse">
+                <div className="bg-white rounded-2xl shadow-lg overflow-hidden h-[420px]">
+                  <div className="bg-gray-300 h-56"></div>
+                  <div className="p-5 space-y-3">
                     <div className="h-4 bg-gray-300 rounded"></div>
                     <div className="h-4 bg-gray-300 rounded w-3/4"></div>
+                    <div className="h-4 bg-gray-300 rounded w-1/2"></div>
+                    <div className="flex justify-between mt-4">
+                      <div className="h-4 bg-gray-300 rounded w-20"></div>
+                      <div className="h-4 bg-gray-300 rounded w-16"></div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -173,170 +208,257 @@ const TrendingNowSection = () => {
   return (
     <section className="py-16 bg-gradient-to-br from-orange-50 to-purple-50">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <TrendingUp className="h-8 w-8 text-orange-500" />
-            <h2 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-              Trending Now
-            </h2>
+        {/* Header with Navigation Arrows */}
+        <div className="flex items-end justify-between mb-12">
+          <div className="text-center md:text-left">
+            <div className="flex items-center justify-center md:justify-start gap-2 mb-4">
+              <TrendingUp className="h-8 w-8 text-orange-500" />
+              <h2 className="text-2xl md:text-3xl font-bold text-black">
+                Trending Now
+              </h2>
+            </div>
+            <p className="text-lg text-gray-600 max-w-2xl">
+              Discover the most popular courses and events that learners are choosing right now
+            </p>
           </div>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Discover the most popular courses and events that learners are choosing right now
-          </p>
+          
+          {/* Navigation Arrows */}
+          <div className="hidden md:flex items-center space-x-3">
+            <Button
+              onClick={scrollLeft}
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 rounded-full border-gray-300 hover:border-purple-400 hover:bg-purple-50 transition-all duration-300 shadow-sm"
+            >
+              <ChevronLeft className="h-5 w-5 text-gray-600 hover:text-purple-600" />
+            </Button>
+            <Button
+              onClick={scrollRight}
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 rounded-full border-gray-300 hover:border-orange-400 hover:bg-orange-50 transition-all duration-300 shadow-sm"
+            >
+              <ChevronRight className="h-5 w-5 text-gray-600 hover:text-orange-600" />
+            </Button>
+          </div>
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-          {trendingContent.map((item, index) => (
-            <Card key={item.id} className="group hover:shadow-xl transition-all duration-300 bg-white/80 backdrop-blur-sm border-orange-200 hover:border-orange-300 overflow-hidden h-fit">
-              <div className="relative h-32 overflow-hidden">
-                {(item.type === 'course' ? item.thumbnail_url : item.image_url) ? (
-                  <img 
-                    src={item.type === 'course' ? item.thumbnail_url : item.image_url} 
-                    alt={item.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-orange-400 to-purple-400 flex items-center justify-center">
-                    {item.type === 'course' ? (
-                      <BookOpen className="h-8 w-8 text-white opacity-80" />
-                    ) : (
-                      <Calendar className="h-8 w-8 text-white opacity-80" />
-                    )}
-                  </div>
-                )}
-                
-                {/* Video Play Icon for courses */}
-                {item.type === 'course' && (
-                  <Link 
-                    to={`/learning/course-detail/${item.id}`}
-                    className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                  >
-                    <div className="bg-white/90 rounded-full p-2 hover:bg-white transition-colors">
-                      <Play className="h-4 w-4 text-orange-600" />
-                    </div>
-                  </Link>
-                )}
 
-                <div className="absolute top-2 left-2">
-                  <Badge 
-                    variant={item.type === 'course' ? 'default' : 'secondary'}
-                    className="bg-orange-100 text-orange-800 border-orange-200 text-xs"
-                  >
-                    {item.type === 'course' ? 'COURSE' : 'EVENT'}
-                  </Badge>
-                </div>
-                
-                {/* Wishlist Button for courses */}
-                {item.type === 'course' && (
-                  <div className="absolute top-2 right-2 z-10">
-                    <WishlistButton 
-                      itemId={item.id}
-                      itemType="course"
-                      variant="ghost"
-                      size="icon"
-                      className="bg-white/80 hover:bg-white rounded-full p-1 shadow-md hover:shadow-lg transition-all"
-                    />
-                  </div>
-                )}
-                
-                <div className="absolute bottom-2 right-2">
-                  <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50 text-xs">
-                    <TrendingUp className="h-3 w-3 mr-1" />
-                    #{index + 1}
-                  </Badge>
-                </div>
-              </div>
-              
-              <CardHeader className="pb-2 p-3">
-                <CardTitle className="text-sm group-hover:text-orange-600 transition-colors line-clamp-2 h-10">
-                  {item.title}
-                </CardTitle>
-                <CardDescription className="line-clamp-2 text-xs h-8">
-                  {item.type === 'course' ? item.summary : item.description}
-                </CardDescription>
-              </CardHeader>
-              
-              <CardContent className="pt-0 p-3">
-                {item.type === 'course' ? (
-                  <>
-                    <div className="flex items-center justify-between mb-2 text-xs">
-                      <div className="flex items-center text-gray-600">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {formatDuration(item.duration_minutes)}
+        {/* Horizontal Scrolling Container */}
+        <div className="relative">
+          <div 
+            ref={scrollContainerRef}
+            className="flex overflow-x-auto scrollbar-hide space-x-6 pb-6 snap-x snap-mandatory"
+            style={{
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none'
+            }}
+          >
+            {duplicatedContent.map((item, index) => (
+              <div 
+                key={`${item.id}-${index}`} 
+                className="flex-none w-80 snap-start"
+              >
+                <Card className="group hover:shadow-2xl transition-all duration-500 bg-white/90 backdrop-blur-sm border-purple-100 hover:border-purple-300 overflow-hidden h-[420px] flex flex-col">
+                  {/* Content Thumbnail with Icon */}
+                  <div className="relative h-56 overflow-hidden bg-gradient-to-br from-purple-400 to-orange-400">
+                    {(item.type === 'course' ? item.thumbnail_url : item.image_url) ? (
+                      <img 
+                        src={item.type === 'course' ? item.thumbnail_url : item.image_url} 
+                        alt={item.title}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-purple-400 to-orange-400 flex items-center justify-center">
+                        {item.type === 'course' ? (
+                          <BookOpen className="h-14 w-14 text-white opacity-90" />
+                        ) : (
+                          <Calendar className="h-14 w-14 text-white opacity-90" />
+                        )}
                       </div>
-                      <Badge variant="outline" className="border-purple-200 text-purple-600 text-xs">
-                        {item.difficulty_level}
+                    )}
+                    
+                    {/* Animated Orange Icon - Always Visible */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="bg-orange-500/90 rounded-full p-4 shadow-lg animate-pulse-slow">
+                        {item.type === 'course' ? (
+                          <Play className="h-6 w-6 text-white fill-current" />
+                        ) : (
+                          <Calendar className="h-6 w-6 text-white" />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Hover Overlay */}
+                    <Link 
+                      to={item.type === 'course' ? `/learning/course-detail/${item.id}` : `/event-detail/${item.id}`}
+                      className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-all duration-300"
+                    >
+                      <div className="bg-white rounded-full p-4 transform scale-110 group-hover:scale-100 transition-transform duration-300 shadow-xl">
+                        {item.type === 'course' ? (
+                          <Play className="h-7 w-7 text-orange-600 fill-current" />
+                        ) : (
+                          <Calendar className="h-7 w-7 text-orange-600" />
+                        )}
+                      </div>
+                    </Link>
+
+                    {/* Wishlist Button for courses */}
+                    {item.type === 'course' && (
+                      <div className="absolute top-3 right-3 z-20">
+                        <WishlistButton 
+                          itemId={item.id}
+                          itemType="course"
+                          variant="ghost"
+                          size="icon"
+                          className="bg-white/90 hover:bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
+                        />
+                      </div>
+                    )}
+
+                    {/* Type Badge */}
+                    <div className="absolute top-3 left-3">
+                      <Badge className="bg-white/95 text-purple-800 border-purple-200 text-xs font-medium backdrop-blur-sm">
+                        {item.type === 'course' ? 'COURSE' : 'EVENT'}
                       </Badge>
                     </div>
-                    <div className="flex items-center justify-between mb-3 text-xs">
-                      <div className="flex items-center text-gray-600">
-                        <Star className="h-3 w-3 mr-1 fill-yellow-400 text-yellow-400" />
-                        <span>{item.average_rating?.toFixed(1) || 0}</span>
-                        <span className="ml-1">({item.total_reviews || 0})</span>
-                      </div>
-                      <div className="flex items-center text-gray-600">
-                        <Users className="h-3 w-3 mr-1" />
-                        <span>{item.total_students || 0}</span>
-                      </div>
+
+                    {/* Trending Badge */}
+                    <div className="absolute bottom-3 right-3">
+                      <Badge className="bg-gradient-to-r from-green-500 to-emerald-600 text-white border-0 text-xs font-bold shadow-lg">
+                        <TrendingUp className="h-3 w-3 mr-1" />
+                        #{index + 1}
+                      </Badge>
                     </div>
-                    <Link to={`/learning/course-detail/${item.id}`}>
-                      <Button className="w-full bg-gradient-to-r from-orange-600 to-purple-600 hover:from-orange-700 hover:to-purple-700 text-white border-0 text-xs py-1 h-8">
-                        View Course
-                      </Button>
-                    </Link>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between mb-2 text-xs">
-                      <div className="flex items-center text-gray-600">
-                        <Calendar className="h-3 w-3 mr-1" />
-                        {formatDate(item.start_time)}
-                      </div>
-                      <div className="flex items-center text-gray-600">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {formatTime(item.start_time)}
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between mb-3 text-xs">
-                      <div className="flex items-center text-gray-600">
-                        <Users className="h-3 w-3 mr-1" />
-                        <span>{item.total_attendees || 0} attending</span>
-                      </div>
-                      {item.price > 0 && !item.is_free && (
-                        <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-xs">
+
+                    {/* Price/Free Badge */}
+                    <div className="absolute bottom-3 left-3">
+                      {item.is_free ? (
+                        <Badge className="bg-green-500 text-white border-0 text-xs font-bold shadow-lg">
+                          Free
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-blue-500 text-white border-0 text-xs font-bold shadow-lg">
                           <PriceDisplay amount={item.price} originalCurrency="USD" />
                         </Badge>
                       )}
-                      {item.is_free && (
-                        <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">
-                          Free
-                        </Badge>
+                    </div>
+                  </div>
+                  
+                  {/* Content Details */}
+                  <div className="flex-1 p-5 flex flex-col">
+                    <CardHeader className="p-0 pb-3">
+                      <CardTitle className="text-base font-bold group-hover:text-purple-600 transition-colors duration-300 line-clamp-2 leading-tight">
+                        {item.title}
+                      </CardTitle>
+                      <CardDescription className="line-clamp-2 text-sm mt-2 text-gray-600 leading-relaxed">
+                        {item.type === 'course' ? item.summary : item.description}
+                      </CardDescription>
+                    </CardHeader>
+                    
+                    <CardContent className="p-0 mt-auto space-y-3">
+                      {/* Course Specific Details */}
+                      {item.type === 'course' ? (
+                        <>
+                          {/* Duration and Difficulty */}
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center text-gray-600 font-medium">
+                              <Clock className="h-4 w-4 mr-2 text-purple-500" />
+                              {formatDuration(item.duration_minutes)}
+                            </div>
+                            <Badge variant="outline" className="border-orange-300 text-orange-600 bg-orange-50 text-xs font-semibold">
+                              {item.difficulty_level}
+                            </Badge>
+                          </div>
+
+                          {/* Reviews and Students */}
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center text-gray-700 font-medium">
+                              <Star className="h-4 w-4 mr-1 fill-yellow-400 text-yellow-400" />
+                              <span>{item.average_rating?.toFixed(1) || 0}</span>
+                              <span className="ml-1 text-gray-500">({item.total_reviews || 0})</span>
+                            </div>
+                            <div className="flex items-center text-gray-700 font-medium">
+                              <Users className="h-4 w-4 mr-2 text-blue-500" />
+                              <span>{item.total_students || 0}</span>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {/* Event Date and Time */}
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center text-gray-600 font-medium">
+                              <Calendar className="h-4 w-4 mr-2 text-purple-500" />
+                              {formatDate(item.start_time)}
+                            </div>
+                            <div className="flex items-center text-gray-600 font-medium">
+                              <Clock className="h-4 w-4 mr-1 text-orange-500" />
+                              {formatTime(item.start_time)}
+                            </div>
+                          </div>
+
+                          {/* Location and Attendees */}
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center text-gray-700 font-medium">
+                              <MapPin className="h-4 w-4 mr-2 text-blue-500" />
+                              <span className="truncate max-w-[120px]">{item.location || 'Online'}</span>
+                            </div>
+                            <div className="flex items-center text-gray-700 font-medium">
+                              <Users className="h-4 w-4 mr-2 text-green-500" />
+                              <span>{item.total_attendees || 0}</span>
+                            </div>
+                          </div>
+                        </>
                       )}
-                    </div>
-                    <div className="flex items-center gap-1 text-xs text-gray-600 mb-3">
-                      <MapPin className="h-3 w-3" />
-                      <span className="truncate">{item.location || 'Online'}</span>
-                    </div>
-                    <Link to={`/event-detail/${item.id}`}>
-                      <Button className="w-full bg-gradient-to-r from-orange-600 to-purple-600 hover:from-orange-700 hover:to-purple-700 text-white border-0 text-xs py-1 h-8">
-                        View Event
-                      </Button>
-                    </Link>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                      
+                      {/* View Button */}
+                      <Link 
+                        to={item.type === 'course' ? `/learning/course-detail/${item.id}` : `/event-detail/${item.id}`} 
+                        className="block mt-3"
+                      >
+                        <Button className="w-full bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600 text-white border-0 text-sm font-semibold py-2 h-10 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5">
+                          {item.type === 'course' ? 'View Course' : 'View Event'}
+                        </Button>
+                      </Link>
+                    </CardContent>
+                  </div>
+                </Card>
+              </div>
+            ))}
+          </div>
         </div>
         
-        <div className="text-center">
+        <div className="text-center mt-8">
           <Link to="/trending">
-            <Button size="lg" variant="outline" className="border-orange-300 text-orange-600 hover:bg-orange-50">
+            <Button size="lg" className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 rounded-xl px-8">
               View All Trending
             </Button>
           </Link>
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes pulse-slow {
+          0%, 100% { opacity: 0.9; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.05); }
+        }
+        .animate-pulse-slow {
+          animation: pulse-slow 2s ease-in-out infinite;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .snap-x {
+          scroll-snap-type: x mandatory;
+        }
+        .snap-start {
+          scroll-snap-align: start;
+        }
+      `}</style>
     </section>
   );
 };
