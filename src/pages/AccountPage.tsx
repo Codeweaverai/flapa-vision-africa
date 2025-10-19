@@ -825,9 +825,7 @@ const AccountPage = () => {
                         </div>
                       </div>
                       <div className="mt-3 pt-3 border-t border-orange-200/30">
-                        <div className="text-xs text-gray-600">
-                          <strong>Example price:</strong> {formatPrice(49.99)}
-                        </div>
+            
                       </div>
                     </div>
                   </CardContent>
