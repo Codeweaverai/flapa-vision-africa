@@ -21,7 +21,6 @@ const Index = () => {
       <BrowseCategoriesSection />
       <CoursesSection />
       <CommunityAISection />
-      <LocalContentSection />
       <MediaSection />
       <LearningSection />
       <TrendingNowSection />
