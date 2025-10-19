@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +10,7 @@ import {
   BookOpen, Clock, Search, Filter, Star, Users, TrendingUp, Play, 
   Code, Smartphone, Database, Cloud, Shield, Gamepad2, Briefcase,
   GraduationCap, Mic, Video, Heart, Coffee, Users2, Home, Car,
-  Utensils, Palette, Music, Camera, Cpu, Globe, BarChart3
+  Utensils, Palette, Music, Camera, Cpu, Globe, BarChart3, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { VALID_CATEGORIES } from '@/services/courseService';
@@ -32,13 +32,9 @@ interface Course {
   difficulty_level: string;
   created_at: string;
   creator_id: string;
-  reviews: {
-    avg_rating: number;
-    total_reviews: number;
-    positive_percentage: number;
-  };
-  lessons_count: number;
-  students_count: number;
+  average_rating?: number;
+  total_reviews?: number;
+  total_students?: number;
 }
 
 // Course categories with icons matching the mobile app
@@ -123,6 +119,12 @@ const ExploreCoursesPage = () => {
   const [priceFilter, setPriceFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [hasMoreCourses, setHasMoreCourses] = useState(true);
+  const categoryScrollRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to top on component mount
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   useEffect(() => {
     loadCourses();
@@ -145,7 +147,11 @@ const ExploreCoursesPage = () => {
       
       const { data: coursesData, error: coursesError } = await supabase
         .from('courses')
-        .select('*')
+        .select(`
+          *,
+          course_reviews (rating),
+          course_enrollments (id)
+        `)
         .eq('is_published', true)
         .order('created_at', { ascending: false });
 
@@ -157,49 +163,23 @@ const ExploreCoursesPage = () => {
         return;
       }
 
-      const enhancedCourses = await Promise.all(
-        coursesData.map(async (course) => {
-          const { data: reviews } = await supabase
-            .from('course_reviews')
-            .select('rating')
-            .eq('course_id', course.id);
+      const enhancedCourses = coursesData.map(course => {
+        const reviews = course.course_reviews || [];
+        const enrollments = course.course_enrollments || [];
+        
+        const averageRating = reviews.length > 0 
+          ? reviews.reduce((sum: number, review: any) => sum + review.rating, 0) / reviews.length 
+          : 0;
 
-          const totalReviews = reviews?.length || 0;
-          const avgRating = totalReviews > 0 
-            ? reviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews 
-            : 0;
-          const positiveReviews = reviews?.filter(review => review.rating >= 4).length || 0;
-          const positivePercentage = totalReviews > 0 ? (positiveReviews / totalReviews) * 100 : 0;
-
-          const { data: modules } = await supabase
-            .from('course_modules')
-            .select('id, lessons:lessons(id)')
-            .eq('course_id', course.id);
-
-          const lessonsCount = modules?.reduce((total, module) => {
-            return total + (module.lessons?.length || 0);
-          }, 0) || 0;
-
-          const { data: enrollments } = await supabase
-            .from('course_enrollments')
-            .select('id')
-            .eq('course_id', course.id)
-            .eq('payment_status', 'completed');
-
-          const studentsCount = enrollments?.length || 0;
-
-          return {
-            ...course,
-            reviews: {
-              avg_rating: avgRating,
-              total_reviews: totalReviews,
-              positive_percentage: positivePercentage
-            },
-            lessons_count: lessonsCount,
-            students_count: studentsCount
-          };
-        })
-      );
+        return {
+          ...course,
+          average_rating: Math.round(averageRating * 10) / 10,
+          total_reviews: reviews.length,
+          total_students: enrollments.length,
+          course_reviews: undefined,
+          course_enrollments: undefined
+        };
+      });
 
       setCourses(enhancedCourses);
     } catch (error) {
@@ -319,6 +299,30 @@ const ExploreCoursesPage = () => {
     setLoadingMore(false);
   };
 
+  const scrollCategoryLeft = () => {
+    if (categoryScrollRef.current) {
+      categoryScrollRef.current.scrollBy({
+        left: -200,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  const scrollCategoryRight = () => {
+    if (categoryScrollRef.current) {
+      categoryScrollRef.current.scrollBy({
+        left: 200,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
       <Layout>
@@ -338,32 +342,61 @@ const ExploreCoursesPage = () => {
             </p>
           </div>
 
-          {/* Category Quick Filters */}
+          {/* Enhanced Category Quick Filters with Horizontal Scroll and Arrows */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-900">Browse Categories</h2>
-              <div className="text-sm text-gray-600">
-                {loading 
-                  ? 'Loading...' 
-                  : `${displayedCourses.length} course${displayedCourses.length !== 1 ? 's' : ''} found`
-                }
+              <div className="flex items-center space-x-3">
+                <Button
+                  onClick={scrollCategoryLeft}
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10 rounded-full border-gray-300 hover:border-purple-400 hover:bg-purple-50 transition-all duration-300 shadow-sm"
+                >
+                  <ChevronLeft className="h-5 w-5 text-gray-600 hover:text-purple-600" />
+                </Button>
+                <Button
+                  onClick={scrollCategoryRight}
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10 rounded-full border-gray-300 hover:border-orange-400 hover:bg-orange-50 transition-all duration-300 shadow-sm"
+                >
+                  <ChevronRight className="h-5 w-5 text-gray-600 hover:text-orange-600" />
+                </Button>
               </div>
             </div>
-            <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
+            <div 
+              ref={categoryScrollRef}
+              className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory"
+              style={{
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none'
+              }}
+            >
               {COURSE_CATEGORIES.map((category) => {
                 const IconComponent = category.icon;
                 return (
                   <button
                     key={category.value}
                     onClick={() => setSelectedCategory(category.value)}
-                    className={`flex items-center gap-2 px-4 py-3 rounded-xl font-medium transition-all duration-300 flex-shrink-0 ${
+                    className={`flex flex-col items-center gap-3 p-6 rounded-2xl font-medium transition-all duration-300 flex-shrink-0 w-40 snap-start ${
                       selectedCategory === category.value
-                        ? `bg-gradient-to-r ${category.color} text-white shadow-lg transform scale-105`
-                        : 'bg-white/80 text-gray-700 hover:bg-white hover:shadow-md border border-gray-200/50'
+                        ? `bg-gradient-to-r ${category.color} text-white shadow-2xl transform scale-105`
+                        : 'bg-white/80 text-gray-700 hover:bg-white hover:shadow-xl border border-gray-200/50 hover:border-gray-300'
                     }`}
                   >
-                    <IconComponent className="h-4 w-4" />
-                    {category.label}
+                    <div className={`p-3 rounded-xl ${
+                      selectedCategory === category.value 
+                        ? 'bg-white/20' 
+                        : 'bg-gray-100/80'
+                    }`}>
+                      <IconComponent className={`h-6 w-6 ${
+                        selectedCategory === category.value ? 'text-white' : `text-${category.color.split('-')[1]}-500`
+                      }`} />
+                    </div>
+                    <span className="text-sm font-semibold text-center leading-tight">
+                      {category.label}
+                    </span>
                   </button>
                 );
               })}
@@ -429,134 +462,115 @@ const ExploreCoursesPage = () => {
                 {displayedCourses.map((course) => (
                   <Card 
                     key={course.id} 
-                    className="bg-white/90 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden group hover:scale-105"
+                    className="group hover:shadow-2xl transition-all duration-500 bg-white/90 backdrop-blur-sm border-purple-100 hover:border-purple-300 overflow-hidden h-[420px] flex flex-col"
                   >
-                    <div className="relative">
+                    {/* Course Thumbnail with Video Icon */}
+                    <div className="relative h-56 overflow-hidden bg-gradient-to-br from-purple-400 to-orange-400">
                       {course.thumbnail_url ? (
-                        <img
-                          src={course.thumbnail_url}
+                        <img 
+                          src={course.thumbnail_url} 
                           alt={course.title}
-                          className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-500"
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                         />
                       ) : (
-                        <div className="w-full h-48 bg-gradient-to-r from-orange-200 to-purple-200 flex items-center justify-center group-hover:from-orange-300 group-hover:to-purple-300 transition-all duration-500">
-                          <BookOpen className="h-16 w-16 text-white/80" />
+                        <div className="w-full h-full bg-gradient-to-br from-purple-400 to-orange-400 flex items-center justify-center">
+                          <BookOpen className="h-14 w-14 text-white opacity-90" />
                         </div>
                       )}
                       
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                      
+                      {/* Animated Orange Video Icon - Always Visible */}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="bg-orange-500/90 rounded-full p-4 shadow-lg animate-pulse-slow">
+                          <Play className="h-6 w-6 text-white fill-current" />
+                        </div>
+                      </div>
+
+                      {/* Hover Overlay */}
+                      <Link 
+                        to={`/learning/course-detail/${course.id}`}
+                        className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-all duration-300"
+                      >
+                        <div className="bg-white rounded-full p-4 transform scale-110 group-hover:scale-100 transition-transform duration-300 shadow-xl">
+                          <Play className="h-7 w-7 text-orange-600 fill-current" />
+                        </div>
+                      </Link>
+
                       {/* Wishlist Button */}
-                      <div className="absolute top-3 left-3 z-10">
+                      <div className="absolute top-3 right-3 z-20">
                         <WishlistButton 
                           itemId={course.id}
                           itemType="course"
                           variant="ghost"
                           size="icon"
-                          className="bg-white/80 hover:bg-white rounded-full p-2 shadow-md hover:shadow-lg transition-all hover:scale-110"
+                          className="bg-white/90 hover:bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
                         />
                       </div>
-                      
-                      <div className="absolute top-3 right-3">
+
+                      {/* Category Badge */}
+                      <div className="absolute top-3 left-3">
+                        <Badge className="bg-white/95 text-purple-800 border-purple-200 text-xs font-medium backdrop-blur-sm">
+                          {course.category}
+                        </Badge>
+                      </div>
+
+                      {/* Price/Free Badge */}
+                      <div className="absolute bottom-3 right-3">
                         {course.is_free ? (
-                          <Badge className="bg-green-500 text-white border-0 shadow-lg">
+                          <Badge className="bg-green-500 text-white border-0 text-xs font-bold shadow-lg">
                             Free
                           </Badge>
                         ) : (
-                          course.price > 0 && (
-                            <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 shadow-lg">
-                              <PriceDisplay amount={course.price} originalCurrency="USD" />
-                            </Badge>
-                          )
+                          <Badge className="bg-blue-500 text-white border-0 text-xs font-bold shadow-lg">
+                            <PriceDisplay amount={course.price} originalCurrency="USD" />
+                          </Badge>
                         )}
                       </div>
-                      
-                      {course.category && (
-                        <div className="absolute bottom-3 left-3">
-                          <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm border-0">
-                            {course.category}
-                          </Badge>
-                        </div>
-                      )}
                     </div>
-
-                    <CardHeader className="pb-4">
-                      <div className="flex justify-between items-start mb-2">
-                        {course.difficulty_level && (
-                          <Badge variant="outline" className="border-purple-300 text-purple-600">
+                    
+                    {/* Course Content */}
+                    <div className="flex-1 p-5 flex flex-col">
+                      <CardHeader className="p-0 pb-3">
+                        <CardTitle className="text-base font-bold group-hover:text-purple-600 transition-colors duration-300 line-clamp-2 leading-tight">
+                          {course.title}
+                        </CardTitle>
+                        <CardDescription className="line-clamp-2 text-sm mt-2 text-gray-600 leading-relaxed">
+                          {course.summary}
+                        </CardDescription>
+                      </CardHeader>
+                      
+                      <CardContent className="p-0 mt-auto space-y-3">
+                        {/* Duration and Difficulty */}
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center text-gray-600 font-medium">
+                            <Clock className="h-4 w-4 mr-2 text-purple-500" />
+                            {formatDuration(course.duration_minutes)}
+                          </div>
+                          <Badge variant="outline" className="border-orange-300 text-orange-600 bg-orange-50 text-xs font-semibold">
                             {course.difficulty_level}
                           </Badge>
-                        )}
-                        {course.reviews?.avg_rating > 0 && (
-                          <div className="flex items-center gap-1 text-sm">
-                            <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                            <span className="font-medium">
-                              {course.reviews.avg_rating.toFixed(1)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <CardTitle className="line-clamp-2 text-lg group-hover:text-orange-600 transition-colors duration-300">
-                        {course.title}
-                      </CardTitle>
-                      
-                      {course.summary && (
-                        <p className="text-sm text-gray-600 line-clamp-3">
-                          {course.summary}
-                        </p>
-                      )}
-                    </CardHeader>
+                        </div>
 
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        {course.duration_minutes > 0 && (
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-orange-500" />
-                            <span className="text-gray-600">
-                              {Math.ceil(course.duration_minutes / 60)}h
-                            </span>
+                        {/* Reviews and Students */}
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center text-gray-700 font-medium">
+                            <Star className="h-4 w-4 mr-1 fill-yellow-400 text-yellow-400" />
+                            <span>{course.average_rating?.toFixed(1) || 0}</span>
+                            <span className="ml-1 text-gray-500">({course.total_reviews || 0})</span>
                           </div>
-                        )}
+                          <div className="flex items-center text-gray-700 font-medium">
+                            <Users className="h-4 w-4 mr-2 text-blue-500" />
+                            <span>{course.total_students || 0}</span>
+                          </div>
+                        </div>
                         
-                        {course.students_count > 0 && (
-                          <div className="flex items-center gap-2">
-                            <Users className="h-4 w-4 text-purple-500" />
-                            <span className="text-gray-600">
-                              {course.students_count} students
-                            </span>
-                          </div>
-                        )}
-                        
-                        {course.reviews?.positive_percentage > 0 && (
-                          <div className="flex items-center gap-2">
-                            <TrendingUp className="h-4 w-4 text-green-500" />
-                            <span className="text-gray-600">
-                              {Math.round(course.reviews.positive_percentage)}% positive
-                            </span>
-                          </div>
-                        )}
-                        
-                        {course.lessons_count > 0 && (
-                          <div className="flex items-center gap-2">
-                            <BookOpen className="h-4 w-4 text-blue-500" />
-                            <span className="text-gray-600">
-                              {course.lessons_count} lessons
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      <Button 
-                        asChild 
-                        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 group"
-                      >
-                        <Link to={`/learning/course-detail/${course.id}`} className="flex items-center justify-center">
-                          <Play className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform" />
-                          View Course
+                        {/* View Course Button */}
+                        <Link to={`/learning/course-detail/${course.id}`} className="block mt-3">
+                          <Button className="w-full bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600 text-white border-0 text-sm font-semibold py-2 h-10 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5">
+                            View Course
+                          </Button>
                         </Link>
-                      </Button>
-                    </CardContent>
+                      </CardContent>
+                    </div>
                   </Card>
                 ))}
               </div>
@@ -611,6 +625,29 @@ const ExploreCoursesPage = () => {
           )}
         </div>
       </Layout>
+
+      <style jsx>{`
+        @keyframes pulse-slow {
+          0%, 100% { opacity: 0.9; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.05); }
+        }
+        .animate-pulse-slow {
+          animation: pulse-slow 2s ease-in-out infinite;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .snap-x {
+          scroll-snap-type: x mandatory;
+        }
+        .snap-start {
+          scroll-snap-align: start;
+        }
+      `}</style>
     </div>
   );
 };
