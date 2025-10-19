@@ -117,7 +117,7 @@ interface CreatorProfile {
   total_reviews?: number;
 }
 
-// Skills You'll Gain Component for the new tab
+// Skills You'll Gain Component for the new tab - UPDATED COLORS
 const SkillsYouWillGain = ({ skills }: { skills: Course['course_skill_outcomes'] }) => {
   if (!skills || skills.length === 0) {
     return (
@@ -136,13 +136,13 @@ const SkillsYouWillGain = ({ skills }: { skills: Course['course_skill_outcomes']
   const getSkillLevelColor = (level: string) => {
     switch (level?.toLowerCase()) {
       case 'beginner':
-        return 'from-green-500 to-emerald-600';
+        return 'from-orange-500 to-purple-600'; // CHANGED from green to orange-purple
       case 'intermediate':
-        return 'from-blue-500 to-cyan-600';
+        return 'from-orange-500 to-purple-600'; // CHANGED from blue to orange-purple
       case 'advanced':
-        return 'from-purple-500 to-indigo-600';
+        return 'from-orange-500 to-purple-600'; // CHANGED from purple to orange-purple
       case 'expert':
-        return 'from-red-500 to-pink-600';
+        return 'from-orange-500 to-purple-600'; // CHANGED from red to orange-purple
       default:
         return 'from-orange-500 to-purple-600';
     }
@@ -187,7 +187,7 @@ const SkillsYouWillGain = ({ skills }: { skills: Course['course_skill_outcomes']
                         {skill.is_core_skill && (
                           <Badge 
                             variant="outline" 
-                            className="text-xs bg-yellow-50 text-yellow-700 border-yellow-200"
+                            className="text-xs bg-gradient-to-r from-orange-50 to-purple-50 text-orange-700 border-orange-200" // CHANGED from yellow to orange-purple
                           >
                             Core Skill
                           </Badge>
@@ -206,7 +206,7 @@ const SkillsYouWillGain = ({ skills }: { skills: Course['course_skill_outcomes']
             ))}
         </div>
         
-        {/* Skills Summary */}
+        {/* Skills Summary - UPDATED COLORS */}
         <div className="mt-6 p-4 bg-gradient-to-r from-orange-500 to-purple-600 rounded-xl text-white">
           <div className="flex items-center gap-3 mb-2">
             <Target className="h-5 w-5" />
@@ -922,7 +922,7 @@ const CourseDetailPage = () => {
                         {course.difficulty_level}
                       </Badge>
                       {course.certificate_enabled && (
-                        <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                        <Badge variant="outline" className="bg-gradient-to-r from-orange-50 to-purple-50 text-orange-700 border-orange-200"> {/* CHANGED from yellow to orange-purple */}
                           <Award className="w-3 h-3 mr-1" />
                           Certificate
                         </Badge>
@@ -1176,7 +1176,7 @@ const CourseDetailPage = () => {
                 </CardContent>
               </Card>
 
-              {/* Creator Card - IMPROVED DESIGN with ALWAYS VISIBLE student count */}
+              {/* Creator Card - FIXED: Always show student count regardless of login status */}
               {creatorProfile && (
                 <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
                   <CardContent className="p-6">
@@ -1195,7 +1195,7 @@ const CourseDetailPage = () => {
                       </div>
                     </div>
                     
-                    {/* Stats with Icons - ALWAYS VISIBLE */}
+                    {/* Stats with Icons - ALWAYS VISIBLE regardless of login status */}
                     <div className="grid grid-cols-3 gap-4 text-center mb-4">
                       <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-3 rounded-lg">
                         <div className="flex items-center justify-center gap-1 mb-1">
