@@ -23,7 +23,8 @@ import {
   BarChart3,
   GraduationCap,
   ThumbsUp,
-  Zap
+  Zap,
+  Target
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import CourseReviews from '@/components/course/CourseReviews';
@@ -116,91 +117,128 @@ interface CreatorProfile {
   total_reviews?: number;
 }
 
-// Skills to be Gained Component
-const SkillsToBeGained = ({ skills }: { skills: Course['course_skill_outcomes'] }) => {
+// Skills You'll Gain Component for the new tab
+const SkillsYouWillGain = ({ skills }: { skills: Course['course_skill_outcomes'] }) => {
   if (!skills || skills.length === 0) {
-    return null;
+    return (
+      <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+        <CardContent className="p-6">
+          <div className="text-center py-8">
+            <Target className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Skills You'll Gain</h3>
+            <p className="text-gray-600">No specific skills listed for this course.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   const getSkillLevelColor = (level: string) => {
     switch (level?.toLowerCase()) {
       case 'beginner':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'from-green-500 to-emerald-600';
       case 'intermediate':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
+        return 'from-blue-500 to-cyan-600';
       case 'advanced':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
+        return 'from-purple-500 to-indigo-600';
       case 'expert':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'from-red-500 to-pink-600';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'from-orange-500 to-purple-600';
     }
   };
 
   const getSkillLevelIcon = (level: string) => {
-    switch (level?.toLowerCase()) {
-      case 'beginner':
-        return <div className="w-2 h-2 rounded-full bg-green-500" />;
-      case 'intermediate':
-        return <div className="w-2 h-2 rounded-full bg-blue-500" />;
-      case 'advanced':
-        return <div className="w-2 h-2 rounded-full bg-purple-500" />;
-      case 'expert':
-        return <div className="w-2 h-2 rounded-full bg-red-500" />;
-      default:
-        return <div className="w-2 h-2 rounded-full bg-gray-500" />;
-    }
+    const gradientClass = getSkillLevelColor(level);
+    return (
+      <div className={`bg-gradient-to-r ${gradientClass} p-2 rounded-lg text-white`}>
+        <Zap className="h-4 w-4" />
+      </div>
+    );
   };
 
   return (
-    <div className="space-y-3">
-      <h4 className="font-semibold text-gray-900 text-sm mb-3">Skills You'll Gain</h4>
-      <div className="space-y-3">
-        {skills
-          .sort((a, b) => a.order_index - b.order_index)
-          .map((skill) => (
-            <div 
-              key={skill.id}
-              className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 p-3 transition-all duration-200 hover:shadow-md"
-            >
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Zap className="h-4 w-4 text-blue-600 flex-shrink-0" />
-                  <h5 className="font-medium text-gray-900 text-sm leading-tight">
-                    {skill.skill_name}
-                  </h5>
+    <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+      <CardContent className="p-6">
+        <h3 className="text-xl font-semibold mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+          Skills You'll Gain
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {skills
+            .sort((a, b) => a.order_index - b.order_index)
+            .map((skill) => (
+              <div 
+                key={skill.id}
+                className="bg-gradient-to-r from-orange-50 to-purple-50 rounded-xl border border-orange-200 p-4 transition-all duration-300 hover:shadow-lg hover:scale-105"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    {getSkillLevelIcon(skill.skill_level)}
+                    <div>
+                      <h5 className="font-semibold text-gray-900 text-base">
+                        {skill.skill_name}
+                      </h5>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge 
+                          className={`bg-gradient-to-r ${getSkillLevelColor(skill.skill_level)} text-white border-0 text-xs`}
+                        >
+                          {skill.skill_level || 'Intermediate'}
+                        </Badge>
+                        {skill.is_core_skill && (
+                          <Badge 
+                            variant="outline" 
+                            className="text-xs bg-yellow-50 text-yellow-700 border-yellow-200"
+                          >
+                            Core Skill
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                {skill.is_core_skill && (
-                  <Badge 
-                    variant="outline" 
-                    className="text-xs bg-yellow-50 text-yellow-700 border-yellow-200"
-                  >
-                    Core
-                  </Badge>
+                
+                {skill.skill_description && (
+                  <p className="text-gray-700 text-sm leading-relaxed">
+                    {skill.skill_description}
+                  </p>
                 )}
               </div>
-              
-              {skill.skill_description && (
-                <p className="text-gray-600 text-xs mb-2 leading-relaxed">
-                  {skill.skill_description}
-                </p>
-              )}
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {getSkillLevelIcon(skill.skill_level)}
-                  <Badge 
-                    variant="outline" 
-                    className={`text-xs ${getSkillLevelColor(skill.skill_level)}`}
-                  >
-                    {skill.skill_level || 'Intermediate'}
-                  </Badge>
-                </div>
-              </div>
+            ))}
+        </div>
+        
+        {/* Skills Summary */}
+        <div className="mt-6 p-4 bg-gradient-to-r from-orange-500 to-purple-600 rounded-xl text-white">
+          <div className="flex items-center gap-3 mb-2">
+            <Target className="h-5 w-5" />
+            <h4 className="font-semibold">Skills Summary</h4>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="text-center">
+              <div className="font-bold text-lg">{skills.length}</div>
+              <div className="text-orange-100">Total Skills</div>
             </div>
-          ))}
-      </div>
-    </div>
+            <div className="text-center">
+              <div className="font-bold text-lg">
+                {skills.filter(s => s.is_core_skill).length}
+              </div>
+              <div className="text-orange-100">Core Skills</div>
+            </div>
+            <div className="text-center">
+              <div className="font-bold text-lg">
+                {skills.filter(s => s.skill_level?.toLowerCase() === 'advanced' || s.skill_level?.toLowerCase() === 'expert').length}
+              </div>
+              <div className="text-orange-100">Advanced</div>
+            </div>
+            <div className="text-center">
+              <div className="font-bold text-lg">
+                {skills.filter(s => s.skill_level?.toLowerCase() === 'beginner' || s.skill_level?.toLowerCase() === 'intermediate').length}
+              </div>
+              <div className="text-orange-100">Beginner/Intermediate</div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
@@ -822,7 +860,7 @@ const CourseDetailPage = () => {
 
   // Gradient Icon Component
   const GradientIcon = ({ children }: { children: React.ReactNode }) => (
-    <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-1 rounded-lg text-white">
+    <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-2 rounded-lg text-white">
       {children}
     </div>
   );
@@ -968,7 +1006,7 @@ const CourseDetailPage = () => {
                 </CardContent>
               </Card>
 
-              {/* Course Tabs */}
+              {/* Course Tabs - UPDATED: Replaced Instructor with Skills You'll Gain */}
               <Tabs defaultValue="overview" className="space-y-6">
                 <TabsList className="grid w-full grid-cols-4 bg-white/80 backdrop-blur-sm border border-gray-200">
                   <TabsTrigger value="overview" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">
@@ -980,8 +1018,8 @@ const CourseDetailPage = () => {
                   <TabsTrigger value="reviews" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">
                     Reviews
                   </TabsTrigger>
-                  <TabsTrigger value="instructor" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">
-                    Instructor
+                  <TabsTrigger value="skills" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">
+                    Skills You'll Gain
                   </TabsTrigger>
                 </TabsList>
 
@@ -1029,9 +1067,14 @@ const CourseDetailPage = () => {
                           .sort((a, b) => a.order_index - b.order_index)
                           .map((module, moduleIndex) => (
                             <div key={module.id} className="border border-gray-200 rounded-lg p-4 bg-white/80 backdrop-blur-sm">
-                              <h4 className="font-semibold text-lg mb-2 text-gray-900">
-                                Module {moduleIndex + 1}: {module.title}
-                              </h4>
+                              <div className="flex items-center gap-3 mb-2">
+                                <GradientIcon>
+                                  <BookOpen className="w-4 h-4" />
+                                </GradientIcon>
+                                <h4 className="font-semibold text-lg text-gray-900">
+                                  Module {moduleIndex + 1}: {module.title}
+                                </h4>
+                              </div>
                               {module.description && (
                                 <p className="text-gray-600 text-sm mb-3">{module.description}</p>
                               )}
@@ -1040,7 +1083,9 @@ const CourseDetailPage = () => {
                                   .sort((a, b) => a.order_index - b.order_index)
                                   .map((lesson, lessonIndex) => (
                                     <div key={lesson.id} className="flex items-center gap-3 p-3 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 rounded-lg transition-all duration-200">
-                                      <Play className="w-4 h-4 text-blue-500" />
+                                      <GradientIcon>
+                                        <Play className="w-3 h-3" />
+                                      </GradientIcon>
                                       <span className="text-sm text-gray-700">
                                         {moduleIndex + 1}.{lessonIndex + 1} {lesson.title}
                                       </span>
@@ -1061,26 +1106,8 @@ const CourseDetailPage = () => {
                   <CourseReviews courseId={course.id} />
                 </TabsContent>
 
-                <TabsContent value="instructor">
-                  <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-                    <CardContent className="p-6">
-                      <div className="flex items-center gap-4 mb-6">
-                        <Avatar className="w-16 h-16 border-2 border-orange-300">
-                          <AvatarImage src={course.profiles?.avatar_url} />
-                          <AvatarFallback className="bg-gradient-to-r from-orange-500 to-purple-600 text-white text-lg">
-                            {course.profiles?.full_name?.charAt(0) || 'I'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <h3 className="text-xl font-semibold text-gray-900">{course.profiles?.full_name || 'Unknown Creator'}</h3>
-                          <p className="text-gray-600">Course Instructor</p>
-                        </div>
-                      </div>
-                      <div className="text-gray-700">
-                        <p>{course.profiles?.bio || 'Meet your instructor and learn more about their expertise and teaching style.'}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
+                <TabsContent value="skills">
+                  <SkillsYouWillGain skills={course.course_skill_outcomes} />
                 </TabsContent>
               </Tabs>
             </div>
@@ -1149,7 +1176,7 @@ const CourseDetailPage = () => {
                 </CardContent>
               </Card>
 
-              {/* Creator Card - IMPROVED DESIGN */}
+              {/* Creator Card - IMPROVED DESIGN with ALWAYS VISIBLE student count */}
               {creatorProfile && (
                 <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
                   <CardContent className="p-6">
@@ -1168,7 +1195,7 @@ const CourseDetailPage = () => {
                       </div>
                     </div>
                     
-                    {/* Stats with Icons */}
+                    {/* Stats with Icons - ALWAYS VISIBLE */}
                     <div className="grid grid-cols-3 gap-4 text-center mb-4">
                       <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-3 rounded-lg">
                         <div className="flex items-center justify-center gap-1 mb-1">
@@ -1255,13 +1282,6 @@ const CourseDetailPage = () => {
                   <div className="mt-6 pt-6 border-t border-gray-200">
                     <SocialShareIcons courseTitle={course.title} courseUrl={courseUrl} />
                   </div>
-
-                  {/* Skills to be Gained Section */}
-                  {course.course_skill_outcomes && course.course_skill_outcomes.length > 0 && (
-                    <div className="mt-6 pt-6 border-t border-gray-200">
-                      <SkillsToBeGained skills={course.course_skill_outcomes} />
-                    </div>
-                  )}
 
                   {/* FAQ Section */}
                   <div className="mt-6 pt-6 border-t border-gray-200">
