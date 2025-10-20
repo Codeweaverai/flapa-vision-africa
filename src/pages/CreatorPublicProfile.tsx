@@ -5,13 +5,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Star, BookOpen, Users, Award, Clock, Play, MessageCircle, Calendar, MapPin } from 'lucide-react';
+import { Star, BookOpen, Users, Award, Clock, Play, MessageCircle, Calendar, MapPin, TrendingUp, Eye } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserFollowButton } from '@/components/community/UserFollowButton';
 import { FollowersList } from '@/components/community/FollowersList';
 import { getFollowStats } from '@/services/communityFollowerService';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 interface CreatorProfile {
   id: string;
@@ -35,6 +36,9 @@ interface Course {
   is_free: boolean;
   duration_minutes: number;
   difficulty_level: string;
+  average_rating?: number;
+  total_reviews?: number;
+  total_students?: number;
 }
 
 interface Event {
@@ -48,6 +52,7 @@ interface Event {
   end_time: string;
   location: string;
   event_type: string;
+  total_attendees?: number;
 }
 
 const CreatorPublicProfile: React.FC = () => {
@@ -117,22 +122,55 @@ const CreatorPublicProfile: React.FC = () => {
         is_following: isFollowing
       });
 
-      // Fetch courses and events in parallel
-      const [coursesResult, eventsResult] = await Promise.all([
-        supabase
-          .from('courses')
-          .select('id, title, description, thumbnail_url, price, is_free, duration_minutes, difficulty_level')
-          .eq('creator_id', id)
-          .eq('is_published', true),
-        
-        supabase
-          .from('events')
-          .select('id, title, description, image_url, price, is_free, start_time, end_time, location, event_type')
-          .eq('creator_id', id)
-      ]);
+      // Fetch courses with reviews and enrollments
+      const { data: coursesData, error: coursesError } = await supabase
+        .from('courses')
+        .select(`
+          *,
+          course_reviews (rating),
+          course_enrollments (id)
+        `)
+        .eq('creator_id', id)
+        .eq('is_published', true);
 
-      setCourses(coursesResult.data || []);
-      setEvents(eventsResult.data || []);
+      if (!coursesError && coursesData) {
+        const coursesWithStats = coursesData.map(course => {
+          const reviews = course.course_reviews || [];
+          const enrollments = course.course_enrollments || [];
+          
+          const averageRating = reviews.length > 0 
+            ? reviews.reduce((sum: number, review: any) => sum + review.rating, 0) / reviews.length 
+            : 0;
+
+          return {
+            ...course,
+            average_rating: Math.round(averageRating * 10) / 10,
+            total_reviews: reviews.length,
+            total_students: enrollments.length,
+            course_reviews: undefined,
+            course_enrollments: undefined
+          };
+        });
+        setCourses(coursesWithStats);
+      }
+
+      // Fetch events with bookings
+      const { data: eventsData, error: eventsError } = await supabase
+        .from('events')
+        .select(`
+          *,
+          event_bookings (id)
+        `)
+        .eq('creator_id', id);
+
+      if (!eventsError && eventsData) {
+        const eventsWithStats = eventsData.map(event => ({
+          ...event,
+          total_attendees: (event.event_bookings || []).length,
+          event_bookings: undefined
+        }));
+        setEvents(eventsWithStats);
+      }
 
     } catch (error) {
       console.error('Error loading creator data:', error);
@@ -189,6 +227,12 @@ const CreatorPublicProfile: React.FC = () => {
     }
   };
 
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  };
+
   const formatEventDate = (dateString: string) => {
     try {
       return new Date(dateString).toLocaleDateString('en-US', {
@@ -203,23 +247,30 @@ const CreatorPublicProfile: React.FC = () => {
     }
   };
 
+  // Gradient Icon Component
+  const GradientIcon = ({ children }: { children: React.ReactNode }) => (
+    <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-2 rounded-lg text-white">
+      {children}
+    </div>
+  );
+
   if (loading) {
     return (
       <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-pink-100">
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
           <div className="container mx-auto px-4 py-8">
             <div className="animate-pulse space-y-6">
               <div className="flex items-center space-x-4 mb-8">
-                <div className="w-32 h-32 bg-gray-300 rounded-full"></div>
+                <div className="w-32 h-32 bg-gradient-to-r from-orange-200 to-purple-200 rounded-full"></div>
                 <div className="space-y-4 flex-1">
-                  <div className="h-8 bg-gray-300 rounded w-1/3"></div>
-                  <div className="h-4 bg-gray-300 rounded w-1/2"></div>
-                  <div className="h-4 bg-gray-300 rounded w-2/3"></div>
+                  <div className="h-8 bg-gradient-to-r from-orange-200 to-purple-200 rounded w-1/3"></div>
+                  <div className="h-4 bg-gradient-to-r from-orange-200 to-purple-200 rounded w-1/2"></div>
+                  <div className="h-4 bg-gradient-to-r from-orange-200 to-purple-200 rounded w-2/3"></div>
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-64 bg-gray-300 rounded"></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="h-80 bg-gradient-to-r from-orange-50 to-purple-50 rounded-2xl shadow-lg"></div>
                 ))}
               </div>
             </div>
@@ -232,12 +283,15 @@ const CreatorPublicProfile: React.FC = () => {
   if (error) {
     return (
       <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-pink-100 flex items-center justify-center">
-          <Card>
-            <CardContent className="p-6 text-center">
-              <h2 className="text-xl font-semibold mb-2">Creator Profile Error</h2>
-              <p className="text-muted-foreground mb-4">{error}</p>
-              <Button asChild>
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
+          <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-2xl">
+            <CardContent className="p-8 text-center">
+              <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full flex items-center justify-center">
+                <TrendingUp className="h-10 w-10 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Creator Profile Error</h2>
+              <p className="text-gray-600 mb-6">{error}</p>
+              <Button asChild className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white">
                 <Link to="/courses">Browse Courses</Link>
               </Button>
             </CardContent>
@@ -250,11 +304,14 @@ const CreatorPublicProfile: React.FC = () => {
   if (!creator) {
     return (
       <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-pink-100 flex items-center justify-center">
-          <Card>
-            <CardContent className="p-6 text-center">
-              <h2 className="text-xl font-semibold mb-2">Creator Not Found</h2>
-              <Button asChild>
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
+          <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-2xl">
+            <CardContent className="p-8 text-center">
+              <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full flex items-center justify-center">
+                <Eye className="h-10 w-10 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">Creator Not Found</h2>
+              <Button asChild className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white">
                 <Link to="/courses">Browse Courses</Link>
               </Button>
             </CardContent>
@@ -266,59 +323,77 @@ const CreatorPublicProfile: React.FC = () => {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-50 to-pink-100">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
         <div className="container mx-auto px-4 py-8">
-          {/* Creator Header */}
-          <Card className="mb-8 bg-white/80 backdrop-blur-sm shadow-xl border-0">
-            <CardContent className="p-8">
-              <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-                <Avatar className="w-32 h-32 border-4 border-white shadow-lg">
-                  <AvatarImage src={creator.avatar_url} alt={creator.full_name} />
-                  <AvatarFallback className="text-2xl bg-gradient-to-br from-orange-400 to-purple-600 text-white">
-                    {creator.full_name?.split(' ').map(n => n[0]).join('') || creator.username?.[0] || 'U'}
-                  </AvatarFallback>
-                </Avatar>
+          {/* Enhanced Creator Header */}
+          <Card className="mb-8 bg-white/90 backdrop-blur-sm shadow-2xl border-0 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-orange-500/5 to-purple-600/5"></div>
+            <CardContent className="p-8 relative">
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-8">
+                <div className="relative">
+                  <Avatar className="w-32 h-32 border-4 border-white shadow-2xl">
+                    <AvatarImage src={creator.avatar_url} alt={creator.full_name} />
+                    <AvatarFallback className="text-2xl bg-gradient-to-br from-orange-500 to-purple-600 text-white">
+                      {creator.full_name?.split(' ').map(n => n[0]).join('') || creator.username?.[0] || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  {creator.is_creator && (
+                    <div className="absolute -bottom-2 -right-2">
+                      <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-2 border-white shadow-lg">
+                        <Award className="w-3 h-3 mr-1" />
+                        Verified
+                      </Badge>
+                    </div>
+                  )}
+                </div>
                 
                 <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
+                  <div className="flex items-center gap-3 mb-3">
                     <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
                       {creator.full_name || creator.username}
                     </h1>
-                    {creator.is_creator && (
-                      <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
-                        <Award className="w-3 h-3 mr-1" />
-                        Verified Creator
-                      </Badge>
-                    )}
                   </div>
                   
-                  <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground mb-4">
-                    <div className="flex items-center gap-1">
-                      <BookOpen className="w-4 h-4 text-orange-500" />
-                      <span>{courses.length} Courses</span>
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div className="bg-gradient-to-r from-orange-50 to-purple-50 rounded-xl p-4 text-center border border-orange-200">
+                      <div className="flex items-center justify-center gap-2 mb-1">
+                        <BookOpen className="w-4 h-4 text-orange-600" />
+                        <span className="text-2xl font-bold text-gray-900">{courses.length}</span>
+                      </div>
+                      <p className="text-xs text-gray-600">Courses</p>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4 text-purple-500" />
-                      <span>{events.length} Events</span>
+                    <div className="bg-gradient-to-r from-orange-50 to-purple-50 rounded-xl p-4 text-center border border-purple-200">
+                      <div className="flex items-center justify-center gap-2 mb-1">
+                        <Calendar className="w-4 h-4 text-purple-600" />
+                        <span className="text-2xl font-bold text-gray-900">{events.length}</span>
+                      </div>
+                      <p className="text-xs text-gray-600">Events</p>
                     </div>
                     <button 
                       onClick={() => setShowFollowers({ userId: creatorId!, tab: 'followers' })}
-                      className="flex items-center gap-1 hover:text-blue-600 transition-colors"
+                      className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-4 text-center border border-blue-200 hover:shadow-lg transition-all duration-300"
                     >
-                      <Users className="w-4 h-4 text-blue-500" />
-                      <span>{creator.followers_count || 0} Followers</span>
+                      <div className="flex items-center justify-center gap-2 mb-1">
+                        <Users className="w-4 h-4 text-blue-600" />
+                        <span className="text-2xl font-bold text-gray-900">{creator.followers_count || 0}</span>
+                      </div>
+                      <p className="text-xs text-gray-600">Followers</p>
                     </button>
                     <button 
                       onClick={() => setShowFollowers({ userId: creatorId!, tab: 'following' })}
-                      className="flex items-center gap-1 hover:text-blue-600 transition-colors"
+                      className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 text-center border border-green-200 hover:shadow-lg transition-all duration-300"
                     >
-                      <Users className="w-4 h-4 text-green-500" />
-                      <span>{creator.following_count || 0} Following</span>
+                      <div className="flex items-center justify-center gap-2 mb-1">
+                        <Users className="w-4 h-4 text-green-600" />
+                        <span className="text-2xl font-bold text-gray-900">{creator.following_count || 0}</span>
+                      </div>
+                      <p className="text-xs text-gray-600">Following</p>
                     </button>
                   </div>
                   
                   {creator.bio && (
-                    <p className="text-muted-foreground leading-relaxed max-w-3xl mb-6">
+                    <p className="text-gray-700 leading-relaxed max-w-3xl mb-6 p-4 bg-gradient-to-r from-orange-50 to-purple-50 rounded-xl border border-orange-200">
                       {creator.bio}
                     </p>
                   )}
@@ -333,12 +408,13 @@ const CreatorPublicProfile: React.FC = () => {
                         showCount={true}
                         followersCount={creator.followers_count}
                         variant="default"
+                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl"
                       />
                       <Button 
                         onClick={handleSendMessage}
                         size="lg"
                         variant="outline"
-                        className="border-gray-300"
+                        className="border-orange-300 text-orange-600 hover:bg-orange-50 hover:border-orange-400 shadow-lg hover:shadow-xl"
                       >
                         <MessageCircle className="w-5 h-5 mr-2" />
                         Message
@@ -350,61 +426,113 @@ const CreatorPublicProfile: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Courses Section */}
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold mb-6 text-gray-800">Published Courses</h2>
+          {/* Enhanced Courses Section */}
+          <div className="mb-12">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-2 rounded-lg">
+                <BookOpen className="h-6 w-6 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800">Published Courses</h2>
+            </div>
             
             {courses.length === 0 ? (
-              <Card className="bg-white/80 backdrop-blur-sm">
-                <CardContent className="p-8 text-center">
-                  <BookOpen className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-xl font-semibold mb-2">No Courses Yet</h3>
-                  <p className="text-muted-foreground">This creator hasn't published any courses yet.</p>
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+                <CardContent className="p-12 text-center">
+                  <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full flex items-center justify-center">
+                    <BookOpen className="h-10 w-10 text-white" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2 text-gray-800">No Courses Yet</h3>
+                  <p className="text-gray-600">This creator hasn't published any courses yet.</p>
                 </CardContent>
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {courses.map((course) => (
-                  <Card key={course.id} className="group bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0">
-                    <div className="aspect-video bg-gradient-to-br from-orange-200 to-purple-200 rounded-t-lg overflow-hidden">
+                  <Card key={course.id} className="group bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border-0 overflow-hidden">
+                    <div className="relative h-48 bg-gradient-to-br from-orange-400 to-purple-400 overflow-hidden">
                       {course.thumbnail_url ? (
                         <img 
                           src={course.thumbnail_url} 
                           alt={course.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <BookOpen className="w-12 h-12 text-white/60" />
+                          <BookOpen className="w-12 h-12 text-white/80" />
                         </div>
                       )}
-                    </div>
-                    
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-semibold text-lg line-clamp-2 flex-1">
-                          {course.title}
-                        </h3>
-                        <Badge variant={course.is_free ? "secondary" : "default"} className="ml-2">
-                          {course.is_free ? 'Free' : `$${course.price}`}
-                        </Badge>
-                      </div>
                       
-                      <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                        {course.description}
-                      </p>
-                      
-                      <div className="flex items-center justify-between text-sm text-muted-foreground mb-4">
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
-                          <span>{Math.floor(course.duration_minutes / 60)}h {course.duration_minutes % 60}m</span>
+                      {/* Animated Play Icon */}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="bg-orange-500/90 rounded-full p-3 shadow-lg animate-pulse-slow">
+                          <Play className="h-5 w-5 text-white fill-current" />
                         </div>
-                        <Badge variant="outline" className="text-xs">
+                      </div>
+
+                      {/* Hover Overlay */}
+                      <Link 
+                        to={`/learning/course-detail/${course.id}`}
+                        className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-all duration-300"
+                      >
+                        <div className="bg-white rounded-full p-3 transform scale-110 group-hover:scale-100 transition-transform duration-300 shadow-xl">
+                          <Play className="h-6 w-6 text-orange-600 fill-current" />
+                        </div>
+                      </Link>
+
+                      {/* Price Badge */}
+                      <div className="absolute top-3 right-3">
+                        {course.is_free ? (
+                          <Badge className="bg-green-500 text-white border-0 shadow-lg">
+                            Free
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-blue-500 text-white border-0 shadow-lg">
+                            <PriceDisplay amount={course.price} originalCurrency="USD" />
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* Difficulty Badge */}
+                      <div className="absolute top-3 left-3">
+                        <Badge className="bg-white/95 text-purple-800 border-purple-200 backdrop-blur-sm">
                           {course.difficulty_level}
                         </Badge>
                       </div>
+                    </div>
+                    
+                    <CardContent className="p-5">
+                      <h3 className="font-bold text-lg mb-2 line-clamp-2 group-hover:text-purple-600 transition-colors duration-300">
+                        {course.title}
+                      </h3>
                       
-                      <Button className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700" asChild>
+                      <p className="text-sm text-gray-600 mb-4 line-clamp-2 leading-relaxed">
+                        {course.description}
+                      </p>
+                      
+                      {/* Course Stats */}
+                      <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-4 h-4 text-purple-500" />
+                          <span>{formatDuration(course.duration_minutes)}</span>
+                        </div>
+                        {course.average_rating && course.average_rating > 0 && (
+                          <div className="flex items-center gap-1">
+                            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                            <span>{course.average_rating.toFixed(1)}</span>
+                            <span className="text-gray-500">({course.total_reviews})</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Students Count */}
+                      {course.total_students && course.total_students > 0 && (
+                        <div className="flex items-center gap-1 text-sm text-gray-600 mb-4">
+                          <Users className="w-4 h-4 text-blue-500" />
+                          <span>{course.total_students} students</span>
+                        </div>
+                      )}
+                      
+                      <Button className="w-full bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300" asChild>
                         <Link to={`/learning/course-detail/${course.id}`}>
                           <Play className="h-4 w-4 mr-2" />
                           View Course
@@ -417,64 +545,110 @@ const CreatorPublicProfile: React.FC = () => {
             )}
           </div>
 
-          {/* Events Section */}
+          {/* Enhanced Events Section */}
           <div className="mb-8">
-            <h2 className="text-2xl font-bold mb-6 text-gray-800">Published Events</h2>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="bg-gradient-to-r from-purple-500 to-orange-600 p-2 rounded-lg">
+                <Calendar className="h-6 w-6 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800">Published Events</h2>
+            </div>
             
             {events.length === 0 ? (
-              <Card className="bg-white/80 backdrop-blur-sm">
-                <CardContent className="p-8 text-center">
-                  <Calendar className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-xl font-semibold mb-2">No Events Yet</h3>
-                  <p className="text-muted-foreground">This creator hasn't published any events yet.</p>
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+                <CardContent className="p-12 text-center">
+                  <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-r from-purple-500 to-orange-600 rounded-full flex items-center justify-center">
+                    <Calendar className="h-10 w-10 text-white" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2 text-gray-800">No Events Yet</h3>
+                  <p className="text-gray-600">This creator hasn't published any events yet.</p>
                 </CardContent>
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {events.map((event) => (
-                  <Card key={event.id} className="group bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0">
-                    <div className="aspect-video bg-gradient-to-br from-orange-200 to-purple-200 rounded-t-lg overflow-hidden">
+                  <Card key={event.id} className="group bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border-0 overflow-hidden">
+                    <div className="relative h-48 bg-gradient-to-br from-purple-400 to-orange-400 overflow-hidden">
                       {event.image_url ? (
                         <img 
                           src={event.image_url} 
                           alt={event.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <Calendar className="w-12 h-12 text-white/60" />
+                          <Calendar className="w-12 h-12 text-white/80" />
                         </div>
                       )}
-                    </div>
-                    
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-semibold text-lg line-clamp-2 flex-1">
-                          {event.title}
-                        </h3>
-                        <Badge variant={event.is_free ? "secondary" : "default"} className="ml-2">
-                          {event.is_free ? 'Free' : `$${event.price}`}
+                      
+                      {/* Animated Calendar Icon */}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="bg-orange-500/90 rounded-full p-3 shadow-lg animate-pulse-slow">
+                          <Calendar className="h-5 w-5 text-white" />
+                        </div>
+                      </div>
+
+                      {/* Hover Overlay */}
+                      <Link 
+                        to={`/events/${event.id}`}
+                        className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-all duration-300"
+                      >
+                        <div className="bg-white rounded-full p-3 transform scale-110 group-hover:scale-100 transition-transform duration-300 shadow-xl">
+                          <Calendar className="h-6 w-6 text-orange-600" />
+                        </div>
+                      </Link>
+
+                      {/* Price Badge */}
+                      <div className="absolute top-3 right-3">
+                        {event.is_free ? (
+                          <Badge className="bg-green-500 text-white border-0 shadow-lg">
+                            Free
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-blue-500 text-white border-0 shadow-lg">
+                            <PriceDisplay amount={event.price} originalCurrency="USD" />
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* Event Type Badge */}
+                      <div className="absolute top-3 left-3">
+                        <Badge className="bg-white/95 text-purple-800 border-purple-200 backdrop-blur-sm">
+                          {event.event_type}
                         </Badge>
                       </div>
+                    </div>
+                    
+                    <CardContent className="p-5">
+                      <h3 className="font-bold text-lg mb-2 line-clamp-2 group-hover:text-purple-600 transition-colors duration-300">
+                        {event.title}
+                      </h3>
                       
-                      <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                      <p className="text-sm text-gray-600 mb-4 line-clamp-2 leading-relaxed">
                         {event.description}
                       </p>
                       
-                      <div className="space-y-2 text-sm text-muted-foreground mb-4">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4 text-orange-500" />
+                      {/* Event Details */}
+                      <div className="space-y-2 text-sm text-gray-600 mb-4">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-purple-500" />
                           <span>{formatEventDate(event.start_time)}</span>
                         </div>
                         {event.location && (
-                          <div className="flex items-center gap-1">
-                            <MapPin className="w-4 h-4 text-purple-500" />
+                          <div className="flex items-center gap-2">
+                            <MapPin className="w-4 h-4 text-orange-500" />
                             <span className="line-clamp-1">{event.location}</span>
+                          </div>
+                        )}
+                        {event.total_attendees && event.total_attendees > 0 && (
+                          <div className="flex items-center gap-2">
+                            <Users className="w-4 h-4 text-blue-500" />
+                            <span>{event.total_attendees} attending</span>
                           </div>
                         )}
                       </div>
                       
-                      <Button className="w-full bg-gradient-to-r from-purple-500 to-orange-600 hover:from-purple-600 hover:to-orange-700" asChild>
+                      <Button className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300" asChild>
                         <Link to={`/events/${event.id}`}>
                           <Calendar className="h-4 w-4 mr-2" />
                           View Event
@@ -498,6 +672,16 @@ const CreatorPublicProfile: React.FC = () => {
           )}
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes pulse-slow {
+          0%, 100% { opacity: 0.9; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.05); }
+        }
+        .animate-pulse-slow {
+          animation: pulse-slow 2s ease-in-out infinite;
+        }
+      `}</style>
     </Layout>
   );
 };
