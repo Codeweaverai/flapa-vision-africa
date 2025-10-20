@@ -325,21 +325,20 @@ const CreatorPublicProfile: React.FC = () => {
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
         <div className="container mx-auto px-4 py-8">
-          {/* Enhanced Creator Header */}
-          <Card className="mb-8 bg-white/90 backdrop-blur-sm shadow-2xl border-0 overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-orange-500/5 to-purple-600/5"></div>
-            <CardContent className="p-8 relative">
+          {/* Enhanced Creator Header with Orange-Purple Gradient Background */}
+          <Card className="mb-8 bg-gradient-to-r from-orange-500 to-purple-600 shadow-2xl border-0 overflow-hidden">
+            <CardContent className="p-8 relative text-white">
               <div className="flex flex-col md:flex-row items-start md:items-center gap-8">
                 <div className="relative">
-                  <Avatar className="w-32 h-32 border-4 border-white shadow-2xl">
+                  <Avatar className="w-32 h-32 border-4 border-white/20 shadow-2xl">
                     <AvatarImage src={creator.avatar_url} alt={creator.full_name} />
-                    <AvatarFallback className="text-2xl bg-gradient-to-br from-orange-500 to-purple-600 text-white">
+                    <AvatarFallback className="text-2xl bg-white/20 text-white">
                       {creator.full_name?.split(' ').map(n => n[0]).join('') || creator.username?.[0] || 'U'}
                     </AvatarFallback>
                   </Avatar>
                   {creator.is_creator && (
                     <div className="absolute -bottom-2 -right-2">
-                      <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-2 border-white shadow-lg">
+                      <Badge className="bg-white/20 text-white border-2 border-white/30 backdrop-blur-sm shadow-lg">
                         <Award className="w-3 h-3 mr-1" />
                         Verified
                       </Badge>
@@ -349,51 +348,51 @@ const CreatorPublicProfile: React.FC = () => {
                 
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-3">
-                    <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    <h1 className="text-3xl font-bold text-white">
                       {creator.full_name || creator.username}
                     </h1>
                   </div>
                   
-                  {/* Stats Grid */}
+                  {/* Stats Grid with White Text */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div className="bg-gradient-to-r from-orange-50 to-purple-50 rounded-xl p-4 text-center border border-orange-200">
+                    <div className="bg-white/10 rounded-xl p-4 text-center border border-white/20 backdrop-blur-sm">
                       <div className="flex items-center justify-center gap-2 mb-1">
-                        <BookOpen className="w-4 h-4 text-orange-600" />
-                        <span className="text-2xl font-bold text-gray-900">{courses.length}</span>
+                        <BookOpen className="w-4 h-4 text-white" />
+                        <span className="text-2xl font-bold text-white">{courses.length}</span>
                       </div>
-                      <p className="text-xs text-gray-600">Courses</p>
+                      <p className="text-xs text-white/80">Courses</p>
                     </div>
-                    <div className="bg-gradient-to-r from-orange-50 to-purple-50 rounded-xl p-4 text-center border border-purple-200">
+                    <div className="bg-white/10 rounded-xl p-4 text-center border border-white/20 backdrop-blur-sm">
                       <div className="flex items-center justify-center gap-2 mb-1">
-                        <Calendar className="w-4 h-4 text-purple-600" />
-                        <span className="text-2xl font-bold text-gray-900">{events.length}</span>
+                        <Calendar className="w-4 h-4 text-white" />
+                        <span className="text-2xl font-bold text-white">{events.length}</span>
                       </div>
-                      <p className="text-xs text-gray-600">Events</p>
+                      <p className="text-xs text-white/80">Events</p>
                     </div>
                     <button 
                       onClick={() => setShowFollowers({ userId: creatorId!, tab: 'followers' })}
-                      className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-4 text-center border border-blue-200 hover:shadow-lg transition-all duration-300"
+                      className="bg-white/10 rounded-xl p-4 text-center border border-white/20 backdrop-blur-sm hover:bg-white/20 transition-all duration-300"
                     >
                       <div className="flex items-center justify-center gap-2 mb-1">
-                        <Users className="w-4 h-4 text-blue-600" />
-                        <span className="text-2xl font-bold text-gray-900">{creator.followers_count || 0}</span>
+                        <Users className="w-4 h-4 text-white" />
+                        <span className="text-2xl font-bold text-white">{creator.followers_count || 0}</span>
                       </div>
-                      <p className="text-xs text-gray-600">Followers</p>
+                      <p className="text-xs text-white/80">Followers</p>
                     </button>
                     <button 
                       onClick={() => setShowFollowers({ userId: creatorId!, tab: 'following' })}
-                      className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 text-center border border-green-200 hover:shadow-lg transition-all duration-300"
+                      className="bg-white/10 rounded-xl p-4 text-center border border-white/20 backdrop-blur-sm hover:bg-white/20 transition-all duration-300"
                     >
                       <div className="flex items-center justify-center gap-2 mb-1">
-                        <Users className="w-4 h-4 text-green-600" />
-                        <span className="text-2xl font-bold text-gray-900">{creator.following_count || 0}</span>
+                        <Users className="w-4 h-4 text-white" />
+                        <span className="text-2xl font-bold text-white">{creator.following_count || 0}</span>
                       </div>
-                      <p className="text-xs text-gray-600">Following</p>
+                      <p className="text-xs text-white/80">Following</p>
                     </button>
                   </div>
                   
                   {creator.bio && (
-                    <p className="text-gray-700 leading-relaxed max-w-3xl mb-6 p-4 bg-gradient-to-r from-orange-50 to-purple-50 rounded-xl border border-orange-200">
+                    <p className="text-white/90 leading-relaxed max-w-3xl mb-6 p-4 bg-white/10 rounded-xl border border-white/20 backdrop-blur-sm">
                       {creator.bio}
                     </p>
                   )}
@@ -408,13 +407,13 @@ const CreatorPublicProfile: React.FC = () => {
                         showCount={true}
                         followersCount={creator.followers_count}
                         variant="default"
-                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl"
+                        className="bg-white/20 hover:bg-white/30 text-white border-white/30 shadow-lg hover:shadow-xl backdrop-blur-sm"
                       />
                       <Button 
                         onClick={handleSendMessage}
                         size="lg"
                         variant="outline"
-                        className="border-orange-300 text-orange-600 hover:bg-orange-50 hover:border-orange-400 shadow-lg hover:shadow-xl"
+                        className="border-white/30 text-white hover:bg-white/20 hover:border-white/40 shadow-lg hover:shadow-xl backdrop-blur-sm"
                       >
                         <MessageCircle className="w-5 h-5 mr-2" />
                         Message
