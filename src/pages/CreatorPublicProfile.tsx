@@ -476,7 +476,7 @@ const CreatorPublicProfile: React.FC = () => {
                           size="lg"
                           className="bg-white/20 hover:bg-white/30 text-white border-white/30 shadow-lg hover:shadow-xl backdrop-blur-sm"
                         >
-                          <Link to="/auth/login">
+                          <Link to="/auth">
                             Follow
                           </Link>
                         </Button>
@@ -486,7 +486,7 @@ const CreatorPublicProfile: React.FC = () => {
                           
                           className="border-white/30 text-orange hover:bg-white/20 hover:border-white/40 shadow-lg hover:shadow-xl backdrop-blur-sm"
                         >
-                          <Link to="/auth/login">
+                          <Link to="/auth">
                             <MessageCircle className="w-5 h-5 mr-2" />
                             Message
                           </Link>
