@@ -100,19 +100,25 @@ const CreatorPublicProfile: React.FC = () => {
         return;
       }
 
-      // Get follow stats and status if user is logged in
+      // Get follow stats and status
       let followStats = { followers_count: 0, following_count: 0 };
       let isFollowing = false;
       
-      if (user) {
+      try {
         followStats = await getFollowStats(id);
-        const { data: followData } = await supabase
-          .from('community_followers')
-          .select('id')
-          .eq('follower_id', user.id)
-          .eq('following_id', id)
-          .single();
-        isFollowing = !!followData;
+        
+        if (user) {
+          const { data: followData } = await supabase
+            .from('community_followers')
+            .select('id')
+            .eq('follower_id', user.id)
+            .eq('following_id', id)
+            .single();
+          isFollowing = !!followData;
+        }
+      } catch (error) {
+        console.error('Error fetching follow stats:', error);
+        // Continue with default values if follow stats fail
       }
 
       setCreator({
@@ -182,15 +188,50 @@ const CreatorPublicProfile: React.FC = () => {
   };
 
   const handleSendMessage = async () => {
-    if (!user || !creatorId || !creator) {
+    if (!user) {
       toast.error('Please log in to send a message');
       return;
     }
 
+    if (!creatorId || !creator) {
+      toast.error('Creator information not available');
+      return;
+    }
+
     try {
-      const { error } = await supabase
+      // Check if conversation already exists
+      const { data: existingConversation } = await supabase
+        .from('inbox_conversations')
+        .select('id')
+        .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
+        .or(`user1_id.eq.${creatorId},user2_id.eq.${creatorId}`)
+        .single();
+
+      let conversationId;
+
+      if (existingConversation) {
+        conversationId = existingConversation.id;
+      } else {
+        // Create new conversation
+        const { data: newConversation, error: convError } = await supabase
+          .from('inbox_conversations')
+          .insert({
+            user1_id: user.id,
+            user2_id: creatorId,
+            last_message_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (convError) throw convError;
+        conversationId = newConversation.id;
+      }
+
+      // Send initial message
+      const { error: messageError } = await supabase
         .from('inbox_messages')
         .insert({
+          conversation_id: conversationId,
           sender_id: user.id,
           recipient_id: creatorId,
           subject: `Message to ${creator.full_name}`,
@@ -198,19 +239,21 @@ const CreatorPublicProfile: React.FC = () => {
           message_type: 'direct'
         });
 
-      if (error) throw error;
+      if (messageError) throw messageError;
 
+      // Create notification
       await supabase
         .from('notifications')
         .insert({
           user_id: creatorId,
           content: `You have a new message from ${user.user_metadata?.full_name || user.email}`,
           type: 'message',
-          related_id: creatorId
+          related_id: conversationId
         });
 
       toast.success('Message sent successfully!');
-      window.location.href = '/inbox';
+      // Redirect to inbox or conversation
+      window.location.href = `/inbox?conversation=${conversationId}`;
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Failed to send message');
@@ -222,8 +265,20 @@ const CreatorPublicProfile: React.FC = () => {
       setCreator(prev => prev ? {
         ...prev,
         is_following: isFollowing,
-        followers_count: (prev.followers_count || 0) + (isFollowing ? 1 : -1)
+        followers_count: Math.max(0, (prev.followers_count || 0) + (isFollowing ? 1 : -1))
       } : null);
+    }
+  };
+
+  const handleFollowersClick = () => {
+    if (creatorId) {
+      setShowFollowers({ userId: creatorId, tab: 'followers' });
+    }
+  };
+
+  const handleFollowingClick = () => {
+    if (creatorId) {
+      setShowFollowers({ userId: creatorId, tab: 'following' });
     }
   };
 
@@ -246,13 +301,6 @@ const CreatorPublicProfile: React.FC = () => {
       return 'Date TBD';
     }
   };
-
-  // Gradient Icon Component
-  const GradientIcon = ({ children }: { children: React.ReactNode }) => (
-    <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-2 rounded-lg text-white">
-      {children}
-    </div>
-  );
 
   if (loading) {
     return (
@@ -370,8 +418,8 @@ const CreatorPublicProfile: React.FC = () => {
                       <p className="text-xs text-white/80">Events</p>
                     </div>
                     <button 
-                      onClick={() => setShowFollowers({ userId: creatorId!, tab: 'followers' })}
-                      className="bg-white/10 rounded-xl p-4 text-center border border-white/20 backdrop-blur-sm hover:bg-white/20 transition-all duration-300"
+                      onClick={handleFollowersClick}
+                      className="bg-white/10 rounded-xl p-4 text-center border border-white/20 backdrop-blur-sm hover:bg-white/20 transition-all duration-300 cursor-pointer"
                     >
                       <div className="flex items-center justify-center gap-2 mb-1">
                         <Users className="w-4 h-4 text-white" />
@@ -380,8 +428,8 @@ const CreatorPublicProfile: React.FC = () => {
                       <p className="text-xs text-white/80">Followers</p>
                     </button>
                     <button 
-                      onClick={() => setShowFollowers({ userId: creatorId!, tab: 'following' })}
-                      className="bg-white/10 rounded-xl p-4 text-center border border-white/20 backdrop-blur-sm hover:bg-white/20 transition-all duration-300"
+                      onClick={handleFollowingClick}
+                      className="bg-white/10 rounded-xl p-4 text-center border border-white/20 backdrop-blur-sm hover:bg-white/20 transition-all duration-300 cursor-pointer"
                     >
                       <div className="flex items-center justify-center gap-2 mb-1">
                         <Users className="w-4 h-4 text-white" />
@@ -397,29 +445,56 @@ const CreatorPublicProfile: React.FC = () => {
                     </p>
                   )}
 
-                  {user && user.id !== creatorId && (
-                    <div className="flex gap-3">
-                      <UserFollowButton
-                        userId={creatorId!}
-                        isFollowing={creator.is_following || false}
-                        onFollowChange={handleFollowChange}
-                        size="lg"
-                        showCount={true}
-                        followersCount={creator.followers_count}
-                        variant="default"
-                        className="bg-white/20 hover:bg-white/30 text-white border-white/30 shadow-lg hover:shadow-xl backdrop-blur-sm"
-                      />
-                      <Button 
-                        onClick={handleSendMessage}
-                        size="lg"
-                        variant="outline"
-                        className="border-white/30 text-white hover:bg-white/20 hover:border-white/40 shadow-lg hover:shadow-xl backdrop-blur-sm"
-                      >
-                        <MessageCircle className="w-5 h-5 mr-2" />
-                        Message
-                      </Button>
-                    </div>
-                  )}
+                  {/* Action Buttons */}
+                  <div className="flex flex-wrap gap-3">
+                    {user && user.id !== creatorId && (
+                      <>
+                        <UserFollowButton
+                          userId={creatorId!}
+                          isFollowing={creator.is_following || false}
+                          onFollowChange={handleFollowChange}
+                          size="lg"
+                          showCount={false}
+                          followersCount={creator.followers_count}
+                          variant="default"
+                          className="bg-white/20 hover:bg-white/30 text-white border-white/30 shadow-lg hover:shadow-xl backdrop-blur-sm"
+                        />
+                        <Button 
+                          onClick={handleSendMessage}
+                          size="lg"
+                          variant="outline"
+                          className="border-white/30 text-white hover:bg-white/20 hover:border-white/40 shadow-lg hover:shadow-xl backdrop-blur-sm"
+                        >
+                          <MessageCircle className="w-5 h-5 mr-2" />
+                          Message
+                        </Button>
+                      </>
+                    )}
+                    {!user && (
+                      <div className="flex gap-3">
+                        <Button 
+                          asChild
+                          size="lg"
+                          className="bg-white/20 hover:bg-white/30 text-white border-white/30 shadow-lg hover:shadow-xl backdrop-blur-sm"
+                        >
+                          <Link to="/auth/login">
+                            Follow
+                          </Link>
+                        </Button>
+                        <Button 
+                          asChild
+                          size="lg"
+                          variant="outline"
+                          className="border-white/30 text-white hover:bg-white/20 hover:border-white/40 shadow-lg hover:shadow-xl backdrop-blur-sm"
+                        >
+                          <Link to="/auth/login">
+                            <MessageCircle className="w-5 h-5 mr-2" />
+                            Message
+                          </Link>
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </CardContent>
