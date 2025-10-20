@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Bot, Sparkles, Calendar, Clock, Users, Zap, CheckCircle, ArrowRight, Play, Star, MapPin, Ticket, Mic, Plus, X, User, Music, Camera } from 'lucide-react';
+import { Bot, Sparkles, Calendar, Clock, Users, Zap, CheckCircle, ArrowRight, Play, Star, MapPin, Ticket, Mic, Plus, X, User, Music, Camera, Image, Shield, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
@@ -267,6 +267,16 @@ Please generate a detailed event proposal with agenda, speaker profiles based on
       description: "Includes detailed event schedule and timing"
     },
     {
+      icon: <Shield className="h-5 w-5" />,
+      title: "Real Speaker Verification",
+      description: "Authentic speaker profiles with verification"
+    },
+    {
+      icon: <Image className="h-5 w-5" />,
+      title: "AI Image Generation",
+      description: "Automated event banners & speaker portraits"
+    },
+    {
       icon: <Mic className="h-5 w-5" />,
       title: "Specific Speaker Research",
       description: "Research real speakers based on your inputs"
@@ -320,9 +330,21 @@ Please generate a detailed event proposal with agenda, speaker profiles based on
     }
   };
 
+  const getAgentDisplayName = (agent: string) => {
+    const agentNames: { [key: string]: string } = {
+      manager: 'Manager Agent',
+      structure: 'Structure Agent',
+      agenda: 'Agenda Agent',
+      speaker: 'Speaker Agent',
+      ticket: 'Ticket Agent',
+      image: 'Image Agent'
+    };
+    return agentNames[agent] || agent;
+  };
+
   return (
     <CreatorLayout title="Create Event with AI">
-      <div className="max-w-4xl mx-auto space-y-8">
+      <div className="max-w-6xl mx-auto space-y-8">
         {/* Header */}
         <div className="text-center space-y-4">
           <div className="flex justify-center items-center space-x-3">
@@ -330,17 +352,18 @@ Please generate a detailed event proposal with agenda, speaker profiles based on
               <Bot className="h-8 w-8 text-white" />
             </div>
             <Sparkles className="h-8 w-8 text-orange-500" />
+            <Image className="h-8 w-8 text-purple-500" />
           </div>
           <h1 className={`text-4xl font-bold ${gradientTextClass}`}>
             AI Event Creator
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Let our AI Manager Agent create a complete, production-ready event for you
+            Create complete, production-ready events with real speaker verification and AI-generated visuals
           </p>
         </div>
 
         {/* Features Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {features.map((feature, index) => (
             <Card key={index} className="text-center border-0 shadow-lg bg-white/90 backdrop-blur-sm hover:shadow-xl transition-all duration-300">
               <CardContent className="pt-6">
@@ -469,7 +492,13 @@ Please generate a detailed event proposal with agenda, speaker profiles based on
               {/* Speakers/Performers Section */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label className="text-base font-semibold">Speakers & Performers *</Label>
+                  <div className="space-y-1">
+                    <Label className="text-base font-semibold">Speakers & Performers *</Label>
+                    <p className="text-sm text-gray-600 flex items-center">
+                      <Shield className="h-3 w-3 mr-1 text-green-500" />
+                      Real speaker verification enabled
+                    </p>
+                  </div>
                   <Button
                     type="button"
                     onClick={addSpeaker}
@@ -577,6 +606,38 @@ Please generate a detailed event proposal with agenda, speaker profiles based on
                 </div>
               </div>
 
+              {/* AI Features Notice */}
+              <div className="bg-gradient-to-r from-purple-50 to-orange-50 rounded-lg p-4 border border-purple-200">
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0">
+                    <div className={`rounded-full ${gradientClass} p-2 text-white`}>
+                      <Bot className="h-5 w-5" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-gray-800">AI-Powered Event Creation</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
+                      <div className="flex items-center space-x-2">
+                        <Shield className="h-4 w-4 text-green-500" />
+                        <span>Real speaker verification</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Image className="h-4 w-4 text-purple-500" />
+                        <span>AI-generated event banners</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Camera className="h-4 w-4 text-orange-500" />
+                        <span>Speaker portrait generation</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle className="h-4 w-4 text-blue-500" />
+                        <span>Anti-hallucination safeguards</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <Button
                 onClick={generateProposal}
                 disabled={loading || !eventData.title.trim() || !eventData.description.trim() || speakers.every(s => !s.name.trim())}
@@ -595,7 +656,7 @@ Please generate a detailed event proposal with agenda, speaker profiles based on
             <CardContent className="pt-12 pb-12">
               <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto mb-6"></div>
               <h3 className="text-xl font-semibold mb-2 text-gray-800">Generating Your Event Proposal</h3>
-              <p className="text-gray-600 mb-4">Our AI is crafting a comprehensive event structure...</p>
+              <p className="text-gray-600 mb-4">Our AI is crafting a comprehensive event structure with real speaker verification...</p>
               <div className="flex justify-center space-x-2">
                 <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>
                 <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -680,7 +741,7 @@ Please generate a detailed event proposal with agenda, speaker profiles based on
                 </div>
               )}
 
-              {/* AI Agent Features */}
+              {/* Enhanced AI Agent Features */}
               <div className="bg-gradient-to-r from-purple-50 to-orange-50 rounded-lg p-4 border border-purple-200">
                 <h4 className="font-semibold text-lg mb-3 flex items-center">
                   <Bot className="h-5 w-5 mr-2 text-purple-500" />
@@ -696,8 +757,16 @@ Please generate a detailed event proposal with agenda, speaker profiles based on
                     <span>Complete event agenda</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span>Specific speaker research</span>
+                    <Shield className="h-4 w-4 text-green-500" />
+                    <span>Real speaker verification</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Image className="h-4 w-4 text-purple-500" />
+                    <span>AI-generated event banners</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Camera className="h-4 w-4 text-orange-500" />
+                    <span>Speaker portrait generation</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <CheckCircle className="h-4 w-4 text-green-500" />
@@ -784,15 +853,55 @@ Please generate a detailed event proposal with agenda, speaker profiles based on
                   AI Agent Activity
                 </h5>
                 <div className="space-y-2 text-sm">
-                  {['manager', 'structure', 'agenda', 'speaker', 'ticket'].map((agent) => (
+                  {['manager', 'structure', 'agenda', 'speaker', 'ticket', 'image'].map((agent) => (
                     <div key={agent} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
                       <div className="flex items-center space-x-2">
                         <div className={`w-2 h-2 rounded-full ${getAgentStatusColor(getAgentStatus(agent))}`}></div>
-                        <span className="capitalize">{agent} Agent</span>
+                        <span className="capitalize">{getAgentDisplayName(agent)}</span>
                       </div>
-                      <span className="text-xs text-gray-500 capitalize">{getAgentStatus(agent)}</span>
+                      <div className="flex items-center space-x-2">
+                        {agent === 'speaker' && getAgentStatus(agent) === 'completed' && (
+                          <Shield className="h-3 w-3 text-green-500" />
+                        )}
+                        {agent === 'image' && getAgentStatus(agent) === 'completed' && (
+                          <Image className="h-3 w-3 text-purple-500" />
+                        )}
+                        <span className="text-xs text-gray-500 capitalize">{getAgentStatus(agent)}</span>
+                      </div>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {/* Enhanced Features Notice */}
+              <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4 border border-green-200">
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0">
+                    <div className="rounded-full bg-green-500 p-2 text-white">
+                      <Shield className="h-5 w-5" />
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-800 mb-2">Enhanced AI Features Active</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
+                      <div className="flex items-center space-x-2">
+                        <Shield className="h-4 w-4 text-green-500" />
+                        <span>Real speaker verification</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Image className="h-4 w-4 text-purple-500" />
+                        <span>AI-generated visuals</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <AlertCircle className="h-4 w-4 text-orange-500" />
+                        <span>Anti-hallucination safeguards</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle className="h-4 w-4 text-blue-500" />
+                        <span>Confidence scoring</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
