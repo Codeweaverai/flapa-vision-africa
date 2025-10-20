@@ -483,7 +483,7 @@ const CreatorPublicProfile: React.FC = () => {
                         <Button 
                           asChild
                           size="lg"
-                          variant="outline"
+                          
                           className="border-white/30 text-orange hover:bg-white/20 hover:border-white/40 shadow-lg hover:shadow-xl backdrop-blur-sm"
                         >
                           <Link to="/auth/login">
