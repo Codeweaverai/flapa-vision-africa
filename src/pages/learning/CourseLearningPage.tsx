@@ -15,7 +15,7 @@ import {
   MessageCircle, Target, CheckCircle, StickyNote,
   CheckCircle2, GraduationCap, Eye, FileText, ChevronUp, ChevronDown,
   Zap, Bookmark, Share, Download, Crown, Rocket, Trophy, Sparkles,
-  Menu, X, HelpCircle, AlertCircle
+  Menu, X, HelpCircle, AlertCircle, RotateCcw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import EnhancedCourseModuleList from '@/components/course/EnhancedCourseModuleList';
@@ -221,8 +221,13 @@ const CourseLearningPage = () => {
   const isCourseCompleted = progressPercentage === 100;
   const hasPassedExam = examResult?.passed;
   const isFirstExamAttempt = !examResult;
+  const maxExamAttempts = 5;
+  const hasExceededAttempts = examResult && examResult.attempts >= maxExamAttempts;
+  
+  // Updated logic for exam buttons
   const showTakeExamButton = isCourseCompleted && finalExam && isFirstExamAttempt;
-  const showRetakeExamButton = isCourseCompleted && finalExam && examResult && !hasPassedExam;
+  const showRetakeExamButton = isCourseCompleted && finalExam && examResult && !hasPassedExam && !hasExceededAttempts;
+  const showRestartCourseButton = isCourseCompleted && finalExam && examResult && !hasPassedExam && hasExceededAttempts;
   const showViewCertificateButton = isCourseCompleted && (!finalExam || hasPassedExam);
 
   const calculateCourseProgress = (completed: string[], total: number): number => {
@@ -289,6 +294,55 @@ const CourseLearningPage = () => {
       setExamResult(examResultData);
     } catch (error) {
       console.error('Error loading exam result:', error);
+    }
+  };
+
+  // Reset course progress
+  const resetCourseProgress = async () => {
+    if (!user || !courseId || !enrollment) return;
+
+    try {
+      // Delete all lesson progress
+      const { error: progressError } = await supabase
+        .from('lesson_progress')
+        .delete()
+        .eq('enrollment_id', enrollment.id);
+
+      if (progressError) throw progressError;
+
+      // Reset course progress
+      const { error: courseProgressError } = await supabase
+        .from('course_progress')
+        .upsert({
+          user_id: user.id,
+          course_id: courseId,
+          progress_percentage: 0,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,course_id'
+        });
+
+      if (courseProgressError) throw courseProgressError;
+
+      // Reset exam result attempts or delete
+      if (examResult) {
+        const { error: examError } = await supabase
+          .from('exam_results')
+          .delete()
+          .eq('id', examResult.id);
+
+        if (examError) throw examError;
+      }
+
+      // Reload data
+      setCompletedLessons([]);
+      setExamResult(null);
+      await syncCourseProgress();
+      
+      toast.success('Course progress reset successfully. Please review all materials before retaking the exam.');
+    } catch (error) {
+      console.error('Error resetting course progress:', error);
+      toast.error('Failed to reset course progress');
     }
   };
 
@@ -706,13 +760,13 @@ const CourseLearningPage = () => {
                   />
                 </Progress>
 
-                <div className="flex flex-wrap gap-3 mt-4">
+                <div className="flex flex-col gap-3 mt-4">
                   {isNotComplete && hasLessons && (
                     <Button
                       onClick={markAllLessonsComplete}
                       disabled={markingComplete}
                       size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-white"
+                      className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto"
                     >
                       {markingComplete ? (
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -727,7 +781,7 @@ const CourseLearningPage = () => {
                     <Button
                       onClick={handleTakeExam}
                       size="sm"
-                      className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
+                      className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white w-full sm:w-auto"
                     >
                       <GraduationCap className="h-4 w-4 mr-2" />
                       Take Final Exam
@@ -735,21 +789,50 @@ const CourseLearningPage = () => {
                   )}
 
                   {showRetakeExamButton && (
-                    <Button
-                      onClick={handleTakeExam}
-                      size="sm"
-                      className="bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 text-white"
-                    >
-                      <GraduationCap className="h-4 w-4 mr-2" />
-                      Retake Final Exam
-                    </Button>
+                    <div className="space-y-2">
+                      <Button
+                        onClick={handleTakeExam}
+                        size="sm"
+                        className="bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 text-white w-full sm:w-auto"
+                      >
+                        <GraduationCap className="h-4 w-4 mr-2" />
+                        Retake Final Exam (Attempt {examResult?.attempts || 1}/{maxExamAttempts})
+                      </Button>
+                      {examResult && (
+                        <p className="text-sm text-gray-600 text-center">
+                          Previous score: {examResult.score}% - {examResult.passed ? 'Passed' : 'Failed'}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {showRestartCourseButton && (
+                    <div className="space-y-2">
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                        <div className="flex items-center gap-2 text-yellow-800 mb-2">
+                          <AlertCircle className="h-4 w-4" />
+                          <span className="text-sm font-medium">Maximum exam attempts reached</span>
+                        </div>
+                        <p className="text-sm text-yellow-700 mb-3">
+                          You've used all {maxExamAttempts} attempts. Please review the course materials and restart the course to try again.
+                        </p>
+                        <Button
+                          onClick={resetCourseProgress}
+                          size="sm"
+                          className="bg-yellow-600 hover:bg-yellow-700 text-white w-full"
+                        >
+                          <RotateCcw className="h-4 w-4 mr-2" />
+                          Restart Course & Review Materials
+                        </Button>
+                      </div>
+                    </div>
                   )}
 
                   {showViewCertificateButton && (
                     <Button
                       onClick={navigateToCourseResults}
                       size="sm"
-                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                      className="bg-purple-600 hover:bg-purple-700 text-white w-full sm:w-auto"
                     >
                       <Trophy className="h-4 w-4 mr-2" />
                       View Certificate
@@ -810,13 +893,16 @@ const CourseLearningPage = () => {
                     completedLessons={completedLessons}
                     onQuizStart={handleQuizStart}
                     onFinalExamStart={() => setShowExamModal(true)}
+                    examResult={examResult}
+                    maxExamAttempts={maxExamAttempts}
+                    onRestartCourse={resetCourseProgress}
                   />
                 </CardContent>
               </Card>
             </div>
 
             {/* Main Content Area - Reduced Width to prevent overlay */}
-              <div className="xl:col-span-3 max-w-4xl xl:ml-auto">
+            <div className="xl:col-span-3 max-w-4xl xl:ml-auto">
               <Card className="shadow-xl border-0">
                 <CardContent className="p-0">
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -1175,6 +1261,15 @@ const CourseLearningPage = () => {
                     Retake Exam
                   </Button>
                 )}
+                {showRestartCourseButton && (
+                  <Button
+                    onClick={resetCourseProgress}
+                    className="flex-1 bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white shadow-lg"
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Restart Course
+                  </Button>
+                )}
                 {showViewCertificateButton && (
                   <Button
                     onClick={navigateToCourseResults}
@@ -1196,7 +1291,7 @@ const CourseLearningPage = () => {
                 <Button
                   onClick={handleResumeLearning}
                   className="flex-1 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg transition-all duration-200 hover:scale-105"
-                >
+                  >
                   <Play className="h-4 w-4 mr-2" />
                   Continue
                 </Button>
@@ -1215,6 +1310,7 @@ const CourseLearningPage = () => {
           enrollmentId={enrollment?.id || ''}
           onComplete={handleExamComplete}
           previousAttempt={examResult}
+          maxAttempts={maxExamAttempts}
         />
       )}
 
