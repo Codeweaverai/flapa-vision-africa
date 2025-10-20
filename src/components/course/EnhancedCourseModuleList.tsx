@@ -21,7 +21,9 @@ import {
   User,
   ChevronLeft,
   ChevronRight,
-  Trophy
+  Trophy,
+  RotateCcw,
+  AlertCircle
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
@@ -68,6 +70,16 @@ interface CreatorProfile {
   bio?: string;
 }
 
+interface ExamResult {
+  id: string;
+  enrollment_id: string;
+  exam_id: string;
+  score: number;
+  passed: boolean;
+  completed_at: string;
+  attempts: number;
+}
+
 interface EnhancedCourseModuleListProps {
   modules: Module[];
   courseId: string;
@@ -77,6 +89,9 @@ interface EnhancedCourseModuleListProps {
   completedLessons?: string[];
   onQuizStart?: (quizId: string, lessonId: string) => void;
   onFinalExamStart?: (examId: string) => void;
+  examResult?: ExamResult | null;
+  maxExamAttempts?: number;
+  onRestartCourse?: () => void;
 }
 
 const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
@@ -87,7 +102,10 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
   currentLessonId,
   completedLessons = [],
   onQuizStart,
-  onFinalExamStart
+  onFinalExamStart,
+  examResult,
+  maxExamAttempts = 5,
+  onRestartCourse
 }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -280,6 +298,12 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
     return completedLessons.includes(lessonId);
   };
 
+  // Exam logic
+  const hasPassedExam = examResult?.passed;
+  const hasExceededAttempts = examResult && examResult.attempts >= maxExamAttempts;
+  const showFinalExamButton = finalExam && courseProgress >= 80 && !hasPassedExam && !hasExceededAttempts;
+  const showRestartCourseButton = finalExam && courseProgress >= 80 && !hasPassedExam && hasExceededAttempts;
+
   return (
     <div className="space-y-4 w-full max-w-md mx-auto px-2 sm:px-0">
       {/* Course Progress */}
@@ -409,13 +433,13 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
         ))}
       </Accordion>
 
-      {/* Final Exam */}
-      {finalExam && courseProgress >= 80 && (
+      {/* Final Exam - Only show if not passed and not exceeded attempts */}
+      {showFinalExamButton && (
         <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-orange-200 rounded-lg p-3 sm:p-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2 sm:gap-3">
               <Award className="h-5 w-5 sm:h-6 sm:w-6 text-orange-600" />
-              <div>
+              <div className="flex-1">
                 <h4 className="text-sm sm:text-base font-semibold text-orange-800">{finalExam.title}</h4>
                 {finalExam.description && (
                   <p className="text-xs sm:text-sm text-orange-600 mt-1 line-clamp-2">{finalExam.description}</p>
@@ -428,24 +452,68 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
                     <Clock className="h-3 w-3 mr-1" />
                     {finalExam.time_limit_minutes} mins
                   </div>
+                  {examResult && (
+                    <Badge variant="outline" className="text-xs sm:text-sm text-orange-700 border-orange-300">
+                      Attempt {examResult.attempts}/{maxExamAttempts}
+                    </Badge>
+                  )}
                 </div>
+                {examResult && (
+                  <p className="text-xs text-orange-600 mt-1">
+                    Previous score: {examResult.score}%
+                  </p>
+                )}
               </div>
             </div>
             <Button 
-              className="w-full sm:w-auto mt-2 sm:mt-0 bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600"
+              className="w-full bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600"
               onClick={() => onFinalExamStart?.(finalExam.id)}
             >
               <Award className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-              Take Exam
+              {examResult ? 'Retake Exam' : 'Take Exam'}
             </Button>
           </div>
         </div>
       )}
 
-      {/* Course Results Button */}
-      {courseProgress === 100 && (
+      {/* Restart Course Button - Show when exceeded attempts */}
+      {showRestartCourseButton && (
+        <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-lg p-3 sm:p-4">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6 text-red-600" />
+              <div className="flex-1">
+                <h4 className="text-sm sm:text-base font-semibold text-red-800">Maximum Attempts Reached</h4>
+                <p className="text-xs sm:text-sm text-red-600 mt-1">
+                  You've used all {maxExamAttempts} exam attempts. Review the course materials and restart to try again.
+                </p>
+                {examResult && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-xs text-red-600">
+                      Last score: {examResult.score}% (Required: {finalExam?.passing_score}%)
+                    </p>
+                    <p className="text-xs text-red-600">
+                      Attempts: {examResult.attempts}/{maxExamAttempts}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+            <Button 
+              className="w-full bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600"
+              onClick={onRestartCourse}
+            >
+              <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              Restart Course & Review Materials
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Course Results Button - Only show if passed exam or no exam required */}
+      {courseProgress === 100 && (!finalExam || hasPassedExam) && (
         <div className="bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-200 rounded-lg p-3 sm:p-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2 sm:gap-3">
               <Trophy className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
               <div>
@@ -454,7 +522,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
               </div>
             </div>
             <Button 
-              className="w-full sm:w-auto mt-2 sm:mt-0 bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600"
+              className="w-full bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600"
               onClick={() => navigate(`/course/${courseId}/results`)}
             >
               <Trophy className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
@@ -467,8 +535,8 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
       {/* Creator Profile */}
       {creatorProfile && (
         <div className="bg-gradient-to-r from-orange-50 to-purple-50 border-2 border-orange-200 rounded-lg p-3 sm:p-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2 sm:gap-3 w-full">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <Avatar className="h-10 w-10 sm:h-12 sm:w-12">
                 <AvatarImage src={creatorProfile.avatar_url || undefined} />
                 <AvatarFallback>
@@ -486,7 +554,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
             <Button 
               variant="outline"
               size="sm"
-              className="w-full sm:w-auto mt-2 sm:mt-0 border-orange-300 text-orange-600 hover:bg-orange-100"
+              className="w-full border-orange-300 text-orange-600 hover:bg-orange-100"
               onClick={() => navigate(`/creator/profile/${creatorProfile.id}`)}
             >
               <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
