@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, DollarSign, CheckCircle, Smartphone, CreditCard } from 'lucide-react';
+import { AlertCircle, DollarSign, CheckCircle, Smartphone, CreditCard, ArrowRight } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -312,14 +312,17 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   if (checkingProfile) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Loading</DialogTitle>
-            <DialogDescription>Loading payout methods...</DialogDescription>
-          </DialogHeader>
-          <div className="flex items-center justify-center p-6">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            <span className="ml-2">Loading payout methods...</span>
+        <DialogContent className="sm:max-w-lg bg-gradient-to-br from-white to-slate-50 border-0 shadow-xl">
+          <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-1 rounded-t-lg">
+            <div className="bg-white rounded-t-lg p-6">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-purple-600">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-500"></div>
+                  Loading
+                </DialogTitle>
+                <DialogDescription>Loading payout methods...</DialogDescription>
+              </DialogHeader>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -328,100 +331,122 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
-            Withdraw Funds
-          </DialogTitle>
-          <DialogDescription>
-            Request a transfer from your available balance
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-lg bg-gradient-to-br from-white to-slate-50 border-0 shadow-xl p-0 overflow-hidden">
+        {/* Gradient Header */}
+        <div className="bg-gradient-to-r from-orange-500 via-purple-500 to-purple-600 p-1">
+          <div className="bg-white rounded-t-lg p-6">
+            <DialogHeader className="space-y-3">
+              <DialogTitle className="flex items-center gap-3 text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-purple-600">
+                <div className="p-2 rounded-lg bg-gradient-to-r from-orange-500 to-purple-600 text-white">
+                  <DollarSign className="h-5 w-5" />
+                </div>
+                Withdraw Funds
+              </DialogTitle>
+              <DialogDescription className="text-slate-600">
+                Request a transfer from your available balance
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+        </div>
 
-        <div className="space-y-4">
-          <div className="bg-slate-50 p-4 rounded-lg">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm text-muted-foreground">Available Balance</span>
-              <Badge variant="outline" className="bg-green-50 text-green-700">
-                {selectedPayoutMethod === 'stripe' ? 
-                  formatPrice(convertedBalance, currentCurrency) :
-                  formatPrice(convertedBalance, localCurrency)
-                }
+        <div className="p-6 space-y-6">
+          {/* Balance Card */}
+          <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-xl border border-orange-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-sm font-medium text-slate-600">Available Balance</span>
+                <div className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent mt-1">
+                  {selectedPayoutMethod === 'stripe' ? 
+                    formatPrice(convertedBalance, currentCurrency) :
+                    formatPrice(convertedBalance, localCurrency)
+                  }
+                </div>
+              </div>
+              <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 px-3 py-1">
+                Available
               </Badge>
             </div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-xs text-slate-500 mt-2">
               Funds available for withdrawal (after 7-day hold period)
               {selectedPayoutMethod === 'mobile_money' && localCurrency !== 'USD' && (
-                <div className="mt-1 text-xs text-blue-600">
+                <div className="mt-1 text-xs bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent font-medium">
                   USD equivalent: {formatPrice(availableBalance, 'USD')} • Rate: 1 USD = {exchangeRate} {localCurrency}
                 </div>
               )}
             </div>
           </div>
 
-          {/* Payout Method Selection */}
+          {/* Payout Method Selection - Horizontal Layout */}
           {hasAnyPayoutMethod && (
             <div className="space-y-3">
-              <Label>Payout Method</Label>
-              
-              {hasStripeSetup && (
-                <div 
-                  className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                    selectedPayoutMethod === 'stripe' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                  }`}
-                  onClick={() => setSelectedPayoutMethod('stripe')}
-                >
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      checked={selectedPayoutMethod === 'stripe'}
-                      onChange={() => setSelectedPayoutMethod('stripe')}
-                      className="text-blue-600"
-                    />
-                    <CreditCard className="h-5 w-5" />
-                    <div>
-                      <div className="font-medium">Stripe Transfer</div>
-                      <div className="text-sm text-muted-foreground">Instant transfer to connected account</div>
-                    </div>
-                    <CheckCircle className="h-4 w-4 text-green-600 ml-auto" />
-                  </div>
-                </div>
-              )}
-
-              {hasMobileMoneySetup && (
-                <div 
-                  className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                    selectedPayoutMethod === 'mobile_money' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                  }`}
-                  onClick={() => setSelectedPayoutMethod('mobile_money')}
-                >
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      checked={selectedPayoutMethod === 'mobile_money'}
-                      onChange={() => setSelectedPayoutMethod('mobile_money')}
-                      className="text-blue-600"
-                    />
-                    <Smartphone className="h-5 w-5" />
-                    <div>
-                      <div className="font-medium">Mobile Money</div>
-                      <div className="text-sm text-muted-foreground">
-                        {profileData?.mobile_money_operator} - {formatDisplayNumber(profileData?.mobile_money_number)}
+              <Label className="text-sm font-semibold text-slate-700">Payout Method</Label>
+              <div className="grid grid-cols-2 gap-3">
+                {hasStripeSetup && (
+                  <div 
+                    className={`p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
+                      selectedPayoutMethod === 'stripe' 
+                        ? 'border-orange-500 bg-gradient-to-br from-orange-50 to-purple-50 shadow-md scale-105' 
+                        : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
+                    }`}
+                    onClick={() => setSelectedPayoutMethod('stripe')}
+                  >
+                    <div className="flex flex-col items-center text-center space-y-2">
+                      <div className={`p-2 rounded-lg ${
+                        selectedPayoutMethod === 'stripe' 
+                          ? 'bg-gradient-to-r from-orange-500 to-purple-600 text-white' 
+                          : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        <CreditCard className="h-4 w-4" />
                       </div>
-                      <div className="text-xs text-muted-foreground">Within 24 hours</div>
+                      <div className="font-medium text-sm">Stripe</div>
+                      <div className="text-xs text-slate-500">Instant transfer</div>
+                      {selectedPayoutMethod === 'stripe' && (
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      )}
                     </div>
-                    <CheckCircle className="h-4 w-4 text-green-600 ml-auto" />
                   </div>
+                )}
+
+                {hasMobileMoneySetup && (
+                  <div 
+                    className={`p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
+                      selectedPayoutMethod === 'mobile_money' 
+                        ? 'border-purple-500 bg-gradient-to-br from-purple-50 to-orange-50 shadow-md scale-105' 
+                        : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
+                    }`}
+                    onClick={() => setSelectedPayoutMethod('mobile_money')}
+                  >
+                    <div className="flex flex-col items-center text-center space-y-2">
+                      <div className={`p-2 rounded-lg ${
+                        selectedPayoutMethod === 'mobile_money' 
+                          ? 'bg-gradient-to-r from-purple-500 to-orange-500 text-white' 
+                          : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        <Smartphone className="h-4 w-4" />
+                      </div>
+                      <div className="font-medium text-sm">Mobile Money</div>
+                      <div className="text-xs text-slate-500">Within 24 hours</div>
+                      {selectedPayoutMethod === 'mobile_money' && (
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Selected Method Details */}
+              {selectedPayoutMethod === 'mobile_money' && profileData?.mobile_money_number && (
+                <div className="text-center text-sm text-slate-600 bg-slate-50 py-2 rounded-lg">
+                  {profileData?.mobile_money_operator} • {formatDisplayNumber(profileData?.mobile_money_number)}
                 </div>
               )}
             </div>
           )}
 
           {!hasAnyPayoutMethod && (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
+            <Alert className="bg-gradient-to-r from-orange-50 to-red-50 border-orange-200">
+              <AlertCircle className="h-4 w-4 text-orange-600" />
+              <AlertDescription className="text-orange-800">
                 No payout methods configured. Please set up Stripe Connect or Mobile Money in your settings.
               </AlertDescription>
             </Alert>
@@ -429,10 +454,11 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
 
           {hasAnyPayoutMethod && (
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="amount">Withdrawal Amount</Label>
+              {/* Amount Input */}
+              <div className="space-y-3">
+                <Label htmlFor="amount" className="text-sm font-semibold text-slate-700">Withdrawal Amount</Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-medium">
                     {selectedPayoutMethod === 'stripe' ? 
                       (currentCurrency === 'USD' ? '$' : currentCurrency) :
                       (localCurrency === 'USD' ? '$' : localCurrency)
@@ -444,14 +470,14 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                     placeholder="0.00"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    className="pl-16"
+                    className="pl-16 py-3 text-lg border-2 border-slate-200 rounded-xl focus:border-orange-500 transition-colors"
                     min={minAmount}
                     max={convertedBalance}
                     step="0.01"
                   />
                 </div>
                 {withdrawAmount > 0 && (
-                  <div className="text-sm text-muted-foreground">
+                  <div className="text-sm bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent font-medium">
                     {selectedPayoutMethod === 'stripe' ? 
                       formatPrice(withdrawAmount, currentCurrency) :
                       `${formatPrice(withdrawAmount, localCurrency)} (${formatPrice(withdrawAmount / exchangeRate, 'USD')} USD)`
@@ -461,9 +487,9 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
               </div>
 
               {withdrawAmount > 0 && !isValidAmount && (
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
+                <Alert className="bg-gradient-to-r from-red-50 to-orange-50 border-red-200">
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                  <AlertDescription className="text-red-700">
                     {withdrawAmount < minAmount
                       ? `Minimum withdrawal amount is ${formatPrice(minAmount, selectedPayoutMethod === 'stripe' ? currentCurrency : localCurrency)}`
                       : "Amount exceeds available balance"
@@ -472,14 +498,26 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                 </Alert>
               )}
 
-              <div className="bg-blue-50 p-3 rounded-lg">
-                <div className="text-xs text-blue-700 space-y-1">
-                  <div>• Minimum withdrawal: {formatPrice(minAmount, selectedPayoutMethod === 'stripe' ? currentCurrency : localCurrency)}</div>
-                  <div>• Processing time: {selectedPayoutMethod === 'stripe' ? 'Instant' : 'Within 24 hours'}</div>
-                  <div>• Platform fee: 8% (already deducted)</div>
-                  <div>• You'll receive an email confirmation</div>
+              {/* Info Box */}
+              <div className="bg-gradient-to-r from-blue-50 to-cyan-50 p-4 rounded-xl border border-blue-200">
+                <div className="text-sm text-blue-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span>Minimum withdrawal:</span>
+                    <span className="font-semibold">{formatPrice(minAmount, selectedPayoutMethod === 'stripe' ? currentCurrency : localCurrency)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Processing time:</span>
+                    <span className="font-semibold">{selectedPayoutMethod === 'stripe' ? 'Instant' : 'Within 24 hours'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Platform fee:</span>
+                    <span className="font-semibold">8% (already deducted)</span>
+                  </div>
                   {selectedPayoutMethod === 'mobile_money' && localCurrency !== 'USD' && (
-                    <div>• Exchange rate: 1 USD = {exchangeRate} {localCurrency}</div>
+                    <div className="flex items-center justify-between">
+                      <span>Exchange rate:</span>
+                      <span className="font-semibold">1 USD = {exchangeRate} {localCurrency}</span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -487,19 +525,36 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          {hasAnyPayoutMethod && (
+        {/* Footer with Horizontal Button Layout */}
+        <DialogFooter className="px-6 pb-6 pt-4 border-t border-slate-200 bg-slate-50">
+          <div className="flex gap-3 w-full">
             <Button 
-              onClick={handleWithdraw} 
-              disabled={!isValidAmount || loading}
-              className="min-w-[100px]"
+              variant="outline" 
+              onClick={() => onOpenChange(false)}
+              className="flex-1 border-slate-300 text-slate-700 hover:bg-slate-100 rounded-xl py-2"
             >
-              {loading ? "Processing..." : selectedPayoutMethod === 'stripe' ? "Transfer" : "Withdraw"}
+              Cancel
             </Button>
-          )}
+            {hasAnyPayoutMethod && (
+              <Button 
+                onClick={handleWithdraw} 
+                disabled={!isValidAmount || loading}
+                className="flex-1 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white rounded-xl py-2 font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              >
+                {loading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    Processing...
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    {selectedPayoutMethod === 'stripe' ? "Transfer Now" : "Withdraw"}
+                    <ArrowRight className="h-4 w-4" />
+                  </div>
+                )}
+              </Button>
+            )}
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
