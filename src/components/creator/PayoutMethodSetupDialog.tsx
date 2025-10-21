@@ -13,11 +13,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, CreditCard, Smartphone, CheckCircle, ExternalLink } from 'lucide-react';
+import { AlertCircle, CreditCard, Smartphone, CheckCircle, ExternalLink, Sparkles } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
+import ReactCountryFlag from "react-country-flag";
 
 interface PayoutMethodSetupDialogProps {
   open: boolean;
@@ -34,107 +35,107 @@ interface ProfileData {
 }
 
 const PAWAPAY_COUNTRIES = {
-  'Zambia': { code: 'ZMB', flag: '🇿🇲', dialCode: '+260' },
-  'Kenya': { code: 'KEN', flag: '🇰🇪', dialCode: '+254' },
-  'Uganda': { code: 'UGA', flag: '🇺🇬', dialCode: '+256' },
-  'Tanzania': { code: 'TZA', flag: '🇹🇿', dialCode: '+255' },
-  'Ghana': { code: 'GHA', flag: '🇬🇭', dialCode: '+233' },
-  'Nigeria': { code: 'NGA', flag: '🇳🇬', dialCode: '+234' },
-  'Rwanda': { code: 'RWA', flag: '🇷🇼', dialCode: '+250' },
-  'Malawi': { code: 'MWI', flag: '🇲🇼', dialCode: '+265' },
-  'Mozambique': { code: 'MOZ', flag: '🇲🇿', dialCode: '+258' },
-  'Senegal': { code: 'SEN', flag: '🇸🇳', dialCode: '+221' },
-  'Benin': { code: 'BEN', flag: '🇧🇯', dialCode: '+229' },
-  'Burkina Faso': { code: 'BFA', flag: '🇧🇫', dialCode: '+226' },
-  'Cameroon': { code: 'CMR', flag: '🇨🇲', dialCode: '+237' },
-  'Congo-Brazzaville': { code: 'COG', flag: '🇨🇬', dialCode: '+242' },
-  'DRC': { code: 'COD', flag: '🇨🇩', dialCode: '+243' },
-  'Gabon': { code: 'GAB', flag: '🇬🇦', dialCode: '+241' },
-  'Ivory Coast': { code: 'CIV', flag: '🇨🇮', dialCode: '+225' },
-  'Lesotho': { code: 'LSO', flag: '🇱🇸', dialCode: '+266' },
-  'Sierra Leone': { code: 'SLE', flag: '🇸🇱', dialCode: '+232' },
+  'Zambia': { code: 'ZM', flag: '🇿🇲', dialCode: '+260' },
+  'Kenya': { code: 'KE', flag: '🇰🇪', dialCode: '+254' },
+  'Uganda': { code: 'UG', flag: '🇺🇬', dialCode: '+256' },
+  'Tanzania': { code: 'TZ', flag: '🇹🇿', dialCode: '+255' },
+  'Ghana': { code: 'GH', flag: '🇬🇭', dialCode: '+233' },
+  'Nigeria': { code: 'NG', flag: '🇳🇬', dialCode: '+234' },
+  'Rwanda': { code: 'RW', flag: '🇷🇼', dialCode: '+250' },
+  'Malawi': { code: 'MW', flag: '🇲🇼', dialCode: '+265' },
+  'Mozambique': { code: 'MZ', flag: '🇲🇿', dialCode: '+258' },
+  'Senegal': { code: 'SN', flag: '🇸🇳', dialCode: '+221' },
+  'Benin': { code: 'BJ', flag: '🇧🇯', dialCode: '+229' },
+  'Burkina Faso': { code: 'BF', flag: '🇧🇫', dialCode: '+226' },
+  'Cameroon': { code: 'CM', flag: '🇨🇲', dialCode: '+237' },
+  'Congo-Brazzaville': { code: 'CG', flag: '🇨🇬', dialCode: '+242' },
+  'DRC': { code: 'CD', flag: '🇨🇩', dialCode: '+243' },
+  'Gabon': { code: 'GA', flag: '🇬🇦', dialCode: '+241' },
+  'Ivory Coast': { code: 'CI', flag: '🇨🇮', dialCode: '+225' },
+  'Lesotho': { code: 'LS', flag: '🇱🇸', dialCode: '+266' },
+  'Sierra Leone': { code: 'SL', flag: '🇸🇱', dialCode: '+232' },
 };
 
 const MOBILE_OPERATORS = {
-  ZMB: [
+  ZM: [
     { code: 'mtn_zmb', name: 'MTN Zambia' },
     { code: 'airtel_zmb', name: 'Airtel Zambia' }
   ],
-  KEN: [
+  KE: [
     { code: 'mpesa_ken', name: 'M-Pesa Kenya' },
     { code: 'airtel_ken', name: 'Airtel Kenya' },
     { code: 'equitel_ken', name: 'Equitel Kenya' }
   ],
-  UGA: [
+  UG: [
     { code: 'mtn_uga', name: 'MTN Uganda' },
     { code: 'airtel_uga', name: 'Airtel Uganda' }
   ],
-  TZA: [
+  TZ: [
     { code: 'vodacom_tza', name: 'Vodacom Tanzania' },
     { code: 'tigo_tza', name: 'Tigo Tanzania' },
     { code: 'airtel_tza', name: 'Airtel Tanzania' }
   ],
-  GHA: [
+  GH: [
     { code: 'mtn_gha', name: 'MTN Ghana' },
     { code: 'vodafone_gha', name: 'Vodafone Ghana' },
     { code: 'airteltigo_gha', name: 'AirtelTigo Ghana' }
   ],
-  NGA: [
+  NG: [
     { code: 'mtn_nga', name: 'MTN Nigeria' },
     { code: 'airtel_nga', name: 'Airtel Nigeria' },
     { code: 'glo_nga', name: 'Glo Nigeria' },
     { code: '9mobile_nga', name: '9mobile Nigeria' }
   ],
-  RWA: [
+  RW: [
     { code: 'mtn_rwa', name: 'MTN Rwanda' },
     { code: 'airtel_rwa', name: 'Airtel Rwanda' }
   ],
-  MWI: [
+  MW: [
     { code: 'airtel_mwi', name: 'Airtel Malawi' },
     { code: 'tnm_mwi', name: 'TNM Malawi' }
   ],
-  MOZ: [
+  MZ: [
     { code: 'vodacom_moz', name: 'Vodacom Mozambique' },
     { code: 'mcel_moz', name: 'Mcel Mozambique' }
   ],
-  SEN: [
+  SN: [
     { code: 'orange_sen', name: 'Orange Senegal' },
     { code: 'free_sen', name: 'Free Senegal' }
   ],
-  BEN: [
+  BJ: [
     { code: 'mtn_ben', name: 'MTN Benin' },
     { code: 'moov_ben', name: 'Moov Benin' }
   ],
-  BFA: [
+  BF: [
     { code: 'orange_bfa', name: 'Orange Burkina Faso' },
     { code: 'moov_bfa', name: 'Moov Burkina Faso' }
   ],
-  CMR: [
+  CM: [
     { code: 'mtn_cmr', name: 'MTN Cameroon' },
     { code: 'orange_cmr', name: 'Orange Cameroon' }
   ],
-  COG: [
+  CG: [
     { code: 'airtel_cog', name: 'Airtel Congo' },
     { code: 'mtn_cog', name: 'MTN Congo' }
   ],
-  COD: [
+  CD: [
     { code: 'vodacom_cod', name: 'Vodacom DRC' },
     { code: 'airtel_cod', name: 'Airtel DRC' }
   ],
-  GAB: [
+  GA: [
     { code: 'airtel_gab', name: 'Airtel Gabon' },
     { code: 'moov_gab', name: 'Moov Gabon' }
   ],
-  CIV: [
+  CI: [
     { code: 'orange_civ', name: 'Orange Ivory Coast' },
     { code: 'mtn_civ', name: 'MTN Ivory Coast' },
     { code: 'moov_civ', name: 'Moov Ivory Coast' }
   ],
-  LSO: [
+  LS: [
     { code: 'vodacom_lso', name: 'Vodacom Lesotho' },
     { code: 'econet_lso', name: 'Econet Lesotho' }
   ],
-  SLE: [
+  SL: [
     { code: 'orange_sle', name: 'Orange Sierra Leone' },
     { code: 'airtel_sle', name: 'Airtel Sierra Leone' }
   ]
@@ -146,7 +147,7 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
   onSuccess
 }) => {
   const [selectedMethod, setSelectedMethod] = useState<'stripe' | 'mobile_money'>('stripe');
-  const [selectedCountry, setSelectedCountry] = useState('USA');
+  const [selectedCountry, setSelectedCountry] = useState('US');
   const [mobileOperator, setMobileOperator] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
@@ -201,7 +202,6 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
 
     setLoading(true);
     try {
-      // First create or get the Stripe Connect account
       const { data: accountData, error: accountError } = await supabase.functions.invoke('create-stripe-connect-account', {
         body: { userId: user.id }
       });
@@ -212,7 +212,6 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
       }
 
       if (accountData?.accountId) {
-        // Create account link for onboarding
         const { data: linkData, error: linkError } = await supabase.functions.invoke('create-stripe-account-link', {
           body: { 
             accountId: accountData.accountId,
@@ -227,7 +226,6 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
         }
 
         if (linkData?.url) {
-          // Open Stripe Connect setup in the same window
           window.location.href = linkData.url;
         }
       }
@@ -272,14 +270,19 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
   if (loadingProfile) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md bg-gradient-to-br from-white to-orange-50/30">
           <DialogHeader>
-            <DialogTitle>Loading</DialogTitle>
-            <DialogDescription>Loading payout settings...</DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-purple-600">
+                <Sparkles className="h-4 w-4 text-white" />
+              </div>
+              Loading Payment Settings
+            </DialogTitle>
+            <DialogDescription>Loading your payout preferences...</DialogDescription>
           </DialogHeader>
           <div className="flex items-center justify-center p-6">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            <span className="ml-2">Loading payout settings...</span>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gradient-to-r from-orange-500 to-purple-600"></div>
+            <span className="ml-3 text-gray-600">Loading payout settings...</span>
           </div>
         </DialogContent>
       </Dialog>
@@ -288,39 +291,57 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Payout Method Setup</DialogTitle>
-          <DialogDescription>
-            Choose your preferred method to receive payments
-          </DialogDescription>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-white to-purple-50/20 border-0 shadow-2xl rounded-2xl">
+        {/* Header with Gradient */}
+        <DialogHeader className="p-6 pb-4 bg-gradient-to-r from-orange-500/5 to-purple-600/5 rounded-t-2xl border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-gradient-to-r from-orange-500 to-purple-600 shadow-lg">
+              <Sparkles className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <DialogTitle className="text-xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                Payout Method Setup
+              </DialogTitle>
+              <DialogDescription className="text-gray-600 mt-1">
+                Choose your preferred method to receive payments securely
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-6 p-6">
           {/* Current Status */}
           {profileData && (
             <div className="space-y-3">
-              <Label className="text-sm font-medium">Current Setup</Label>
+              <Label className="text-sm font-semibold text-gray-700">Current Setup</Label>
               
               {profileData.stripe_connect_account_id && (
-                <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
-                  <CreditCard className="h-4 w-4 text-blue-600" />
-                  <span className="text-sm">Stripe Connect</span>
-                  {profileData.stripe_onboarding_completed ? (
-                    <Badge variant="default" className="bg-green-100 text-green-800">Connected</Badge>
-                  ) : (
-                    <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Setup Required</Badge>
-                  )}
+                <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-blue-50 to-blue-100/50 rounded-xl border border-blue-200">
+                  <div className="p-2 rounded-lg bg-blue-500/10">
+                    <CreditCard className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <span className="text-sm font-medium text-gray-800">Stripe Connect</span>
+                    {profileData.stripe_onboarding_completed ? (
+                      <Badge className="ml-2 bg-green-100 text-green-800 border-green-200">Connected</Badge>
+                    ) : (
+                      <Badge className="ml-2 bg-yellow-100 text-yellow-800 border-yellow-200">Setup Required</Badge>
+                    )}
+                  </div>
                 </div>
               )}
 
               {profileData.mobile_money_operator && profileData.mobile_money_number && (
-                <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg">
-                  <Smartphone className="h-4 w-4 text-green-600" />
-                  <span className="text-sm">Mobile Money</span>
-                  <Badge variant="default" className="bg-green-100 text-green-800">Configured</Badge>
-                  <span className="text-xs text-muted-foreground ml-auto">
-                    {profileData.mobile_money_operator} - {profileData.mobile_money_number}
+                <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-green-50 to-green-100/50 rounded-xl border border-green-200">
+                  <div className="p-2 rounded-lg bg-green-500/10">
+                    <Smartphone className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <span className="text-sm font-medium text-gray-800">Mobile Money</span>
+                    <Badge className="ml-2 bg-green-100 text-green-800 border-green-200">Configured</Badge>
+                  </div>
+                  <span className="text-xs text-gray-600">
+                    {profileData.mobile_money_operator} • {profileData.mobile_money_number}
                   </span>
                 </div>
               )}
@@ -329,59 +350,75 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
 
           {/* Method Selection */}
           <div className="space-y-4">
-            <Label className="text-sm font-medium">Select Payout Method</Label>
+            <Label className="text-sm font-semibold text-gray-700">Select Payout Method</Label>
             
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Stripe Option */}
               <Card 
-                className={`cursor-pointer transition-colors ${
-                  selectedMethod === 'stripe' ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'
+                className={`cursor-pointer transition-all duration-300 border-2 ${
+                  selectedMethod === 'stripe' 
+                    ? 'border-orange-300 bg-gradient-to-br from-orange-50 to-purple-50 shadow-lg scale-105' 
+                    : 'border-gray-200 hover:border-orange-200 hover:shadow-md'
                 }`}
                 onClick={() => setSelectedMethod('stripe')}
               >
                 <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      checked={selectedMethod === 'stripe'}
-                      onChange={() => setSelectedMethod('stripe')}
-                      className="text-blue-600"
-                    />
-                    <CreditCard className="h-5 w-5" />
-                    <div>
-                      <CardTitle className="text-base">Stripe Connect</CardTitle>
-                      <CardDescription>Bank transfers (2-7 business days) • Available in USA</CardDescription>
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg ${
+                      selectedMethod === 'stripe' 
+                        ? 'bg-gradient-to-r from-orange-500 to-purple-600' 
+                        : 'bg-gray-100'
+                    }`}>
+                      <CreditCard className={`h-5 w-5 ${
+                        selectedMethod === 'stripe' ? 'text-white' : 'text-gray-600'
+                      }`} />
                     </div>
-                    {profileData?.stripe_connect_account_id && profileData?.stripe_onboarding_completed && (
-                      <CheckCircle className="h-4 w-4 text-green-600 ml-auto" />
-                    )}
+                    <div className="flex-1">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        Stripe Connect
+                        {profileData?.stripe_connect_account_id && profileData?.stripe_onboarding_completed && (
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        )}
+                      </CardTitle>
+                      <CardDescription className="text-xs mt-1">
+                        Bank transfers (2-7 business days) • Available in USA
+                      </CardDescription>
+                    </div>
                   </div>
                 </CardHeader>
               </Card>
 
               {/* Mobile Money Option */}
               <Card 
-                className={`cursor-pointer transition-colors ${
-                  selectedMethod === 'mobile_money' ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'
+                className={`cursor-pointer transition-all duration-300 border-2 ${
+                  selectedMethod === 'mobile_money' 
+                    ? 'border-orange-300 bg-gradient-to-br from-orange-50 to-purple-50 shadow-lg scale-105' 
+                    : 'border-gray-200 hover:border-orange-200 hover:shadow-md'
                 }`}
                 onClick={() => setSelectedMethod('mobile_money')}
               >
                 <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      checked={selectedMethod === 'mobile_money'}
-                      onChange={() => setSelectedMethod('mobile_money')}
-                      className="text-blue-600"
-                    />
-                    <Smartphone className="h-5 w-5" />
-                    <div>
-                      <CardTitle className="text-base">Mobile Money</CardTitle>
-                      <CardDescription>Direct mobile money transfers • Available in Africa</CardDescription>
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg ${
+                      selectedMethod === 'mobile_money' 
+                        ? 'bg-gradient-to-r from-orange-500 to-purple-600' 
+                        : 'bg-gray-100'
+                    }`}>
+                      <Smartphone className={`h-5 w-5 ${
+                        selectedMethod === 'mobile_money' ? 'text-white' : 'text-gray-600'
+                      }`} />
                     </div>
-                    {profileData?.mobile_money_operator && profileData?.mobile_money_number && (
-                      <CheckCircle className="h-4 w-4 text-green-600 ml-auto" />
-                    )}
+                    <div className="flex-1">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        Mobile Money
+                        {profileData?.mobile_money_operator && profileData?.mobile_money_number && (
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        )}
+                      </CardTitle>
+                      <CardDescription className="text-xs mt-1">
+                        Direct mobile money transfers • Available in Africa
+                      </CardDescription>
+                    </div>
                   </div>
                 </CardHeader>
               </Card>
@@ -390,23 +427,36 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
 
           {/* Configuration Forms */}
           {selectedMethod === 'stripe' && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="country">Country</Label>
+            <div className="space-y-4 p-4 bg-gray-50/50 rounded-xl border border-gray-200">
+              <div className="space-y-3">
+                <Label htmlFor="country" className="text-sm font-semibold">Country</Label>
                 <Select value={selectedCountry} onValueChange={setSelectedCountry}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-12 border-2 border-gray-200 bg-white hover:border-orange-300 transition-colors rounded-xl">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="USA">🇺🇸 United States</SelectItem>
+                  <SelectContent className="border-0 shadow-xl rounded-xl bg-white/95 backdrop-blur-sm">
+                    <SelectItem value="US">
+                      <div className="flex items-center gap-3 py-2">
+                        <ReactCountryFlag
+                          countryCode="US"
+                          svg
+                          style={{
+                            width: '20px',
+                            height: '15px',
+                            borderRadius: '3px',
+                          }}
+                        />
+                        <span>United States</span>
+                      </div>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               {profileData?.stripe_connect_account_id && profileData?.stripe_onboarding_completed ? (
-                <Alert>
-                  <CheckCircle className="h-4 w-4" />
-                  <AlertDescription>
+                <Alert className="bg-green-50 border-green-200">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <AlertDescription className="text-green-800">
                     Your Stripe Connect account is already set up and ready to receive payments.
                   </AlertDescription>
                 </Alert>
@@ -414,47 +464,66 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
                 <Button 
                   onClick={handleConnectStripe} 
                   disabled={loading}
-                  className="w-full"
+                  className="w-full h-12 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl"
                 >
                   <ExternalLink className="h-4 w-4 mr-2" />
-                  {loading ? "Connecting..." : "Connect with Stripe"}
+                  {loading ? "Connecting to Stripe..." : "Connect with Stripe"}
                 </Button>
               )}
             </div>
           )}
 
           {selectedMethod === 'mobile_money' && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="country">Country</Label>
+            <div className="space-y-4 p-4 bg-gradient-to-br from-orange-50/30 to-purple-50/30 rounded-xl border border-orange-200/50">
+              <div className="space-y-3">
+                <Label htmlFor="country" className="text-sm font-semibold flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-orange-500" />
+                  Country
+                </Label>
                 <Select value={selectedCountry} onValueChange={setSelectedCountry}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-12 border-2 border-orange-200/60 bg-white hover:border-orange-300 transition-colors rounded-xl">
                     <SelectValue placeholder="Select country" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="min-w-[300px] border-0 shadow-xl rounded-xl bg-white/95 backdrop-blur-sm max-h-[300px]">
                     {Object.entries(PAWAPAY_COUNTRIES).map(([country, details]) => (
                       <SelectItem key={details.code} value={details.code}>
-                        <span className="flex items-center gap-2">
-                          <span>{details.flag}</span>
-                          <span>{country}</span>
-                        </span>
+                        <div className="flex items-center gap-3 py-2">
+                          <ReactCountryFlag
+                            countryCode={details.code}
+                            svg
+                            style={{
+                              width: '20px',
+                              height: '15px',
+                              borderRadius: '3px',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                            }}
+                            title={country}
+                          />
+                          <div className="flex flex-col">
+                            <span className="font-medium text-gray-800">{country}</span>
+                            <span className="text-xs text-gray-500">{details.dialCode}</span>
+                          </div>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              {selectedCountry && selectedCountry !== 'USA' && (
-                <div className="space-y-2">
-                  <Label htmlFor="operator">Mobile Operator</Label>
+              {selectedCountry && selectedCountry !== 'US' && (
+                <div className="space-y-3">
+                  <Label htmlFor="operator" className="text-sm font-semibold">Mobile Operator</Label>
                   <Select value={mobileOperator} onValueChange={setMobileOperator}>
-                    <SelectTrigger>
+                    <SelectTrigger className="h-12 border-2 border-orange-200/60 bg-white hover:border-orange-300 transition-colors rounded-xl">
                       <SelectValue placeholder="Select operator" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="border-0 shadow-xl rounded-xl bg-white/95 backdrop-blur-sm">
                       {MOBILE_OPERATORS[selectedCountry as keyof typeof MOBILE_OPERATORS]?.map((operator) => (
                         <SelectItem key={operator.code} value={operator.code}>
-                          {operator.name}
+                          <div className="flex items-center gap-2 py-1">
+                            <div className="w-2 h-2 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full"></div>
+                            {operator.name}
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -462,34 +531,53 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
                 </div>
               )}
 
-              {selectedCountry && selectedCountry !== 'USA' && (
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder={`${Object.values(PAWAPAY_COUNTRIES).find(c => c.code === selectedCountry)?.dialCode || '+XXX'} XXX XXX XXX`}
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                  />
+              {selectedCountry && selectedCountry !== 'US' && (
+                <div className="space-y-3">
+                  <Label htmlFor="phone" className="text-sm font-semibold">Phone Number</Label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <span className="text-gray-500 text-sm">
+                        {Object.values(PAWAPAY_COUNTRIES).find(c => c.code === selectedCountry)?.dialCode}
+                      </span>
+                    </div>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="XXX XXX XXX"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      className="h-12 pl-20 border-2 border-orange-200/60 bg-white hover:border-orange-300 focus:border-orange-400 transition-colors rounded-xl"
+                    />
+                  </div>
                 </div>
               )}
 
-              {selectedCountry && selectedCountry !== 'USA' && (
+              {selectedCountry && selectedCountry !== 'US' && (
                 <Button 
                   onClick={handleSaveMobileMoney}
                   disabled={loading || !mobileOperator || !phoneNumber}
-                  className="w-full"
+                  className="w-full h-12 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? "Saving..." : "Save Mobile Money Details"}
+                  {loading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      Saving Details...
+                    </div>
+                  ) : (
+                    "Save Mobile Money Details"
+                  )}
                 </Button>
               )}
             </div>
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="p-6 pt-4 border-t border-gray-200 bg-gray-50/50 rounded-b-2xl">
+          <Button 
+            variant="outline" 
+            onClick={() => onOpenChange(false)}
+            className="border-2 border-gray-300 hover:border-gray-400 bg-white text-gray-700 font-medium rounded-xl px-6 py-2 transition-colors"
+          >
             Close
           </Button>
         </DialogFooter>
