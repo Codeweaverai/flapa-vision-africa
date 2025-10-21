@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { Upload, X, Plus, Trash2, Calendar } from 'lucide-react';
+import { Upload, X, Plus, Trash2, Calendar, MapPin, Link, Users, DollarSign, Ticket } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface TicketType {
@@ -24,31 +24,31 @@ interface TicketType {
   is_active: boolean;
 }
 
-// Event categories with icons matching the mobile app
+// Enhanced event categories with better icons
 const EVENT_CATEGORIES = [
-  { value: 'webinar', label: 'Webinar', icon: Calendar, color: 'from-blue-500 to-cyan-600' },
-  { value: 'conferences', label: 'Conferences', icon: Calendar, color: 'from-purple-500 to-indigo-600' },
-  { value: 'live-music', label: 'Live Music', icon: Calendar, color: 'from-pink-500 to-rose-600' },
-  { value: 'sports-events', label: 'Sports Events', icon: Calendar, color: 'from-green-500 to-emerald-600' },
-  { value: 'night-life', label: 'Night Life', icon: Calendar, color: 'from-purple-500 to-pink-600' },
-  { value: 'concerts', label: 'Concerts', icon: Calendar, color: 'from-orange-500 to-red-600' },
-  { value: 'comedy-shows', label: 'Comedy Shows', icon: Calendar, color: 'from-yellow-500 to-amber-600' },
-  { value: 'business-events', label: 'Business Events', icon: Calendar, color: 'from-blue-500 to-indigo-600' },
-  { value: 'wellness-events', label: 'Wellness Events', icon: Calendar, color: 'from-green-500 to-teal-600' },
-  { value: 'summit', label: 'Summit', icon: Calendar, color: 'from-gray-500 to-blue-600' },
-  { value: 'picnic', label: 'Picnic', icon: Calendar, color: 'from-green-500 to-lime-600' },
-  { value: 'workshops', label: 'Workshops', icon: Calendar, color: 'from-purple-500 to-blue-600' },
-  { value: 'festivals', label: 'Festivals', icon: Calendar, color: 'from-orange-500 to-yellow-600' },
-  { value: 'gaming-events', label: 'Gaming Events', icon: Calendar, color: 'from-green-500 to-emerald-600' },
-  { value: 'food-drink', label: 'Food & Drink', icon: Calendar, color: 'from-red-500 to-orange-600' },
-  { value: 'art-exhibitions', label: 'Art Exhibitions', icon: Calendar, color: 'from-pink-500 to-purple-600' },
-  { value: 'travel-events', label: 'Travel Events', icon: Calendar, color: 'from-blue-500 to-cyan-600' },
-  { value: 'tech-meetups', label: 'Tech Meetups', icon: Calendar, color: 'from-blue-500 to-indigo-600' },
-  { value: 'science-fairs', label: 'Science Fairs', icon: Calendar, color: 'from-purple-500 to-blue-600' },
-  { value: 'cultural-events', label: 'Cultural Events', icon: Calendar, color: 'from-amber-500 to-orange-600' },
-  { value: 'auto-shows', label: 'Auto Shows', icon: Calendar, color: 'from-gray-500 to-red-600' },
-  { value: 'science-events', label: 'Science Events', icon: Calendar, color: 'from-purple-500 to-pink-600' },
-  { value: 'community-events', label: 'Community Events', icon: Calendar, color: 'from-green-500 to-blue-600' }
+  { value: 'webinar', label: 'Webinar', icon: Users, color: 'from-blue-500 to-cyan-600' },
+  { value: 'conferences', label: 'Conferences', icon: Users, color: 'from-purple-500 to-indigo-600' },
+  { value: 'live-music', label: 'Live Music', icon: Users, color: 'from-pink-500 to-rose-600' },
+  { value: 'sports-events', label: 'Sports Events', icon: Users, color: 'from-green-500 to-emerald-600' },
+  { value: 'night-life', label: 'Night Life', icon: Users, color: 'from-purple-500 to-pink-600' },
+  { value: 'concerts', label: 'Concerts', icon: Users, color: 'from-orange-500 to-red-600' },
+  { value: 'comedy-shows', label: 'Comedy Shows', icon: Users, color: 'from-yellow-500 to-amber-600' },
+  { value: 'business-events', label: 'Business Events', icon: Users, color: 'from-blue-500 to-indigo-600' },
+  { value: 'wellness-events', label: 'Wellness Events', icon: Users, color: 'from-green-500 to-teal-600' },
+  { value: 'summit', label: 'Summit', icon: Users, color: 'from-gray-500 to-blue-600' },
+  { value: 'picnic', label: 'Picnic', icon: Users, color: 'from-green-500 to-lime-600' },
+  { value: 'workshops', label: 'Workshops', icon: Users, color: 'from-purple-500 to-blue-600' },
+  { value: 'festivals', label: 'Festivals', icon: Users, color: 'from-orange-500 to-yellow-600' },
+  { value: 'gaming-events', label: 'Gaming Events', icon: Users, color: 'from-green-500 to-emerald-600' },
+  { value: 'food-drink', label: 'Food & Drink', icon: Users, color: 'from-red-500 to-orange-600' },
+  { value: 'art-exhibitions', label: 'Art Exhibitions', icon: Users, color: 'from-pink-500 to-purple-600' },
+  { value: 'travel-events', label: 'Travel Events', icon: Users, color: 'from-blue-500 to-cyan-600' },
+  { value: 'tech-meetups', label: 'Tech Meetups', icon: Users, color: 'from-blue-500 to-indigo-600' },
+  { value: 'science-fairs', label: 'Science Fairs', icon: Users, color: 'from-purple-500 to-blue-600' },
+  { value: 'cultural-events', label: 'Cultural Events', icon: Users, color: 'from-amber-500 to-orange-600' },
+  { value: 'auto-shows', label: 'Auto Shows', icon: Users, color: 'from-gray-500 to-red-600' },
+  { value: 'science-events', label: 'Science Events', icon: Users, color: 'from-purple-500 to-pink-600' },
+  { value: 'community-events', label: 'Community Events', icon: Users, color: 'from-green-500 to-blue-600' }
 ];
 
 const CreatorEventCreate = () => {
@@ -251,52 +251,65 @@ const CreatorEventCreate = () => {
 
   return (
     <CreatorLayout title="Create Event">
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 py-6">
-        <div className="container mx-auto px-4">
-          <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-2xl">
-            <CardHeader className="text-center pb-6">
-              <CardTitle className="text-4xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
-                Create New Event
-              </CardTitle>
-              <p className="text-lg text-gray-600">
-                Share your amazing event with the world
-              </p>
-            </CardHeader>
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 py-8">
+        <div className="container mx-auto px-4 max-w-6xl">
+          {/* Enhanced Header Card */}
+          <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-2xl rounded-3xl overflow-hidden">
+            <div className="bg-gradient-to-r from-orange-500 via-purple-600 to-pink-600 p-1">
+              <CardHeader className="bg-white/95 text-center pb-6 pt-8">
+                <CardTitle className="text-4xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                  Create New Event
+                </CardTitle>
+                <p className="text-lg text-gray-600 font-medium">
+                  Share your amazing event with the world
+                </p>
+              </CardHeader>
+            </div>
+            
             <CardContent className="p-8">
-              <form onSubmit={handleSubmit} className="space-y-8">
-                {/* Event Categories Horizontal Scroll */}
+              <form onSubmit={handleSubmit} className="space-y-10">
+                {/* Enhanced Event Categories Section */}
                 <div className="space-y-4">
-                  <Label className="text-lg font-semibold text-gray-900">Event Category *</Label>
+                  <Label className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    <Ticket className="h-5 w-5 text-orange-500" />
+                    Event Category *
+                  </Label>
                   <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
-                    {EVENT_CATEGORIES.map((category) => (
-                      <button
-                        key={category.value}
-                        type="button"
-                        onClick={() => handleInputChange('event_type', category.value)}
-                        className={`flex items-center gap-2 px-4 py-3 rounded-xl font-medium transition-all duration-300 flex-shrink-0 ${
-                          formData.event_type === category.value
-                            ? `bg-gradient-to-r ${category.color} text-white shadow-lg transform scale-105`
-                            : 'bg-white/80 text-gray-700 hover:bg-white hover:shadow-md border border-gray-200/50'
-                        }`}
-                      >
-                        <category.icon className="h-4 w-4" />
-                        {category.label}
-                      </button>
-                    ))}
+                    {EVENT_CATEGORIES.map((category) => {
+                      const IconComponent = category.icon;
+                      return (
+                        <button
+                          key={category.value}
+                          type="button"
+                          onClick={() => handleInputChange('event_type', category.value)}
+                          className={`flex items-center gap-3 px-5 py-4 rounded-2xl font-semibold transition-all duration-300 flex-shrink-0 min-w-max ${
+                            formData.event_type === category.value
+                              ? `bg-gradient-to-r ${category.color} text-white shadow-2xl transform scale-105 ring-2 ring-white/50`
+                              : 'bg-white/80 text-gray-700 hover:bg-white hover:shadow-xl border border-gray-200/60 hover:border-gray-300'
+                          }`}
+                        >
+                          <IconComponent className="h-5 w-5" />
+                          {category.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Left Column - Basic Info */}
+                  {/* Left Column - Enhanced Basic Info */}
                   <div className="space-y-6">
                     <div className="space-y-2">
-                      <Label className="text-base font-semibold" htmlFor="title">Event Title *</Label>
+                      <Label className="text-base font-semibold flex items-center gap-2" htmlFor="title">
+                        <Calendar className="h-5 w-5 text-orange-500" />
+                        Event Title *
+                      </Label>
                       <Input
                         id="title"
                         value={formData.title}
                         onChange={(e) => handleInputChange('title', e.target.value)}
                         placeholder="Enter an engaging event title"
-                        className="h-12 bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                        className="h-12 bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl text-lg font-medium transition-all duration-300"
                         required
                       />
                     </div>
@@ -309,72 +322,84 @@ const CreatorEventCreate = () => {
                         onChange={(e) => handleInputChange('description', e.target.value)}
                         placeholder="Describe what attendees can expect from your event..."
                         rows={6}
-                        className="bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl resize-none"
+                        className="bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl resize-none text-base transition-all duration-300"
                         required
                       />
                     </div>
 
-                    {/* Event Image Upload */}
+                    {/* Enhanced Event Image Upload */}
                     <div className="space-y-4">
                       <Label className="text-base font-semibold">Event Image</Label>
                       <div className="space-y-4">
                         {imagePreview ? (
-                          <div className="relative inline-block">
+                          <div className="relative inline-block group">
                             <img 
                               src={imagePreview} 
                               alt="Event image preview" 
-                              className="max-h-48 rounded-xl border-2 border-gray-200 shadow-lg"
+                              className="max-h-64 rounded-2xl border-2 border-gray-200 shadow-lg transition-transform duration-300 group-hover:scale-105"
                             />
                             <Button
                               type="button"
                               variant="destructive"
                               size="icon"
-                              className="absolute -top-2 -right-2 h-8 w-8 bg-gradient-to-r from-red-500 to-pink-600 border-0 shadow-lg"
+                              className="absolute -top-2 -right-2 h-9 w-9 bg-gradient-to-r from-red-500 to-pink-600 border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-110"
                               onClick={removeImage}
                             >
                               <X className="h-4 w-4" />
                             </Button>
                           </div>
                         ) : (
-                          <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center bg-white/50 hover:bg-white transition-colors">
-                            <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                            <div className="space-y-2">
-                              <Label htmlFor="image" className="cursor-pointer">
-                                <span className="text-base font-medium text-gray-700">Click to upload event image</span>
-                                <Input
-                                  id="image"
-                                  name="image"
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={handleImageUpload}
-                                  className="hidden"
-                                />
-                              </Label>
-                              <p className="text-sm text-gray-500">PNG, JPG, GIF up to 5MB</p>
+                          <div className="border-2 border-dashed border-gray-300 rounded-2xl p-10 text-center bg-white/50 hover:bg-white transition-all duration-300 group cursor-pointer">
+                            <div className="space-y-4">
+                              <div className="bg-gradient-to-r from-orange-500 to-purple-600 rounded-full p-4 w-16 h-16 mx-auto flex items-center justify-center shadow-lg">
+                                <Upload className="h-8 w-8 text-white" />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="image" className="cursor-pointer">
+                                  <span className="text-base font-semibold text-gray-700 group-hover:text-orange-600 transition-colors">
+                                    Click to upload event image
+                                  </span>
+                                  <Input
+                                    id="image"
+                                    name="image"
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageUpload}
+                                    className="hidden"
+                                  />
+                                </Label>
+                                <p className="text-sm text-gray-500">PNG, JPG, GIF up to 5MB</p>
+                              </div>
                             </div>
                           </div>
                         )}
                         {uploadingImage && (
-                          <div className="text-center text-orange-600 font-medium">
-                            Uploading image...
+                          <div className="text-center">
+                            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500 to-purple-600 text-white px-4 py-2 rounded-full text-sm font-semibold">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              Uploading image...
+                            </div>
                           </div>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Right Column - Details */}
+                  {/* Right Column - Enhanced Details */}
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 gap-6">
                       <div className="space-y-2">
-                        <Label className="text-base font-semibold" htmlFor="capacity">Capacity</Label>
+                        <Label className="text-base font-semibold flex items-center gap-2" htmlFor="capacity">
+                          <Users className="h-5 w-5 text-orange-500" />
+                          Capacity
+                        </Label>
                         <Input
                           id="capacity"
                           type="number"
                           value={formData.capacity}
                           onChange={(e) => handleInputChange('capacity', parseInt(e.target.value) || 0)}
                           min="1"
-                          className="h-12 bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                          className="h-12 bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl text-lg font-medium transition-all duration-300"
                         />
                       </div>
                       
@@ -386,7 +411,7 @@ const CreatorEventCreate = () => {
                             type="datetime-local"
                             value={formData.start_time}
                             onChange={(e) => handleInputChange('start_time', e.target.value)}
-                            className="h-12 bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                            className="h-12 bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl text-lg font-medium transition-all duration-300"
                             required
                           />
                         </div>
@@ -398,7 +423,7 @@ const CreatorEventCreate = () => {
                             type="datetime-local"
                             value={formData.end_time}
                             onChange={(e) => handleInputChange('end_time', e.target.value)}
-                            className="h-12 bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                            className="h-12 bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl text-lg font-medium transition-all duration-300"
                             required
                           />
                         </div>
@@ -407,35 +432,44 @@ const CreatorEventCreate = () => {
                     
                     <div className="grid grid-cols-1 gap-6">
                       <div className="space-y-2">
-                        <Label className="text-base font-semibold" htmlFor="location">Location (For in-person events)</Label>
+                        <Label className="text-base font-semibold flex items-center gap-2" htmlFor="location">
+                          <MapPin className="h-5 w-5 text-orange-500" />
+                          Location (For in-person events)
+                        </Label>
                         <Input
                           id="location"
                           value={formData.location}
                           onChange={(e) => handleInputChange('location', e.target.value)}
                           placeholder="Enter event venue or address"
-                          className="h-12 bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                          className="h-12 bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl text-lg font-medium transition-all duration-300"
                         />
                       </div>
                       
                       <div className="space-y-2">
-                        <Label className="text-base font-semibold" htmlFor="online_meeting_link">Online Meeting Link (For virtual events)</Label>
+                        <Label className="text-base font-semibold flex items-center gap-2" htmlFor="online_meeting_link">
+                          <Link className="h-5 w-5 text-orange-500" />
+                          Online Meeting Link (For virtual events)
+                        </Label>
                         <Input
                           id="online_meeting_link"
                           value={formData.online_meeting_link}
                           onChange={(e) => handleInputChange('online_meeting_link', e.target.value)}
                           placeholder="https://zoom.us/j/..."
-                          className="h-12 bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                          className="h-12 bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl text-lg font-medium transition-all duration-300"
                         />
                       </div>
                     </div>
                   </div>
                 </div>
                 
-                {/* Pricing Section */}
+                {/* Enhanced Pricing Section */}
                 <div className="space-y-6">
-                  <div className="flex flex-row items-center justify-between rounded-2xl border-2 border-gray-200 p-6 bg-white/80">
+                  <div className="flex flex-row items-center justify-between rounded-2xl border-2 border-gray-200 p-6 bg-white/80 backdrop-blur-sm shadow-lg">
                     <div className="space-y-1">
-                      <Label className="text-base font-semibold">Free Event</Label>
+                      <Label className="text-base font-semibold flex items-center gap-2">
+                        <DollarSign className="h-5 w-5 text-orange-500" />
+                        Free Event
+                      </Label>
                       <p className="text-gray-600 text-sm">
                         Toggle if this is a free event or requires payment
                       </p>
@@ -448,7 +482,7 @@ const CreatorEventCreate = () => {
                           setTicketTypes([]);
                         }
                       }}
-                      className="data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-orange-500 data-[state=checked]:to-purple-600"
+                      className="data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-orange-500 data-[state=checked]:to-purple-600 h-6 w-11"
                     />
                   </div>
                   
@@ -464,14 +498,14 @@ const CreatorEventCreate = () => {
                           placeholder="0.00"
                           min="0"
                           step="0.01"
-                          className="h-12 bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                          className="h-12 bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl text-lg font-medium transition-all duration-300"
                         />
                       </div>
 
                       <div className="space-y-2">
                         <Label className="text-base font-semibold" htmlFor="currency">Currency</Label>
                         <Select value={formData.currency} onValueChange={(value) => handleInputChange('currency', value)}>
-                          <SelectTrigger className="h-12 bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl">
+                          <SelectTrigger className="h-12 bg-white/80 border-2 border-gray-200 focus:border-orange-500 rounded-xl text-lg font-medium transition-all duration-300">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -500,33 +534,36 @@ const CreatorEventCreate = () => {
                   )}
                 </div>
 
-                {/* Ticket Types Section */}
+                {/* Enhanced Ticket Types Section */}
                 {!formData.is_free && (
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
-                      <Label className="text-xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
-                        Ticket Types
-                      </Label>
+                      <div>
+                        <Label className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                          Ticket Types
+                        </Label>
+                        <p className="text-gray-600 mt-1">Create different ticket options for your event</p>
+                      </div>
                       <Button 
                         type="button" 
                         onClick={addTicketType} 
-                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300"
+                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 px-6 py-3 rounded-xl font-semibold"
                       >
-                        <Plus className="h-4 w-4 mr-2" />
+                        <Plus className="h-5 w-5 mr-2" />
                         Add Ticket Type
                       </Button>
                     </div>
 
                     {ticketTypes.map((ticket, index) => (
-                      <Card key={ticket.id} className="p-6 bg-white/80 backdrop-blur-sm border-2 border-gray-200 shadow-lg">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                      <Card key={ticket.id} className="p-6 bg-white/80 backdrop-blur-sm border-2 border-gray-200 shadow-xl rounded-2xl">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                           <div className="space-y-2">
                             <Label className="font-semibold">Ticket Name *</Label>
                             <Input
                               value={ticket.name}
                               onChange={(e) => updateTicketType(index, 'name', e.target.value)}
                               placeholder="e.g., Early Bird, VIP, Standard"
-                              className="bg-white border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                              className="bg-white border-2 border-gray-200 focus:border-orange-500 rounded-xl transition-all duration-300"
                               required
                             />
                           </div>
@@ -537,7 +574,7 @@ const CreatorEventCreate = () => {
                               value={ticket.ticket_type} 
                               onValueChange={(value) => updateTicketType(index, 'ticket_type', value)}
                             >
-                              <SelectTrigger className="bg-white border-2 border-gray-200 focus:border-orange-500 rounded-xl">
+                              <SelectTrigger className="bg-white border-2 border-gray-200 focus:border-orange-500 rounded-xl transition-all duration-300">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -556,7 +593,7 @@ const CreatorEventCreate = () => {
                               onChange={(e) => updateTicketType(index, 'price', parseFloat(e.target.value) || 0)}
                               min="0"
                               step="0.01"
-                              className="bg-white border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                              className="bg-white border-2 border-gray-200 focus:border-orange-500 rounded-xl transition-all duration-300"
                               required
                             />
                           </div>
@@ -568,7 +605,7 @@ const CreatorEventCreate = () => {
                               value={ticket.quantity_available}
                               onChange={(e) => updateTicketType(index, 'quantity_available', parseInt(e.target.value) || 0)}
                               min="1"
-                              className="bg-white border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                              className="bg-white border-2 border-gray-200 focus:border-orange-500 rounded-xl transition-all duration-300"
                               required
                             />
                           </div>
@@ -581,17 +618,17 @@ const CreatorEventCreate = () => {
                               type="datetime-local"
                               value={ticket.early_bird_end_date}
                               onChange={(e) => updateTicketType(index, 'early_bird_end_date', e.target.value)}
-                              className="bg-white border-2 border-gray-200 focus:border-orange-500 rounded-xl"
+                              className="bg-white border-2 border-gray-200 focus:border-orange-500 rounded-xl transition-all duration-300"
                             />
                           </div>
 
                           <div className="flex items-end justify-end">
                             <Button
                               type="button"
-                              className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300"
+                              className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 px-6 py-3 rounded-xl font-semibold"
                               onClick={() => removeTicketType(index)}
                             >
-                              <Trash2 className="h-4 w-4 mr-2" />
+                              <Trash2 className="h-5 w-5 mr-2" />
                               Remove
                             </Button>
                           </div>
@@ -604,7 +641,7 @@ const CreatorEventCreate = () => {
                             onChange={(e) => updateTicketType(index, 'description', e.target.value)}
                             placeholder="What's included with this ticket? Any special benefits or features?"
                             rows={3}
-                            className="bg-white border-2 border-gray-200 focus:border-orange-500 rounded-xl resize-none"
+                            className="bg-white border-2 border-gray-200 focus:border-orange-500 rounded-xl resize-none transition-all duration-300"
                           />
                         </div>
                       </Card>
@@ -612,25 +649,25 @@ const CreatorEventCreate = () => {
                   </div>
                 )}
                 
-                {/* Action Buttons */}
-                <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">
+                {/* Enhanced Action Buttons */}
+                <div className="flex justify-end space-x-4 pt-8 border-t border-gray-200">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => navigate('/creator/events')}
                     disabled={loading}
-                    className="h-12 px-8 border-2 border-gray-300 hover:border-orange-500 text-gray-700 hover:text-orange-600 rounded-xl font-semibold transition-all duration-300"
+                    className="h-12 px-8 border-2 border-gray-300 hover:border-orange-500 text-gray-700 hover:text-orange-600 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg"
                   >
                     Cancel
                   </Button>
                   <Button 
                     type="submit" 
                     disabled={loading || uploadingImage}
-                    className="h-12 px-8 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl font-semibold"
+                    className="h-12 px-8 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-xl font-semibold hover:scale-105"
                   >
                     {loading ? (
                       <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
                         Creating Event...
                       </>
                     ) : (
