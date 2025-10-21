@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, DollarSign, CheckCircle, Smartphone, CreditCard, Sparkles, Zap, Clock, Shield } from 'lucide-react';
+import { AlertCircle, DollarSign, CheckCircle, Smartphone, CreditCard } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -19,7 +19,6 @@ import { toast } from 'sonner';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { CurrencyCode } from '@/constants/currencies';
-import { fetchCreatorEarnings } from '@/services/creatorPaymentService';
 
 interface EnhancedWithdrawDialogProps {
   open: boolean;
@@ -37,15 +36,6 @@ interface ProfileData {
   default_payout_method?: string;
 }
 
-interface EarningsData {
-  available_balance: number;
-  pending_balance: number;
-  total_earnings: number;
-  total_platform_fees: number;
-  course_revenue: number;
-  event_revenue: number;
-}
-
 const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   open,
   onOpenChange,
@@ -61,63 +51,28 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   const [convertedBalance, setConvertedBalance] = useState(0);
   const [localCurrency, setLocalCurrency] = useState<CurrencyCode>('USD');
   const [exchangeRate, setExchangeRate] = useState(1);
-  const [earnings, setEarnings] = useState<EarningsData>({
-    available_balance: 0,
-    pending_balance: 0,
-    total_earnings: 0,
-    total_platform_fees: 0,
-    course_revenue: 0,
-    event_revenue: 0
-  });
-  const [loadingEarnings, setLoadingEarnings] = useState(true);
-  
   const { user } = useAuth();
   const { convertPrice, currentCurrency, formatPrice } = useCurrency();
 
   // Helper function to format phone number for display (remove + prefix)
   const formatDisplayNumber = (phoneNumber: string | undefined) => {
     if (!phoneNumber) return '';
+    
+    // Remove any + prefix and trim whitespace
     return phoneNumber.replace(/^\+/, '').trim();
   };
 
   // Helper function to format phone number for PawaPay API (digits only)
   const formatPhoneNumberForAPI = (phoneNumber: string | undefined) => {
     if (!phoneNumber) return '';
-    return phoneNumber.replace(/\D/g, '');
-  };
-
-  // Load earnings data exactly like in CreatorPayments
-  const loadEarningsData = async () => {
-    if (!user) return;
     
-    try {
-      setLoadingEarnings(true);
-      const earningsData = await fetchCreatorEarnings(user.id);
-      setEarnings(earningsData);
-      
-      console.log('Earnings data loaded:', earningsData);
-      
-    } catch (error) {
-      console.error('Error loading earnings data:', error);
-      // Fallback to props if API fails - EXACTLY like CreatorPayments
-      setEarnings({
-        available_balance: availableBalance,
-        pending_balance: 0,
-        total_earnings: 0,
-        total_platform_fees: 0,
-        course_revenue: 0,
-        event_revenue: 0
-      });
-    } finally {
-      setLoadingEarnings(false);
-    }
+    // Remove ALL non-digit characters: +, spaces, dashes, etc.
+    return phoneNumber.replace(/\D/g, '');
   };
 
   useEffect(() => {
     if (open && user) {
-      console.log('Dialog opened, loading data...');
       loadProfileData();
-      loadEarningsData();
     }
   }, [open, user]);
 
@@ -125,16 +80,12 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   useEffect(() => {
     const handleCurrencyConversion = async () => {
       try {
-        // Use earnings.available_balance from API call, fallback to props
-        const currentBalance = earnings.available_balance > 0 ? earnings.available_balance : availableBalance;
-        console.log('Current balance for conversion:', currentBalance);
-        
         if (selectedPayoutMethod === 'stripe') {
           // For Stripe, show balance in current display currency
-          const converted = await convertPrice(currentBalance, 'USD');
+          const converted = await convertPrice(availableBalance, 'USD');
           setConvertedBalance(converted);
           setLocalCurrency(currentCurrency);
-          setExchangeRate(converted / currentBalance);
+          setExchangeRate(converted / availableBalance);
         } else if (selectedPayoutMethod === 'mobile_money' && profileData?.mobile_money_operator) {
           // For mobile money, determine local currency from operator
           const operatorParts = profileData.mobile_money_operator.split('_');
@@ -154,7 +105,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           const targetCurrency = currencyMap[countryCode] || 'USD';
           
           // Get exchange rate for mobile money
-          let localAmount = currentBalance;
+          let localAmount = availableBalance;
           let rate = 1;
           
           if (targetCurrency !== 'USD') {
@@ -169,38 +120,25 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
             };
             
             rate = exchangeRates[targetCurrency] || 1;
-            localAmount = currentBalance * rate;
+            localAmount = availableBalance * rate;
           }
           
           setConvertedBalance(localAmount);
           setLocalCurrency(targetCurrency);
           setExchangeRate(rate);
-        } else {
-          // Fallback: if no specific conversion is needed, use the available balance directly
-          setConvertedBalance(currentBalance);
-          setLocalCurrency('USD');
-          setExchangeRate(1);
         }
       } catch (error) {
         console.error('Error converting balance:', error);
-        // Fallback to original values
-        const currentBalance = earnings.available_balance > 0 ? earnings.available_balance : availableBalance;
-        setConvertedBalance(currentBalance);
+        setConvertedBalance(availableBalance);
         setLocalCurrency('USD');
         setExchangeRate(1);
       }
     };
 
-    if ((earnings.available_balance > 0 || availableBalance > 0) && profileData) {
+    if (availableBalance > 0 && profileData) {
       handleCurrencyConversion();
-    } else {
-      // Set initial values even if balance is 0 or profile not loaded yet
-      const currentBalance = earnings.available_balance > 0 ? earnings.available_balance : availableBalance;
-      setConvertedBalance(currentBalance);
-      setLocalCurrency('USD');
-      setExchangeRate(1);
     }
-  }, [earnings.available_balance, availableBalance, selectedPayoutMethod, profileData, currentCurrency, convertPrice]);
+  }, [availableBalance, selectedPayoutMethod, profileData, currentCurrency, convertPrice]);
 
   const loadProfileData = async () => {
     if (!user) return;
@@ -220,6 +158,8 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
 
       if (data) {
         setProfileData(data);
+        
+        // Set the payout method based on what's configured
         if (data.default_payout_method) {
           setSelectedPayoutMethod(data.default_payout_method as 'stripe' | 'mobile_money');
         } else if (data.stripe_connect_account_id && data.stripe_onboarding_completed) {
@@ -235,6 +175,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
     }
   };
 
+  // Define these variables before they're used
   const hasStripeSetup = profileData?.stripe_connect_account_id && profileData?.stripe_onboarding_completed;
   const hasMobileMoneySetup = profileData?.mobile_money_operator && profileData?.mobile_money_number;
   const hasAnyPayoutMethod = hasStripeSetup || hasMobileMoneySetup;
@@ -323,7 +264,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           localCurrency,
           exchangeRate,
           usdAmountToDeduct, // USD amount to deduct from balance
-          availableBalance: earnings.available_balance > 0 ? earnings.available_balance : availableBalance,
+          availableBalance,
           originalPhoneNumber: profileData.mobile_money_number,
           formattedPhoneNumber: formattedPhoneNumber
         });
@@ -366,18 +307,19 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   const withdrawAmount = parseFloat(amount) || 0;
   const minAmount = selectedPayoutMethod === 'stripe' ? 5 : 
     (localCurrency === 'ZMW' ? 75 : localCurrency === 'KES' ? 750 : 5); // Approximate minimums
-  
-  // Use the actual available balance for validation
-  const actualAvailableBalance = earnings.available_balance > 0 ? earnings.available_balance : availableBalance;
   const isValidAmount = withdrawAmount >= minAmount && withdrawAmount <= convertedBalance;
 
-  if (checkingProfile || loadingEarnings) {
+  if (checkingProfile) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-lg bg-gradient-to-br from-white to-orange-50/30 border-0 shadow-2xl rounded-2xl">
-          <div className="flex items-center justify-center p-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gradient-to-r from-orange-500 to-purple-600"></div>
-            <span className="ml-3 text-gray-600">Loading payout methods...</span>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Loading</DialogTitle>
+            <DialogDescription>Loading payout methods...</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-center p-6">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <span className="ml-2">Loading payout methods...</span>
           </div>
         </DialogContent>
       </Dialog>
@@ -386,259 +328,178 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] bg-gradient-to-br from-white to-purple-50/20 border-0 shadow-2xl rounded-2xl overflow-hidden">
-        {/* Compact Header */}
-        <DialogHeader className="p-6 pb-4 bg-gradient-to-r from-orange-500/5 to-purple-600/5 border-b border-gray-100">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-gradient-to-r from-orange-500 to-purple-600 shadow-lg">
-                <DollarSign className="h-4 w-4 text-white" />
-              </div>
-              <div>
-                <DialogTitle className="text-lg font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                  Withdraw Funds
-                </DialogTitle>
-                <DialogDescription className="text-gray-600 text-sm">
-                  Transfer from your available balance
-                </DialogDescription>
-              </div>
-            </div>
-            <div className="bg-gradient-to-r from-orange-500 to-purple-600 text-white px-3 py-2 rounded-xl text-sm font-semibold shadow-lg">
-              <PriceDisplay 
-                value={convertedBalance} 
-                currency={selectedPayoutMethod === 'stripe' ? currentCurrency : localCurrency}
-              />
-            </div>
-          </div>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5" />
+            Withdraw Funds
+          </DialogTitle>
+          <DialogDescription>
+            Request a transfer from your available balance
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="p-6 space-y-6 overflow-y-auto">
-          {/* Available Balance Info */}
-          <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-xl border border-orange-200/50">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-purple-600">
-                  <DollarSign className="h-3 w-3 text-white" />
-                </div>
-                <span className="text-sm font-medium text-gray-700">Available Balance</span>
-              </div>
-              <div className="text-right">
-                <div className="text-lg font-bold text-gray-800">
-                  <PriceDisplay 
-                    value={convertedBalance} 
-                    currency={selectedPayoutMethod === 'stripe' ? currentCurrency : localCurrency}
-                  />
-                </div>
-                {selectedPayoutMethod === 'mobile_money' && localCurrency !== 'USD' && (
-                  <div className="text-xs text-gray-500 mt-1">
-                    USD: <PriceDisplay value={actualAvailableBalance} currency="USD" />
-                  </div>
-                )}
-              </div>
+        <div className="space-y-4">
+          <div className="bg-slate-50 p-4 rounded-lg">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm text-muted-foreground">Available Balance</span>
+              <Badge variant="outline" className="bg-green-50 text-green-700">
+                {selectedPayoutMethod === 'stripe' ? 
+                  formatPrice(convertedBalance, currentCurrency) :
+                  formatPrice(convertedBalance, localCurrency)
+                }
+              </Badge>
             </div>
-            <div className="text-xs text-gray-500 mt-2">
+            <div className="text-xs text-muted-foreground">
               Funds available for withdrawal (after 7-day hold period)
               {selectedPayoutMethod === 'mobile_money' && localCurrency !== 'USD' && (
-                <div className="mt-1 text-xs text-orange-600 font-medium">
-                  Exchange rate: 1 USD = {exchangeRate} {localCurrency}
+                <div className="mt-1 text-xs text-blue-600">
+                  USD equivalent: {formatPrice(availableBalance, 'USD')} • Rate: 1 USD = {exchangeRate} {localCurrency}
                 </div>
               )}
             </div>
           </div>
 
-          {/* Payout Method Selection - Horizontal Layout */}
+          {/* Payout Method Selection */}
           {hasAnyPayoutMethod && (
             <div className="space-y-3">
-              <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-orange-500" />
-                Payout Method
-              </Label>
+              <Label>Payout Method</Label>
               
-              <div className="flex gap-3">
-                {hasStripeSetup && (
-                  <div 
-                    className={`flex-1 p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 min-w-0 ${
-                      selectedPayoutMethod === 'stripe' 
-                        ? 'border-orange-300 bg-gradient-to-br from-orange-50 to-purple-50 shadow-lg' 
-                        : 'border-gray-200 hover:border-orange-200 hover:shadow-md'
-                    }`}
-                    onClick={() => setSelectedPayoutMethod('stripe')}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg flex-shrink-0 ${
-                        selectedPayoutMethod === 'stripe' 
-                          ? 'bg-gradient-to-r from-orange-500 to-purple-600' 
-                          : 'bg-gray-100'
-                      }`}>
-                        <CreditCard className={`h-4 w-4 ${
-                          selectedPayoutMethod === 'stripe' ? 'text-white' : 'text-gray-600'
-                        }`} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm">Stripe Transfer</div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                          <Zap className="h-3 w-3 text-green-500" />
-                          <span>Instant</span>
-                        </div>
-                      </div>
-                      {selectedPayoutMethod === 'stripe' && (
-                        <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
-                      )}
+              {hasStripeSetup && (
+                <div 
+                  className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                    selectedPayoutMethod === 'stripe' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                  }`}
+                  onClick={() => setSelectedPayoutMethod('stripe')}
+                >
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      checked={selectedPayoutMethod === 'stripe'}
+                      onChange={() => setSelectedPayoutMethod('stripe')}
+                      className="text-blue-600"
+                    />
+                    <CreditCard className="h-5 w-5" />
+                    <div>
+                      <div className="font-medium">Stripe Transfer</div>
+                      <div className="text-sm text-muted-foreground">Instant transfer to connected account</div>
                     </div>
+                    <CheckCircle className="h-4 w-4 text-green-600 ml-auto" />
                   </div>
-                )}
+                </div>
+              )}
 
-                {hasMobileMoneySetup && (
-                  <div 
-                    className={`flex-1 p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 min-w-0 ${
-                      selectedPayoutMethod === 'mobile_money' 
-                        ? 'border-orange-300 bg-gradient-to-br from-orange-50 to-purple-50 shadow-lg' 
-                        : 'border-gray-200 hover:border-orange-200 hover:shadow-md'
-                    }`}
-                    onClick={() => setSelectedPayoutMethod('mobile_money')}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg flex-shrink-0 ${
-                        selectedPayoutMethod === 'mobile_money' 
-                          ? 'bg-gradient-to-r from-orange-500 to-purple-600' 
-                          : 'bg-gray-100'
-                      }`}>
-                        <Smartphone className={`h-4 w-4 ${
-                          selectedPayoutMethod === 'mobile_money' ? 'text-white' : 'text-gray-600'
-                        }`} />
+              {hasMobileMoneySetup && (
+                <div 
+                  className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                    selectedPayoutMethod === 'mobile_money' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                  }`}
+                  onClick={() => setSelectedPayoutMethod('mobile_money')}
+                >
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      checked={selectedPayoutMethod === 'mobile_money'}
+                      onChange={() => setSelectedPayoutMethod('mobile_money')}
+                      className="text-blue-600"
+                    />
+                    <Smartphone className="h-5 w-5" />
+                    <div>
+                      <div className="font-medium">Mobile Money</div>
+                      <div className="text-sm text-muted-foreground">
+                        {profileData?.mobile_money_operator} - {formatDisplayNumber(profileData?.mobile_money_number)}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm">Mobile Money</div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                          <Clock className="h-3 w-3 text-blue-500" />
-                          <span>24 hours</span>
-                        </div>
-                        <div className="text-xs text-gray-500 truncate">
-                          {profileData?.mobile_money_operator}
-                        </div>
-                      </div>
-                      {selectedPayoutMethod === 'mobile_money' && (
-                        <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
-                      )}
+                      <div className="text-xs text-muted-foreground">Within 24 hours</div>
                     </div>
+                    <CheckCircle className="h-4 w-4 text-green-600 ml-auto" />
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           )}
 
           {!hasAnyPayoutMethod && (
-            <Alert className="bg-gradient-to-r from-orange-50 to-red-50 border-orange-200 p-4">
-              <div className="flex items-center gap-3">
-                <AlertCircle className="h-4 w-4 text-orange-600 flex-shrink-0" />
-                <AlertDescription className="text-orange-800 text-sm">
-                  No payout methods configured. Please set up payout methods in settings.
-                </AlertDescription>
-              </div>
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                No payout methods configured. Please set up Stripe Connect or Mobile Money in your settings.
+              </AlertDescription>
             </Alert>
           )}
 
           {hasAnyPayoutMethod && (
             <div className="space-y-4">
-              {/* Amount Input Row */}
-              <div className="grid grid-cols-2 gap-4 items-end">
-                <div className="space-y-3">
-                  <Label htmlFor="amount" className="text-sm font-semibold text-gray-700">
-                    Withdrawal Amount
-                  </Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">
-                      {selectedPayoutMethod === 'stripe' ? 
-                        (currentCurrency === 'USD' ? '$' : currentCurrency) :
-                        (localCurrency === 'USD' ? '$' : localCurrency)
-                      }
-                    </span>
-                    <Input
-                      id="amount"
-                      type="number"
-                      placeholder="0.00"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      className="pl-12 h-12 border-2 border-orange-200/60 bg-white hover:border-orange-300 focus:border-orange-400 transition-colors rounded-xl text-lg font-semibold"
-                      min={minAmount}
-                      max={convertedBalance}
-                      step="0.01"
-                    />
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="amount">Withdrawal Amount</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    {selectedPayoutMethod === 'stripe' ? 
+                      (currentCurrency === 'USD' ? '$' : currentCurrency) :
+                      (localCurrency === 'USD' ? '$' : localCurrency)
+                    }
+                  </span>
+                  <Input
+                    id="amount"
+                    type="number"
+                    placeholder="0.00"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="pl-16"
+                    min={minAmount}
+                    max={convertedBalance}
+                    step="0.01"
+                  />
                 </div>
-                
-                <Button 
-                  onClick={handleWithdraw} 
-                  disabled={!isValidAmount || loading}
-                  className="h-12 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <div className="flex items-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                      <span>Processing</span>
-                    </div>
-                  ) : selectedPayoutMethod === 'stripe' ? "Transfer Now" : "Withdraw"}
-                </Button>
+                {withdrawAmount > 0 && (
+                  <div className="text-sm text-muted-foreground">
+                    {selectedPayoutMethod === 'stripe' ? 
+                      formatPrice(withdrawAmount, currentCurrency) :
+                      `${formatPrice(withdrawAmount, localCurrency)} (${formatPrice(withdrawAmount / exchangeRate, 'USD')} USD)`
+                    }
+                  </div>
+                )}
               </div>
 
-              {/* Amount Details & Validation */}
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="space-y-2">
-                  {withdrawAmount > 0 && (
-                    <div className="text-gray-600 font-medium">
-                      <PriceDisplay 
-                        value={withdrawAmount} 
-                        currency={selectedPayoutMethod === 'stripe' ? currentCurrency : localCurrency}
-                      />
-                      {selectedPayoutMethod === 'mobile_money' && localCurrency !== 'USD' && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          USD: <PriceDisplay value={withdrawAmount / exchangeRate} currency="USD" />
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {withdrawAmount > 0 && !isValidAmount && (
-                    <div className="flex items-center gap-2 text-red-600">
-                      <AlertCircle className="h-3 w-3" />
-                      <span className="text-sm">
-                        {withdrawAmount < minAmount
-                          ? `Minimum: ${formatPrice(minAmount, selectedPayoutMethod === 'stripe' ? currentCurrency : localCurrency)}`
-                          : "Exceeds balance"
-                        }
-                      </span>
-                    </div>
-                  )}
-                </div>
+              {withdrawAmount > 0 && !isValidAmount && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    {withdrawAmount < minAmount
+                      ? `Minimum withdrawal amount is ${formatPrice(minAmount, selectedPayoutMethod === 'stripe' ? currentCurrency : localCurrency)}`
+                      : "Amount exceeds available balance"
+                    }
+                  </AlertDescription>
+                </Alert>
+              )}
 
-                <div className="text-right space-y-2">
-                  <div className="flex items-center gap-2 justify-end text-xs text-gray-500">
-                    <Shield className="h-3 w-3" />
-                    <span>Platform fee: 8%</span>
-                  </div>
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <div className="text-xs text-blue-700 space-y-1">
+                  <div>• Minimum withdrawal: {formatPrice(minAmount, selectedPayoutMethod === 'stripe' ? currentCurrency : localCurrency)}</div>
+                  <div>• Processing time: {selectedPayoutMethod === 'stripe' ? 'Instant' : 'Within 24 hours'}</div>
+                  <div>• Platform fee: 8% (already deducted)</div>
+                  <div>• You'll receive an email confirmation</div>
                   {selectedPayoutMethod === 'mobile_money' && localCurrency !== 'USD' && (
-                    <div className="text-xs text-gray-500">
-                      Rate: 1 USD = {exchangeRate} {localCurrency}
-                    </div>
+                    <div>• Exchange rate: 1 USD = {exchangeRate} {localCurrency}</div>
                   )}
-                  <div className="flex items-center gap-2 justify-end text-xs text-gray-500">
-                    <Clock className="h-3 w-3" />
-                    <span>{selectedPayoutMethod === 'stripe' ? 'Instant' : '24 hours'}</span>
-                  </div>
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        <DialogFooter className="p-4 border-t border-gray-200 bg-gray-50/50">
-          <Button 
-            variant="outline" 
-            onClick={() => onOpenChange(false)}
-            className="border-2 border-gray-300 hover:border-gray-400 bg-white text-gray-700 font-medium rounded-xl px-6 transition-colors"
-          >
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
+          {hasAnyPayoutMethod && (
+            <Button 
+              onClick={handleWithdraw} 
+              disabled={!isValidAmount || loading}
+              className="min-w-[100px]"
+            >
+              {loading ? "Processing..." : selectedPayoutMethod === 'stripe' ? "Transfer" : "Withdraw"}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
