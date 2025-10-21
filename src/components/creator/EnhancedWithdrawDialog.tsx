@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { CurrencyCode } from '@/constants/currencies';
+import { fetchCreatorEarnings } from '@/services/creatorPaymentService';
 
 interface EnhancedWithdrawDialogProps {
   open: boolean;
@@ -36,6 +37,15 @@ interface ProfileData {
   default_payout_method?: string;
 }
 
+interface EarningsData {
+  available_balance: number;
+  pending_balance: number;
+  total_earnings: number;
+  total_platform_fees: number;
+  course_revenue: number;
+  event_revenue: number;
+}
+
 const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   open,
   onOpenChange,
@@ -51,6 +61,16 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   const [convertedBalance, setConvertedBalance] = useState(0);
   const [localCurrency, setLocalCurrency] = useState<CurrencyCode>('USD');
   const [exchangeRate, setExchangeRate] = useState(1);
+  const [earnings, setEarnings] = useState<EarningsData>({
+    available_balance: 0,
+    pending_balance: 0,
+    total_earnings: 0,
+    total_platform_fees: 0,
+    course_revenue: 0,
+    event_revenue: 0
+  });
+  const [loadingEarnings, setLoadingEarnings] = useState(true);
+  
   const { user } = useAuth();
   const { convertPrice, currentCurrency, formatPrice } = useCurrency();
 
@@ -66,9 +86,45 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
     return phoneNumber.replace(/\D/g, '');
   };
 
+  // Load earnings data like in CreatorPayments
+  const loadEarningsData = async () => {
+    if (!user) return;
+    
+    try {
+      setLoadingEarnings(true);
+      const earningsData = await fetchCreatorEarnings(user.id);
+      setEarnings(earningsData);
+      
+      // Update converted balance based on earnings data
+      const currentBalance = earningsData.available_balance;
+      setConvertedBalance(currentBalance);
+      
+    } catch (error) {
+      console.error('Error loading earnings data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load earnings data",
+        variant: "destructive"
+      });
+      // Fallback to props if API fails
+      setEarnings({
+        available_balance: availableBalance,
+        pending_balance: 0,
+        total_earnings: 0,
+        total_platform_fees: 0,
+        course_revenue: 0,
+        event_revenue: 0
+      });
+      setConvertedBalance(availableBalance);
+    } finally {
+      setLoadingEarnings(false);
+    }
+  };
+
   useEffect(() => {
     if (open && user) {
       loadProfileData();
+      loadEarningsData();
     }
   }, [open, user]);
 
@@ -76,12 +132,14 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   useEffect(() => {
     const handleCurrencyConversion = async () => {
       try {
+        const currentBalance = earnings.available_balance;
+        
         if (selectedPayoutMethod === 'stripe') {
           // For Stripe, show balance in current display currency
-          const converted = await convertPrice(availableBalance, 'USD');
+          const converted = await convertPrice(currentBalance, 'USD');
           setConvertedBalance(converted);
           setLocalCurrency(currentCurrency);
-          setExchangeRate(converted / availableBalance);
+          setExchangeRate(converted / currentBalance);
         } else if (selectedPayoutMethod === 'mobile_money' && profileData?.mobile_money_operator) {
           // For mobile money, determine local currency from operator
           const operatorParts = profileData.mobile_money_operator.split('_');
@@ -101,7 +159,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           const targetCurrency = currencyMap[countryCode] || 'USD';
           
           // Get exchange rate for mobile money
-          let localAmount = availableBalance;
+          let localAmount = currentBalance;
           let rate = 1;
           
           if (targetCurrency !== 'USD') {
@@ -116,7 +174,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
             };
             
             rate = exchangeRates[targetCurrency] || 1;
-            localAmount = availableBalance * rate;
+            localAmount = currentBalance * rate;
           }
           
           setConvertedBalance(localAmount);
@@ -124,28 +182,28 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           setExchangeRate(rate);
         } else {
           // Fallback: if no specific conversion is needed, use the available balance directly
-          setConvertedBalance(availableBalance);
+          setConvertedBalance(currentBalance);
           setLocalCurrency('USD');
           setExchangeRate(1);
         }
       } catch (error) {
         console.error('Error converting balance:', error);
         // Fallback to original values
-        setConvertedBalance(availableBalance);
+        setConvertedBalance(earnings.available_balance);
         setLocalCurrency('USD');
         setExchangeRate(1);
       }
     };
 
-    if (availableBalance > 0 && profileData) {
+    if (earnings.available_balance > 0 && profileData) {
       handleCurrencyConversion();
     } else {
       // Set initial values even if balance is 0 or profile not loaded yet
-      setConvertedBalance(availableBalance);
+      setConvertedBalance(earnings.available_balance);
       setLocalCurrency('USD');
       setExchangeRate(1);
     }
-  }, [availableBalance, selectedPayoutMethod, profileData, currentCurrency, convertPrice]);
+  }, [earnings.available_balance, selectedPayoutMethod, profileData, currentCurrency, convertPrice]);
 
   const loadProfileData = async () => {
     if (!user) return;
@@ -268,7 +326,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           localCurrency,
           exchangeRate,
           usdAmountToDeduct, // USD amount to deduct from balance
-          availableBalance,
+          availableBalance: earnings.available_balance,
           originalPhoneNumber: profileData.mobile_money_number,
           formattedPhoneNumber: formattedPhoneNumber
         });
@@ -313,7 +371,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
     (localCurrency === 'ZMW' ? 75 : localCurrency === 'KES' ? 750 : 5); // Approximate minimums
   const isValidAmount = withdrawAmount >= minAmount && withdrawAmount <= convertedBalance;
 
-  if (checkingProfile) {
+  if (checkingProfile || loadingEarnings) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-lg bg-gradient-to-br from-white to-orange-50/30 border-0 shadow-2xl rounded-2xl">
@@ -373,7 +431,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                 </div>
                 {selectedPayoutMethod === 'mobile_money' && localCurrency !== 'USD' && (
                   <div className="text-xs text-gray-500 mt-1">
-                    USD: <PriceDisplay value={availableBalance} currency="USD" />
+                    USD: <PriceDisplay value={earnings.available_balance} currency="USD" />
                   </div>
                 )}
               </div>
