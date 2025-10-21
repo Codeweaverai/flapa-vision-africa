@@ -312,7 +312,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   if (checkingProfile) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-lg bg-gradient-to-br from-white to-slate-50 border-0 shadow-xl">
+        <DialogContent className="max-w-2xl bg-gradient-to-br from-white to-slate-50 border-0 shadow-xl">
           <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-1 rounded-t-lg">
             <div className="bg-white rounded-t-lg p-6">
               <DialogHeader>
@@ -331,9 +331,9 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg bg-gradient-to-br from-white to-slate-50 border-0 shadow-xl p-0 overflow-hidden">
+      <DialogContent className="max-w-2xl bg-gradient-to-br from-white to-slate-50 border-0 shadow-xl p-0 overflow-hidden max-h-[90vh] flex flex-col">
         {/* Gradient Header */}
-        <div className="bg-gradient-to-r from-orange-500 via-purple-500 to-purple-600 p-1">
+        <div className="bg-gradient-to-r from-orange-500 via-purple-500 to-purple-600 p-1 shrink-0">
           <div className="bg-white rounded-t-lg p-6">
             <DialogHeader className="space-y-3">
               <DialogTitle className="flex items-center gap-3 text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-purple-600">
@@ -349,7 +349,8 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           </div>
         </div>
 
-        <div className="p-6 space-y-6">
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Balance Card */}
           <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-xl border border-orange-100">
             <div className="flex items-center justify-between">
@@ -380,7 +381,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           {hasAnyPayoutMethod && (
             <div className="space-y-3">
               <Label className="text-sm font-semibold text-slate-700">Payout Method</Label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 {hasStripeSetup && (
                   <div 
                     className={`p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
@@ -398,8 +399,8 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                       }`}>
                         <CreditCard className="h-4 w-4" />
                       </div>
-                      <div className="font-medium text-sm">Stripe</div>
-                      <div className="text-xs text-slate-500">Instant transfer</div>
+                      <div className="font-medium text-sm">Stripe Transfer</div>
+                      <div className="text-xs text-slate-500">Instant transfer to connected account</div>
                       {selectedPayoutMethod === 'stripe' && (
                         <CheckCircle className="h-4 w-4 text-green-500" />
                       )}
@@ -526,7 +527,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         </div>
 
         {/* Footer with Horizontal Button Layout */}
-        <DialogFooter className="px-6 pb-6 pt-4 border-t border-slate-200 bg-slate-50">
+        <DialogFooter className="px-6 pb-6 pt-4 border-t border-slate-200 bg-slate-50 shrink-0">
           <div className="flex gap-3 w-full">
             <Button 
               variant="outline" 
