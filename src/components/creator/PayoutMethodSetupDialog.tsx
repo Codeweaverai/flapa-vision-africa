@@ -35,107 +35,131 @@ interface ProfileData {
 }
 
 const PAWAPAY_COUNTRIES = {
-  'Zambia': { code: 'ZM', flag: '🇿🇲', dialCode: '+260' },
-  'Kenya': { code: 'KE', flag: '🇰🇪', dialCode: '+254' },
-  'Uganda': { code: 'UG', flag: '🇺🇬', dialCode: '+256' },
-  'Tanzania': { code: 'TZ', flag: '🇹🇿', dialCode: '+255' },
-  'Ghana': { code: 'GH', flag: '🇬🇭', dialCode: '+233' },
-  'Nigeria': { code: 'NG', flag: '🇳🇬', dialCode: '+234' },
-  'Rwanda': { code: 'RW', flag: '🇷🇼', dialCode: '+250' },
-  'Malawi': { code: 'MW', flag: '🇲🇼', dialCode: '+265' },
-  'Mozambique': { code: 'MZ', flag: '🇲🇿', dialCode: '+258' },
-  'Senegal': { code: 'SN', flag: '🇸🇳', dialCode: '+221' },
-  'Benin': { code: 'BJ', flag: '🇧🇯', dialCode: '+229' },
-  'Burkina Faso': { code: 'BF', flag: '🇧🇫', dialCode: '+226' },
-  'Cameroon': { code: 'CM', flag: '🇨🇲', dialCode: '+237' },
-  'Congo-Brazzaville': { code: 'CG', flag: '🇨🇬', dialCode: '+242' },
-  'DRC': { code: 'CD', flag: '🇨🇩', dialCode: '+243' },
-  'Gabon': { code: 'GA', flag: '🇬🇦', dialCode: '+241' },
-  'Ivory Coast': { code: 'CI', flag: '🇨🇮', dialCode: '+225' },
-  'Lesotho': { code: 'LS', flag: '🇱🇸', dialCode: '+266' },
-  'Sierra Leone': { code: 'SL', flag: '🇸🇱', dialCode: '+232' },
+  'Zambia': { code: 'ZMB', flag: '🇿🇲', dialCode: '+260' },
+  'Kenya': { code: 'KEN', flag: '🇰🇪', dialCode: '+254' },
+  'Uganda': { code: 'UGA', flag: '🇺🇬', dialCode: '+256' },
+  'Tanzania': { code: 'TZA', flag: '🇹🇿', dialCode: '+255' },
+  'Ghana': { code: 'GHA', flag: '🇬🇭', dialCode: '+233' },
+  'Nigeria': { code: 'NGA', flag: '🇳🇬', dialCode: '+234' },
+  'Rwanda': { code: 'RWA', flag: '🇷🇼', dialCode: '+250' },
+  'Malawi': { code: 'MWI', flag: '🇲🇼', dialCode: '+265' },
+  'Mozambique': { code: 'MOZ', flag: '🇲🇿', dialCode: '+258' },
+  'Senegal': { code: 'SEN', flag: '🇸🇳', dialCode: '+221' },
+  'Benin': { code: 'BEN', flag: '🇧🇯', dialCode: '+229' },
+  'Burkina Faso': { code: 'BFA', flag: '🇧🇫', dialCode: '+226' },
+  'Cameroon': { code: 'CMR', flag: '🇨🇲', dialCode: '+237' },
+  'Congo-Brazzaville': { code: 'COG', flag: '🇨🇬', dialCode: '+242' },
+  'DRC': { code: 'COD', flag: '🇨🇩', dialCode: '+243' },
+  'Gabon': { code: 'GAB', flag: '🇬🇦', dialCode: '+241' },
+  'Ivory Coast': { code: 'CIV', flag: '🇨🇮', dialCode: '+225' },
+  'Lesotho': { code: 'LSO', flag: '🇱🇸', dialCode: '+266' },
+  'Sierra Leone': { code: 'SLE', flag: '🇸🇱', dialCode: '+232' },
+};
+
+// Country code mapping for ReactCountryFlag (3-letter to 2-letter)
+const COUNTRY_CODE_MAP: { [key: string]: string } = {
+  'ZMB': 'ZM',
+  'KEN': 'KE',
+  'UGA': 'UG',
+  'TZA': 'TZ',
+  'GHA': 'GH',
+  'NGA': 'NG',
+  'RWA': 'RW',
+  'MWI': 'MW',
+  'MOZ': 'MZ',
+  'SEN': 'SN',
+  'BEN': 'BJ',
+  'BFA': 'BF',
+  'CMR': 'CM',
+  'COG': 'CG',
+  'COD': 'CD',
+  'GAB': 'GA',
+  'CIV': 'CI',
+  'LSO': 'LS',
+  'SLE': 'SL',
+  'USA': 'US'
 };
 
 const MOBILE_OPERATORS = {
-  ZM: [
+  ZMB: [
     { code: 'mtn_zmb', name: 'MTN Zambia' },
     { code: 'airtel_zmb', name: 'Airtel Zambia' }
   ],
-  KE: [
+  KEN: [
     { code: 'mpesa_ken', name: 'M-Pesa Kenya' },
     { code: 'airtel_ken', name: 'Airtel Kenya' },
     { code: 'equitel_ken', name: 'Equitel Kenya' }
   ],
-  UG: [
+  UGA: [
     { code: 'mtn_uga', name: 'MTN Uganda' },
     { code: 'airtel_uga', name: 'Airtel Uganda' }
   ],
-  TZ: [
+  TZA: [
     { code: 'vodacom_tza', name: 'Vodacom Tanzania' },
     { code: 'tigo_tza', name: 'Tigo Tanzania' },
     { code: 'airtel_tza', name: 'Airtel Tanzania' }
   ],
-  GH: [
+  GHA: [
     { code: 'mtn_gha', name: 'MTN Ghana' },
     { code: 'vodafone_gha', name: 'Vodafone Ghana' },
     { code: 'airteltigo_gha', name: 'AirtelTigo Ghana' }
   ],
-  NG: [
+  NGA: [
     { code: 'mtn_nga', name: 'MTN Nigeria' },
     { code: 'airtel_nga', name: 'Airtel Nigeria' },
     { code: 'glo_nga', name: 'Glo Nigeria' },
     { code: '9mobile_nga', name: '9mobile Nigeria' }
   ],
-  RW: [
+  RWA: [
     { code: 'mtn_rwa', name: 'MTN Rwanda' },
     { code: 'airtel_rwa', name: 'Airtel Rwanda' }
   ],
-  MW: [
+  MWI: [
     { code: 'airtel_mwi', name: 'Airtel Malawi' },
     { code: 'tnm_mwi', name: 'TNM Malawi' }
   ],
-  MZ: [
+  MOZ: [
     { code: 'vodacom_moz', name: 'Vodacom Mozambique' },
     { code: 'mcel_moz', name: 'Mcel Mozambique' }
   ],
-  SN: [
+  SEN: [
     { code: 'orange_sen', name: 'Orange Senegal' },
     { code: 'free_sen', name: 'Free Senegal' }
   ],
-  BJ: [
+  BEN: [
     { code: 'mtn_ben', name: 'MTN Benin' },
     { code: 'moov_ben', name: 'Moov Benin' }
   ],
-  BF: [
+  BFA: [
     { code: 'orange_bfa', name: 'Orange Burkina Faso' },
     { code: 'moov_bfa', name: 'Moov Burkina Faso' }
   ],
-  CM: [
+  CMR: [
     { code: 'mtn_cmr', name: 'MTN Cameroon' },
     { code: 'orange_cmr', name: 'Orange Cameroon' }
   ],
-  CG: [
+  COG: [
     { code: 'airtel_cog', name: 'Airtel Congo' },
     { code: 'mtn_cog', name: 'MTN Congo' }
   ],
-  CD: [
+  COD: [
     { code: 'vodacom_cod', name: 'Vodacom DRC' },
     { code: 'airtel_cod', name: 'Airtel DRC' }
   ],
-  GA: [
+  GAB: [
     { code: 'airtel_gab', name: 'Airtel Gabon' },
     { code: 'moov_gab', name: 'Moov Gabon' }
   ],
-  CI: [
+  CIV: [
     { code: 'orange_civ', name: 'Orange Ivory Coast' },
     { code: 'mtn_civ', name: 'MTN Ivory Coast' },
     { code: 'moov_civ', name: 'Moov Ivory Coast' }
   ],
-  LS: [
+  LSO: [
     { code: 'vodacom_lso', name: 'Vodacom Lesotho' },
     { code: 'econet_lso', name: 'Econet Lesotho' }
   ],
-  SL: [
+  SLE: [
     { code: 'orange_sle', name: 'Orange Sierra Leone' },
     { code: 'airtel_sle', name: 'Airtel Sierra Leone' }
   ]
@@ -147,7 +171,7 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
   onSuccess
 }) => {
   const [selectedMethod, setSelectedMethod] = useState<'stripe' | 'mobile_money'>('stripe');
-  const [selectedCountry, setSelectedCountry] = useState('US');
+  const [selectedCountry, setSelectedCountry] = useState('USA');
   const [mobileOperator, setMobileOperator] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
@@ -265,6 +289,11 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper function to get 2-letter country code for ReactCountryFlag
+  const getCountryCode = (countryCode: string): string => {
+    return COUNTRY_CODE_MAP[countryCode] || 'US';
   };
 
   if (loadingProfile) {
@@ -435,10 +464,10 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="border-0 shadow-xl rounded-xl bg-white/95 backdrop-blur-sm">
-                    <SelectItem value="US">
+                    <SelectItem value="USA">
                       <div className="flex items-center gap-3 py-2">
                         <ReactCountryFlag
-                          countryCode="US"
+                          countryCode={getCountryCode('USA')}
                           svg
                           style={{
                             width: '20px',
@@ -489,7 +518,7 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
                       <SelectItem key={details.code} value={details.code}>
                         <div className="flex items-center gap-3 py-2">
                           <ReactCountryFlag
-                            countryCode={details.code}
+                            countryCode={getCountryCode(details.code)}
                             svg
                             style={{
                               width: '20px',
@@ -510,7 +539,7 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
                 </Select>
               </div>
 
-              {selectedCountry && selectedCountry !== 'US' && (
+              {selectedCountry && selectedCountry !== 'USA' && (
                 <div className="space-y-3">
                   <Label htmlFor="operator" className="text-sm font-semibold">Mobile Operator</Label>
                   <Select value={mobileOperator} onValueChange={setMobileOperator}>
@@ -531,7 +560,7 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
                 </div>
               )}
 
-              {selectedCountry && selectedCountry !== 'US' && (
+              {selectedCountry && selectedCountry !== 'USA' && (
                 <div className="space-y-3">
                   <Label htmlFor="phone" className="text-sm font-semibold">Phone Number</Label>
                   <div className="relative">
@@ -552,7 +581,7 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
                 </div>
               )}
 
-              {selectedCountry && selectedCountry !== 'US' && (
+              {selectedCountry && selectedCountry !== 'USA' && (
                 <Button 
                   onClick={handleSaveMobileMoney}
                   disabled={loading || !mobileOperator || !phoneNumber}
