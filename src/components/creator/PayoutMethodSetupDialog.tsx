@@ -39,6 +39,7 @@ interface BankAccountDetails {
   bank_id: string;
   branch_code: string;
   verified: boolean;
+  recipient_id?: string;
 }
 
 interface ProfileData {
@@ -192,6 +193,7 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isCreatingRecipient, setIsCreatingRecipient] = useState(false);
   const [banks, setBanks] = useState<Bank[]>([]);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -268,7 +270,8 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
             bank_name: existingDetails.bank_name || '',
             bank_id: existingDetails.bank_id || '',
             branch_code: existingDetails.branch_code || '',
-            verified: existingDetails.verified || false
+            verified: existingDetails.verified || false,
+            recipient_id: existingDetails.recipient_id || ''
           });
         }
       }
@@ -349,29 +352,75 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
     }
   };
 
+  const createRecipient = async (): Promise<string> => {
+    if (!bankDetails.account_number || !bankDetails.bank_id || !bankDetails.account_name) {
+      throw new Error('Account details are incomplete for recipient creation');
+    }
+
+    setIsCreatingRecipient(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-recipient', {
+        body: {
+          accountNumber: bankDetails.account_number,
+          bankId: bankDetails.bank_id,
+          accountName: bankDetails.account_name,
+          country: 'zm',
+          currency: 'ZMW'
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        const recipientId = data.data.data.id;
+        toast.success('Recipient created successfully in Lenco system!');
+        return recipientId;
+      } else {
+        throw new Error(data.error || 'Recipient creation failed');
+      }
+    } catch (error) {
+      console.error('Error creating recipient:', error);
+      toast.error('Failed to create recipient in Lenco system');
+      throw error;
+    } finally {
+      setIsCreatingRecipient(false);
+    }
+  };
+
   const handleSaveBankTransfer = async () => {
-    if (!user || !bankDetails.account_number || !bankDetails.bank_id) {
-      toast.error('Please fill in all bank account details');
+    if (!user || !bankDetails.account_number || !bankDetails.bank_id || !bankDetails.verified) {
+      toast.error('Please verify your bank account first');
       return;
     }
 
     setLoading(true);
     try {
+      let recipientId = bankDetails.recipient_id;
+
+      // Create recipient in Lenco system if not already created
+      if (!recipientId) {
+        recipientId = await createRecipient();
+      }
+
+      // Save bank details with recipient ID
       const { error } = await supabase
         .from('profiles')
         .update({
           default_payout_method: 'bank',
-          bank_account_details: bankDetails
+          bank_account_details: {
+            ...bankDetails,
+            recipient_id: recipientId
+          }
         })
         .eq('id', user.id);
 
       if (error) throw error;
 
-      toast.success('Bank transfer details saved successfully!');
+      toast.success('Bank transfer setup completed successfully!');
       onSuccess();
       onOpenChange(false);
     } catch (error) {
-      console.error('Error saving bank transfer details:', error);
+      console.error('Error saving bank transfer:', error);
       toast.error('Failed to save bank transfer details');
     } finally {
       setLoading(false);
@@ -402,6 +451,7 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
         setBankDetails(prev => ({
           ...prev,
           account_name: resolvedAccount.accountName,
+          bank_name: resolvedAccount.bank.name,
           verified: true
         }));
         toast.success('Account verified successfully!');
@@ -527,7 +577,9 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
                   </div>
                   <div className="flex-1">
                     <span className="text-sm font-medium text-gray-800">Bank Transfer</span>
-                    <Badge className="ml-2 bg-green-100 text-green-800 border-green-200">Configured</Badge>
+                    <Badge className="ml-2 bg-green-100 text-green-800 border-green-200">
+                      {profileData.bank_account_details.recipient_id ? 'Fully Configured' : 'Configured'}
+                    </Badge>
                   </div>
                   <span className="text-xs text-gray-600">
                     {profileData.bank_account_details.bank_name} • {profileData.bank_account_details.account_number}
@@ -640,7 +692,7 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
                         )}
                       </CardTitle>
                       <CardDescription className="text-xs mt-1">
-                        Direct bank transfers • Available in Africa
+                        Direct bank transfers • Available in Zambia
                       </CardDescription>
                     </div>
                   </div>
@@ -898,15 +950,33 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
                   </div>
                 </div>
 
+                {bankDetails.verified && !bankDetails.recipient_id && (
+                  <Alert className="bg-blue-50 border-blue-200">
+                    <AlertCircle className="h-4 w-4 text-blue-600" />
+                    <AlertDescription className="text-blue-800">
+                      Your account is verified! Click "Save Bank Transfer Details" to create a recipient in Lenco system for faster future payouts.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {bankDetails.recipient_id && (
+                  <Alert className="bg-green-50 border-green-200">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-green-800">
+                      Recipient successfully created in Lenco system! Future payouts will be faster.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 <Button 
                   onClick={handleSaveBankTransfer}
-                  disabled={loading || !bankDetails.account_number || !bankDetails.bank_id || !bankDetails.verified}
+                  disabled={loading || !bankDetails.account_number || !bankDetails.bank_id || !bankDetails.verified || isCreatingRecipient}
                   className="w-full h-12 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? (
+                  {loading || isCreatingRecipient ? (
                     <div className="flex items-center gap-2">
                       <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                      Saving Details...
+                      {isCreatingRecipient ? "Creating Recipient..." : "Saving Details..."}
                     </div>
                   ) : (
                     "Save Bank Transfer Details"
