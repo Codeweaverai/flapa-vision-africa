@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { BarChart, Calendar, DollarSign, CreditCard, Download, AlertCircle, ExternalLink, TrendingUp, Minus, Settings, Smartphone, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BarChart, Calendar, DollarSign, CreditCard, Download, AlertCircle, ExternalLink, TrendingUp, Minus, Settings, Smartphone, ChevronLeft, ChevronRight, Building2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
@@ -108,7 +108,7 @@ const CreatorPayments: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('stripe_connect_account_id, stripe_onboarding_completed, mobile_money_operator, mobile_money_number, default_payout_method')
+        .select('stripe_connect_account_id, stripe_onboarding_completed, mobile_money_operator, mobile_money_number, default_payout_method, bank_account_details')
         .eq('id', user.id)
         .single();
 
@@ -259,6 +259,12 @@ const CreatorPayments: React.FC = () => {
     }
   };
 
+  const hasBankTransferSetup = () => {
+    return profileData?.bank_account_details && 
+           profileData.bank_account_details.verified && 
+           profileData.bank_account_details.account_number;
+  };
+
   const renderPagination = (currentPage: number, totalItems: number, onPageChange: (page: number) => void) => {
     const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
     
@@ -302,14 +308,15 @@ const CreatorPayments: React.FC = () => {
   const renderPayoutMethodInfo = () => {
     const hasStripeSetup = profileData?.stripe_connect_account_id && profileData?.stripe_onboarding_completed;
     const hasMobileMoneySetup = profileData?.mobile_money_operator && profileData?.mobile_money_number;
+    const hasBankSetup = hasBankTransferSetup();
 
-    if (!hasStripeSetup && !hasMobileMoneySetup) {
+    if (!hasStripeSetup && !hasMobileMoneySetup && !hasBankSetup) {
       return (
         <Alert className="bg-gradient-to-r from-orange-100 to-purple-100 border-orange-200 shadow-sm">
           <AlertCircle className="h-4 w-4 text-orange-600" />
           <AlertTitle className="text-orange-800">No Payout Method Set Up</AlertTitle>
           <AlertDescription className="text-orange-700">
-            Set up a payout method to withdraw your earnings. Choose between Stripe (for USA) or Mobile Money (for African countries).
+            Set up a payout method to withdraw your earnings. Choose between Stripe (for USA), Mobile Money, or Bank Transfer (for African countries).
           </AlertDescription>
         </Alert>
       );
@@ -359,7 +366,80 @@ const CreatorPayments: React.FC = () => {
       );
     }
 
-    return null;
+    if (profileData?.default_payout_method === 'bank' && hasBankSetup) {
+      const bankDetails = profileData.bank_account_details;
+      return (
+        <div className="bg-gradient-to-r from-purple-100 to-purple-50 p-4 rounded-lg border border-purple-200 shadow-sm">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <Building2 className="h-5 w-5 text-purple-600" />
+            <div className="flex-1">
+              <div className="font-medium text-purple-900">Bank Transfer - Connected</div>
+              <div className="text-sm text-purple-700">
+                {bankDetails.bank_name} • {bankDetails.account_number}
+              </div>
+              <div className="text-xs text-purple-600 mt-1">
+                {bankDetails.account_name} • 1-3 business days
+              </div>
+              {bankDetails.recipient_id && (
+                <div className="text-xs text-purple-500 mt-1">
+                  Recipient ID: {bankDetails.recipient_id.substring(0, 16)}...
+                </div>
+              )}
+            </div>
+            <Badge variant="default" className="bg-green-100 text-green-800 shadow-sm mt-2 sm:mt-0">
+              Active
+            </Badge>
+          </div>
+        </div>
+      );
+    }
+
+    // Show all available methods if no default is set
+    return (
+      <div className="space-y-3">
+        <div className="text-sm font-medium text-gray-700">Available Payout Methods:</div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {hasStripeSetup && (
+            <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-800">Stripe</span>
+              </div>
+            </div>
+          )}
+          {hasMobileMoneySetup && (
+            <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+              <div className="flex items-center gap-2">
+                <Smartphone className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-medium text-green-800">Mobile Money</span>
+              </div>
+            </div>
+          )}
+          {hasBankSetup && (
+            <div className="bg-purple-50 p-3 rounded-lg border border-purple-200">
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-purple-600" />
+                <span className="text-sm font-medium text-purple-800">Bank Transfer</span>
+              </div>
+            </div>
+          )}
+        </div>
+        <Alert className="bg-amber-50 border-amber-200">
+          <AlertCircle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-700">
+            No default payout method selected. Please set a default method in payout settings.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  };
+
+  const hasAnyPayoutMethod = () => {
+    const hasStripeSetup = profileData?.stripe_connect_account_id && profileData?.stripe_onboarding_completed;
+    const hasMobileMoneySetup = profileData?.mobile_money_operator && profileData?.mobile_money_number;
+    const hasBankSetup = hasBankTransferSetup();
+    
+    return hasStripeSetup || hasMobileMoneySetup || hasBankSetup;
   };
 
   const renderTransactionCard = (transaction: any) => {
@@ -445,11 +525,50 @@ const CreatorPayments: React.FC = () => {
   };
 
   const renderPayoutCard = (payout: any) => {
+    const getGradientClass = (method: string) => {
+      switch (method) {
+        case 'stripe':
+          return 'bg-gradient-to-br from-blue-500 to-blue-600';
+        case 'mobile_money':
+          return 'bg-gradient-to-br from-green-500 to-green-600';
+        case 'bank':
+          return 'bg-gradient-to-br from-purple-500 to-purple-600';
+        default:
+          return 'bg-gradient-to-br from-gray-500 to-gray-600';
+      }
+    };
+
     const statusColor = payout.status === 'completed' 
-      ? 'bg-gradient-to-br from-green-500 to-teal-600'
+      ? getGradientClass(payout.payout_method)
       : payout.status === 'failed'
       ? 'bg-gradient-to-br from-red-500 to-rose-600'
       : 'bg-gradient-to-br from-amber-500 to-orange-600';
+    
+    const getMethodIcon = (method: string) => {
+      switch (method) {
+        case 'stripe':
+          return <CreditCard className="h-4 w-4" />;
+        case 'mobile_money':
+          return <Smartphone className="h-4 w-4" />;
+        case 'bank':
+          return <Building2 className="h-4 w-4" />;
+        default:
+          return <DollarSign className="h-4 w-4" />;
+      }
+    };
+
+    const getMethodLabel = (method: string) => {
+      switch (method) {
+        case 'stripe':
+          return 'Stripe Connect';
+        case 'mobile_money':
+          return 'Mobile Money';
+        case 'bank':
+          return 'Bank Transfer';
+        default:
+          return method;
+      }
+    };
     
     return (
       <Card key={payout.id} className={`mb-3 ${statusColor} text-white shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 w-full`}>
@@ -472,9 +591,12 @@ const CreatorPayments: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <p className="text-sm text-white/80">Method</p>
-              <Badge variant="outline" className="bg-white/20 text-white border-white/30">
-                {payout.payout_method === 'stripe' ? 'Stripe Connect' : 'Mobile Money'}
-              </Badge>
+              <div className="flex items-center gap-2 mt-1">
+                {getMethodIcon(payout.payout_method)}
+                <Badge variant="outline" className="bg-white/20 text-white border-white/30">
+                  {getMethodLabel(payout.payout_method)}
+                </Badge>
+              </div>
             </div>
             <div>
               <p className="text-sm text-white/80">Currency</p>
@@ -536,7 +658,7 @@ const CreatorPayments: React.FC = () => {
               <CardFooter>
                 <Button 
                   onClick={() => setIsWithdrawDialogOpen(true)}
-                  disabled={loadingEarnings || earnings.available_balance < 5 || (!profileData?.stripe_connect_account_id && !profileData?.mobile_money_operator)}
+                  disabled={loadingEarnings || earnings.available_balance < 5 || !hasAnyPayoutMethod()}
                   className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
                 >
                   Withdraw Funds
