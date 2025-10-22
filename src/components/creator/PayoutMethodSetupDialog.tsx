@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, CreditCard, Smartphone, CheckCircle, ExternalLink, Sparkles } from 'lucide-react';
+import { AlertCircle, CreditCard, Smartphone, CheckCircle, ExternalLink, Sparkles, Building2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -26,12 +26,28 @@ interface PayoutMethodSetupDialogProps {
   onSuccess: () => void;
 }
 
+interface Bank {
+  id: string;
+  name: string;
+  country: string;
+}
+
+interface BankAccountDetails {
+  account_name: string;
+  account_number: string;
+  bank_name: string;
+  bank_id: string;
+  branch_code: string;
+  verified: boolean;
+}
+
 interface ProfileData {
   stripe_connect_account_id?: string;
   stripe_onboarding_completed?: boolean;
   mobile_money_operator?: string;
   mobile_money_number?: string;
   default_payout_method?: string;
+  bank_account_details?: BankAccountDetails;
 }
 
 const PAWAPAY_COUNTRIES = {
@@ -170,21 +186,51 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
   onOpenChange,
   onSuccess
 }) => {
-  const [selectedMethod, setSelectedMethod] = useState<'stripe' | 'mobile_money'>('stripe');
+  const [selectedMethod, setSelectedMethod] = useState<'stripe' | 'mobile_money' | 'bank'>('stripe');
   const [selectedCountry, setSelectedCountry] = useState('USA');
   const [mobileOperator, setMobileOperator] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [banks, setBanks] = useState<Bank[]>([]);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   
+  // Bank Transfer State
+  const [bankDetails, setBankDetails] = useState<BankAccountDetails>({
+    account_name: '',
+    account_number: '',
+    bank_name: '',
+    bank_id: '',
+    branch_code: '',
+    verified: false
+  });
+
   const { user } = useAuth();
 
   useEffect(() => {
     if (open && user) {
       loadProfileData();
+      loadBanks();
     }
   }, [open, user]);
+
+  const loadBanks = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('get-lenco-banks', {
+        body: { country: 'zm' }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        setBanks(data.data.data || []);
+      }
+    } catch (error) {
+      console.error('Error loading banks:', error);
+      toast.error('Failed to load bank list');
+    }
+  };
 
   const loadProfileData = async () => {
     if (!user) return;
@@ -193,7 +239,7 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('stripe_connect_account_id, stripe_onboarding_completed, mobile_money_operator, mobile_money_number, default_payout_method')
+        .select('stripe_connect_account_id, stripe_onboarding_completed, mobile_money_operator, mobile_money_number, default_payout_method, bank_account_details')
         .eq('id', user.id)
         .single();
 
@@ -205,13 +251,25 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
       if (data) {
         setProfileData(data);
         if (data.default_payout_method) {
-          setSelectedMethod(data.default_payout_method as 'stripe' | 'mobile_money');
+          setSelectedMethod(data.default_payout_method as 'stripe' | 'mobile_money' | 'bank');
         }
         if (data.mobile_money_operator) {
           setMobileOperator(data.mobile_money_operator);
         }
         if (data.mobile_money_number) {
           setPhoneNumber(data.mobile_money_number);
+        }
+        // Load bank account details if they exist
+        if (data.bank_account_details && typeof data.bank_account_details === 'object') {
+          const existingDetails = data.bank_account_details as any;
+          setBankDetails({
+            account_name: existingDetails.account_name || '',
+            account_number: existingDetails.account_number || '',
+            bank_name: existingDetails.bank_name || '',
+            bank_id: existingDetails.bank_id || '',
+            branch_code: existingDetails.branch_code || '',
+            verified: existingDetails.verified || false
+          });
         }
       }
     } catch (error) {
@@ -289,6 +347,93 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSaveBankTransfer = async () => {
+    if (!user || !bankDetails.account_number || !bankDetails.bank_id) {
+      toast.error('Please fill in all bank account details');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          default_payout_method: 'bank',
+          bank_account_details: bankDetails
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      toast.success('Bank transfer details saved successfully!');
+      onSuccess();
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Error saving bank transfer details:', error);
+      toast.error('Failed to save bank transfer details');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyAccount = async () => {
+    if (!bankDetails.account_number || !bankDetails.bank_id) {
+      toast.error('Please enter account number and select a bank');
+      return;
+    }
+
+    setIsVerifying(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('resolve-account', {
+        body: {
+          accountNumber: bankDetails.account_number,
+          bankId: bankDetails.bank_id,
+          country: 'zm'
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        const resolvedAccount = data.data.data;
+        setBankDetails(prev => ({
+          ...prev,
+          account_name: resolvedAccount.accountName,
+          verified: true
+        }));
+        toast.success('Account verified successfully!');
+      } else {
+        throw new Error(data.error || 'Verification failed');
+      }
+    } catch (error) {
+      console.error('Error verifying account:', error);
+      toast.error('Account verification failed. Please check details.');
+      setBankDetails(prev => ({ ...prev, verified: false }));
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleBankDetailsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setBankDetails(prev => ({ 
+      ...prev, 
+      [name]: value,
+      verified: false // Reset verification when details change
+    }));
+  };
+
+  const handleBankSelect = (bankId: string) => {
+    const selectedBank = banks.find(bank => bank.id === bankId);
+    setBankDetails(prev => ({
+      ...prev,
+      bank_id: bankId,
+      bank_name: selectedBank?.name || '',
+      verified: false // Reset verification when bank changes
+    }));
   };
 
   // Helper function to get 2-letter country code for ReactCountryFlag
@@ -374,6 +519,21 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
                   </span>
                 </div>
               )}
+
+              {profileData.bank_account_details && (
+                <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-purple-50 to-purple-100/50 rounded-xl border border-purple-200">
+                  <div className="p-2 rounded-lg bg-purple-500/10">
+                    <Building2 className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div className="flex-1">
+                    <span className="text-sm font-medium text-gray-800">Bank Transfer</span>
+                    <Badge className="ml-2 bg-green-100 text-green-800 border-green-200">Configured</Badge>
+                  </div>
+                  <span className="text-xs text-gray-600">
+                    {profileData.bank_account_details.bank_name} • {profileData.bank_account_details.account_number}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
@@ -381,7 +541,7 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
           <div className="space-y-4">
             <Label className="text-sm font-semibold text-gray-700">Select Payout Method</Label>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Stripe Option */}
               <Card 
                 className={`cursor-pointer transition-all duration-300 border-2 ${
@@ -446,6 +606,41 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
                       </CardTitle>
                       <CardDescription className="text-xs mt-1">
                         Direct mobile money transfers • Available in Africa
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+              </Card>
+
+              {/* Bank Transfer Option */}
+              <Card 
+                className={`cursor-pointer transition-all duration-300 border-2 ${
+                  selectedMethod === 'bank' 
+                    ? 'border-orange-300 bg-gradient-to-br from-orange-50 to-purple-50 shadow-lg scale-105' 
+                    : 'border-gray-200 hover:border-orange-200 hover:shadow-md'
+                }`}
+                onClick={() => setSelectedMethod('bank')}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg ${
+                      selectedMethod === 'bank' 
+                        ? 'bg-gradient-to-r from-orange-500 to-purple-600' 
+                        : 'bg-gray-100'
+                    }`}>
+                      <Building2 className={`h-5 w-5 ${
+                        selectedMethod === 'bank' ? 'text-white' : 'text-gray-600'
+                      }`} />
+                    </div>
+                    <div className="flex-1">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        Bank Transfer
+                        {profileData?.bank_account_details && (
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        )}
+                      </CardTitle>
+                      <CardDescription className="text-xs mt-1">
+                        Direct bank transfers • Available in Africa
                       </CardDescription>
                     </div>
                   </div>
@@ -597,6 +792,127 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
                   )}
                 </Button>
               )}
+            </div>
+          )}
+
+          {selectedMethod === 'bank' && (
+            <div className="space-y-4 p-4 bg-gradient-to-br from-orange-50/30 to-purple-50/30 rounded-xl border border-orange-200/50">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-purple-600">
+                    <Building2 className="h-4 w-4 text-white" />
+                  </div>
+                  <span className="text-sm font-semibold text-gray-800">Bank Account Details</span>
+                  {profileData?.bank_account_details && (
+                    <CheckCircle className="h-4 w-4 text-green-600 ml-1" />
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="bank_id" className="text-sm font-medium text-gray-700">
+                      Bank
+                    </Label>
+                    <Select value={bankDetails.bank_id} onValueChange={handleBankSelect}>
+                      <SelectTrigger className="border-gray-300 focus:border-orange-500 focus:ring-orange-500">
+                        <SelectValue placeholder="Select your bank" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {banks.map((bank) => (
+                          <SelectItem key={bank.id} value={bank.id}>
+                            {bank.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="account_number" className="text-sm font-medium text-gray-700">
+                      Account Number
+                    </Label>
+                    <div className="flex space-x-2">
+                      <Input
+                        type="text"
+                        id="account_number"
+                        name="account_number"
+                        value={bankDetails.account_number}
+                        onChange={handleBankDetailsChange}
+                        placeholder="Enter account number"
+                        className="border-gray-300 focus:border-orange-500 focus:ring-orange-500 flex-1"
+                      />
+                      <Button
+                        type="button"
+                        onClick={verifyAccount}
+                        disabled={isVerifying || !bankDetails.account_number || !bankDetails.bank_id}
+                        className="bg-gradient-to-r from-orange-500 to-purple-600 text-white px-4 disabled:opacity-50 disabled:cursor-not-allowed hover:from-orange-600 hover:to-purple-700 transition-all duration-200"
+                      >
+                        {isVerifying ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        ) : (
+                          'Verify'
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="account_name" className="text-sm font-medium text-gray-700">
+                      Account Name
+                    </Label>
+                    <Input
+                      type="text"
+                      id="account_name"
+                      name="account_name"
+                      value={bankDetails.account_name}
+                      onChange={handleBankDetailsChange}
+                      placeholder={bankDetails.verified ? "Auto-verified" : "Will auto-populate after verification"}
+                      className={`border-gray-300 focus:border-orange-500 focus:ring-orange-500 ${
+                        bankDetails.verified ? 'bg-green-50 border-green-200' : ''
+                      }`}
+                      readOnly={bankDetails.verified}
+                    />
+                    {bankDetails.verified && (
+                      <div className="flex items-center space-x-1 text-green-600 text-sm">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        <span>Account verified</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="branch_code" className="text-sm font-medium text-gray-700">
+                      Branch Code (Optional)
+                    </Label>
+                    <Input
+                      type="text"
+                      id="branch_code"
+                      name="branch_code"
+                      value={bankDetails.branch_code}
+                      onChange={handleBankDetailsChange}
+                      placeholder="Branch code"
+                      className="border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                    />
+                  </div>
+                </div>
+
+                <Button 
+                  onClick={handleSaveBankTransfer}
+                  disabled={loading || !bankDetails.account_number || !bankDetails.bank_id || !bankDetails.verified}
+                  className="w-full h-12 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      Saving Details...
+                    </div>
+                  ) : (
+                    "Save Bank Transfer Details"
+                  )}
+                </Button>
+              </div>
             </div>
           )}
         </div>
