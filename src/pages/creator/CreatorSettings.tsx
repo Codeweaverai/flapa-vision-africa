@@ -7,12 +7,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import ProfilePictureUpload from '@/components/user/ProfilePictureUpload';
 import ReactCountryFlag from "react-country-flag";
-import { Smartphone, Sparkles, CheckCircle } from 'lucide-react';
+import { Smartphone, Sparkles, CheckCircle, AlertCircle, Building2 } from 'lucide-react';
 
 interface Bank {
   id: string;
@@ -27,6 +28,7 @@ interface BankAccountDetails {
   bank_id: string;
   branch_code: string;
   verified: boolean;
+  recipient_id?: string;
 }
 
 interface Profile {
@@ -180,6 +182,7 @@ const CreatorSettings = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isCreatingRecipient, setIsCreatingRecipient] = useState(false);
   const [banks, setBanks] = useState<Bank[]>([]);
   const [bankDetails, setBankDetails] = useState<BankAccountDetails>({
     account_name: '',
@@ -267,7 +270,8 @@ const CreatorSettings = () => {
             bank_name: existingDetails.bank_name || '',
             bank_id: existingDetails.bank_id || '',
             branch_code: existingDetails.branch_code || '',
-            verified: existingDetails.verified || false
+            verified: existingDetails.verified || false,
+            recipient_id: existingDetails.recipient_id || ''
           });
         }
       }
@@ -325,6 +329,7 @@ const CreatorSettings = () => {
         setBankDetails(prev => ({
           ...prev,
           account_name: resolvedAccount.accountName,
+          bank_name: resolvedAccount.bank.name,
           verified: true
         }));
         toast.success('Account verified successfully!');
@@ -337,6 +342,41 @@ const CreatorSettings = () => {
       setBankDetails(prev => ({ ...prev, verified: false }));
     } finally {
       setIsVerifying(false);
+    }
+  };
+
+  const createRecipient = async (): Promise<string> => {
+    if (!bankDetails.account_number || !bankDetails.bank_id || !bankDetails.account_name) {
+      throw new Error('Account details are incomplete for recipient creation');
+    }
+
+    setIsCreatingRecipient(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-recipient', {
+        body: {
+          accountNumber: bankDetails.account_number,
+          bankId: bankDetails.bank_id,
+          accountName: bankDetails.account_name,
+          country: 'zm',
+          currency: 'ZMW'
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        const recipientId = data.data.data.id;
+        toast.success('Recipient created successfully in Lenco system!');
+        return recipientId;
+      } else {
+        throw new Error(data.error || 'Recipient creation failed');
+      }
+    } catch (error) {
+      console.error('Error creating recipient:', error);
+      toast.error('Failed to create recipient in Lenco system');
+      throw error;
+    } finally {
+      setIsCreatingRecipient(false);
     }
   };
 
@@ -378,7 +418,22 @@ const CreatorSettings = () => {
 
       // Add bank data if selected
       if (profile.payout_method === 'bank') {
-        updateData.bank_account_details = bankDetails;
+        let recipientId = bankDetails.recipient_id;
+
+        // Create recipient in Lenco system if verified but not created yet
+        if (bankDetails.verified && !recipientId) {
+          try {
+            recipientId = await createRecipient();
+          } catch (error) {
+            console.error('Recipient creation failed, but saving bank details anyway:', error);
+            // Continue with saving even if recipient creation fails
+          }
+        }
+
+        updateData.bank_account_details = {
+          ...bankDetails,
+          recipient_id: recipientId
+        };
       }
 
       const { error } = await supabase
@@ -621,6 +676,16 @@ const CreatorSettings = () => {
 
                   {profile.payout_method === 'bank' && (
                     <div className="space-y-4 p-4 bg-gradient-to-br from-orange-50 to-purple-50 rounded-lg border border-orange-100">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="p-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-purple-600">
+                          <Building2 className="h-4 w-4 text-white" />
+                        </div>
+                        <span className="text-sm font-semibold text-gray-800">Bank Account Details</span>
+                        {profile.bank_account_details && (
+                          <CheckCircle className="h-4 w-4 text-green-600 ml-1" />
+                        )}
+                      </div>
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="bank_id" className="text-sm font-medium text-gray-700">
@@ -710,6 +775,24 @@ const CreatorSettings = () => {
                           />
                         </div>
                       </div>
+
+                      {bankDetails.verified && !bankDetails.recipient_id && (
+                        <Alert className="bg-blue-50 border-blue-200">
+                          <AlertCircle className="h-4 w-4 text-blue-600" />
+                          <AlertDescription className="text-blue-800">
+                            Your account is verified! Click "Update Profile" to create a recipient in Lenco system for faster future payouts.
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
+                      {bankDetails.recipient_id && (
+                        <Alert className="bg-green-50 border-green-200">
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                          <AlertDescription className="text-green-800">
+                            Recipient successfully created in Lenco system! Future payouts will be faster.
+                          </AlertDescription>
+                        </Alert>
+                      )}
                     </div>
                   )}
                 </div>
@@ -717,13 +800,15 @@ const CreatorSettings = () => {
 
               <Button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isCreatingRecipient}
                 className="w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white py-3 px-6 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:from-orange-600 hover:to-purple-700 transition-all duration-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl"
               >
-                {isSubmitting ? (
+                {isSubmitting || isCreatingRecipient ? (
                   <div className="flex items-center space-x-2">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Updating Profile...</span>
+                    <span>
+                      {isCreatingRecipient ? "Creating Recipient..." : "Updating Profile..."}
+                    </span>
                   </div>
                 ) : (
                   'Update Profile'
