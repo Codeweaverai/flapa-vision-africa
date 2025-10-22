@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, DollarSign, CheckCircle, Smartphone, CreditCard, ArrowRight } from 'lucide-react';
+import { AlertCircle, DollarSign, CheckCircle, Smartphone, CreditCard, Building2, ArrowRight } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -34,6 +34,15 @@ interface ProfileData {
   mobile_money_operator?: string;
   mobile_money_number?: string;
   default_payout_method?: string;
+  bank_account_details?: {
+    account_name: string;
+    account_number: string;
+    bank_name: string;
+    bank_id: string;
+    branch_code: string;
+    verified: boolean;
+    recipient_id?: string;
+  };
 }
 
 const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
@@ -47,7 +56,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   const [loading, setLoading] = useState(false);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [checkingProfile, setCheckingProfile] = useState(true);
-  const [selectedPayoutMethod, setSelectedPayoutMethod] = useState<'stripe' | 'mobile_money'>('stripe');
+  const [selectedPayoutMethod, setSelectedPayoutMethod] = useState<'stripe' | 'mobile_money' | 'bank'>('stripe');
   const [convertedBalance, setConvertedBalance] = useState(0);
   const [localCurrency, setLocalCurrency] = useState<CurrencyCode>('USD');
   const [exchangeRate, setExchangeRate] = useState(1);
@@ -126,6 +135,13 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           setConvertedBalance(localAmount);
           setLocalCurrency(targetCurrency);
           setExchangeRate(rate);
+        } else if (selectedPayoutMethod === 'bank') {
+          // For bank transfers, use Zambian Kwacha
+          const rate = 23.4; // 1 USD = 23.4 ZMW
+          const localAmount = availableBalance * rate;
+          setConvertedBalance(localAmount);
+          setLocalCurrency('ZMW');
+          setExchangeRate(rate);
         }
       } catch (error) {
         console.error('Error converting balance:', error);
@@ -147,7 +163,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('stripe_connect_account_id, stripe_onboarding_completed, mobile_money_operator, mobile_money_number, default_payout_method')
+        .select('stripe_connect_account_id, stripe_onboarding_completed, mobile_money_operator, mobile_money_number, default_payout_method, bank_account_details')
         .eq('id', user.id)
         .single();
 
@@ -161,11 +177,13 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         
         // Set the payout method based on what's configured
         if (data.default_payout_method) {
-          setSelectedPayoutMethod(data.default_payout_method as 'stripe' | 'mobile_money');
+          setSelectedPayoutMethod(data.default_payout_method as 'stripe' | 'mobile_money' | 'bank');
         } else if (data.stripe_connect_account_id && data.stripe_onboarding_completed) {
           setSelectedPayoutMethod('stripe');
         } else if (data.mobile_money_operator && data.mobile_money_number) {
           setSelectedPayoutMethod('mobile_money');
+        } else if (data.bank_account_details && data.bank_account_details.verified) {
+          setSelectedPayoutMethod('bank');
         }
       }
     } catch (error) {
@@ -178,7 +196,8 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
   // Define these variables before they're used
   const hasStripeSetup = profileData?.stripe_connect_account_id && profileData?.stripe_onboarding_completed;
   const hasMobileMoneySetup = profileData?.mobile_money_operator && profileData?.mobile_money_number;
-  const hasAnyPayoutMethod = hasStripeSetup || hasMobileMoneySetup;
+  const hasBankSetup = profileData?.bank_account_details && profileData.bank_account_details.verified;
+  const hasAnyPayoutMethod = hasStripeSetup || hasMobileMoneySetup || hasBankSetup;
 
   useEffect(() => {
     if (profileData) {
@@ -186,13 +205,53 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         setSelectedPayoutMethod('stripe');
       } else if (profileData.default_payout_method === 'mobile_money' && hasMobileMoneySetup) {
         setSelectedPayoutMethod('mobile_money');
+      } else if (profileData.default_payout_method === 'bank' && hasBankSetup) {
+        setSelectedPayoutMethod('bank');
       } else if (hasStripeSetup) {
         setSelectedPayoutMethod('stripe');
       } else if (hasMobileMoneySetup) {
         setSelectedPayoutMethod('mobile_money');
+      } else if (hasBankSetup) {
+        setSelectedPayoutMethod('bank');
       }
     }
-  }, [profileData, hasStripeSetup, hasMobileMoneySetup]);
+  }, [profileData, hasStripeSetup, hasMobileMoneySetup, hasBankSetup]);
+
+  const handleBankTransfer = async (withdrawAmount: number, usdAmount: number) => {
+    if (!user || !profileData?.bank_account_details) {
+      throw new Error('Bank account details not configured');
+    }
+
+    const bankDetails = profileData.bank_account_details;
+    
+    // Generate unique reference
+    const reference = `SP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    const { data, error } = await supabase.functions.invoke('initiate-transfer', {
+      body: {
+        amount: usdAmount, // USD amount to deduct
+        accountId: 'your-lenco-account-id', // This should be your Lenco business account ID
+        narration: 'SkillPulse Payout',
+        reference: reference,
+        transferRecipientId: bankDetails.recipient_id, // Use recipient ID for faster processing
+        accountNumber: bankDetails.recipient_id ? undefined : bankDetails.account_number, // Only if no recipient ID
+        bankId: bankDetails.recipient_id ? undefined : bankDetails.bank_id, // Only if no recipient ID
+        country: 'zm', // Zambia only
+        creator_id: user.id
+      }
+    });
+
+    if (error) {
+      console.error('Lenco bank transfer error:', error);
+      throw error;
+    }
+
+    if (!data?.success) {
+      throw new Error(data?.message || 'Bank transfer request failed');
+    }
+
+    return data;
+  };
 
   const handleWithdraw = async () => {
     if (!user || !profileData) return;
@@ -205,7 +264,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
 
     // Check minimum amount based on local currency
     const minAmountUSD = 2;
-    const minAmountLocal = selectedPayoutMethod === 'mobile_money' ? 
+    const minAmountLocal = selectedPayoutMethod === 'stripe' ? 
       minAmountUSD * exchangeRate : minAmountUSD;
     
     if (withdrawAmount < minAmountLocal) {
@@ -291,6 +350,24 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
         } else {
           throw new Error(data?.message || 'Payout request failed');
         }
+      } else if (selectedPayoutMethod === 'bank') {
+        // Calculate the USD equivalent to deduct from balance
+        const usdAmountToDeduct = withdrawAmount / exchangeRate;
+
+        console.log('Bank Transfer Withdrawal:', {
+          withdrawAmount: withdrawAmount, // ZMW amount
+          localCurrency,
+          exchangeRate,
+          usdAmountToDeduct, // USD amount to deduct from balance
+          availableBalance,
+          bankDetails: profileData.bank_account_details
+        });
+
+        const result = await handleBankTransfer(withdrawAmount, usdAmountToDeduct);
+
+        if (result.success) {
+          toast.success(`Bank transfer request submitted successfully! You will receive ${formatPrice(withdrawAmount, localCurrency)} in your bank account within 1-3 business days.`);
+        }
       }
 
       onSuccess();
@@ -306,7 +383,8 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
 
   const withdrawAmount = parseFloat(amount) || 0;
   const minAmount = selectedPayoutMethod === 'stripe' ? 5 : 
-    (localCurrency === 'ZMW' ? 75 : localCurrency === 'KES' ? 750 : 5); // Approximate minimums
+    selectedPayoutMethod === 'bank' ? 50 : // 50 ZMW minimum for bank transfers
+    (localCurrency === 'ZMW' ? 75 : localCurrency === 'KES' ? 750 : 5); // Mobile money minimums
   const isValidAmount = withdrawAmount >= minAmount && withdrawAmount <= convertedBalance;
 
   if (checkingProfile) {
@@ -369,7 +447,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
             </div>
             <div className="text-xs text-slate-500 mt-2">
               Funds available for withdrawal (after 7-day hold period)
-              {selectedPayoutMethod === 'mobile_money' && localCurrency !== 'USD' && (
+              {selectedPayoutMethod !== 'stripe' && localCurrency !== 'USD' && (
                 <div className="mt-1 text-xs bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent font-medium">
                   USD equivalent: {formatPrice(availableBalance, 'USD')} • Rate: 1 USD = {exchangeRate} {localCurrency}
                 </div>
@@ -381,7 +459,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           {hasAnyPayoutMethod && (
             <div className="space-y-3">
               <Label className="text-sm font-semibold text-slate-700">Payout Method</Label>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 {hasStripeSetup && (
                   <div 
                     className={`p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
@@ -433,12 +511,44 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                     </div>
                   </div>
                 )}
+
+                {hasBankSetup && (
+                  <div 
+                    className={`p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
+                      selectedPayoutMethod === 'bank' 
+                        ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-purple-50 shadow-md scale-105' 
+                        : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
+                    }`}
+                    onClick={() => setSelectedPayoutMethod('bank')}
+                  >
+                    <div className="flex flex-col items-center text-center space-y-2">
+                      <div className={`p-2 rounded-lg ${
+                        selectedPayoutMethod === 'bank' 
+                          ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white' 
+                          : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        <Building2 className="h-4 w-4" />
+                      </div>
+                      <div className="font-medium text-sm">Bank Transfer</div>
+                      <div className="text-xs text-slate-500">1-3 business days</div>
+                      {selectedPayoutMethod === 'bank' && (
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
               
               {/* Selected Method Details */}
               {selectedPayoutMethod === 'mobile_money' && profileData?.mobile_money_number && (
                 <div className="text-center text-sm text-slate-600 bg-slate-50 py-2 rounded-lg">
                   {profileData?.mobile_money_operator} • {formatDisplayNumber(profileData?.mobile_money_number)}
+                </div>
+              )}
+              
+              {selectedPayoutMethod === 'bank' && profileData?.bank_account_details && (
+                <div className="text-center text-sm text-slate-600 bg-slate-50 py-2 rounded-lg">
+                  {profileData.bank_account_details.bank_name} • {profileData.bank_account_details.account_number}
                 </div>
               )}
             </div>
@@ -448,7 +558,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
             <Alert className="bg-gradient-to-r from-orange-50 to-red-50 border-orange-200">
               <AlertCircle className="h-4 w-4 text-orange-600" />
               <AlertDescription className="text-orange-800">
-                No payout methods configured. Please set up Stripe Connect or Mobile Money in your settings.
+                No payout methods configured. Please set up Stripe Connect, Mobile Money, or Bank Transfer in your settings.
               </AlertDescription>
             </Alert>
           )}
@@ -508,13 +618,16 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                   </div>
                   <div className="flex items-center justify-between">
                     <span>Processing time:</span>
-                    <span className="font-semibold">{selectedPayoutMethod === 'stripe' ? 'Instant' : 'Within 24 hours'}</span>
+                    <span className="font-semibold">
+                      {selectedPayoutMethod === 'stripe' ? 'Instant' : 
+                       selectedPayoutMethod === 'mobile_money' ? 'Within 24 hours' : '1-3 business days'}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span>Platform fee:</span>
                     <span className="font-semibold">8% (already deducted)</span>
                   </div>
-                  {selectedPayoutMethod === 'mobile_money' && localCurrency !== 'USD' && (
+                  {selectedPayoutMethod !== 'stripe' && localCurrency !== 'USD' && (
                     <div className="flex items-center justify-between">
                       <span>Exchange rate:</span>
                       <span className="font-semibold">1 USD = {exchangeRate} {localCurrency}</span>
