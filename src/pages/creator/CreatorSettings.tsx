@@ -11,6 +11,8 @@ import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import ProfilePictureUpload from '@/components/user/ProfilePictureUpload';
+import ReactCountryFlag from "react-country-flag";
+import { Smartphone, Sparkles, CheckCircle } from 'lucide-react';
 
 interface Bank {
   id: string;
@@ -36,8 +38,142 @@ interface Profile {
   is_creator?: boolean;
   payout_method?: 'stripe' | 'mobile_money' | 'bank';
   mobile_money_number?: string;
+  mobile_money_country?: string;
+  mobile_money_operator?: string;
   bank_account_details?: BankAccountDetails;
 }
+
+// Country data from PaymentMethodSetupDialog
+const PAWAPAY_COUNTRIES = {
+  'Zambia': { code: 'ZMB', flag: '🇿🇲', dialCode: '+260' },
+  'Kenya': { code: 'KEN', flag: '🇰🇪', dialCode: '+254' },
+  'Uganda': { code: 'UGA', flag: '🇺🇬', dialCode: '+256' },
+  'Tanzania': { code: 'TZA', flag: '🇹🇿', dialCode: '+255' },
+  'Ghana': { code: 'GHA', flag: '🇬🇭', dialCode: '+233' },
+  'Nigeria': { code: 'NGA', flag: '🇳🇬', dialCode: '+234' },
+  'Rwanda': { code: 'RWA', flag: '🇷🇼', dialCode: '+250' },
+  'Malawi': { code: 'MWI', flag: '🇲🇼', dialCode: '+265' },
+  'Mozambique': { code: 'MOZ', flag: '🇲🇿', dialCode: '+258' },
+  'Senegal': { code: 'SEN', flag: '🇸🇳', dialCode: '+221' },
+  'Benin': { code: 'BEN', flag: '🇧🇯', dialCode: '+229' },
+  'Burkina Faso': { code: 'BFA', flag: '🇧🇫', dialCode: '+226' },
+  'Cameroon': { code: 'CMR', flag: '🇨🇲', dialCode: '+237' },
+  'Congo-Brazzaville': { code: 'COG', flag: '🇨🇬', dialCode: '+242' },
+  'DRC': { code: 'COD', flag: '🇨🇩', dialCode: '+243' },
+  'Gabon': { code: 'GAB', flag: '🇬🇦', dialCode: '+241' },
+  'Ivory Coast': { code: 'CIV', flag: '🇨🇮', dialCode: '+225' },
+  'Lesotho': { code: 'LSO', flag: '🇱🇸', dialCode: '+266' },
+  'Sierra Leone': { code: 'SLE', flag: '🇸🇱', dialCode: '+232' },
+};
+
+// Country code mapping for ReactCountryFlag (3-letter to 2-letter)
+const COUNTRY_CODE_MAP: { [key: string]: string } = {
+  'ZMB': 'ZM',
+  'KEN': 'KE',
+  'UGA': 'UG',
+  'TZA': 'TZ',
+  'GHA': 'GH',
+  'NGA': 'NG',
+  'RWA': 'RW',
+  'MWI': 'MW',
+  'MOZ': 'MZ',
+  'SEN': 'SN',
+  'BEN': 'BJ',
+  'BFA': 'BF',
+  'CMR': 'CM',
+  'COG': 'CG',
+  'COD': 'CD',
+  'GAB': 'GA',
+  'CIV': 'CI',
+  'LSO': 'LS',
+  'SLE': 'SL',
+  'USA': 'US'
+};
+
+const MOBILE_OPERATORS = {
+  ZMB: [
+    { code: 'mtn_zmb', name: 'MTN Zambia' },
+    { code: 'airtel_zmb', name: 'Airtel Zambia' }
+  ],
+  KEN: [
+    { code: 'mpesa_ken', name: 'M-Pesa Kenya' },
+    { code: 'airtel_ken', name: 'Airtel Kenya' },
+    { code: 'equitel_ken', name: 'Equitel Kenya' }
+  ],
+  UGA: [
+    { code: 'mtn_uga', name: 'MTN Uganda' },
+    { code: 'airtel_uga', name: 'Airtel Uganda' }
+  ],
+  TZA: [
+    { code: 'vodacom_tza', name: 'Vodacom Tanzania' },
+    { code: 'tigo_tza', name: 'Tigo Tanzania' },
+    { code: 'airtel_tza', name: 'Airtel Tanzania' }
+  ],
+  GHA: [
+    { code: 'mtn_gha', name: 'MTN Ghana' },
+    { code: 'vodafone_gha', name: 'Vodafone Ghana' },
+    { code: 'airteltigo_gha', name: 'AirtelTigo Ghana' }
+  ],
+  NGA: [
+    { code: 'mtn_nga', name: 'MTN Nigeria' },
+    { code: 'airtel_nga', name: 'Airtel Nigeria' },
+    { code: 'glo_nga', name: 'Glo Nigeria' },
+    { code: '9mobile_nga', name: '9mobile Nigeria' }
+  ],
+  RWA: [
+    { code: 'mtn_rwa', name: 'MTN Rwanda' },
+    { code: 'airtel_rwa', name: 'Airtel Rwanda' }
+  ],
+  MWI: [
+    { code: 'airtel_mwi', name: 'Airtel Malawi' },
+    { code: 'tnm_mwi', name: 'TNM Malawi' }
+  ],
+  MOZ: [
+    { code: 'vodacom_moz', name: 'Vodacom Mozambique' },
+    { code: 'mcel_moz', name: 'Mcel Mozambique' }
+  ],
+  SEN: [
+    { code: 'orange_sen', name: 'Orange Senegal' },
+    { code: 'free_sen', name: 'Free Senegal' }
+  ],
+  BEN: [
+    { code: 'mtn_ben', name: 'MTN Benin' },
+    { code: 'moov_ben', name: 'Moov Benin' }
+  ],
+  BFA: [
+    { code: 'orange_bfa', name: 'Orange Burkina Faso' },
+    { code: 'moov_bfa', name: 'Moov Burkina Faso' }
+  ],
+  CMR: [
+    { code: 'mtn_cmr', name: 'MTN Cameroon' },
+    { code: 'orange_cmr', name: 'Orange Cameroon' }
+  ],
+  COG: [
+    { code: 'airtel_cog', name: 'Airtel Congo' },
+    { code: 'mtn_cog', name: 'MTN Congo' }
+  ],
+  COD: [
+    { code: 'vodacom_cod', name: 'Vodacom DRC' },
+    { code: 'airtel_cod', name: 'Airtel DRC' }
+  ],
+  GAB: [
+    { code: 'airtel_gab', name: 'Airtel Gabon' },
+    { code: 'moov_gab', name: 'Moov Gabon' }
+  ],
+  CIV: [
+    { code: 'orange_civ', name: 'Orange Ivory Coast' },
+    { code: 'mtn_civ', name: 'MTN Ivory Coast' },
+    { code: 'moov_civ', name: 'Moov Ivory Coast' }
+  ],
+  LSO: [
+    { code: 'vodacom_lso', name: 'Vodacom Lesotho' },
+    { code: 'econet_lso', name: 'Econet Lesotho' }
+  ],
+  SLE: [
+    { code: 'orange_sle', name: 'Orange Sierra Leone' },
+    { code: 'airtel_sle', name: 'Airtel Sierra Leone' }
+  ]
+};
 
 const CreatorSettings = () => {
   const { user } = useAuth();
@@ -53,6 +189,11 @@ const CreatorSettings = () => {
     branch_code: '',
     verified: false
   });
+  
+  // Mobile Money State
+  const [mobileCountry, setMobileCountry] = useState('ZMB');
+  const [mobileOperator, setMobileOperator] = useState('');
+  const [mobileNumber, setMobileNumber] = useState('');
 
   useEffect(() => {
     if (user) {
@@ -64,7 +205,7 @@ const CreatorSettings = () => {
   const loadBanks = async () => {
     try {
       const { data, error } = await supabase.functions.invoke('get-lenco-banks', {
-        body: { country: 'zm' } // Default to Zambia, can be made dynamic
+        body: { country: 'zm' }
       });
 
       if (error) throw error;
@@ -100,10 +241,24 @@ const CreatorSettings = () => {
           is_creator: data.is_creator,
           payout_method: data.payout_method as 'stripe' | 'mobile_money' | 'bank',
           mobile_money_number: data.mobile_money_number,
+          mobile_money_country: data.mobile_money_country,
+          mobile_money_operator: data.mobile_money_operator,
         };
 
         setProfile(profileData);
 
+        // Set mobile money data if exists
+        if (data.mobile_money_country) {
+          setMobileCountry(data.mobile_money_country);
+        }
+        if (data.mobile_money_operator) {
+          setMobileOperator(data.mobile_money_operator);
+        }
+        if (data.mobile_money_number) {
+          setMobileNumber(data.mobile_money_number);
+        }
+
+        // Set bank details if exists
         if (data.bank_account_details && typeof data.bank_account_details === 'object') {
           const existingDetails = data.bank_account_details as any;
           setBankDetails({
@@ -192,6 +347,12 @@ const CreatorSettings = () => {
     } : null);
   };
 
+  const handleMobileCountryChange = (countryCode: string) => {
+    setMobileCountry(countryCode);
+    // Reset operator when country changes
+    setMobileOperator('');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !profile) return;
@@ -199,16 +360,26 @@ const CreatorSettings = () => {
     setIsSubmitting(true);
 
     try {
-      const updateData = {
+      const updateData: any = {
         username: profile.username,
         full_name: profile.full_name,
         bio: profile.bio,
         is_creator: profile.is_creator,
         payout_method: profile.payout_method,
-        mobile_money_number: profile.mobile_money_number,
-        bank_account_details: bankDetails as any,
         updated_at: new Date().toISOString()
       };
+
+      // Add mobile money data if selected
+      if (profile.payout_method === 'mobile_money') {
+        updateData.mobile_money_country = mobileCountry;
+        updateData.mobile_money_operator = mobileOperator;
+        updateData.mobile_money_number = mobileNumber;
+      }
+
+      // Add bank data if selected
+      if (profile.payout_method === 'bank') {
+        updateData.bank_account_details = bankDetails;
+      }
 
       const { error } = await supabase
         .from('profiles')
@@ -243,6 +414,11 @@ const CreatorSettings = () => {
       console.error('Error updating avatar:', error);
       toast.error('Failed to update profile picture');
     }
+  };
+
+  // Helper function to get 2-letter country code for ReactCountryFlag
+  const getCountryCode = (countryCode: string): string => {
+    return COUNTRY_CODE_MAP[countryCode] || 'US';
   };
 
   if (!profile) {
@@ -352,19 +528,94 @@ const CreatorSettings = () => {
                   </div>
 
                   {profile.payout_method === 'mobile_money' && (
-                    <div className="space-y-2">
-                      <Label htmlFor="mobile_money_number" className="text-sm font-medium text-gray-700">
-                        Mobile Money Number
-                      </Label>
-                      <Input
-                        type="text"
-                        id="mobile_money_number"
-                        name="mobile_money_number"
-                        value={profile.mobile_money_number || ''}
-                        onChange={handleChange}
-                        placeholder="Enter mobile money number"
-                        className="border-gray-300 focus:border-orange-500 focus:ring-orange-500"
-                      />
+                    <div className="space-y-4 p-4 bg-gradient-to-br from-orange-50 to-purple-50 rounded-lg border border-orange-100">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="p-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-purple-600">
+                          <Smartphone className="h-4 w-4 text-white" />
+                        </div>
+                        <span className="text-sm font-semibold text-gray-800">Mobile Money Details</span>
+                        {profile.mobile_money_number && profile.mobile_money_operator && (
+                          <CheckCircle className="h-4 w-4 text-green-600 ml-1" />
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="mobile_country" className="text-sm font-medium text-gray-700">
+                            Country
+                          </Label>
+                          <Select value={mobileCountry} onValueChange={handleMobileCountryChange}>
+                            <SelectTrigger className="border-gray-300 focus:border-orange-500 focus:ring-orange-500">
+                              <SelectValue placeholder="Select country" />
+                            </SelectTrigger>
+                            <SelectContent className="min-w-[300px] max-h-[300px]">
+                              {Object.entries(PAWAPAY_COUNTRIES).map(([country, details]) => (
+                                <SelectItem key={details.code} value={details.code}>
+                                  <div className="flex items-center gap-3 py-1">
+                                    <ReactCountryFlag
+                                      countryCode={getCountryCode(details.code)}
+                                      svg
+                                      style={{
+                                        width: '20px',
+                                        height: '15px',
+                                        borderRadius: '3px',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                      }}
+                                      title={country}
+                                    />
+                                    <div className="flex flex-col">
+                                      <span className="font-medium text-gray-800 text-sm">{country}</span>
+                                      <span className="text-xs text-gray-500">{details.dialCode}</span>
+                                    </div>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="mobile_operator" className="text-sm font-medium text-gray-700">
+                            Mobile Operator
+                          </Label>
+                          <Select value={mobileOperator} onValueChange={setMobileOperator}>
+                            <SelectTrigger className="border-gray-300 focus:border-orange-500 focus:ring-orange-500">
+                              <SelectValue placeholder="Select operator" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {MOBILE_OPERATORS[mobileCountry as keyof typeof MOBILE_OPERATORS]?.map((operator) => (
+                                <SelectItem key={operator.code} value={operator.code}>
+                                  <div className="flex items-center gap-2 py-1">
+                                    <div className="w-2 h-2 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full"></div>
+                                    <span className="text-sm">{operator.name}</span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="md:col-span-2 space-y-2">
+                          <Label htmlFor="mobile_number" className="text-sm font-medium text-gray-700">
+                            Phone Number
+                          </Label>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                              <span className="text-gray-500 text-sm">
+                                {Object.values(PAWAPAY_COUNTRIES).find(c => c.code === mobileCountry)?.dialCode}
+                              </span>
+                            </div>
+                            <Input
+                              id="mobile_number"
+                              type="tel"
+                              placeholder="XXX XXX XXX"
+                              value={mobileNumber}
+                              onChange={(e) => setMobileNumber(e.target.value)}
+                              className="pl-20 border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
 
