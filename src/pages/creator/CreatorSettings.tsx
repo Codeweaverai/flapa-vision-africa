@@ -63,7 +63,7 @@ const CreatorSettings = () => {
 
   const loadBanks = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('get-banks', {
+      const { data, error } = await supabase.functions.invoke('get-lenco-banks', {
         body: { country: 'zm' } // Default to Zambia, can be made dynamic
       });
 
