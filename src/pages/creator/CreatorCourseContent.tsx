@@ -22,8 +22,10 @@ import {
 import ModuleFormDialog from '@/components/admin/ModuleFormDialog';
 import LessonFormDialog from '@/components/admin/LessonFormDialog';
 import QuizFormDialog from '@/components/admin/QuizFormDialog';
+import QuizEditDialog from '@/components/admin/QuizEditDialog';
 import FinalExamFormDialog from '@/components/admin/FinalExamFormDialog';
 import LessonTranscriptManager from '@/components/creator/LessonTranscriptManager';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 import { supabase } from '@/lib/supabaseClient';
 
 interface FinalExam {
@@ -60,11 +62,13 @@ const CreatorCourseContent = () => {
   const [moduleDialogOpen, setModuleDialogOpen] = useState(false);
   const [lessonDialogOpen, setLessonDialogOpen] = useState(false);
   const [quizDialogOpen, setQuizDialogOpen] = useState(false);
+  const [quizEditDialogOpen, setQuizEditDialogOpen] = useState(false);
   const [finalExamDialogOpen, setFinalExamDialogOpen] = useState(false);
   
   // Selected items for editing
   const [editingModule, setEditingModule] = useState<CourseModule | null>(null);
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
+  const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
   const [editingFinalExam, setEditingFinalExam] = useState<FinalExam | null>(null);
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
@@ -291,8 +295,22 @@ const CreatorCourseContent = () => {
   };
 
   const handleEditQuiz = (quiz: Quiz) => {
-    // You can implement quiz editing here
-    toast.info('Quiz editing feature coming soon!');
+    setEditingQuiz(quiz);
+    setQuizEditDialogOpen(true);
+  };
+
+  const handleQuizUpdated = () => {
+    if (id) {
+      fetchCourseWithModulesAndLessons(id).then(courseData => {
+        if (courseData) {
+          setCourse(courseData);
+          setModules(courseData.modules || []);
+          loadAllQuizzes(courseData.modules || []);
+        }
+      });
+    }
+    setQuizEditDialogOpen(false);
+    setEditingQuiz(null);
   };
 
   const handleDeleteQuiz = async (quizId: string, lessonId: string) => {
@@ -360,6 +378,25 @@ const CreatorCourseContent = () => {
     } catch (error) {
       console.error('Error deleting final exam:', error);
       toast.error('Failed to delete final exam');
+    }
+  };
+
+  const handleToggleExamPublished = async () => {
+    if (!finalExam) return;
+
+    try {
+      const { error } = await supabase
+        .from('final_exams')
+        .update({ is_published: !finalExam.is_published })
+        .eq('id', finalExam.id);
+
+      if (error) throw error;
+
+      setFinalExam({ ...finalExam, is_published: !finalExam.is_published });
+      toast.success(`Final exam ${finalExam.is_published ? 'unpublished' : 'published'} successfully`);
+    } catch (error) {
+      console.error('Error updating final exam:', error);
+      toast.error('Failed to update final exam');
     }
   };
 
@@ -650,7 +687,7 @@ const CreatorCourseContent = () => {
                         <Badge variant="secondary" className="bg-blue-100 text-blue-700">Free</Badge>
                       ) : (
                         <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-emerald-200">
-                          ${course.price}
+                          <PriceDisplay amount={course.price} originalCurrency="USD" />
                         </Badge>
                       )}
                     </div>
@@ -733,7 +770,6 @@ const CreatorCourseContent = () => {
             </TabsContent>
             
             <TabsContent value="final-exam">
-              {/* Final Exam content remains the same as your original code */}
               <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm">
                 <CardHeader>
                   <div className="flex justify-between items-center">
@@ -907,6 +943,15 @@ const CreatorCourseContent = () => {
             lessonId={selectedLessonId}
             moduleId={selectedModuleId}
             onQuizSaved={handleQuizSaved}
+          />
+        )}
+
+        {quizEditDialogOpen && editingQuiz && (
+          <QuizEditDialog
+            open={quizEditDialogOpen}
+            onOpenChange={setQuizEditDialogOpen}
+            quiz={editingQuiz}
+            onQuizUpdated={handleQuizUpdated}
           />
         )}
 
