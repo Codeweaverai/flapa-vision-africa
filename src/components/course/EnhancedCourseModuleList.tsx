@@ -23,7 +23,9 @@ import {
   ChevronRight,
   Trophy,
   RotateCcw,
-  AlertCircle
+  AlertCircle,
+  FileQuestion,
+  Star
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
@@ -34,6 +36,7 @@ interface Quiz {
   title: string;
   description?: string;
   passing_score: number;
+  question_count?: number;
 }
 
 interface Lesson {
@@ -80,6 +83,14 @@ interface ExamResult {
   attempts: number;
 }
 
+interface QuizResult {
+  id: string;
+  quiz_id: string;
+  score: number;
+  passed: boolean;
+  completed_at: string;
+}
+
 interface EnhancedCourseModuleListProps {
   modules: Module[];
   courseId: string;
@@ -114,6 +125,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
   const [creatorProfile, setCreatorProfile] = useState<CreatorProfile | null>(null);
   const [courseProgress, setCourseProgress] = useState(0);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [quizResults, setQuizResults] = useState<{[key: string]: QuizResult}>({});
 
   useEffect(() => {
     if (courseId) {
@@ -127,6 +139,12 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
   useEffect(() => {
     calculateProgress();
   }, [modules, completedLessons]);
+
+  useEffect(() => {
+    if (user && courseId) {
+      fetchQuizResults();
+    }
+  }, [user, courseId, modules]);
 
   const fetchFinalExam = async () => {
     try {
@@ -158,6 +176,40 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
       setCreatorProfile(data);
     } catch (error) {
       console.error('Error fetching creator profile:', error);
+    }
+  };
+
+  const fetchQuizResults = async () => {
+    if (!user) return;
+
+    try {
+      // Get enrollment
+      const { data: enrollment } = await supabase
+        .from('course_enrollments')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('course_id', courseId)
+        .single();
+
+      if (!enrollment) return;
+
+      // Get all quiz results for this enrollment
+      const { data: results, error } = await supabase
+        .from('quiz_results')
+        .select('*')
+        .eq('enrollment_id', enrollment.id);
+
+      if (error) throw error;
+
+      // Convert to lookup object
+      const resultsMap: {[key: string]: QuizResult} = {};
+      results?.forEach(result => {
+        resultsMap[result.quiz_id] = result;
+      });
+
+      setQuizResults(resultsMap);
+    } catch (error) {
+      console.error('Error fetching quiz results:', error);
     }
   };
 
@@ -298,6 +350,20 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
     return completedLessons.includes(lessonId);
   };
 
+  const getQuizResult = (quizId: string) => {
+    return quizResults[quizId];
+  };
+
+  const hasPassedQuiz = (quizId: string) => {
+    const result = getQuizResult(quizId);
+    return result?.passed || false;
+  };
+
+  const getQuizScore = (quizId: string) => {
+    const result = getQuizResult(quizId);
+    return result?.score || 0;
+  };
+
   // Exam logic
   const hasPassedExam = examResult?.passed;
   const hasExceededAttempts = examResult && examResult.attempts >= maxExamAttempts;
@@ -372,9 +438,10 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
               )}
               
               {module.lessons && module.lessons.length > 0 ? (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {module.lessons.map((lesson, index) => (
-                    <div key={lesson.id}>
+                    <div key={lesson.id} className="space-y-2">
+                      {/* Lesson Card */}
                       <div 
                         className={`flex flex-col items-start justify-between p-3 border rounded-lg cursor-pointer transition-all ${
                           currentLessonId === lesson.id 
@@ -420,6 +487,83 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
                           {currentLessonId === lesson.id ? 'Watching' : 'Watch'}
                         </Button>
                       </div>
+
+                      {/* Quizzes Section - Show below lesson */}
+                      {lesson.quizzes && lesson.quizzes.length > 0 && (
+                        <div className="ml-4 space-y-2 border-l-2 border-orange-200 pl-3">
+                          <div className="flex items-center space-x-1">
+                            <FileQuestion className="h-3 w-3 text-orange-500" />
+                            <span className="text-xs font-medium text-gray-600">Lesson Quizzes</span>
+                          </div>
+                          {lesson.quizzes.map((quiz) => {
+                            const quizResult = getQuizResult(quiz.id);
+                            const hasPassed = hasPassedQuiz(quiz.id);
+                            const score = getQuizScore(quiz.id);
+
+                            return (
+                              <div
+                                key={quiz.id}
+                                className="flex items-center justify-between p-2 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg border border-orange-200 cursor-pointer hover:shadow-sm transition-all"
+                                onClick={() => onQuizStart?.(quiz.id, lesson.id)}
+                              >
+                                <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                  <FileQuestion className="h-3 w-3 text-orange-600 flex-shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <h5 className="text-xs font-medium text-gray-800 truncate">
+                                      {quiz.title}
+                                    </h5>
+                                    {quiz.description && (
+                                      <p className="text-xs text-gray-600 truncate">
+                                        {quiz.description}
+                                      </p>
+                                    )}
+                                    <div className="flex items-center space-x-2 mt-1">
+                                      <Badge 
+                                        variant="outline" 
+                                        className={`text-xs ${
+                                          hasPassed 
+                                            ? 'bg-green-100 text-green-700 border-green-200' 
+                                            : 'bg-orange-100 text-orange-700 border-orange-200'
+                                        }`}
+                                      >
+                                        {quiz.passing_score}% to pass
+                                      </Badge>
+                                      <span className="text-xs text-gray-500">
+                                        {quiz.question_count || 0} questions
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center space-x-2 flex-shrink-0">
+                                  {quizResult ? (
+                                    <div className="flex items-center space-x-1">
+                                      <Badge 
+                                        variant={hasPassed ? "default" : "secondary"}
+                                        className={`text-xs ${
+                                          hasPassed 
+                                            ? 'bg-green-500 text-white' 
+                                            : 'bg-red-500 text-white'
+                                        }`}
+                                      >
+                                        {score}%
+                                      </Badge>
+                                      {hasPassed ? (
+                                        <CheckCircle className="h-3 w-3 text-green-500" />
+                                      ) : (
+                                        <AlertCircle className="h-3 w-3 text-red-500" />
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <Badge variant="outline" className="text-xs bg-blue-100 text-blue-700 border-blue-200">
+                                      Start
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
