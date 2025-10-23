@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Trash2, GraduationCap } from 'lucide-react';
+import { Plus, Trash2, GraduationCap, Sparkles, Loader2, CheckCircle, Clock, Target } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 
 interface FinalExam {
@@ -285,177 +284,266 @@ const FinalExamFormDialog: React.FC<FinalExamFormDialogProps> = ({
 
   const distribution = difficultyDistribution();
 
+  const GradientButton = ({ children, ...props }: any) => (
+    <Button
+      {...props}
+      className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
+    >
+      {children}
+    </Button>
+  );
+
+  const GradientIcon = () => (
+    <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-2 rounded-lg">
+      <GraduationCap className="h-5 w-5 text-white" />
+    </div>
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <GraduationCap className="h-5 w-5 text-orange-500" />
-            {editingExam ? 'Edit Final Exam' : 'Create Final Exam'}
-          </DialogTitle>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-white to-gray-50/50 border-0 shadow-2xl">
+        <DialogHeader className="space-y-4">
+          <div className="flex items-center space-x-3">
+            <GradientIcon />
+            <DialogTitle className="bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent text-2xl font-bold">
+              {editingExam ? 'Edit Final Exam' : 'Create Final Exam'}
+            </DialogTitle>
+          </div>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="title">Exam Title</Label>
-              <Input
-                id="title"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="time_limit">Time Limit (minutes)</Label>
-              <Input
-                id="time_limit"
-                type="number"
-                value={formData.time_limit_minutes}
-                onChange={(e) => setFormData({ ...formData, time_limit_minutes: parseInt(e.target.value) })}
-                min="30"
-                max="180"
-                required
-              />
-            </div>
-          </div>
+          {/* Exam Details Card */}
+          <Card className="border-l-4 border-l-orange-500 shadow-sm">
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="title" className="text-sm font-semibold text-gray-700 flex items-center">
+                    <GraduationCap className="h-4 w-4 mr-2 text-orange-500" />
+                    Exam Title
+                  </Label>
+                  <Input
+                    id="title"
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    className="border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="time_limit" className="text-sm font-semibold text-gray-700 flex items-center">
+                    <Clock className="h-4 w-4 mr-2 text-blue-500" />
+                    Time Limit (minutes)
+                  </Label>
+                  <Input
+                    id="time_limit"
+                    type="number"
+                    value={formData.time_limit_minutes}
+                    onChange={(e) => setFormData({ ...formData, time_limit_minutes: parseInt(e.target.value) })}
+                    min="30"
+                    max="180"
+                    className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+              </div>
 
-          <div>
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Optional exam description"
-            />
-          </div>
+              <div className="space-y-2 mt-4">
+                <Label htmlFor="description" className="text-sm font-semibold text-gray-700">
+                  Description
+                </Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Optional exam description"
+                  className="border-gray-300 focus:border-purple-500 focus:ring-purple-500"
+                />
+              </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="passing_score">Passing Score (%)</Label>
-              <Input
-                id="passing_score"
-                type="number"
-                value={formData.passing_score}
-                onChange={(e) => setFormData({ ...formData, passing_score: parseInt(e.target.value) })}
-                min="50"
-                max="100"
-                required
-              />
-            </div>
-            <div className="flex items-center space-x-2 pt-6">
-              <input
-                type="checkbox"
-                id="is_published"
-                checked={formData.is_published}
-                onChange={(e) => setFormData({ ...formData, is_published: e.target.checked })}
-                className="rounded"
-              />
-              <Label htmlFor="is_published">Publish Exam</Label>
-            </div>
-          </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="passing_score" className="text-sm font-semibold text-gray-700 flex items-center">
+                    <Target className="h-4 w-4 mr-2 text-green-500" />
+                    Passing Score (%)
+                  </Label>
+                  <Input
+                    id="passing_score"
+                    type="number"
+                    value={formData.passing_score}
+                    onChange={(e) => setFormData({ ...formData, passing_score: parseInt(e.target.value) })}
+                    min="50"
+                    max="100"
+                    className="border-gray-300 focus:border-green-500 focus:ring-green-500"
+                    required
+                  />
+                </div>
+                <div className="flex items-center space-x-2 pt-6">
+                  <input
+                    type="checkbox"
+                    id="is_published"
+                    checked={formData.is_published}
+                    onChange={(e) => setFormData({ ...formData, is_published: e.target.checked })}
+                    className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                  />
+                  <Label htmlFor="is_published" className="text-sm font-semibold text-gray-700">
+                    Publish Exam
+                  </Label>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
+          {/* Question Distribution Card */}
           {questions.length > 0 && (
-            <Card>
+            <Card className="bg-gradient-to-r from-orange-50 to-purple-50 border border-orange-200">
               <CardHeader>
-                <CardTitle className="text-sm">Question Distribution</CardTitle>
+                <CardTitle className="text-sm font-semibold">Question Distribution</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex gap-2 flex-wrap">
-                  <Badge variant="outline">Easy/Moderate: {distribution.easy + distribution.moderate}%</Badge>
-                  <Badge variant="outline">Application: {distribution.application}%</Badge>
-                  <Badge variant="outline">Advanced: {distribution.advanced}%</Badge>
+                  <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200">
+                    Easy/Moderate: {distribution.easy + distribution.moderate}%
+                  </Badge>
+                  <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
+                    Application: {distribution.application}%
+                  </Badge>
+                  <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200">
+                    Advanced: {distribution.advanced}%
+                  </Badge>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
+                <p className="text-xs text-gray-600 mt-2">
+                  <CheckCircle className="h-3 w-3 inline mr-1 text-green-500" />
                   Recommended: 60% Easy/Moderate, 30% Application, 10% Advanced
                 </p>
               </CardContent>
             </Card>
           )}
 
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <Label>Questions ({questions.length})</Label>
-              <Button type="button" onClick={addQuestion} size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Question
-              </Button>
-            </div>
+          {/* Questions Section */}
+          <Card className="border border-gray-200 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <Label className="text-lg font-semibold text-gray-800">Questions ({questions.length})</Label>
+                <Button 
+                  type="button" 
+                  onClick={addQuestion} 
+                  size="sm"
+                  className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Question
+                </Button>
+              </div>
 
-            <div className="space-y-4">
-              {questions.map((question, questionIndex) => (
-                <Card key={questionIndex}>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm">Question {questionIndex + 1}</CardTitle>
-                      <div className="flex items-center gap-2">
-                        <Select
-                          value={question.difficulty_level}
-                          onValueChange={(value) => updateQuestion(questionIndex, 'difficulty_level', value)}
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="easy">Easy</SelectItem>
-                            <SelectItem value="moderate">Moderate</SelectItem>
-                            <SelectItem value="application">Application</SelectItem>
-                            <SelectItem value="advanced">Advanced</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => removeQuestion(questionIndex)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Textarea
-                      value={question.question}
-                      onChange={(e) => updateQuestion(questionIndex, 'question', e.target.value)}
-                      placeholder="Enter your question here..."
-                      required
-                    />
-                    
-                    <div className="space-y-2">
-                      <Label className="text-sm">Answers</Label>
-                      {question.answers.map((answer, answerIndex) => (
-                        <div key={answerIndex} className="flex items-center gap-2">
-                          <input
-                            type="radio"
-                            name={`correct-${questionIndex}`}
-                            checked={answer.is_correct}
-                            onChange={() => updateAnswer(questionIndex, answerIndex, 'is_correct', true)}
-                            className="rounded"
-                          />
-                          <Input
-                            value={answer.answer}
-                            onChange={(e) => updateAnswer(questionIndex, answerIndex, 'answer', e.target.value)}
-                            placeholder={`Answer ${answerIndex + 1}`}
-                            required
-                          />
+              <div className="space-y-4">
+                {questions.map((question, questionIndex) => (
+                  <Card key={questionIndex} className="border border-gray-200 bg-white">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm font-semibold flex items-center">
+                          <div className="bg-gradient-to-r from-orange-500 to-purple-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold mr-2">
+                            {questionIndex + 1}
+                          </div>
+                          Question {questionIndex + 1}
+                        </CardTitle>
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={question.difficulty_level}
+                            onValueChange={(value) => updateQuestion(questionIndex, 'difficulty_level', value)}
+                          >
+                            <SelectTrigger className="w-32 border-gray-300 focus:border-orange-500">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="easy" className="text-green-600">Easy</SelectItem>
+                              <SelectItem value="moderate" className="text-yellow-600">Moderate</SelectItem>
+                              <SelectItem value="application" className="text-blue-600">Application</SelectItem>
+                              <SelectItem value="advanced" className="text-purple-600">Advanced</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeQuestion(questionIndex)}
+                            className="border-red-200 text-red-600 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <Textarea
+                        value={question.question}
+                        onChange={(e) => updateQuestion(questionIndex, 'question', e.target.value)}
+                        placeholder="Enter your question here..."
+                        className="border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                        required
+                      />
+                      
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold text-gray-700">Answers</Label>
+                        {question.answers.map((answer, answerIndex) => (
+                          <div key={answerIndex} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
+                            <input
+                              type="radio"
+                              name={`correct-${questionIndex}`}
+                              checked={answer.is_correct}
+                              onChange={() => updateAnswer(questionIndex, answerIndex, 'is_correct', true)}
+                              className="rounded-full border-gray-300 text-orange-500 focus:ring-orange-500"
+                            />
+                            <Input
+                              value={answer.answer}
+                              onChange={(e) => updateAnswer(questionIndex, answerIndex, 'answer', e.target.value)}
+                              placeholder={`Answer ${answerIndex + 1}`}
+                              className="border-0 bg-transparent focus:ring-0"
+                              required
+                            />
+                            {answer.is_correct && (
+                              <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Correct
+                              </Badge>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
-          <div className="flex justify-end gap-3">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <DialogFooter className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 pt-4 border-t border-gray-200">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => onOpenChange(false)}
+              disabled={loading}
+              className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50"
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Saving...' : (editingExam ? 'Update Exam' : 'Create Exam')}
-            </Button>
-          </div>
+            <GradientButton 
+              type="submit" 
+              disabled={loading}
+              className="flex-1"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  {editingExam ? 'Updating Exam...' : 'Creating Exam...'}
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  {editingExam ? 'Update Exam' : 'Create Exam'}
+                </>
+              )}
+            </GradientButton>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
