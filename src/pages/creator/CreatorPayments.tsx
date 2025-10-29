@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { BarChart, Calendar, DollarSign, CreditCard, Download, AlertCircle, ExternalLink, TrendingUp, Minus, Settings, Smartphone, ChevronLeft, ChevronRight, Building2 } from 'lucide-react';
+import { BarChart, Calendar, DollarSign, CreditCard, Download, AlertCircle, ExternalLink, TrendingUp, Minus, Settings, Smartphone, ChevronLeft, ChevronRight, Building2, RefreshCw, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
@@ -34,6 +34,157 @@ import {
 } from "@/components/ui/pagination";
 
 const ITEMS_PER_PAGE = 5;
+
+// Bank Transfer Status Tracker Component
+const BankTransferStatusTracker: React.FC<{ payout: any }> = ({ payout }) => {
+  const [currentStatus, setCurrentStatus] = useState(payout.status);
+  const [loading, setLoading] = useState(false);
+  const [lastChecked, setLastChecked] = useState<Date | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const checkStatus = useCallback(async () => {
+    if (!payout.external_reference || currentStatus !== 'processing') return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('check-transfer-status', {
+        body: { reference: payout.external_reference }
+      });
+
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
+      if (data.success) {
+        const lencoStatus = data.status;
+        let newStatus = payout.status;
+        
+        if (lencoStatus === 'successful') {
+          newStatus = 'completed';
+        } else if (lencoStatus === 'failed') {
+          newStatus = 'failed';
+        }
+        
+        setCurrentStatus(newStatus);
+        setLastChecked(new Date());
+        
+        // Update local state if status changed
+        if (newStatus !== payout.status) {
+          console.log(`Status updated for payout ${payout.id}: ${payout.status} -> ${newStatus}`);
+        }
+      }
+    } catch (err) {
+      console.error('Error checking transfer status:', err);
+      setError('Failed to check status');
+    } finally {
+      setLoading(false);
+    }
+  }, [payout.external_reference, payout.status, payout.id, currentStatus]);
+
+  useEffect(() => {
+    // Only auto-check if status is processing
+    if (currentStatus === 'processing') {
+      // Check immediately
+      checkStatus();
+      
+      // Then check every 2 minutes
+      const interval = setInterval(checkStatus, 120000);
+      return () => clearInterval(interval);
+    }
+  }, [checkStatus, currentStatus]);
+
+  const getStatusDisplay = () => {
+    switch (currentStatus) {
+      case 'completed':
+        return {
+          badge: (
+            <Badge variant="default" className="bg-green-100 text-green-800 shadow-sm flex items-center gap-1">
+              <CheckCircle className="h-3 w-3" />
+              Completed
+            </Badge>
+          ),
+          message: 'Transfer completed successfully'
+        };
+      case 'failed':
+        return {
+          badge: (
+            <Badge variant="destructive" className="shadow-sm flex items-center gap-1">
+              <XCircle className="h-3 w-3" />
+              Failed
+            </Badge>
+          ),
+          message: payout.failure_reason || 'Transfer failed'
+        };
+      case 'processing':
+        return {
+          badge: (
+            <Badge variant="outline" className="bg-blue-100 text-blue-800 shadow-sm flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              Processing
+            </Badge>
+          ),
+          message: 'Transfer is being processed'
+        };
+      default:
+        return {
+          badge: (
+            <Badge variant="secondary" className="shadow-sm">
+              {currentStatus}
+            </Badge>
+          ),
+          message: `Status: ${currentStatus}`
+        };
+    }
+  };
+
+  const statusDisplay = getStatusDisplay();
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        {statusDisplay.badge}
+        {currentStatus === 'processing' && (
+          <button
+            onClick={checkStatus}
+            disabled={loading}
+            className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 transition-colors"
+            title="Check status now"
+          >
+            <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        )}
+      </div>
+      
+      {statusDisplay.message && (
+        <div className="text-xs text-gray-600">
+          {statusDisplay.message}
+        </div>
+      )}
+      
+      {lastChecked && currentStatus === 'processing' && (
+        <div className="text-xs text-gray-500">
+          Last checked: {lastChecked.toLocaleTimeString()}
+        </div>
+      )}
+      
+      {error && (
+        <div className="text-xs text-red-600 flex items-center gap-1">
+          <AlertCircle className="h-3 w-3" />
+          {error}
+        </div>
+      )}
+      
+      {payout.bank_transfer_details?.lenco_reference && (
+        <div className="text-xs text-gray-500">
+          Lenco Ref: {payout.bank_transfer_details.lenco_reference}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const CreatorPayments: React.FC = () => {
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -542,7 +693,9 @@ const CreatorPayments: React.FC = () => {
       ? getGradientClass(payout.payout_method)
       : payout.status === 'failed'
       ? 'bg-gradient-to-br from-red-500 to-rose-600'
-      : 'bg-gradient-to-br from-amber-500 to-orange-600';
+      : payout.status === 'processing'
+      ? 'bg-gradient-to-br from-amber-500 to-orange-600'
+      : 'bg-gradient-to-br from-gray-500 to-gray-600';
     
     const getMethodIcon = (method: string) => {
       switch (method) {
@@ -582,9 +735,15 @@ const CreatorPayments: React.FC = () => {
                 {format(new Date(payout.created_at), 'MMM dd, yyyy')}
               </CardDescription>
             </div>
-            <Badge variant="secondary" className="bg-white/20 text-white backdrop-blur-sm border-white/30">
-              {payout.status.charAt(0).toUpperCase() + payout.status.slice(1)}
-            </Badge>
+            <div className="flex flex-col items-end gap-2">
+              {payout.payout_method === 'bank' ? (
+                <BankTransferStatusTracker payout={payout} />
+              ) : (
+                <Badge variant="secondary" className="bg-white/20 text-white backdrop-blur-sm border-white/30">
+                  {payout.status.charAt(0).toUpperCase() + payout.status.slice(1)}
+                </Badge>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -608,6 +767,34 @@ const CreatorPayments: React.FC = () => {
             <p className="text-sm text-white/80">Destination</p>
             <p className="font-medium line-clamp-1">{payout.destination}</p>
           </div>
+
+          {/* Additional bank transfer details */}
+          {payout.payout_method === 'bank' && payout.bank_transfer_details && (
+            <div className="bg-white/10 p-2 rounded-lg">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs">
+                <div>
+                  <span className="text-white/70">Sent:</span>{' '}
+                  <span className="font-medium">
+                    ZMW {payout.bank_transfer_details.zmw_amount_sent}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-white/70">Fee:</span>{' '}
+                  <span className="font-medium">
+                    ZMW {payout.bank_transfer_details.fee || '0.00'}
+                  </span>
+                </div>
+                {payout.bank_transfer_details.exchange_rate && (
+                  <div className="sm:col-span-2">
+                    <span className="text-white/70">Exchange Rate:</span>{' '}
+                    <span className="font-medium">
+                      1 USD = {Number(payout.bank_transfer_details.exchange_rate).toFixed(2)} ZMW
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     );
@@ -806,12 +993,26 @@ const CreatorPayments: React.FC = () => {
             <TabsContent value="payouts" className="space-y-3">
               <Card className="bg-gradient-to-br from-purple-50 to-orange-50 shadow-sm border-purple-200/50 w-full">
                 <CardHeader>
-                  <CardTitle className="bg-gradient-to-r from-purple-600 to-orange-600 bg-clip-text text-transparent text-lg sm:text-xl">
-                    Payout History
-                  </CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">
-                    Track your withdrawal requests
-                  </CardDescription>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <div>
+                      <CardTitle className="bg-gradient-to-r from-purple-600 to-orange-600 bg-clip-text text-transparent text-lg sm:text-xl">
+                        Payout History
+                      </CardTitle>
+                      <CardDescription className="text-xs sm:text-sm">
+                        Track your withdrawal requests
+                      </CardDescription>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={loadPayouts}
+                      disabled={loadingPayouts}
+                      className="flex items-center gap-2 bg-white/80 hover:bg-white shadow-sm"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${loadingPayouts ? 'animate-spin' : ''}`} />
+                      Refresh
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent className="w-full">
                   {loadingPayouts ? (
