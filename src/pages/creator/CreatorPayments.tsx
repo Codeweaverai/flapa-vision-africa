@@ -172,7 +172,7 @@ const BankTransferStatusTracker: React.FC<{ payout: any; onStatusUpdate: () => v
       </div>
       
       {statusDisplay.message && (
-        <div className="text-xs text-gray-600">
+        <div className="text-xs text-white">
           {statusDisplay.message}
         </div>
       )}
@@ -191,7 +191,7 @@ const BankTransferStatusTracker: React.FC<{ payout: any; onStatusUpdate: () => v
       )}
       
       {payout.bank_transfer_details?.lenco_reference && (
-        <div className="text-xs text-gray-500">
+        <div className="text-xs text-white">
           Lenco Ref: {payout.bank_transfer_details.lenco_reference}
         </div>
       )}
