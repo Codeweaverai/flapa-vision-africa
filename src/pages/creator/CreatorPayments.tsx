@@ -36,7 +36,7 @@ import {
 const ITEMS_PER_PAGE = 5;
 
 // Bank Transfer Status Tracker Component
-const BankTransferStatusTracker: React.FC<{ payout: any }> = ({ payout }) => {
+const BankTransferStatusTracker: React.FC<{ payout: any; onStatusUpdate: () => void }> = ({ payout, onStatusUpdate }) => {
   const [currentStatus, setCurrentStatus] = useState(payout.status);
   const [loading, setLoading] = useState(false);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
@@ -49,40 +49,53 @@ const BankTransferStatusTracker: React.FC<{ payout: any }> = ({ payout }) => {
     setError(null);
     
     try {
+      console.log('🔄 Checking transfer status for:', payout.external_reference);
+      
       const { data, error } = await supabase.functions.invoke('check-transfer-status', {
         body: { reference: payout.external_reference }
       });
 
+      console.log('📊 Status check response:', data);
+
       if (error) {
+        console.error('❌ Status check error:', error);
         setError(error.message);
         return;
       }
 
       if (data.success) {
-        const lencoStatus = data.status;
-        let newStatus = payout.status;
+        // Find the result for this specific payout
+        const result = data.results?.find((r: any) => r.reference === payout.external_reference);
         
-        if (lencoStatus === 'successful') {
-          newStatus = 'completed';
-        } else if (lencoStatus === 'failed') {
-          newStatus = 'failed';
-        }
-        
-        setCurrentStatus(newStatus);
-        setLastChecked(new Date());
-        
-        // Update local state if status changed
-        if (newStatus !== payout.status) {
-          console.log(`Status updated for payout ${payout.id}: ${payout.status} -> ${newStatus}`);
+        if (result) {
+          const lencoStatus = result.lenco_status;
+          let newStatus = payout.status;
+          
+          if (lencoStatus === 'successful' || lencoStatus === 'completed') {
+            newStatus = 'completed';
+          } else if (lencoStatus === 'failed' || lencoStatus === 'rejected') {
+            newStatus = 'failed';
+          }
+          
+          console.log(`🔄 Status update: ${currentStatus} -> ${newStatus} (Lenco: ${lencoStatus})`);
+          
+          setCurrentStatus(newStatus);
+          setLastChecked(new Date());
+          
+          // Trigger parent to reload payouts if status changed
+          if (newStatus !== payout.status) {
+            console.log(`✅ Status changed for payout ${payout.id}: ${payout.status} -> ${newStatus}`);
+            onStatusUpdate();
+          }
         }
       }
     } catch (err) {
-      console.error('Error checking transfer status:', err);
+      console.error('💥 Error checking transfer status:', err);
       setError('Failed to check status');
     } finally {
       setLoading(false);
     }
-  }, [payout.external_reference, payout.status, payout.id, currentStatus]);
+  }, [payout.external_reference, payout.status, payout.id, currentStatus, onStatusUpdate]);
 
   useEffect(() => {
     // Only auto-check if status is processing
@@ -737,7 +750,10 @@ const CreatorPayments: React.FC = () => {
             </div>
             <div className="flex flex-col items-end gap-2">
               {payout.payout_method === 'bank' ? (
-                <BankTransferStatusTracker payout={payout} />
+                <BankTransferStatusTracker 
+                  payout={payout} 
+                  onStatusUpdate={loadPayouts}
+                />
               ) : (
                 <Badge variant="secondary" className="bg-white/20 text-white backdrop-blur-sm border-white/30">
                   {payout.status.charAt(0).toUpperCase() + payout.status.slice(1)}
