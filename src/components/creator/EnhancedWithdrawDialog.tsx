@@ -136,8 +136,8 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           setLocalCurrency(targetCurrency);
           setExchangeRate(rate);
         } else if (selectedPayoutMethod === 'bank') {
-          // For bank transfers, use Zambian Kwacha
-          const rate = 23.4; // 1 USD = 23.4 ZMW
+          // For bank transfers, use Zambian Kwacha directly
+          const rate = 23.4; // 1 USD = 23.4 ZMW (for display purposes)
           const localAmount = availableBalance * rate;
           setConvertedBalance(localAmount);
           setLocalCurrency('ZMW');
@@ -217,7 +217,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
     }
   }, [profileData, hasStripeSetup, hasMobileMoneySetup, hasBankSetup]);
 
-  const handleBankTransfer = async (withdrawAmount: number, usdAmount: number) => {
+  const handleBankTransfer = async (withdrawAmount: number) => {
     if (!user || !profileData?.bank_account_details) {
       throw new Error('Bank account details not configured');
     }
@@ -229,15 +229,20 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
     
     const { data, error } = await supabase.functions.invoke('initiate-transfer', {
       body: {
-        amount: usdAmount, // USD amount to deduct
-        accountId: 'your-lenco-account-id', // This should be your Lenco business account ID
+        amount: withdrawAmount, // Use ZMW amount directly
         narration: 'SkillPulse Payout',
         reference: reference,
-        transferRecipientId: bankDetails.recipient_id, // Use recipient ID for faster processing
-        accountNumber: bankDetails.recipient_id ? undefined : bankDetails.account_number, // Only if no recipient ID
-        bankId: bankDetails.recipient_id ? undefined : bankDetails.bank_id, // Only if no recipient ID
-        country: 'zm', // Zambia only
-        creator_id: user.id
+        transferRecipientId: bankDetails.recipient_id,
+        accountNumber: bankDetails.recipient_id ? undefined : bankDetails.account_number,
+        bankId: bankDetails.recipient_id ? undefined : bankDetails.bank_id,
+        country: 'zm',
+        creator_id: user.id,
+        bank_details: {
+          account_name: bankDetails.account_name,
+          account_number: bankDetails.account_number,
+          bank_name: bankDetails.bank_name,
+          bank_id: bankDetails.bank_id
+        }
       }
     });
 
@@ -265,10 +270,12 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
     // Check minimum amount based on local currency
     const minAmountUSD = 2;
     const minAmountLocal = selectedPayoutMethod === 'stripe' ? 
-      minAmountUSD * exchangeRate : minAmountUSD;
+      minAmountUSD * exchangeRate : 
+      selectedPayoutMethod === 'bank' ? 50 : // 50 ZMW minimum for bank transfers
+      minAmountUSD;
     
     if (withdrawAmount < minAmountLocal) {
-      toast.error(`Minimum withdrawal amount is ${formatPrice(minAmountLocal, localCurrency)}`);
+      toast.error(`Minimum withdrawal amount is ${formatPrice(minAmountLocal, selectedPayoutMethod === 'stripe' ? currentCurrency : localCurrency)}`);
       return;
     }
 
@@ -351,19 +358,18 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           throw new Error(data?.message || 'Payout request failed');
         }
       } else if (selectedPayoutMethod === 'bank') {
-        // Calculate the USD equivalent to deduct from balance
-        const usdAmountToDeduct = withdrawAmount / exchangeRate;
+        if (!profileData.bank_account_details) {
+          toast.error('Bank account details not configured');
+          return;
+        }
 
         console.log('Bank Transfer Withdrawal:', {
           withdrawAmount: withdrawAmount, // ZMW amount
           localCurrency,
-          exchangeRate,
-          usdAmountToDeduct, // USD amount to deduct from balance
-          availableBalance,
           bankDetails: profileData.bank_account_details
         });
 
-        const result = await handleBankTransfer(withdrawAmount, usdAmountToDeduct);
+        const result = await handleBankTransfer(withdrawAmount);
 
         if (result.success) {
           toast.success(`Bank transfer request submitted successfully! You will receive ${formatPrice(withdrawAmount, localCurrency)} in your bank account within 1-3 business days.`);
@@ -449,7 +455,11 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
               Funds available for withdrawal (after 7-day hold period)
               {selectedPayoutMethod !== 'stripe' && localCurrency !== 'USD' && (
                 <div className="mt-1 text-xs bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent font-medium">
-                  USD equivalent: {formatPrice(availableBalance, 'USD')} • Rate: 1 USD = {exchangeRate} {localCurrency}
+                  {selectedPayoutMethod === 'bank' ? (
+                    <>Zambian Bank Transfer (ZMW)</>
+                  ) : (
+                    <>USD equivalent: {formatPrice(availableBalance, 'USD')} • Rate: 1 USD = {exchangeRate} {localCurrency}</>
+                  )}
                 </div>
               )}
             </div>
@@ -591,7 +601,9 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                   <div className="text-sm bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent font-medium">
                     {selectedPayoutMethod === 'stripe' ? 
                       formatPrice(withdrawAmount, currentCurrency) :
-                      `${formatPrice(withdrawAmount, localCurrency)} (${formatPrice(withdrawAmount / exchangeRate, 'USD')} USD)`
+                      selectedPayoutMethod === 'bank' ?
+                        `${formatPrice(withdrawAmount, localCurrency)}` : // Show only ZMW for bank transfers
+                        `${formatPrice(withdrawAmount, localCurrency)} (${formatPrice(withdrawAmount / exchangeRate, 'USD')} USD)`
                     }
                   </div>
                 )}
@@ -627,10 +639,16 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
                     <span>Platform fee:</span>
                     <span className="font-semibold">8% (already deducted)</span>
                   </div>
-                  {selectedPayoutMethod !== 'stripe' && localCurrency !== 'USD' && (
+                  {selectedPayoutMethod !== 'stripe' && selectedPayoutMethod === 'mobile_money' && localCurrency !== 'USD' && (
                     <div className="flex items-center justify-between">
                       <span>Exchange rate:</span>
                       <span className="font-semibold">1 USD = {exchangeRate} {localCurrency}</span>
+                    </div>
+                  )}
+                  {selectedPayoutMethod === 'bank' && (
+                    <div className="flex items-center justify-between">
+                      <span>Currency:</span>
+                      <span className="font-semibold">Zambian Kwacha (ZMW)</span>
                     </div>
                   )}
                 </div>
