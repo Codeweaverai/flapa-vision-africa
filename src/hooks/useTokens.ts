@@ -57,7 +57,7 @@ export const useTokens = () => {
     }
 
     try {
-      // Fetch token balance
+      // Fetch token balance - use upsert instead of separate insert
       const { data: balanceData, error: balanceError } = await supabase
         .from('user_tokens')
         .select('*')
@@ -69,26 +69,40 @@ export const useTokens = () => {
       }
 
       if (!balanceData) {
-        // Initialize token balance for new user
-        const { data: newBalance, error: createError } = await supabase
+        // Use upsert to handle the case where record might already exist
+        const { data: newBalance, error: upsertError } = await supabase
           .from('user_tokens')
-          .insert([{ 
+          .upsert({ 
             user_id: user.id, 
             balance: 0,
             free_tokens_available: 30,
             free_tokens_used: 0,
             has_used_free_trial: false
-          }])
+          }, {
+            onConflict: 'user_id',
+            ignoreDuplicates: false
+          })
           .select()
           .single();
         
-        if (createError) throw createError;
-        setTokenBalance(newBalance);
+        if (upsertError) {
+          // If upsert fails, try to fetch again in case record was created by another process
+          const { data: retryData, error: retryError } = await supabase
+            .from('user_tokens')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+            
+          if (retryError) throw retryError;
+          setTokenBalance(retryData);
+        } else {
+          setTokenBalance(newBalance);
+        }
       } else {
         setTokenBalance(balanceData);
       }
 
-      // Fetch top-up config
+      // Fetch top-up config with fallback
       const { data: configData, error: configError } = await supabase
         .from('top_up_config')
         .select('*')
@@ -96,7 +110,6 @@ export const useTokens = () => {
 
       if (configError) {
         console.warn('Top-up config not found, using defaults');
-        // Set default config if not found
         setTopUpConfig({
           id: 'default',
           min_amount: 10,
@@ -116,12 +129,20 @@ export const useTokens = () => {
         .order('created_at', { ascending: false })
         .limit(20);
 
-      if (transactionsError) throw transactionsError;
-      setTransactions(transactionsData || []);
+      if (transactionsError) {
+        console.warn('Error fetching transactions:', transactionsError);
+        setTransactions([]);
+      } else {
+        setTransactions(transactionsData || []);
+      }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching token data:', error);
-      toast.error('Failed to load token data');
+      
+      // Don't show toast for common errors
+      if (!error.message?.includes('duplicate key') && !error.message?.includes('PGRST116')) {
+        toast.error('Failed to load token data');
+      }
     } finally {
       setLoading(false);
     }
@@ -146,6 +167,11 @@ export const useTokens = () => {
       free: tokenBalance.free_tokens_available,
       paid: tokenBalance.balance
     };
+  }, [tokenBalance]);
+
+  const hasFreeTokensAvailable = useCallback((): boolean => {
+    if (!tokenBalance) return false;
+    return tokenBalance.free_tokens_available > 0 && !tokenBalance.has_used_free_trial;
   }, [tokenBalance]);
 
   const calculatePrice = useCallback((tokenAmount: number): number => {
@@ -189,15 +215,17 @@ export const useTokens = () => {
 
       if (transactionError) throw transactionError;
 
-      // Update user token balance
+      // Update user token balance using upsert to handle conflicts
       const { error: updateError } = await supabase
         .from('user_tokens')
-        .update({
+        .upsert({
+          user_id: user.id,
           balance: (tokenBalance?.balance || 0) + tokenAmount,
           total_purchased: (tokenBalance?.total_purchased || 0) + tokenAmount,
           updated_at: new Date().toISOString()
-        })
-        .eq('user_id', user.id);
+        }, {
+          onConflict: 'user_id'
+        });
 
       if (updateError) throw updateError;
 
@@ -222,20 +250,37 @@ export const useTokens = () => {
     if (!user) throw new Error('User not authenticated');
 
     try {
-      // Get token cost for this feature
-      const { data: costData, error: costError } = await supabase
-        .from('ai_usage_costs')
-        .select('token_cost, description')
-        .eq('feature_type', featureType)
-        .eq('is_active', true)
-        .single();
+      // Get token cost for this feature with fallback
+      let tokenCost = 0;
+      let description = `Usage of ${featureType}`;
+      
+      try {
+        const { data: costData, error: costError } = await supabase
+          .from('ai_usage_costs')
+          .select('token_cost, description')
+          .eq('feature_type', featureType)
+          .eq('is_active', true)
+          .single();
 
-      if (costError) {
-        console.error('Cost lookup error:', costError);
-        throw new Error(`Could not determine token cost for feature: ${featureType}`);
+        if (costError) {
+          // Use default costs if table doesn't exist or record not found
+          const defaultCosts: { [key: string]: number } = {
+            'course_proposal': 8,
+            'full_course': 25,
+            'lesson_content': 5,
+            'quiz_generation': 3,
+            'exam_generation': 5
+          };
+          tokenCost = defaultCosts[featureType] || 10;
+          description = `AI feature: ${featureType}`;
+        } else {
+          tokenCost = costData.token_cost;
+          description = costData.description;
+        }
+      } catch (costLookupError) {
+        console.warn('Failed to lookup feature cost, using defaults:', costLookupError);
+        tokenCost = featureType === 'course_proposal' ? 8 : 25;
       }
-
-      const tokenCost = costData.token_cost;
 
       // Check if user has enough tokens
       if (!hasEnoughTokens(tokenCost)) {
@@ -254,7 +299,7 @@ export const useTokens = () => {
           user_id: user.id,
           amount: -tokenCost,
           type: transactionType,
-          description: costData.description,
+          description: description,
           reference_id: referenceId
         }])
         .select()
@@ -262,15 +307,15 @@ export const useTokens = () => {
 
       if (transactionError) throw transactionError;
 
-      // Update user token balance
+      // Update user token balance using upsert
       const updateData: any = {
+        user_id: user.id,
         updated_at: new Date().toISOString()
       };
 
       if (useFreeTokens) {
         updateData.free_tokens_available = (tokenBalance?.free_tokens_available || 0) - tokenCost;
         updateData.free_tokens_used = (tokenBalance?.free_tokens_used || 0) + tokenCost;
-        // Only mark free trial as used if we're actually using free tokens
         updateData.has_used_free_trial = true;
       } else {
         updateData.balance = (tokenBalance?.balance || 0) - tokenCost;
@@ -279,8 +324,9 @@ export const useTokens = () => {
 
       const { error: updateError } = await supabase
         .from('user_tokens')
-        .update(updateData)
-        .eq('user_id', user.id);
+        .upsert(updateData, {
+          onConflict: 'user_id'
+        });
 
       if (updateError) throw updateError;
 
@@ -361,6 +407,7 @@ export const useTokens = () => {
     loading,
     hasEnoughTokens,
     getAvailableTokens,
+    hasFreeTokensAvailable,
     topUpTokens,
     deductTokens,
     calculatePrice,
@@ -370,5 +417,4 @@ export const useTokens = () => {
   };
 };
 
-// Export the type for use in components
 export type { DeductTokensResult };
