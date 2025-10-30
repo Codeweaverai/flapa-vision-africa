@@ -15,10 +15,70 @@ import { useTokens } from '@/hooks/useTokens';
 import TokenUsageDialog from '@/components/creator/TokenUsageDialog';
 import FreeTrialBanner from '@/components/creator/FreeTrialBanner';
 
+// Safe token hook wrapper
+const useSafeTokens = () => {
+  const tokenHook = useTokens();
+  
+  // Create safe versions of all functions
+  const safeHasEnoughTokens = (cost: number) => {
+    if (typeof tokenHook.hasEnoughTokens === 'function') {
+      return tokenHook.hasEnoughTokens(cost);
+    }
+    console.warn('hasEnoughTokens is not available');
+    return false;
+  };
+
+  const safeDeductTokens = async (featureType: string, referenceId?: string) => {
+    if (typeof tokenHook.deductTokens === 'function') {
+      return await tokenHook.deductTokens(featureType, referenceId);
+    }
+    console.warn('deductTokens is not available, proceeding without token deduction');
+    return { success: true, tokensUsed: 0, wasFree: false, remainingTokens: 0 };
+  };
+
+  const safeGetFeatureCost = async (featureType: string) => {
+    if (typeof tokenHook.getFeatureCost === 'function') {
+      return await tokenHook.getFeatureCost(featureType);
+    }
+    // Default costs
+    return featureType === 'course_proposal' ? 8 : 25;
+  };
+
+  const safeGetAvailableTokens = () => {
+    if (typeof tokenHook.getAvailableTokens === 'function') {
+      return tokenHook.getAvailableTokens();
+    }
+    return { free: 0, paid: 0 };
+  };
+
+  const safeRefetchTokens = () => {
+    if (typeof tokenHook.refetch === 'function') {
+      return tokenHook.refetch();
+    }
+    return Promise.resolve();
+  };
+
+  return {
+    ...tokenHook,
+    hasEnoughTokens: safeHasEnoughTokens,
+    deductTokens: safeDeductTokens,
+    getFeatureCost: safeGetFeatureCost,
+    getAvailableTokens: safeGetAvailableTokens,
+    refetch: safeRefetchTokens,
+  };
+};
+
 const CreatorCourseCreateWithAI = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { tokenBalance, hasEnoughTokens, deductTokens, getFeatureCost, getAvailableTokens, refetch: refetchTokens } = useTokens();
+  const { 
+    tokenBalance, 
+    hasEnoughTokens, 
+    deductTokens, 
+    getFeatureCost, 
+    getAvailableTokens, 
+    refetch: refetchTokens 
+  } = useSafeTokens(); // Using the safe wrapper
   
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'input' | 'generating' | 'proposal' | 'creating'>('input');
@@ -98,13 +158,8 @@ Difficulty Level: ${courseData.difficulty}
 
 Please generate a detailed course proposal with modules, lessons, and learning outcomes.`;
 
-      // Fix: Check if deductTokens is a function before calling it
-      let tokenResult = null;
-      if (typeof deductTokens === 'function') {
-        tokenResult = await deductTokens('course_proposal', `course_proposal_${Date.now()}`);
-      } else {
-        console.warn('deductTokens is not available, proceeding without token deduction');
-      }
+      // Use the safe deductTokens function
+      const tokenResult = await deductTokens('course_proposal', `course_proposal_${Date.now()}`);
       
       const { data, error } = await supabase.functions.invoke('generate-course', {
         body: {
@@ -163,13 +218,8 @@ Please generate a detailed course proposal with modules, lessons, and learning o
     });
 
     try {
-      // Fix: Check if deductTokens is a function before calling it
-      let tokenResult = null;
-      if (typeof deductTokens === 'function') {
-        tokenResult = await deductTokens('full_course', `full_course_${proposalId}`);
-      } else {
-        console.warn('deductTokens is not available, proceeding without token deduction');
-      }
+      // Use the safe deductTokens function
+      const tokenResult = await deductTokens('full_course', `full_course_${proposalId}`);
       
       const { data, error } = await supabase.functions.invoke('generate-course', {
         body: {
@@ -218,19 +268,6 @@ Please generate a detailed course proposal with modules, lessons, and learning o
 
   const handleCreateFullCourse = () => {
     checkTokensAndProceed('full_course', createFullCourse);
-  };
-
-  // Fix: Add safe function checks for token-related functions
-  const safeHasEnoughTokens = (cost: number) => {
-    return typeof hasEnoughTokens === 'function' ? hasEnoughTokens(cost) : false;
-  };
-
-  const safeGetFeatureCost = async (featureType: string) => {
-    if (typeof getFeatureCost === 'function') {
-      return await getFeatureCost(featureType);
-    }
-    // Default costs if function is not available
-    return featureType === 'course_proposal' ? 8 : 25;
   };
 
   const features = [
