@@ -18,67 +18,91 @@ const TokenTopUpSuccess = () => {
   const [loading, setLoading] = useState(true);
   const [transactionDetails, setTransactionDetails] = useState<any>(null);
 
+  // Get parameters from URL
   const depositId = searchParams.get('deposit_id');
   const transactionId = searchParams.get('transaction_id');
   const userId = searchParams.get('user_id');
+  const tokenAmount = searchParams.get('token_amount');
 
   useEffect(() => {
-    if (depositId) {
+    const checkPaymentStatus = async () => {
+      // First try to get deposit_id from URL parameters
+      let targetDepositId = depositId;
+
+      // If no deposit_id in URL, try localStorage as fallback
+      if (!targetDepositId) {
+        const lastPayment = localStorage.getItem('lastPaymentAttempt');
+        if (lastPayment) {
+          const paymentData = JSON.parse(lastPayment);
+          targetDepositId = paymentData.depositId;
+          console.log('Using deposit_id from localStorage:', targetDepositId);
+        }
+      }
+
+      if (!targetDepositId) {
+        toast.error('Invalid payment return URL - missing deposit ID');
+        navigate('/creator/tokens');
+        return;
+      }
+
+      try {
+        setLoading(true);
+        
+        const { data, error } = await supabase.functions.invoke('check-payment-status', {
+          body: {
+            deposit_id: targetDepositId
+          }
+        });
+
+        if (error) {
+          throw new Error(error.message || 'Failed to check payment status');
+        }
+
+        if (data.success) {
+          setTransactionDetails(data);
+          
+          switch (data.payment_status) {
+            case 'completed':
+              setPaymentStatus('completed');
+              toast.success(`Payment completed! ${data.transaction.amount} tokens added to your account.`);
+              await refetchTokens();
+              // Clear localStorage on successful payment
+              localStorage.removeItem('lastPaymentAttempt');
+              break;
+            case 'pending':
+              setPaymentStatus('pending');
+              startPolling(targetDepositId);
+              break;
+            case 'failed':
+            case 'cancelled':
+              setPaymentStatus('failed');
+              toast.error(`Payment ${data.payment_status}. Please try again.`);
+              // Clear localStorage on failed payment
+              localStorage.removeItem('lastPaymentAttempt');
+              break;
+            default:
+              setPaymentStatus('pending');
+              startPolling(targetDepositId);
+          }
+        }
+      } catch (error: any) {
+        console.error('Error checking payment status:', error);
+        toast.error('Failed to verify payment status');
+        setPaymentStatus('failed');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (depositId || localStorage.getItem('lastPaymentAttempt')) {
       checkPaymentStatus();
     } else {
       toast.error('Invalid payment return URL');
       navigate('/creator/tokens');
     }
-  }, [depositId, navigate]);
+  }, [depositId, navigate, refetchTokens]);
 
-  const checkPaymentStatus = async () => {
-    try {
-      setLoading(true);
-      
-      const { data, error } = await supabase.functions.invoke('check-payment-status', {
-        body: {
-          deposit_id: depositId
-        }
-      });
-
-      if (error) {
-        throw new Error(error.message || 'Failed to check payment status');
-      }
-
-      if (data.success) {
-        setTransactionDetails(data);
-        
-        switch (data.payment_status) {
-          case 'completed':
-            setPaymentStatus('completed');
-            toast.success(`Payment completed! ${data.transaction.amount} tokens added to your account.`);
-            await refetchTokens();
-            break;
-          case 'pending':
-            setPaymentStatus('pending');
-            // Start polling if still pending
-            startPolling();
-            break;
-          case 'failed':
-          case 'cancelled':
-            setPaymentStatus('failed');
-            toast.error(`Payment ${data.payment_status}. Please try again.`);
-            break;
-          default:
-            setPaymentStatus('pending');
-            startPolling();
-        }
-      }
-    } catch (error: any) {
-      console.error('Error checking payment status:', error);
-      toast.error('Failed to verify payment status');
-      setPaymentStatus('failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const startPolling = () => {
+  const startPolling = (depositId: string) => {
     const pollInterval = setInterval(async () => {
       try {
         const { data } = await supabase.functions.invoke('check-payment-status', {
@@ -91,10 +115,12 @@ const TokenTopUpSuccess = () => {
           setTransactionDetails(data);
           toast.success(`Payment completed! ${data.transaction.amount} tokens added to your account.`);
           await refetchTokens();
+          localStorage.removeItem('lastPaymentAttempt');
         } else if (data.success && (data.payment_status === 'failed' || data.payment_status === 'cancelled')) {
           clearInterval(pollInterval);
           setPaymentStatus('failed');
           toast.error(`Payment ${data.payment_status}. Please try again.`);
+          localStorage.removeItem('lastPaymentAttempt');
         }
       } catch (error) {
         console.error('Polling error:', error);
@@ -180,27 +206,31 @@ const TokenTopUpSuccess = () => {
               )}
 
               {/* Transaction Details */}
-              {transactionDetails && (
+              {(transactionDetails || depositId) && (
                 <div className="bg-white rounded-lg p-6 border border-gray-200 space-y-4">
                   <h3 className="font-semibold text-gray-900">Transaction Details</h3>
                   
                   <div className="grid grid-cols-2 gap-4 text-sm">
+                    {transactionDetails?.transaction?.id && (
+                      <div>
+                        <span className="text-gray-600">Transaction ID:</span>
+                        <p className="font-mono text-xs">{transactionDetails.transaction.id}</p>
+                      </div>
+                    )}
                     <div>
-                      <span className="text-gray-600">Transaction ID:</span>
-                      <p className="font-mono text-xs">{transactionDetails.transaction.id}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Amount:</span>
+                      <span className="text-gray-600">Token Amount:</span>
                       <p className="font-semibold">
-                        {transactionDetails.transaction.amount} tokens
+                        {transactionDetails?.transaction?.amount || tokenAmount} tokens
                       </p>
                     </div>
-                    <div>
-                      <span className="text-gray-600">Amount Paid:</span>
-                      <p className="font-semibold">
-                        {transactionDetails.transaction.amount_paid} {transactionDetails.pawapay_response?.data?.currency || 'ZMW'}
-                      </p>
-                    </div>
+                    {transactionDetails?.transaction?.amount_paid && (
+                      <div>
+                        <span className="text-gray-600">Amount Paid:</span>
+                        <p className="font-semibold">
+                          {transactionDetails.transaction.amount_paid} {transactionDetails.pawapay_response?.data?.currency || 'ZMW'}
+                        </p>
+                      </div>
+                    )}
                     <div>
                       <span className="text-gray-600">Status:</span>
                       <Badge 
@@ -210,12 +240,12 @@ const TokenTopUpSuccess = () => {
                           'destructive'
                         }
                       >
-                        {transactionDetails.payment_status}
+                        {transactionDetails?.payment_status || paymentStatus}
                       </Badge>
                     </div>
                   </div>
 
-                  {paymentStatus === 'completed' && transactionDetails.tokens_updated && (
+                  {paymentStatus === 'completed' && transactionDetails?.tokens_updated && (
                     <div className="flex items-center justify-center space-x-2 text-green-600 bg-green-50 p-3 rounded-lg">
                       <Coins className="h-5 w-5" />
                       <span className="font-semibold">
@@ -252,7 +282,7 @@ const TokenTopUpSuccess = () => {
 
           {paymentStatus === 'pending' && (
             <Button
-              onClick={checkPaymentStatus}
+              onClick={() => depositId && startPolling(depositId)}
               disabled={loading}
               variant="outline"
             >
@@ -296,6 +326,11 @@ const TokenTopUpSuccess = () => {
                 <p className="text-sm mt-1">
                   Mobile money payments can take 1-5 minutes to process. 
                   This page will automatically update when your payment is complete.
+                  {depositId && (
+                    <span className="block mt-1 font-mono text-xs">
+                      Deposit ID: {depositId}
+                    </span>
+                  )}
                 </p>
               </div>
             </CardContent>
