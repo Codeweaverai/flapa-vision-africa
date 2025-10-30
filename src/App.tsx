@@ -78,6 +78,7 @@ import CreatorRecentActivities from '@/pages/creator/CreatorRecentActivities';
 import CreatorCourseCreateWithAI from '@/pages/creator/CreatorCourseCreateWithAI';
 import CreatorEventCreateWithAI from '@/pages/creator/CreatorEventCreateWithAI';
 import TokenTopUpPage from '@/pages/creator/TokenTopUpPage';
+import TokenTopUpSuccess from '@/pages/creator/TokenTopUpSuccess';
 
 // Import workplace pages
 import AcceptInvitePage from '@/pages/AcceptInvitePage';
@@ -268,6 +269,7 @@ function App() {
                   <Route path="/creator/attendees" element={<ProtectedRoute><CreatorAttendeeManagement /></ProtectedRoute>} />
                  <Route path="/creator/activities" element={<ProtectedRoute><CreatorRecentActivities /></ProtectedRoute>} />
                   <Route path="/creator/tokens" element={<ProtectedRoute><TokenTopUpPage /></ProtectedRoute>} />
+                  <Route path="/creator/tokens/success" element={<ProtectedRoute><TokenTopUpSuccess /></ProtectedRoute>} />
 
       
                   {/* Community Routes */}
