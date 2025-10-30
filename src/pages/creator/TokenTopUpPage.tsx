@@ -6,12 +6,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Coins, CreditCard, Smartphone, Zap, CheckCircle, ArrowLeft, Gift, Shield, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTokens } from '@/hooks/useTokens';
+import PriceDisplay from '@/components/currency/PriceDisplay';
+import ReactCountryFlag from "react-country-flag";
 
 const TokenTopUpPage = () => {
   const navigate = useNavigate();
@@ -23,20 +26,118 @@ const TokenTopUpPage = () => {
   const [tokenAmount, setTokenAmount] = useState<number | ''>('');
   const [customAmount, setCustomAmount] = useState<number | ''>('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [selectedProvider, setSelectedProvider] = useState('');
+  const [selectedCountry, setSelectedCountry] = useState('ZMB');
+  const [selectedOperator, setSelectedOperator] = useState('');
   
   const availableTokens = getAvailableTokens();
 
-  // Payment providers for PawaPay
-  const paymentProviders = [
-    { id: 'MTN_MOMO_ZMB', name: 'MTN Mobile Money Zambia', country: 'Zambia', currency: 'ZMW' },
-    { id: 'AIRTEL_MONEY_ZMB', name: 'Airtel Money Zambia', country: 'Zambia', currency: 'ZMW' },
-    { id: 'MPESA_KE', name: 'M-Pesa Kenya', country: 'Kenya', currency: 'KES' },
-    { id: 'AIRTEL_MONEY_KE', name: 'Airtel Money Kenya', country: 'Kenya', currency: 'KES' },
-    { id: 'ORANGE_MONEY_CM', name: 'Orange Money Cameroon', country: 'Cameroon', currency: 'XAF' },
-    { id: 'MTN_MOMO_GH', name: 'MTN Mobile Money Ghana', country: 'Ghana', currency: 'GHS' },
-    { id: 'VODAFONE_CASH_GH', name: 'Vodafone Cash Ghana', country: 'Ghana', currency: 'GHS' },
-  ];
+  // Country data with currencies and flags
+  const PAWAPAY_COUNTRIES = {
+    'ZMB': { name: 'Zambia', code: 'ZMB', flag: 'ZM', dialCode: '+260', currency: 'ZMW' },
+    'KEN': { name: 'Kenya', code: 'KEN', flag: 'KE', dialCode: '+254', currency: 'KES' },
+    'UGA': { name: 'Uganda', code: 'UGA', flag: 'UG', dialCode: '+256', currency: 'UGX' },
+    'TZA': { name: 'Tanzania', code: 'TZA', flag: 'TZ', dialCode: '+255', currency: 'TZS' },
+    'GHA': { name: 'Ghana', code: 'GHA', flag: 'GH', dialCode: '+233', currency: 'GHS' },
+    'NGA': { name: 'Nigeria', code: 'NGA', flag: 'NG', dialCode: '+234', currency: 'NGN' },
+    'RWA': { name: 'Rwanda', code: 'RWA', flag: 'RW', dialCode: '+250', currency: 'RWF' },
+    'MWI': { name: 'Malawi', code: 'MWI', flag: 'MW', dialCode: '+265', currency: 'MWK' },
+    'MOZ': { name: 'Mozambique', code: 'MOZ', flag: 'MZ', dialCode: '+258', currency: 'MZN' },
+    'SEN': { name: 'Senegal', code: 'SEN', flag: 'SN', dialCode: '+221', currency: 'XOF' },
+    'BEN': { name: 'Benin', code: 'BEN', flag: 'BJ', dialCode: '+229', currency: 'XOF' },
+    'BFA': { name: 'Burkina Faso', code: 'BFA', flag: 'BF', dialCode: '+226', currency: 'XOF' },
+    'CMR': { name: 'Cameroon', code: 'CMR', flag: 'CM', dialCode: '+237', currency: 'XAF' },
+    'COG': { name: 'Congo-Brazzaville', code: 'COG', flag: 'CG', dialCode: '+242', currency: 'XAF' },
+    'COD': { name: 'DRC', code: 'COD', flag: 'CD', dialCode: '+243', currency: 'CDF' },
+    'GAB': { name: 'Gabon', code: 'GAB', flag: 'GA', dialCode: '+241', currency: 'XAF' },
+    'CIV': { name: 'Ivory Coast', code: 'CIV', flag: 'CI', dialCode: '+225', currency: 'XOF' },
+    'LSO': { name: 'Lesotho', code: 'LSO', flag: 'LS', dialCode: '+266', currency: 'LSL' },
+    'SLE': { name: 'Sierra Leone', code: 'SLE', flag: 'SL', dialCode: '+232', currency: 'SLL' },
+  };
+
+  // Mobile operators by country
+  const MOBILE_OPERATORS = {
+    ZMB: [
+      { code: 'MTN_MOMO_ZMB', name: 'MTN Mobile Money Zambia' },
+      { code: 'AIRTEL_MONEY_ZMB', name: 'Airtel Money Zambia' }
+    ],
+    KEN: [
+      { code: 'MPESA_KE', name: 'M-Pesa Kenya' },
+      { code: 'AIRTEL_MONEY_KE', name: 'Airtel Money Kenya' },
+      { code: 'T_KASH_KE', name: 'T-Kash Kenya' }
+    ],
+    UGA: [
+      { code: 'MTN_MOMO_UGA', name: 'MTN Mobile Money Uganda' },
+      { code: 'AIRTEL_MONEY_UGA', name: 'Airtel Money Uganda' }
+    ],
+    TZA: [
+      { code: 'MPESA_TZA', name: 'M-Pesa Tanzania' },
+      { code: 'AIRTEL_MONEY_TZA', name: 'Airtel Money Tanzania' },
+      { code: 'TIGO_PESA_TZA', name: 'Tigo Pesa Tanzania' }
+    ],
+    GHA: [
+      { code: 'MTN_MOMO_GH', name: 'MTN Mobile Money Ghana' },
+      { code: 'VODAFONE_CASH_GH', name: 'Vodafone Cash Ghana' },
+      { code: 'AIRTELTIGO_GH', name: 'AirtelTigo Ghana' }
+    ],
+    NGA: [
+      { code: 'MTN_MOBILE_NGA', name: 'MTN Mobile Nigeria' },
+      { code: 'AIRTEL_MONEY_NGA', name: 'Airtel Money Nigeria' },
+      { code: 'GLO_MOBILE_NGA', name: 'Glo Mobile Nigeria' }
+    ],
+    RWA: [
+      { code: 'MTN_MOMO_RWA', name: 'MTN Mobile Money Rwanda' },
+      { code: 'AIRTEL_MONEY_RWA', name: 'Airtel Money Rwanda' }
+    ],
+    MWI: [
+      { code: 'AIRTEL_MONEY_MWI', name: 'Airtel Money Malawi' },
+      { code: 'TNM_MWI', name: 'TNM Mpamba Malawi' }
+    ],
+    MOZ: [
+      { code: 'MPESA_MOZ', name: 'M-Pesa Mozambique' },
+      { code: 'VODACOM_MOZ', name: 'Vodacom Mozambique' }
+    ],
+    SEN: [
+      { code: 'ORANGE_MONEY_SEN', name: 'Orange Money Senegal' },
+      { code: 'WAVE_SEN', name: 'Wave Senegal' }
+    ],
+    BEN: [
+      { code: 'MTN_MOBILE_BEN', name: 'MTN Mobile Benin' },
+      { code: 'MOOV_BEN', name: 'Moov Benin' }
+    ],
+    BFA: [
+      { code: 'ORANGE_MONEY_BFA', name: 'Orange Money Burkina Faso' },
+      { code: 'MOOV_BFA', name: 'Moov Burkina Faso' }
+    ],
+    CMR: [
+      { code: 'MTN_MOBILE_CMR', name: 'MTN Mobile Cameroon' },
+      { code: 'ORANGE_MONEY_CMR', name: 'Orange Money Cameroon' }
+    ],
+    COG: [
+      { code: 'AIRTEL_MONEY_COG', name: 'Airtel Money Congo' },
+      { code: 'MTN_MOBILE_COG', name: 'MTN Mobile Congo' }
+    ],
+    COD: [
+      { code: 'VODACOM_MONEY_COD', name: 'Vodacom Money DRC' },
+      { code: 'AIRTEL_MONEY_COD', name: 'Airtel Money DRC' }
+    ],
+    GAB: [
+      { code: 'AIRTEL_MONEY_GAB', name: 'Airtel Money Gabon' },
+      { code: 'MOOV_GAB', name: 'Moov Gabon' }
+    ],
+    CIV: [
+      { code: 'ORANGE_MONEY_CIV', name: 'Orange Money Ivory Coast' },
+      { code: 'MTN_MOBILE_CIV', name: 'MTN Mobile Ivory Coast' },
+      { code: 'MOOV_CIV', name: 'Moov Ivory Coast' }
+    ],
+    LSO: [
+      { code: 'VODACOM_MONEY_LSO', name: 'Vodacom Money Lesotho' },
+      { code: 'ECONET_LSO', name: 'Econet Lesotho' }
+    ],
+    SLE: [
+      { code: 'ORANGE_MONEY_SLE', name: 'Orange Money Sierra Leone' },
+      { code: 'AIRTEL_MONEY_SLE', name: 'Airtel Money Sierra Leone' }
+    ]
+  };
 
   const handlePresetSelect = (amount: number) => {
     setTokenAmount(amount);
@@ -118,7 +219,7 @@ const TokenTopUpPage = () => {
       return;
     }
 
-    if (!selectedProvider) {
+    if (!selectedOperator) {
       toast.error('Please select a mobile money provider');
       return;
     }
@@ -132,25 +233,28 @@ const TokenTopUpPage = () => {
 
     try {
       const cost = calculateCost(tokenAmount);
+      const selectedCountryData = PAWAPAY_COUNTRIES[selectedCountry as keyof typeof PAWAPAY_COUNTRIES];
+      
+      if (!selectedCountryData) {
+        throw new Error('Invalid country selected');
+      }
+
+      // Convert USD amount to local currency using PriceDisplay logic
+      // PriceDisplay handles the conversion automatically based on the currency
+      const amountInLocalCurrency = cost; // PriceDisplay will handle conversion
       
       // Convert to cents for PawaPay (they expect amount in smallest currency unit)
-      const amountInCents = Math.round(cost * 100);
-      
-      // Get the provider to determine country
-      const provider = paymentProviders.find(p => p.id === selectedProvider);
-      const countryCode = provider?.country === 'Zambia' ? 'ZMB' : 
-                         provider?.country === 'Kenya' ? 'KEN' :
-                         provider?.country === 'Cameroon' ? 'CMR' :
-                         provider?.country === 'Ghana' ? 'GHA' : 'ZMB';
+      // For most currencies, multiply by 100, but some like UGX, TZS, etc. might be different
+      const amountInCents = Math.round(amountInLocalCurrency * 100);
       
       const { data, error } = await supabase.functions.invoke('token-topup-pawapay', {
         body: {
           tokenAmount: tokenAmount,
           amountPaid: amountInCents,
-          currency: provider?.currency || 'ZMW',
+          currency: selectedCountryData.currency,
           phoneNumber: phoneNumber,
-          country: countryCode,
-          returnUrl: `${window.location.origin}/creator/tokens/success` // Base URL - deposit_id will be added by the function
+          country: selectedCountryData.code,
+          returnUrl: `${window.location.origin}/creator/tokens/success`
         }
       });
 
@@ -167,7 +271,8 @@ const TokenTopUpPage = () => {
             depositId: data.deposit_id,
             transactionId: data.transaction_id,
             tokenAmount: tokenAmount,
-            amountPaid: cost * 12.5, // Convert to ZMW
+            amountPaid: amountInLocalCurrency,
+            currency: selectedCountryData.currency,
             timestamp: Date.now()
           }));
         }
@@ -246,6 +351,11 @@ const TokenTopUpPage = () => {
     checkPendingPayments();
   }, [refetchTokens]);
 
+  // Reset operator when country changes
+  useEffect(() => {
+    setSelectedOperator('');
+  }, [selectedCountry]);
+
   const features = [
     {
       icon: <Zap className="h-5 w-5" />,
@@ -271,6 +381,9 @@ const TokenTopUpPage = () => {
 
   const gradientClass = "bg-gradient-to-r from-orange-500 to-purple-600";
   const gradientTextClass = "bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent";
+
+  const selectedCountryData = PAWAPAY_COUNTRIES[selectedCountry as keyof typeof PAWAPAY_COUNTRIES];
+  const currentOperators = MOBILE_OPERATORS[selectedCountry as keyof typeof MOBILE_OPERATORS] || [];
 
   return (
     <CreatorLayout title="Top Up Tokens">
@@ -409,7 +522,10 @@ const TokenTopUpPage = () => {
                           ${calculateCost(tokenAmount).toFixed(2)}
                         </div>
                         <div className="text-sm text-green-600">
-                          {calculateCost(tokenAmount) * 12.5} ZMW
+                          <PriceDisplay 
+                            amount={calculateCost(tokenAmount)} 
+                            originalCurrency="USD" 
+                          />
                         </div>
                       </div>
                     </div>
@@ -466,60 +582,125 @@ const TokenTopUpPage = () => {
               <TabsContent value="mobile" className="space-y-4">
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Country Selection */}
                     <div className="space-y-2">
-                      <Label htmlFor="phoneNumber">Phone Number *</Label>
-                      <Input
-                        id="phoneNumber"
-                        placeholder="260XXXXXXXXX"
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
-                        required
-                      />
-                      <p className="text-sm text-gray-500">Format: 260 followed by your number (e.g., 260976123456)</p>
+                      <Label htmlFor="country">Country *</Label>
+                      <Select value={selectedCountry} onValueChange={setSelectedCountry}>
+                        <SelectTrigger className="border-gray-300 focus:border-orange-500 focus:ring-orange-500">
+                          <SelectValue placeholder="Select country" />
+                        </SelectTrigger>
+                        <SelectContent className="min-w-[300px] max-h-[300px]">
+                          {Object.values(PAWAPAY_COUNTRIES).map((country) => (
+                            <SelectItem key={country.code} value={country.code}>
+                              <div className="flex items-center gap-3 py-1">
+                                <ReactCountryFlag
+                                  countryCode={country.flag}
+                                  svg
+                                  style={{
+                                    width: '20px',
+                                    height: '15px',
+                                    borderRadius: '3px',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                  }}
+                                  title={country.name}
+                                />
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-gray-800 text-sm">{country.name}</span>
+                                  <span className="text-xs text-gray-500">{country.dialCode} • {country.currency}</span>
+                                </div>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
 
+                    {/* Mobile Operator */}
                     <div className="space-y-2">
-                      <Label htmlFor="provider">Mobile Money Provider *</Label>
-                      <select
-                        id="provider"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                        value={selectedProvider}
-                        onChange={(e) => setSelectedProvider(e.target.value)}
-                        required
-                      >
-                        <option value="">Select Provider</option>
-                        {paymentProviders.map((provider) => (
-                          <option key={provider.id} value={provider.id}>
-                            {provider.name} ({provider.country})
-                          </option>
-                        ))}
-                      </select>
+                      <Label htmlFor="operator">Mobile Money Provider *</Label>
+                      <Select value={selectedOperator} onValueChange={setSelectedOperator}>
+                        <SelectTrigger className="border-gray-300 focus:border-orange-500 focus:ring-orange-500">
+                          <SelectValue placeholder="Select operator" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {currentOperators.map((operator) => (
+                            <SelectItem key={operator.code} value={operator.code}>
+                              <div className="flex items-center gap-2 py-1">
+                                <div className="w-2 h-2 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full"></div>
+                                <span className="text-sm">{operator.name}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Phone Number */}
+                    <div className="md:col-span-2 space-y-2">
+                      <Label htmlFor="phoneNumber">Phone Number *</Label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <span className="text-gray-500 text-sm">
+                            {selectedCountryData?.dialCode}
+                          </span>
+                        </div>
+                        <Input
+                          id="phoneNumber"
+                          type="tel"
+                          placeholder="XXX XXX XXX"
+                          value={phoneNumber}
+                          onChange={(e) => setPhoneNumber(e.target.value)}
+                          className="pl-20 border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                        />
+                      </div>
+                      <p className="text-sm text-gray-500">
+                        Enter your mobile number without the country code
+                      </p>
                     </div>
                   </div>
 
-                  {selectedProvider && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                      <div className="flex items-center space-x-2 text-green-800">
+                  {/* Payment Summary */}
+                  {selectedCountry && selectedOperator && tokenAmount > 0 && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="flex items-center space-x-2 text-green-800 mb-2">
                         <CheckCircle className="h-4 w-4" />
-                        <span className="font-semibold">
-                          {paymentProviders.find(p => p.id === selectedProvider)?.name}
-                        </span>
+                        <span className="font-semibold">Payment Summary</span>
                       </div>
-                      <p className="text-sm text-green-600 mt-1">
-                        You will be redirected to complete your payment. 
-                        After payment, you'll be automatically redirected back where your tokens will be added instantly.
-                        {tokenAmount > 0 && (
-                          <span className="block mt-1 font-semibold">
-                            You're purchasing: {tokenAmount} tokens for {calculateCost(tokenAmount) * 12.5} ZMW
+                      <div className="space-y-2 text-sm text-green-700">
+                        <div className="flex justify-between">
+                          <span>Tokens:</span>
+                          <span className="font-semibold">{tokenAmount} tokens</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Provider:</span>
+                          <span className="font-semibold">
+                            {currentOperators.find(op => op.code === selectedOperator)?.name}
                           </span>
-                        )}
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Country:</span>
+                          <span className="font-semibold">{selectedCountryData?.name}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Amount to pay:</span>
+                          <span className="font-semibold">
+                            <PriceDisplay 
+                              amount={calculateCost(tokenAmount)} 
+                              originalCurrency="USD" 
+                              targetCurrency={selectedCountryData?.currency}
+                            />
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-green-600 mt-2">
+                        You will be redirected to complete your payment. Tokens will be added automatically after successful payment.
                       </p>
                     </div>
                   )}
 
                   <Button
                     onClick={handleMobilePayment}
-                    disabled={loading || !tokenAmount || tokenAmount <= 0 || !phoneNumber || !selectedProvider}
+                    disabled={loading || !tokenAmount || tokenAmount <= 0 || !phoneNumber || !selectedOperator || !selectedCountry}
                     className={`w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl`}
                   >
                     {loading ? (
@@ -530,7 +711,7 @@ const TokenTopUpPage = () => {
                     ) : (
                       <>
                         <Smartphone className="h-4 w-4 mr-2" />
-                        Pay {calculateCost(tokenAmount || 0) * 12.5} ZMW via Mobile Money
+                        Pay via Mobile Money
                       </>
                     )}
                   </Button>
