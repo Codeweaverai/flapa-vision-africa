@@ -141,16 +141,16 @@ const TokenTopUpPage = () => {
       const countryCode = provider?.country === 'Zambia' ? 'ZMB' : 
                          provider?.country === 'Kenya' ? 'KEN' :
                          provider?.country === 'Cameroon' ? 'CMR' :
-                         provider?.country === 'Ghana' ? 'GHA' : 'ZMB'; // Default to Zambia
+                         provider?.country === 'Ghana' ? 'GHA' : 'ZMB';
       
       const { data, error } = await supabase.functions.invoke('token-topup-pawapay', {
         body: {
           tokenAmount: tokenAmount,
-          amountPaid: amountInCents, // Now in cents
+          amountPaid: amountInCents,
           currency: provider?.currency || 'ZMW',
           phoneNumber: phoneNumber,
-          country: countryCode, // Use 3-letter ISO code: ZMB for Zambia
-          returnUrl: `${window.location.origin}/creator/tokens/success?reference=${Date.now()}&type=tokens`
+          country: countryCode,
+          returnUrl: `${window.location.origin}/creator/tokens/success` // Clean URL for success page
         }
       });
 
@@ -160,6 +160,15 @@ const TokenTopUpPage = () => {
 
       if (data?.success && data.redirectUrl) {
         toast.success('Redirecting to payment gateway...');
+        // Store transaction info for success page reference
+        localStorage.setItem('lastPaymentAttempt', JSON.stringify({
+          depositId: data.deposit_id,
+          transactionId: data.transaction_id,
+          tokenAmount: tokenAmount,
+          amountPaid: cost * 12.5, // Convert to ZMW
+          timestamp: Date.now()
+        }));
+        
         // Redirect to PawaPay payment page
         window.location.href = data.redirectUrl;
       } else {
@@ -198,22 +207,38 @@ const TokenTopUpPage = () => {
     }
   };
 
-  // Handle successful payment return from PawaPay
+  // Check for any pending payments when page loads
   useEffect(() => {
-    const checkForSuccessfulPayment = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const success = urlParams.get('success');
-      const reference = urlParams.get('reference');
+    const checkPendingPayments = async () => {
+      const lastPayment = localStorage.getItem('lastPaymentAttempt');
+      if (lastPayment) {
+        const paymentData = JSON.parse(lastPayment);
+        const timeSincePayment = Date.now() - paymentData.timestamp;
+        
+        // If payment was attempted in the last 30 minutes, check status
+        if (timeSincePayment < 30 * 60 * 1000) {
+          try {
+            const { data } = await supabase.functions.invoke('check-payment-status', {
+              body: { deposit_id: paymentData.depositId }
+            });
 
-      if (success === 'true' && reference) {
-        toast.success('Payment successful! Tokens will be added to your account shortly.');
-        await refetchTokens();
-        navigate('/creator/courses/create-with-ai');
+            if (data?.success && data.payment_status === 'completed') {
+              toast.success(`Previous payment completed! ${paymentData.tokenAmount} tokens added to your account.`);
+              await refetchTokens();
+              localStorage.removeItem('lastPaymentAttempt');
+            }
+          } catch (error) {
+            console.error('Error checking pending payment:', error);
+          }
+        } else {
+          // Remove stale payment data
+          localStorage.removeItem('lastPaymentAttempt');
+        }
       }
     };
 
-    checkForSuccessfulPayment();
-  }, [navigate, refetchTokens]);
+    checkPendingPayments();
+  }, [refetchTokens]);
 
   const features = [
     {
@@ -475,7 +500,8 @@ const TokenTopUpPage = () => {
                         </span>
                       </div>
                       <p className="text-sm text-green-600 mt-1">
-                        You will be redirected to complete your payment. Tokens will be added automatically after successful payment.
+                        You will be redirected to complete your payment. 
+                        After payment, you'll be automatically redirected back where your tokens will be added instantly.
                       </p>
                     </div>
                   )}
