@@ -232,25 +232,23 @@ const TokenTopUpPage = () => {
     setLoading(true);
 
     try {
-      const cost = calculateCost(tokenAmount);
       const selectedCountryData = PAWAPAY_COUNTRIES[selectedCountry as keyof typeof PAWAPAY_COUNTRIES];
       
       if (!selectedCountryData) {
         throw new Error('Invalid country selected');
       }
 
-      // Convert USD amount to local currency using PriceDisplay logic
-      // PriceDisplay handles the conversion automatically based on the currency
-      const amountInLocalCurrency = cost; // PriceDisplay will handle conversion
+      // Get the converted amount in local currency - this should match what's displayed in Payment Summary
+      const convertedAmount = calculateCost(tokenAmount);
       
       // Convert to cents for PawaPay (they expect amount in smallest currency unit)
       // For most currencies, multiply by 100, but some like UGX, TZS, etc. might be different
-      const amountInCents = Math.round(amountInLocalCurrency * 100);
+      const amountInCents = Math.round(convertedAmount * 100);
       
       const { data, error } = await supabase.functions.invoke('token-topup-pawapay', {
         body: {
           tokenAmount: tokenAmount,
-          amountPaid: amountInCents,
+          amountPaid: amountInCents, // This should be the converted local currency amount
           currency: selectedCountryData.currency,
           phoneNumber: phoneNumber,
           country: selectedCountryData.code,
@@ -271,7 +269,7 @@ const TokenTopUpPage = () => {
             depositId: data.deposit_id,
             transactionId: data.transaction_id,
             tokenAmount: tokenAmount,
-            amountPaid: amountInLocalCurrency,
+            amountPaid: convertedAmount, // Store the actual converted amount
             currency: selectedCountryData.currency,
             timestamp: Date.now()
           }));
