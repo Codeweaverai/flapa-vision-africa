@@ -1,3 +1,4 @@
+// pages/creator/CreatorCourseCreateWithAI.tsx (Updated)
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -6,15 +7,20 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Bot, Sparkles, BookOpen, Clock, Users, Zap, CheckCircle, ArrowRight, Play, Star, FileText, Target, GraduationCap } from 'lucide-react';
+import { Bot, Sparkles, BookOpen, Clock, Users, Zap, CheckCircle, ArrowRight, Play, Star, FileText, Target, GraduationCap, Coins, Gift } from 'lucide-react';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTokens } from '@/hooks/useTokens';
+import TokenUsageDialog from '@/components/creator/TokenUsageDialog';
+import FreeTrialBanner from '@/components/creator/FreeTrialBanner';
 
 const CreatorCourseCreateWithAI = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { tokenBalance, hasEnoughTokens, deductTokens, getFeatureCost, getAvailableTokens } = useTokens();
+  
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'input' | 'generating' | 'proposal' | 'creating'>('input');
   const [courseData, setCourseData] = useState({
@@ -31,12 +37,41 @@ const CreatorCourseCreateWithAI = () => {
     percentage: 0,
     step: 'Initializing...'
   });
+  
+  // Token usage states
+  const [showTokenDialog, setShowTokenDialog] = useState(false);
+  const [pendingAction, setPendingAction] = useState<() => void>(() => {});
+  const [requiredTokens, setRequiredTokens] = useState(0);
+  const [featureName, setFeatureName] = useState('');
 
   const handleInputChange = (field: string, value: string) => {
     setCourseData(prev => ({
       ...prev,
       [field]: value
     }));
+  };
+
+  const checkTokensAndProceed = async (action: 'proposal' | 'full_course', callback: () => void) => {
+    try {
+      const featureType = action === 'proposal' ? 'course_proposal' : 'full_course';
+      const cost = await getFeatureCost(featureType);
+      const featureName = action === 'proposal' ? 'Course Proposal' : 'Full Course Creation';
+      
+      setRequiredTokens(cost);
+      setFeatureName(featureName);
+      
+      if (hasEnoughTokens(cost)) {
+        // User has enough tokens, proceed directly
+        callback();
+      } else {
+        // Show token dialog
+        setPendingAction(() => callback);
+        setShowTokenDialog(true);
+      }
+    } catch (error) {
+      console.error('Error checking token cost:', error);
+      toast.error('Unable to verify token requirements');
+    }
   };
 
   const generateProposal = async () => {
@@ -59,6 +94,9 @@ Difficulty Level: ${courseData.difficulty}
 
 Please generate a detailed course proposal with modules, lessons, and learning outcomes.`;
 
+      // Deduct tokens before making the API call
+      const tokenResult = await deductTokens('course_proposal', `course_proposal_${Date.now()}`);
+      
       const { data, error } = await supabase.functions.invoke('generate-course', {
         body: {
           user_prompt: prompt,
@@ -73,14 +111,20 @@ Please generate a detailed course proposal with modules, lessons, and learning o
         setProposal(data.proposal);
         setProposalId(data.proposal_id);
         setStep('proposal');
-        toast.success('Course proposal generated successfully!');
+        toast.success(`Course proposal generated successfully! ${tokenResult.wasFree ? '(Used free tokens)' : ''}`);
       } else {
         throw new Error(data.error || 'Failed to generate proposal');
       }
     } catch (error: any) {
       console.error('Error generating proposal:', error);
-      toast.error(error.message || 'Failed to generate course proposal');
-      setStep('input');
+      
+      if (error.message.includes('Insufficient tokens')) {
+        toast.error('Insufficient tokens to generate course proposal');
+        setStep('input');
+      } else {
+        toast.error(error.message || 'Failed to generate course proposal');
+        setStep('input');
+      }
     } finally {
       setLoading(false);
     }
@@ -99,6 +143,9 @@ Please generate a detailed course proposal with modules, lessons, and learning o
     });
 
     try {
+      // Deduct tokens before making the API call
+      const tokenResult = await deductTokens('full_course', `full_course_${proposalId}`);
+      
       const { data, error } = await supabase.functions.invoke('generate-course', {
         body: {
           creator_id: user?.id,
@@ -110,7 +157,7 @@ Please generate a detailed course proposal with modules, lessons, and learning o
       if (error) throw error;
 
       if (data.success) {
-        toast.success('Course created successfully with AI Agents!');
+        toast.success(`Course created successfully with AI Agents! ${tokenResult.wasFree ? '(Used free tokens)' : ''}`);
         navigate(`/creator/courses/${data.course_id}/content`);
       } else {
         throw new Error(data.error || 'Failed to create course');
@@ -118,7 +165,10 @@ Please generate a detailed course proposal with modules, lessons, and learning o
     } catch (error: any) {
       console.error('Error creating course:', error);
       
-      if (error.message?.includes('Stored proposal not found')) {
+      if (error.message.includes('Insufficient tokens')) {
+        toast.error('Insufficient tokens to create full course');
+        setStep('proposal');
+      } else if (error.message?.includes('Stored proposal not found')) {
         toast.error('The course proposal expired. Please generate a new proposal.');
         setStep('input');
       } else if (error.message?.includes('timeout')) {
@@ -131,6 +181,14 @@ Please generate a detailed course proposal with modules, lessons, and learning o
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGenerateProposal = () => {
+    checkTokensAndProceed('proposal', generateProposal);
+  };
+
+  const handleCreateFullCourse = () => {
+    checkTokensAndProceed('full_course', createFullCourse);
   };
 
   const features = [
@@ -177,9 +235,14 @@ Please generate a detailed course proposal with modules, lessons, and learning o
     return progressSteps.find(step => step.percentage <= creationProgress.percentage) || progressSteps[0];
   };
 
+  const availableTokens = getAvailableTokens();
+
   return (
     <CreatorLayout title="Create Course with AI">
       <div className="max-w-4xl mx-auto space-y-8">
+        {/* Free Trial Banner */}
+        <FreeTrialBanner />
+
         {/* Header */}
         <div className="text-center space-y-4">
           <div className="flex justify-center items-center space-x-3">
@@ -195,6 +258,66 @@ Please generate a detailed course proposal with modules, lessons, and learning o
             Let our AI Manager Agent create a complete, production-ready course for you
           </p>
         </div>
+
+        {/* Token Balance Display */}
+        <Card className="bg-gradient-to-r from-orange-50 to-purple-50 border-orange-200">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Your Token Balance</h3>
+                <p className="text-sm text-gray-600">Tokens available for AI features</p>
+              </div>
+              <div className="text-right space-y-2">
+                {/* Free Tokens */}
+                {availableTokens.free > 0 && !tokenBalance?.has_used_free_trial && (
+                  <div className="flex items-center justify-end space-x-2">
+                    <Gift className="h-4 w-4 text-green-500" />
+                    <span className="font-semibold text-green-600">
+                      {availableTokens.free} free tokens
+                    </span>
+                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                      Trial
+                    </Badge>
+                  </div>
+                )}
+                
+                {/* Paid Tokens */}
+                <div className="flex items-center justify-end space-x-2">
+                  <Coins className="h-5 w-5 text-orange-600" />
+                  <span className="text-xl font-bold text-orange-600">
+                    {availableTokens.paid}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-500">paid tokens available</p>
+              </div>
+            </div>
+
+            {/* Usage Information */}
+            <div className="mt-4 grid grid-cols-2 gap-4 text-sm text-gray-600">
+              <div>
+                <div className="flex justify-between">
+                  <span>Course Proposal:</span>
+                  <span className="font-semibold">8 tokens</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Full Course:</span>
+                  <span className="font-semibold">25 tokens</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => navigate('/creator/tokens')}
+                  className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                >
+                  <Coins className="h-4 w-4 mr-1" />
+                  Top Up Tokens
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Features Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -296,12 +419,12 @@ Please generate a detailed course proposal with modules, lessons, and learning o
               </div>
 
               <Button
-                onClick={generateProposal}
+                onClick={handleGenerateProposal}
                 disabled={loading || !courseData.title.trim() || !courseData.description.trim()}
                 className={`w-full ${gradientClass} text-white font-semibold py-3 rounded-lg ${gradientHoverClass} transition-all duration-200 shadow-lg hover:shadow-xl`}
               >
                 <Bot className="h-5 w-5 mr-2" />
-                {loading ? 'Generating Proposal...' : 'Generate Course Proposal'}
+                {loading ? 'Generating Proposal...' : 'Generate Course Proposal (8 tokens)'}
               </Button>
             </CardContent>
           </Card>
@@ -484,7 +607,7 @@ Please generate a detailed course proposal with modules, lessons, and learning o
                   Start Over
                 </Button>
                 <Button
-                  onClick={createFullCourse}
+                  onClick={handleCreateFullCourse}
                   disabled={loading}
                   className={`flex-1 ${gradientClass} text-white font-semibold py-3 rounded-lg ${gradientHoverClass} transition-all duration-200 shadow-lg hover:shadow-xl`}
                 >
@@ -496,7 +619,7 @@ Please generate a detailed course proposal with modules, lessons, and learning o
                   ) : (
                     <>
                       <Bot className="h-4 w-4 mr-2" />
-                      Create with AI Agents
+                      Create with AI Agents (25 tokens)
                       <ArrowRight className="h-4 w-4 ml-2" />
                     </>
                   )}
@@ -602,6 +725,16 @@ Please generate a detailed course proposal with modules, lessons, and learning o
             </CardContent>
           </Card>
         )}
+
+        {/* Token Usage Dialog */}
+        <TokenUsageDialog
+          open={showTokenDialog}
+          onOpenChange={setShowTokenDialog}
+          featureType={requiredTokens === 8 ? 'course_proposal' : 'full_course'}
+          requiredTokens={requiredTokens}
+          featureName={featureName}
+          onContinue={pendingAction}
+        />
       </div>
     </CreatorLayout>
   );
