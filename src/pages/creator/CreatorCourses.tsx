@@ -335,7 +335,7 @@ const CreatorCourses = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => navigate(`/learning/course-detail/${course.id}`)}
+                      onClick={() => navigate(`/creator/courses/${course.id}/preview`)}
                       className="bg-orange-500 text-white hover:bg-orange-700 hover:text-white"
                     >
                       <Eye className="h-4 w-4 mr-1" />
