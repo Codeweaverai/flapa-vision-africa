@@ -132,17 +132,18 @@ const TokenTopUpPage = () => {
 
     try {
       const cost = calculateCost(tokenAmount);
-      const provider = paymentProviders.find(p => p.id === selectedProvider);
+      
+      // Convert to cents for PawaPay (they expect amount in smallest currency unit)
+      const amountInCents = Math.round(cost * 100);
       
       const { data, error } = await supabase.functions.invoke('token-topup-pawapay', {
         body: {
           tokenAmount: tokenAmount,
-          amountPaid: cost,
-          currency: provider?.currency || 'ZMW',
+          amountPaid: amountInCents, // Now in cents
+          currency: 'ZMW',
           phoneNumber: phoneNumber,
-          provider: selectedProvider,
-          clientReferenceId: `TOKENS-${user.id.slice(0, 8)}-${Date.now()}`,
-          customerMessage: `Purchase ${tokenAmount} AI tokens`
+          country: 'ZM', // Zambia country code
+          returnUrl: `${window.location.origin}/creator/tokens/success?reference=${Date.now()}&type=tokens`
         }
       });
 
@@ -150,19 +151,16 @@ const TokenTopUpPage = () => {
         throw new Error(error.message || 'Failed to initiate mobile payment');
       }
 
-      if (data?.success) {
-        toast.success(`Payment initiated! Status: ${data.status}`);
-        // Poll for payment status or wait for webhook
-        setTimeout(() => {
-          handlePaymentSuccess(data.reference);
-        }, 3000);
+      if (data?.success && data.redirectUrl) {
+        toast.success('Redirecting to payment gateway...');
+        // Redirect to PawaPay payment page
+        window.location.href = data.redirectUrl;
       } else {
         throw new Error('Invalid response from payment service');
       }
     } catch (error: any) {
       console.error('Error initiating mobile payment:', error);
       toast.error(error.message || 'Failed to initiate payment');
-    } finally {
       setLoading(false);
     }
   };
@@ -192,6 +190,23 @@ const TokenTopUpPage = () => {
       toast.error('Payment verification failed. Please contact support.');
     }
   };
+
+  // Handle successful payment return from PawaPay
+  useEffect(() => {
+    const checkForSuccessfulPayment = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const success = urlParams.get('success');
+      const reference = urlParams.get('reference');
+
+      if (success === 'true' && reference) {
+        toast.success('Payment successful! Tokens will be added to your account shortly.');
+        await refetchTokens();
+        navigate('/creator/courses/create-with-ai');
+      }
+    };
+
+    checkForSuccessfulPayment();
+  }, [navigate, refetchTokens]);
 
   const features = [
     {
@@ -414,23 +429,25 @@ const TokenTopUpPage = () => {
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="phoneNumber">Phone Number</Label>
+                      <Label htmlFor="phoneNumber">Phone Number *</Label>
                       <Input
                         id="phoneNumber"
                         placeholder="260XXXXXXXXX"
                         value={phoneNumber}
                         onChange={(e) => setPhoneNumber(e.target.value)}
+                        required
                       />
-                      <p className="text-sm text-gray-500">Format: 260 followed by your number</p>
+                      <p className="text-sm text-gray-500">Format: 260 followed by your number (e.g., 260976123456)</p>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="provider">Mobile Money Provider</Label>
+                      <Label htmlFor="provider">Mobile Money Provider *</Label>
                       <select
                         id="provider"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                         value={selectedProvider}
                         onChange={(e) => setSelectedProvider(e.target.value)}
+                        required
                       >
                         <option value="">Select Provider</option>
                         {paymentProviders.map((provider) => (
@@ -451,7 +468,7 @@ const TokenTopUpPage = () => {
                         </span>
                       </div>
                       <p className="text-sm text-green-600 mt-1">
-                        You will receive a payment prompt on your phone to complete the transaction.
+                        You will be redirected to complete your payment. Tokens will be added automatically after successful payment.
                       </p>
                     </div>
                   )}
