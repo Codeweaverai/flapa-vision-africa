@@ -16,6 +16,31 @@ interface TokenUsageDialogProps {
   onContinue?: () => void;
 }
 
+// Safe wrapper for token functions in this component
+const useSafeTokenDialog = () => {
+  const tokenHook = useTokens();
+  
+  const safeGetAvailableTokens = () => {
+    if (typeof tokenHook.getAvailableTokens === 'function') {
+      return tokenHook.getAvailableTokens();
+    }
+    return { free: 0, paid: 0 };
+  };
+
+  const safeHasEnoughTokens = (cost: number) => {
+    if (typeof tokenHook.hasEnoughTokens === 'function') {
+      return tokenHook.hasEnoughTokens(cost);
+    }
+    return false;
+  };
+
+  return {
+    tokenBalance: tokenHook.tokenBalance,
+    getAvailableTokens: safeGetAvailableTokens,
+    hasEnoughTokens: safeHasEnoughTokens,
+  };
+};
+
 const TokenUsageDialog: React.FC<TokenUsageDialogProps> = ({
   open,
   onOpenChange,
@@ -25,7 +50,7 @@ const TokenUsageDialog: React.FC<TokenUsageDialogProps> = ({
   onContinue
 }) => {
   const navigate = useNavigate();
-  const { tokenBalance, getAvailableTokens, hasEnoughTokens } = useTokens();
+  const { tokenBalance, getAvailableTokens, hasEnoughTokens } = useSafeTokenDialog();
   
   const availableTokens = getAvailableTokens();
   const hasFreeTokens = availableTokens.free >= requiredTokens && !tokenBalance?.has_used_free_trial;
