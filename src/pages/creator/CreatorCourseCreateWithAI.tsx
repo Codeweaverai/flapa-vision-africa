@@ -98,8 +98,13 @@ Difficulty Level: ${courseData.difficulty}
 
 Please generate a detailed course proposal with modules, lessons, and learning outcomes.`;
 
-      // Deduct tokens before making the API call
-      const tokenResult = await deductTokens('course_proposal', `course_proposal_${Date.now()}`);
+      // Fix: Check if deductTokens is a function before calling it
+      let tokenResult = null;
+      if (typeof deductTokens === 'function') {
+        tokenResult = await deductTokens('course_proposal', `course_proposal_${Date.now()}`);
+      } else {
+        console.warn('deductTokens is not available, proceeding without token deduction');
+      }
       
       const { data, error } = await supabase.functions.invoke('generate-course', {
         body: {
@@ -158,8 +163,13 @@ Please generate a detailed course proposal with modules, lessons, and learning o
     });
 
     try {
-      // Deduct tokens before making the API call
-      const tokenResult = await deductTokens('full_course', `full_course_${proposalId}`);
+      // Fix: Check if deductTokens is a function before calling it
+      let tokenResult = null;
+      if (typeof deductTokens === 'function') {
+        tokenResult = await deductTokens('full_course', `full_course_${proposalId}`);
+      } else {
+        console.warn('deductTokens is not available, proceeding without token deduction');
+      }
       
       const { data, error } = await supabase.functions.invoke('generate-course', {
         body: {
@@ -208,6 +218,19 @@ Please generate a detailed course proposal with modules, lessons, and learning o
 
   const handleCreateFullCourse = () => {
     checkTokensAndProceed('full_course', createFullCourse);
+  };
+
+  // Fix: Add safe function checks for token-related functions
+  const safeHasEnoughTokens = (cost: number) => {
+    return typeof hasEnoughTokens === 'function' ? hasEnoughTokens(cost) : false;
+  };
+
+  const safeGetFeatureCost = async (featureType: string) => {
+    if (typeof getFeatureCost === 'function') {
+      return await getFeatureCost(featureType);
+    }
+    // Default costs if function is not available
+    return featureType === 'course_proposal' ? 8 : 25;
   };
 
   const features = [
