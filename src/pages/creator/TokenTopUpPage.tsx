@@ -150,7 +150,7 @@ const TokenTopUpPage = () => {
           currency: provider?.currency || 'ZMW',
           phoneNumber: phoneNumber,
           country: countryCode,
-          returnUrl: `${window.location.origin}/creator/tokens/success` // Clean URL for success page
+          returnUrl: `${window.location.origin}/creator/tokens/success` // Base URL - deposit_id will be added by the function
         }
       });
 
@@ -160,14 +160,17 @@ const TokenTopUpPage = () => {
 
       if (data?.success && data.redirectUrl) {
         toast.success('Redirecting to payment gateway...');
-        // Store transaction info for success page reference
-        localStorage.setItem('lastPaymentAttempt', JSON.stringify({
-          depositId: data.deposit_id,
-          transactionId: data.transaction_id,
-          tokenAmount: tokenAmount,
-          amountPaid: cost * 12.5, // Convert to ZMW
-          timestamp: Date.now()
-        }));
+        
+        // Store transaction info for success page reference (backup)
+        if (data.deposit_id) {
+          localStorage.setItem('lastPaymentAttempt', JSON.stringify({
+            depositId: data.deposit_id,
+            transactionId: data.transaction_id,
+            tokenAmount: tokenAmount,
+            amountPaid: cost * 12.5, // Convert to ZMW
+            timestamp: Date.now()
+          }));
+        }
         
         // Redirect to PawaPay payment page
         window.location.href = data.redirectUrl;
@@ -225,6 +228,9 @@ const TokenTopUpPage = () => {
             if (data?.success && data.payment_status === 'completed') {
               toast.success(`Previous payment completed! ${paymentData.tokenAmount} tokens added to your account.`);
               await refetchTokens();
+              localStorage.removeItem('lastPaymentAttempt');
+            } else if (data?.success && (data.payment_status === 'failed' || data.payment_status === 'cancelled')) {
+              // Clear failed payment data
               localStorage.removeItem('lastPaymentAttempt');
             }
           } catch (error) {
@@ -502,6 +508,11 @@ const TokenTopUpPage = () => {
                       <p className="text-sm text-green-600 mt-1">
                         You will be redirected to complete your payment. 
                         After payment, you'll be automatically redirected back where your tokens will be added instantly.
+                        {tokenAmount > 0 && (
+                          <span className="block mt-1 font-semibold">
+                            You're purchasing: {tokenAmount} tokens for {calculateCost(tokenAmount) * 12.5} ZMW
+                          </span>
+                        )}
                       </p>
                     </div>
                   )}
@@ -526,6 +537,19 @@ const TokenTopUpPage = () => {
                 </div>
               </TabsContent>
             </Tabs>
+
+            {/* Additional Info */}
+            <Card className="bg-blue-50 border-blue-200">
+              <CardContent className="pt-6">
+                <div className="text-center text-blue-800">
+                  <p className="font-semibold">Seamless Payment Experience</p>
+                  <p className="text-sm mt-1">
+                    After payment completion, you'll be automatically redirected to check your payment status. 
+                    Tokens are added instantly once payment is confirmed.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Back Button */}
             <div className="flex justify-center pt-4">
