@@ -1,5 +1,4 @@
-// pages/creator/CreatorCourseCreateWithAI.tsx (Updated)
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,7 +18,7 @@ import FreeTrialBanner from '@/components/creator/FreeTrialBanner';
 const CreatorCourseCreateWithAI = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { tokenBalance, hasEnoughTokens, deductTokens, getFeatureCost, getAvailableTokens } = useTokens();
+  const { tokenBalance, hasEnoughTokens, deductTokens, getFeatureCost, getAvailableTokens, refetch: refetchTokens } = useTokens();
   
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'input' | 'generating' | 'proposal' | 'creating'>('input');
@@ -40,7 +39,7 @@ const CreatorCourseCreateWithAI = () => {
   
   // Token usage states
   const [showTokenDialog, setShowTokenDialog] = useState(false);
-  const [pendingAction, setPendingAction] = useState<() => void>(() => {});
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [requiredTokens, setRequiredTokens] = useState(0);
   const [featureName, setFeatureName] = useState('');
 
@@ -80,6 +79,11 @@ const CreatorCourseCreateWithAI = () => {
       return;
     }
 
+    if (!user?.id) {
+      toast.error('User not authenticated');
+      return;
+    }
+
     setLoading(true);
     setStep('generating');
 
@@ -100,38 +104,49 @@ Please generate a detailed course proposal with modules, lessons, and learning o
       const { data, error } = await supabase.functions.invoke('generate-course', {
         body: {
           user_prompt: prompt,
-          creator_id: user?.id,
+          creator_id: user.id,
           action: 'generate_proposal'
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw new Error(error.message || 'Failed to generate proposal');
+      }
 
-      if (data.success) {
+      if (data?.success) {
         setProposal(data.proposal);
         setProposalId(data.proposal_id);
         setStep('proposal');
-        toast.success(`Course proposal generated successfully! ${tokenResult.wasFree ? '(Used free tokens)' : ''}`);
+        toast.success(`Course proposal generated successfully! ${tokenResult?.wasFree ? '(Used free tokens)' : ''}`);
       } else {
-        throw new Error(data.error || 'Failed to generate proposal');
+        throw new Error(data?.error || 'Failed to generate proposal');
       }
     } catch (error: any) {
       console.error('Error generating proposal:', error);
       
-      if (error.message.includes('Insufficient tokens')) {
+      if (error.message?.includes('Insufficient tokens')) {
         toast.error('Insufficient tokens to generate course proposal');
-        setStep('input');
+        await refetchTokens();
       } else {
         toast.error(error.message || 'Failed to generate course proposal');
-        setStep('input');
       }
+      setStep('input');
     } finally {
       setLoading(false);
     }
   };
 
   const createFullCourse = async () => {
-    if (!proposal) return;
+    if (!proposal || !proposalId) {
+      toast.error('No proposal found to create course from');
+      return;
+    }
+
+    if (!user?.id) {
+      toast.error('User not authenticated');
+      return;
+    }
 
     setLoading(true);
     setStep('creating');
@@ -148,25 +163,29 @@ Please generate a detailed course proposal with modules, lessons, and learning o
       
       const { data, error } = await supabase.functions.invoke('generate-course', {
         body: {
-          creator_id: user?.id,
+          creator_id: user.id,
           action: 'generate_full_course',
           proposal_id: proposalId
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw new Error(error.message || 'Failed to create course');
+      }
 
-      if (data.success) {
-        toast.success(`Course created successfully with AI Agents! ${tokenResult.wasFree ? '(Used free tokens)' : ''}`);
+      if (data?.success) {
+        toast.success(`Course created successfully with AI Agents! ${tokenResult?.wasFree ? '(Used free tokens)' : ''}`);
         navigate(`/creator/courses/${data.course_id}/content`);
       } else {
-        throw new Error(data.error || 'Failed to create course');
+        throw new Error(data?.error || 'Failed to create course');
       }
     } catch (error: any) {
       console.error('Error creating course:', error);
       
-      if (error.message.includes('Insufficient tokens')) {
+      if (error.message?.includes('Insufficient tokens')) {
         toast.error('Insufficient tokens to create full course');
+        await refetchTokens();
         setStep('proposal');
       } else if (error.message?.includes('Stored proposal not found')) {
         toast.error('The course proposal expired. Please generate a new proposal.');
@@ -483,13 +502,13 @@ Please generate a detailed course proposal with modules, lessons, and learning o
                   </div>
                   <div className="text-center p-3 bg-white rounded-lg border border-orange-100">
                     <BookOpen className="h-5 w-5 mx-auto mb-1 text-purple-500" />
-                    <p className="font-semibold text-gray-900">{proposal.module_outline.length}</p>
+                    <p className="font-semibold text-gray-900">{proposal.module_outline?.length || 0}</p>
                     <p className="text-xs text-gray-600">Modules</p>
                   </div>
                   <div className="text-center p-3 bg-white rounded-lg border border-orange-100">
                     <FileText className="h-5 w-5 mx-auto mb-1 text-orange-500" />
                     <p className="font-semibold text-gray-900">
-                      {proposal.module_outline.reduce((acc: number, mod: any) => acc + mod.lessons.length, 0)}
+                      {proposal.module_outline?.reduce((acc: number, mod: any) => acc + (mod.lessons?.length || 0), 0) || 0}
                     </p>
                     <p className="text-xs text-gray-600">Lessons</p>
                   </div>
@@ -522,50 +541,54 @@ Please generate a detailed course proposal with modules, lessons, and learning o
               )}
 
               {/* Modules Preview */}
-              <div className="space-y-4">
-                <h4 className="font-semibold text-lg flex items-center">
-                  <BookOpen className="h-5 w-5 mr-2 text-purple-500" />
-                  Course Modules
-                </h4>
-                {proposal.module_outline.map((module: any, index: number) => (
-                  <Card key={index} className="border border-orange-100 hover:border-orange-300 transition-colors">
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <div className="flex items-center space-x-2 mb-1">
-                            <div className={`w-6 h-6 rounded-full ${gradientClass} flex items-center justify-center text-white text-xs font-bold`}>
-                              {module.module_number}
+              {proposal.module_outline && proposal.module_outline.length > 0 && (
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-lg flex items-center">
+                    <BookOpen className="h-5 w-5 mr-2 text-purple-500" />
+                    Course Modules
+                  </h4>
+                  {proposal.module_outline.map((module: any, index: number) => (
+                    <Card key={index} className="border border-orange-100 hover:border-orange-300 transition-colors">
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <div className="flex items-center space-x-2 mb-1">
+                              <div className={`w-6 h-6 rounded-full ${gradientClass} flex items-center justify-center text-white text-xs font-bold`}>
+                                {module.module_number || index + 1}
+                              </div>
+                              <h5 className="font-semibold text-gray-900">{module.module_title}</h5>
                             </div>
-                            <h5 className="font-semibold text-gray-900">{module.module_title}</h5>
+                            <p className="text-sm text-gray-600">{module.module_description}</p>
                           </div>
-                          <p className="text-sm text-gray-600">{module.module_description}</p>
+                          <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                            {module.lessons?.length || 0} lessons
+                          </Badge>
                         </div>
-                        <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
-                          {module.lessons.length} lessons
-                        </Badge>
-                      </div>
-                      <div className="mt-3 grid grid-cols-1 gap-2">
-                        {module.lessons.slice(0, 4).map((lesson: any, lessonIndex: number) => (
-                          <div key={lessonIndex} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                            <div className="flex items-center space-x-2">
-                              <Play className="h-3 w-3 text-orange-500" />
-                              <span className="text-sm font-medium text-gray-700">{lesson.lesson_title}</span>
-                            </div>
-                            <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded">
-                              {lesson.duration_minutes}min
-                            </span>
-                          </div>
-                        ))}
-                        {module.lessons.length > 4 && (
-                          <div className="text-sm text-gray-500 text-center py-1">
-                            +{module.lessons.length - 4} more lessons
+                        {module.lessons && module.lessons.length > 0 && (
+                          <div className="mt-3 grid grid-cols-1 gap-2">
+                            {module.lessons.slice(0, 4).map((lesson: any, lessonIndex: number) => (
+                              <div key={lessonIndex} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                                <div className="flex items-center space-x-2">
+                                  <Play className="h-3 w-3 text-orange-500" />
+                                  <span className="text-sm font-medium text-gray-700">{lesson.lesson_title}</span>
+                                </div>
+                                <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded">
+                                  {lesson.duration_minutes}min
+                                </span>
+                              </div>
+                            ))}
+                            {module.lessons.length > 4 && (
+                              <div className="text-sm text-gray-500 text-center py-1">
+                                +{module.lessons.length - 4} more lessons
+                              </div>
+                            )}
                           </div>
                         )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
 
               {/* AI Agent Features */}
               <div className="bg-gradient-to-r from-purple-50 to-orange-50 rounded-lg p-4 border border-purple-200">
@@ -733,7 +756,7 @@ Please generate a detailed course proposal with modules, lessons, and learning o
           featureType={requiredTokens === 8 ? 'course_proposal' : 'full_course'}
           requiredTokens={requiredTokens}
           featureName={featureName}
-          onContinue={pendingAction}
+          onContinue={pendingAction || (() => {})}
         />
       </div>
     </CreatorLayout>
