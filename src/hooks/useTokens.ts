@@ -1,5 +1,5 @@
 // hooks/useTokens.ts
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
@@ -36,6 +36,13 @@ interface TokenTransaction {
   created_at: string;
 }
 
+interface DeductTokensResult {
+  success: boolean;
+  tokensUsed: number;
+  wasFree: boolean;
+  remainingTokens: number;
+}
+
 export const useTokens = () => {
   const { user } = useAuth();
   const [tokenBalance, setTokenBalance] = useState<TokenBalance | null>(null);
@@ -43,7 +50,7 @@ export const useTokens = () => {
   const [transactions, setTransactions] = useState<TokenTransaction[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!user) {
       setLoading(false);
       return;
@@ -87,8 +94,19 @@ export const useTokens = () => {
         .select('*')
         .single();
 
-      if (configError) throw configError;
-      setTopUpConfig(configData);
+      if (configError) {
+        console.warn('Top-up config not found, using defaults');
+        // Set default config if not found
+        setTopUpConfig({
+          id: 'default',
+          min_amount: 10,
+          max_amount: 1000,
+          default_amounts: [50, 100, 200, 500],
+          token_price: 0.01
+        });
+      } else {
+        setTopUpConfig(configData);
+      }
 
       // Fetch recent transactions
       const { data: transactionsData, error: transactionsError } = await supabase
@@ -107,9 +125,9 @@ export const useTokens = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
-  const hasEnoughTokens = (requiredTokens: number): boolean => {
+  const hasEnoughTokens = useCallback((requiredTokens: number): boolean => {
     if (!tokenBalance) return false;
     
     // Check free tokens first
@@ -119,28 +137,28 @@ export const useTokens = () => {
     
     // Then check paid tokens
     return tokenBalance.balance >= requiredTokens;
-  };
+  }, [tokenBalance]);
 
-  const getAvailableTokens = (): { free: number; paid: number } => {
+  const getAvailableTokens = useCallback((): { free: number; paid: number } => {
     if (!tokenBalance) return { free: 0, paid: 0 };
     
     return {
       free: tokenBalance.free_tokens_available,
       paid: tokenBalance.balance
     };
-  };
+  }, [tokenBalance]);
 
-  const calculatePrice = (tokenAmount: number): number => {
+  const calculatePrice = useCallback((tokenAmount: number): number => {
     if (!topUpConfig) return 0;
     return Number((tokenAmount * topUpConfig.token_price).toFixed(2));
-  };
+  }, [topUpConfig]);
 
-  const calculateTokens = (price: number): number => {
+  const calculateTokens = useCallback((price: number): number => {
     if (!topUpConfig) return 0;
     return Math.floor(price / topUpConfig.token_price);
-  };
+  }, [topUpConfig]);
 
-  const topUpTokens = async (tokenAmount: number, amountPaid: number) => {
+  const topUpTokens = useCallback(async (tokenAmount: number, amountPaid: number) => {
     if (!user) throw new Error('User not authenticated');
     if (!topUpConfig) throw new Error('Top-up configuration not loaded');
 
@@ -198,9 +216,9 @@ export const useTokens = () => {
       console.error('Error topping up tokens:', error);
       throw error;
     }
-  };
+  }, [user, topUpConfig, tokenBalance]);
 
-  const deductTokens = async (featureType: string, referenceId?: string) => {
+  const deductTokens = useCallback(async (featureType: string, referenceId?: string): Promise<DeductTokensResult> => {
     if (!user) throw new Error('User not authenticated');
 
     try {
@@ -212,13 +230,17 @@ export const useTokens = () => {
         .eq('is_active', true)
         .single();
 
-      if (costError) throw new Error('Could not determine token cost');
+      if (costError) {
+        console.error('Cost lookup error:', costError);
+        throw new Error(`Could not determine token cost for feature: ${featureType}`);
+      }
 
       const tokenCost = costData.token_cost;
 
       // Check if user has enough tokens
       if (!hasEnoughTokens(tokenCost)) {
-        throw new Error(`Insufficient tokens. Required: ${tokenCost}, Available: ${getAvailableTokens().free + getAvailableTokens().paid}`);
+        const available = getAvailableTokens();
+        throw new Error(`Insufficient tokens. Required: ${tokenCost}, Available Free: ${available.free}, Available Paid: ${available.paid}`);
       }
 
       // Determine if using free or paid tokens
@@ -248,6 +270,7 @@ export const useTokens = () => {
       if (useFreeTokens) {
         updateData.free_tokens_available = (tokenBalance?.free_tokens_available || 0) - tokenCost;
         updateData.free_tokens_used = (tokenBalance?.free_tokens_used || 0) + tokenCost;
+        // Only mark free trial as used if we're actually using free tokens
         updateData.has_used_free_trial = true;
       } else {
         updateData.balance = (tokenBalance?.balance || 0) - tokenCost;
@@ -296,9 +319,9 @@ export const useTokens = () => {
       console.error('Error deducting tokens:', error);
       throw error;
     }
-  };
+  }, [user, tokenBalance, hasEnoughTokens, getAvailableTokens]);
 
-  const getFeatureCost = async (featureType: string): Promise<number> => {
+  const getFeatureCost = useCallback(async (featureType: string): Promise<number> => {
     try {
       const { data: costData, error } = await supabase
         .from('ai_usage_costs')
@@ -307,17 +330,29 @@ export const useTokens = () => {
         .eq('is_active', true)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.warn(`Feature cost not found for ${featureType}, using default`);
+        // Return default costs for common features
+        const defaultCosts: { [key: string]: number } = {
+          'course_proposal': 8,
+          'full_course': 25,
+          'lesson_content': 5,
+          'quiz_generation': 3,
+          'exam_generation': 5
+        };
+        return defaultCosts[featureType] || 10;
+      }
       return costData.token_cost;
     } catch (error) {
       console.error('Error getting feature cost:', error);
-      return 0;
+      // Return safe default
+      return featureType === 'course_proposal' ? 8 : 25;
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchData();
-  }, [user]);
+  }, [fetchData]);
 
   return {
     tokenBalance,
@@ -334,3 +369,6 @@ export const useTokens = () => {
     refetch: fetchData
   };
 };
+
+// Export the type for use in components
+export type { DeductTokensResult };
