@@ -136,13 +136,20 @@ const TokenTopUpPage = () => {
       // Convert to cents for PawaPay (they expect amount in smallest currency unit)
       const amountInCents = Math.round(cost * 100);
       
+      // Get the provider to determine country
+      const provider = paymentProviders.find(p => p.id === selectedProvider);
+      const countryCode = provider?.country === 'Zambia' ? 'ZMB' : 
+                         provider?.country === 'Kenya' ? 'KEN' :
+                         provider?.country === 'Cameroon' ? 'CMR' :
+                         provider?.country === 'Ghana' ? 'GHA' : 'ZMB'; // Default to Zambia
+      
       const { data, error } = await supabase.functions.invoke('token-topup-pawapay', {
         body: {
           tokenAmount: tokenAmount,
           amountPaid: amountInCents, // Now in cents
-          currency: 'ZMW',
+          currency: provider?.currency || 'ZMW',
           phoneNumber: phoneNumber,
-          country: 'ZM', // Zambia country code
+          country: countryCode, // Use 3-letter ISO code: ZMB for Zambia
           returnUrl: `${window.location.origin}/creator/tokens/success?reference=${Date.now()}&type=tokens`
         }
       });
