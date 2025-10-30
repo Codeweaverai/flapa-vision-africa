@@ -1,3 +1,4 @@
+// components/creator/FreeTrialBanner.tsx
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -5,11 +6,41 @@ import { Badge } from '@/components/ui/badge';
 import { Gift, Zap, BookOpen, Calendar, X } from 'lucide-react';
 import { useTokens } from '@/hooks/useTokens';
 
+// Safe wrapper for token functions in this component
+const useSafeFreeTrial = () => {
+  const tokenHook = useTokens();
+  
+  const safeGetAvailableTokens = () => {
+    if (typeof tokenHook.getAvailableTokens === 'function') {
+      return tokenHook.getAvailableTokens();
+    }
+    return { free: 0, paid: 0 };
+  };
+
+  const safeHasFreeTokensAvailable = () => {
+    if (typeof tokenHook.hasFreeTokensAvailable === 'function') {
+      return tokenHook.hasFreeTokensAvailable();
+    }
+    // Fallback logic
+    const available = safeGetAvailableTokens();
+    return available.free > 0 && !tokenHook.tokenBalance?.has_used_free_trial;
+  };
+
+  return {
+    tokenBalance: tokenHook.tokenBalance,
+    getAvailableTokens: safeGetAvailableTokens,
+    hasFreeTokensAvailable: safeHasFreeTokensAvailable,
+  };
+};
+
 const FreeTrialBanner = () => {
-  const { tokenBalance, hasFreeTokensAvailable, getAvailableTokens } = useTokens();
+  const { tokenBalance, hasFreeTokensAvailable, getAvailableTokens } = useSafeFreeTrial();
   const [dismissed, setDismissed] = React.useState(false);
 
-  if (!hasFreeTokensAvailable() || dismissed) {
+  // Safe check for free tokens
+  const hasFreeTokens = hasFreeTokensAvailable();
+  
+  if (!hasFreeTokens || dismissed) {
     return null;
   }
 
