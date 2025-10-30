@@ -77,6 +77,7 @@ import CreatorWorkplaces from '@/pages/creator/CreatorWorkplaces';
 import CreatorRecentActivities from '@/pages/creator/CreatorRecentActivities';
 import CreatorCourseCreateWithAI from '@/pages/creator/CreatorCourseCreateWithAI';
 import CreatorEventCreateWithAI from '@/pages/creator/CreatorEventCreateWithAI';
+import TokenTopUpPage from '@/pages/creator/TokenTopUpPage';
 
 // Import workplace pages
 import AcceptInvitePage from '@/pages/AcceptInvitePage';
@@ -266,7 +267,9 @@ function App() {
                    <Route path="/creator/settings" element={<ProtectedRoute><CreatorSettings /></ProtectedRoute>} />
                   <Route path="/creator/attendees" element={<ProtectedRoute><CreatorAttendeeManagement /></ProtectedRoute>} />
                  <Route path="/creator/activities" element={<ProtectedRoute><CreatorRecentActivities /></ProtectedRoute>} />
+                  <Route path="/creator/tokens" element={<ProtectedRoute><TokenTopUpPage /></ProtectedRoute>} />
 
+      
                   {/* Community Routes */}
                   <Route path="/community" element={<ProtectedRoute><CommunityPage /></ProtectedRoute>} />
                   <Route path="/community/chat" element={<ProtectedRoute><CommunityChatPage /></ProtectedRoute>} />
