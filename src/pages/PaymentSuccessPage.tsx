@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, ArrowRight, Calendar, BookOpen, Ticket, Sparkles, Gift } from 'lucide-react';
+import { Check, ArrowRight, Calendar, BookOpen, Ticket, Sparkles, Gift, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,65 +13,117 @@ const PaymentSuccessPage = () => {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(true);
   const [itemInfo, setItemInfo] = useState<any>(null);
   const [itemType, setItemType] = useState<'course' | 'event' | 'gift_card' | null>(null);
+  const [orderDetails, setOrderDetails] = useState<any>(null);
   
-  const sessionId = searchParams.get('session_id');
-  const type = searchParams.get('type');
-  const id = searchParams.get('id');
+  const depositId = searchParams.get('deposit_id');
+  const orderId = searchParams.get('order_id');
 
   useEffect(() => {
-    if (sessionId && type && id) {
-      verifyPaymentAndAccess();
+    if (depositId && orderId) {
+      verifyPaymentAndProcess();
     } else {
       setLoading(false);
+      setProcessing(false);
+      toast.error('Missing payment information');
     }
-  }, [sessionId, type, id]);
+  }, [depositId, orderId]);
 
-  const verifyPaymentAndAccess = async () => {
+  const verifyPaymentAndProcess = async () => {
     try {
-      setItemType(type as 'course' | 'event' | 'gift_card');
+      setProcessing(true);
 
-      if (type === 'course') {
-        // Get course information
-        const { data: course, error: courseError } = await supabase
-          .from('courses')
-          .select('title, description, image_url')
-          .eq('id', id)
-          .single();
+      // Call the check-pawapay-session-status function to verify and process payment
+      const response = await fetch('/api/check-pawapay-session-status?depositId=' + depositId, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${await getAccessToken()}`,
+          'Content-Type': 'application/json'
+        }
+      });
 
-        if (courseError) throw courseError;
-        setItemInfo(course);
-        toast.success('Payment successful! You are now enrolled in the course.');
+      const result = await response.json();
 
-      } else if (type === 'event') {
-        // Get event information
-        const { data: event, error: eventError } = await supabase
-          .from('events')
-          .select('title, description, image_url, start_time, location')
-          .eq('id', id)
-          .single();
-
-        if (eventError) throw eventError;
-        setItemInfo(event);
-        toast.success('Payment successful! Your event tickets have been confirmed.');
-
-      } else if (type === 'gift_card') {
-        // Handle gift card success
-        setItemInfo({ title: 'Gift Card', description: 'Your gift card purchase was successful!' });
-        toast.success('Gift card purchase successful!');
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to verify payment');
       }
+
+      if (result.processed) {
+        // Payment was processed successfully, get order details
+        await fetchOrderDetails();
+        toast.success('Payment processed successfully!');
+      } else {
+        // Payment not completed yet, poll again
+        setTimeout(() => {
+          verifyPaymentAndProcess();
+        }, 2000);
+        return;
+      }
+
     } catch (error) {
       console.error('Error verifying payment:', error);
-      toast.error('Error verifying payment');
+      toast.error('Error processing payment. Please contact support.');
     } finally {
+      setProcessing(false);
       setLoading(false);
     }
   };
 
+  const getAccessToken = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token;
+  };
+
+  const fetchOrderDetails = async () => {
+    try {
+      const { data: order, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items(
+            *,
+            courses:item_id(id, title, description, image_url),
+            events:item_id(id, title, description, image_url, start_time, location),
+            event_tickets:item_id(id, event_id, events(title, start_time, location))
+          )
+        `)
+        .eq('id', orderId)
+        .single();
+
+      if (error) throw error;
+
+      setOrderDetails(order);
+
+      // Determine item type and info from order items
+      const firstItem = order.order_items[0];
+      if (firstItem) {
+        if (firstItem.item_type === 'course' && firstItem.courses) {
+          setItemType('course');
+          setItemInfo(firstItem.courses);
+        } else if (firstItem.item_type === 'event_ticket' && firstItem.events) {
+          setItemType('event');
+          setItemInfo(firstItem.events);
+        } else if (firstItem.item_type === 'event_ticket' && firstItem.event_tickets) {
+          setItemType('event');
+          // Fetch event details from event_tickets relation
+          const { data: event } = await supabase
+            .from('events')
+            .select('*')
+            .eq('id', firstItem.event_tickets.event_id)
+            .single();
+          setItemInfo(event);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching order details:', error);
+    }
+  };
+
   const handleContinue = () => {
-    if (itemType === 'course' && id) {
-      navigate(`/learning/course/${id}`);
+    if (itemType === 'course' && orderDetails?.order_items[0]?.item_id) {
+      navigate(`/learning/course/${orderDetails.order_items[0].item_id}`);
     } else if (itemType === 'event') {
       navigate('/my-events');
     } else if (itemType === 'gift_card') {
@@ -91,11 +143,24 @@ const PaymentSuccessPage = () => {
     });
   };
 
-  if (loading) {
+  if (loading || processing) {
     return (
       <Layout>
         <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-orange-200 border-t-orange-600"></div>
+          <Card className="text-center border-0 shadow-2xl bg-white/90 backdrop-blur-sm max-w-md w-full">
+            <CardContent className="p-8">
+              <Loader2 className="w-12 h-12 text-orange-500 animate-spin mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-gray-800 mb-2">
+                {processing ? 'Processing Your Payment...' : 'Loading...'}
+              </h2>
+              <p className="text-gray-600">
+                {processing 
+                  ? 'Please wait while we confirm your payment and enroll you in the course.'
+                  : 'Getting your order details...'
+                }
+              </p>
+            </CardContent>
+          </Card>
         </div>
       </Layout>
     );
@@ -158,9 +223,14 @@ const PaymentSuccessPage = () => {
                     <span className="font-semibold text-lg">
                       {itemType === 'course' ? 'You have been successfully enrolled!' :
                        itemType === 'event' ? 'Your registration has been confirmed!' :
-                       'Your gift card has been purchased successfully!'}
+                       'Your purchase has been completed successfully!'}
                     </span>
                   </div>
+                  {orderDetails && (
+                    <p className="text-sm text-green-700 mt-2">
+                      Order #: {orderDetails.id}
+                    </p>
+                  )}
                 </div>
 
                 {/* Benefits List */}
@@ -198,23 +268,6 @@ const PaymentSuccessPage = () => {
                       </div>
                     </>
                   )}
-                  
-                  {itemType === 'gift_card' && (
-                    <>
-                      <div className="flex items-center justify-center space-x-3 p-3 bg-orange-50 rounded-lg">
-                        <Check className="w-5 h-5 text-green-500" />
-                        <span>Gift card delivered via email</span>
-                      </div>
-                      <div className="flex items-center justify-center space-x-3 p-3 bg-purple-50 rounded-lg">
-                        <Check className="w-5 h-5 text-green-500" />
-                        <span>Valid for 1 year from purchase</span>
-                      </div>
-                      <div className="flex items-center justify-center space-x-3 p-3 bg-orange-50 rounded-lg">
-                        <Check className="w-5 h-5 text-green-500" />
-                        <span>Redeemable for any course or event</span>
-                      </div>
-                    </>
-                  )}
                 </div>
 
                 {/* Action Buttons */}
@@ -237,17 +290,6 @@ const PaymentSuccessPage = () => {
                     >
                       <Ticket className="w-5 h-5 mr-2" />
                       View My Tickets
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </Button>
-                  )}
-                  
-                  {itemType === 'gift_card' && (
-                    <Button 
-                      onClick={handleContinue}
-                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-semibold py-3"
-                    >
-                      <Gift className="w-5 h-5 mr-2" />
-                      View Gift Cards
                       <ArrowRight className="w-4 h-4 ml-2" />
                     </Button>
                   )}
