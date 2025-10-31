@@ -271,7 +271,7 @@ function App() {
                  <Route path="/creator/activities" element={<ProtectedRoute><CreatorRecentActivities /></ProtectedRoute>} />
                   <Route path="/creator/tokens" element={<ProtectedRoute><TokenTopUpPage /></ProtectedRoute>} />
                   <Route path="/creator/tokens/success" element={<ProtectedRoute><TokenTopUpSuccess /></ProtectedRoute>} />
-                  <Route path="/creator/courses/:id/preview'" element={<ProtectedRoute><CoursePreviewPage /></ProtectedRoute>} />
+                  <Route path="/creator/courses/:id/preview" element={<ProtectedRoute><CoursePreviewPage /></ProtectedRoute>} />
 
       
                   {/* Community Routes */}
