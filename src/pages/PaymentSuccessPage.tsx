@@ -378,7 +378,7 @@ const PaymentSuccessPage = () => {
                   <div className="text-center text-blue-800">
                     <p className="font-semibold">Payment Processing</p>
                     <p className="text-sm mt-1">
-                      Mobile money payments can take 1-5 minutes to process. 
+                      Mobile money payments can take 30 seconds to process. 
                       This page will automatically update when your payment is complete.
                       {depositId && (
                         <span className="block mt-1 font-mono text-xs">
