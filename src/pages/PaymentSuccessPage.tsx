@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, ArrowRight, Calendar, BookOpen, Ticket, Sparkles, Gift, Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Check, ArrowRight, Calendar, BookOpen, Ticket, Sparkles, Gift, Loader2, AlertCircle, Clock, Home } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,84 +13,146 @@ const PaymentSuccessPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  
+  const [paymentStatus, setPaymentStatus] = useState<'checking' | 'completed' | 'pending' | 'failed'>('checking');
   const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState(true);
+  const [orderDetails, setOrderDetails] = useState<any>(null);
   const [itemInfo, setItemInfo] = useState<any>(null);
   const [itemType, setItemType] = useState<'course' | 'event' | 'gift_card' | null>(null);
-  const [orderDetails, setOrderDetails] = useState<any>(null);
-  
+
+  // Get parameters from URL
   const depositId = searchParams.get('deposit_id');
   const orderId = searchParams.get('order_id');
 
   useEffect(() => {
-    if (depositId && orderId) {
-      verifyPaymentAndProcess();
-    } else {
-      setLoading(false);
-      setProcessing(false);
-      toast.error('Missing payment information');
-    }
-  }, [depositId, orderId]);
+    const checkPaymentStatus = async () => {
+      // First try to get deposit_id from URL parameters
+      let targetDepositId = depositId;
 
-  const verifyPaymentAndProcess = async () => {
-    try {
-      setProcessing(true);
-
-      // Call the check-pawapay-session-status function to verify and process payment
-      const response = await fetch('/api/check-pawapay-session-status?depositId=' + depositId, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${await getAccessToken()}`,
-          'Content-Type': 'application/json'
+      // If no deposit_id in URL, try localStorage as fallback
+      if (!targetDepositId) {
+        const lastPayment = localStorage.getItem('lastPaymentAttempt');
+        if (lastPayment) {
+          const paymentData = JSON.parse(lastPayment);
+          targetDepositId = paymentData.depositId;
+          console.log('Using deposit_id from localStorage:', targetDepositId);
         }
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to verify payment');
       }
 
-      if (result.processed) {
-        // Payment was processed successfully, get order details
-        await fetchOrderDetails();
-        toast.success('Payment processed successfully!');
-      } else {
-        // Payment not completed yet, poll again
-        setTimeout(() => {
-          verifyPaymentAndProcess();
-        }, 2000);
+      if (!targetDepositId) {
+        toast.error('Invalid payment return URL - missing deposit ID');
+        navigate('/');
         return;
       }
 
-    } catch (error) {
-      console.error('Error verifying payment:', error);
-      toast.error('Error processing payment. Please contact support.');
-    } finally {
-      setProcessing(false);
-      setLoading(false);
+      try {
+        setLoading(true);
+        
+        const { data, error } = await supabase.functions.invoke('check-pawapay-session-status', {
+          body: {
+            deposit_id: targetDepositId
+          }
+        });
+
+        if (error) {
+          throw new Error(error.message || 'Failed to check payment status');
+        }
+
+        if (data.success) {
+          setOrderDetails(data.order);
+          
+          switch (data.payment_status) {
+            case 'completed':
+              setPaymentStatus('completed');
+              toast.success('Payment completed! Your purchase has been processed.');
+              await fetchOrderDetails(data.order.id);
+              // Clear localStorage on successful payment
+              localStorage.removeItem('lastPaymentAttempt');
+              break;
+            case 'pending':
+              setPaymentStatus('pending');
+              startPolling(targetDepositId);
+              break;
+            case 'failed':
+            case 'cancelled':
+              setPaymentStatus('failed');
+              toast.error(`Payment ${data.payment_status}. Please try again.`);
+              // Clear localStorage on failed payment
+              localStorage.removeItem('lastPaymentAttempt');
+              break;
+            default:
+              setPaymentStatus('pending');
+              startPolling(targetDepositId);
+          }
+        }
+      } catch (error: any) {
+        console.error('Error checking payment status:', error);
+        toast.error('Failed to verify payment status');
+        setPaymentStatus('failed');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (depositId || localStorage.getItem('lastPaymentAttempt')) {
+      checkPaymentStatus();
+    } else {
+      toast.error('Invalid payment return URL');
+      navigate('/');
     }
+  }, [depositId, navigate]);
+
+  const startPolling = (depositId: string) => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const { data } = await supabase.functions.invoke('check-pawapay-session-status', {
+          body: { deposit_id: depositId }
+        });
+
+        if (data.success && data.payment_status === 'completed') {
+          clearInterval(pollInterval);
+          setPaymentStatus('completed');
+          setOrderDetails(data.order);
+          toast.success('Payment completed! Your purchase has been processed.');
+          await fetchOrderDetails(data.order.id);
+          localStorage.removeItem('lastPaymentAttempt');
+        } else if (data.success && (data.payment_status === 'failed' || data.payment_status === 'cancelled')) {
+          clearInterval(pollInterval);
+          setPaymentStatus('failed');
+          toast.error(`Payment ${data.payment_status}. Please try again.`);
+          localStorage.removeItem('lastPaymentAttempt');
+        }
+      } catch (error) {
+        console.error('Polling error:', error);
+      }
+    }, 5000); // Check every 5 seconds
+
+    // Stop polling after 5 minutes
+    setTimeout(() => {
+      clearInterval(pollInterval);
+      if (paymentStatus === 'pending') {
+        toast.info('Payment is taking longer than expected. Your order will be processed automatically when payment completes.');
+      }
+    }, 300000); // 5 minutes
   };
 
-  const getAccessToken = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token;
-  };
-
-  const fetchOrderDetails = async () => {
+  const fetchOrderDetails = async (orderIdToFetch?: string) => {
     try {
+      const targetOrderId = orderIdToFetch || orderId;
+      if (!targetOrderId) return;
+
       const { data: order, error } = await supabase
         .from('orders')
         .select(`
           *,
           order_items(
             *,
-            courses:item_id(id, title, description, image_url),
-            events:item_id(id, title, description, image_url, start_time, location),
-            event_tickets:item_id(id, event_id, events(title, start_time, location))
+            courses(id, title, description, image_url),
+            events(id, title, description, image_url, start_time, location),
+            event_tickets(id, event_id)
           )
         `)
-        .eq('id', orderId)
+        .eq('id', targetOrderId)
         .single();
 
       if (error) throw error;
@@ -99,25 +162,87 @@ const PaymentSuccessPage = () => {
       // Determine item type and info from order items
       const firstItem = order.order_items[0];
       if (firstItem) {
-        if (firstItem.item_type === 'course' && firstItem.courses) {
+        if (firstItem.item_type === 'course') {
           setItemType('course');
-          setItemInfo(firstItem.courses);
-        } else if (firstItem.item_type === 'event_ticket' && firstItem.events) {
+          if (firstItem.courses) {
+            setItemInfo(firstItem.courses);
+          } else {
+            // Fallback: fetch course directly
+            const { data: course } = await supabase
+              .from('courses')
+              .select('*')
+              .eq('id', firstItem.item_id)
+              .single();
+            setItemInfo(course);
+          }
+        } else if (firstItem.item_type === 'event_ticket') {
           setItemType('event');
-          setItemInfo(firstItem.events);
-        } else if (firstItem.item_type === 'event_ticket' && firstItem.event_tickets) {
-          setItemType('event');
-          // Fetch event details from event_tickets relation
-          const { data: event } = await supabase
-            .from('events')
-            .select('*')
-            .eq('id', firstItem.event_tickets.event_id)
-            .single();
-          setItemInfo(event);
+          if (firstItem.events) {
+            setItemInfo(firstItem.events);
+          } else if (firstItem.event_tickets) {
+            // Fetch event from event_tickets relation
+            const { data: event } = await supabase
+              .from('events')
+              .select('*')
+              .eq('id', firstItem.event_tickets.event_id)
+              .single();
+            setItemInfo(event);
+          } else {
+            // Fallback: try to find event through event_tickets table
+            const { data: eventTicket } = await supabase
+              .from('event_tickets')
+              .select('events(*)')
+              .eq('id', firstItem.item_id)
+              .single();
+            if (eventTicket?.events) {
+              setItemInfo(eventTicket.events);
+            }
+          }
         }
       }
     } catch (error) {
       console.error('Error fetching order details:', error);
+    }
+  };
+
+  const getStatusConfig = () => {
+    switch (paymentStatus) {
+      case 'completed':
+        return {
+          icon: <Check className="h-12 w-12 text-green-500" />,
+          title: "Payment Completed!",
+          description: "Your purchase has been successfully processed",
+          color: "text-green-600",
+          bgColor: "bg-green-50",
+          borderColor: "border-green-200"
+        };
+      case 'pending':
+        return {
+          icon: <Clock className="h-12 w-12 text-orange-500" />,
+          title: "Payment Processing",
+          description: "Your payment is being processed. This may take a few moments...",
+          color: "text-orange-600",
+          bgColor: "bg-orange-50",
+          borderColor: "border-orange-200"
+        };
+      case 'failed':
+        return {
+          icon: <AlertCircle className="h-12 w-12 text-red-500" />,
+          title: "Payment Failed",
+          description: "Your payment could not be processed. Please try again.",
+          color: "text-red-600",
+          bgColor: "bg-red-50",
+          borderColor: "border-red-200"
+        };
+      default:
+        return {
+          icon: <Clock className="h-12 w-12 text-blue-500" />,
+          title: "Checking Payment Status",
+          description: "Please wait while we verify your payment...",
+          color: "text-blue-600",
+          bgColor: "bg-blue-50",
+          borderColor: "border-blue-200"
+        };
     }
   };
 
@@ -129,7 +254,7 @@ const PaymentSuccessPage = () => {
     } else if (itemType === 'gift_card') {
       navigate('/gift-cards');
     } else {
-      navigate('/');
+      navigate('/my-orders');
     }
   };
 
@@ -143,29 +268,135 @@ const PaymentSuccessPage = () => {
     });
   };
 
-  if (loading || processing) {
+  const statusConfig = getStatusConfig();
+
+  if (paymentStatus !== 'completed') {
     return (
       <Layout>
         <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
-          <Card className="text-center border-0 shadow-2xl bg-white/90 backdrop-blur-sm max-w-md w-full">
-            <CardContent className="p-8">
-              <Loader2 className="w-12 h-12 text-orange-500 animate-spin mx-auto mb-4" />
-              <h2 className="text-xl font-semibold text-gray-800 mb-2">
-                {processing ? 'Processing Your Payment...' : 'Loading...'}
-              </h2>
-              <p className="text-gray-600">
-                {processing 
-                  ? 'Please wait while we confirm your payment and enroll you in the course.'
-                  : 'Getting your order details...'
-                }
-              </p>
-            </CardContent>
-          </Card>
+          <div className="max-w-2xl mx-auto px-4 w-full">
+            {/* Status Card */}
+            <Card className={`border-2 ${statusConfig.borderColor} ${statusConfig.bgColor} shadow-xl`}>
+              <CardContent className="pt-8">
+                <div className="text-center space-y-6">
+                  <div className="flex justify-center">
+                    {statusConfig.icon}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h1 className={`text-3xl font-bold ${statusConfig.color}`}>
+                      {statusConfig.title}
+                    </h1>
+                    <p className="text-lg text-gray-600">
+                      {statusConfig.description}
+                    </p>
+                  </div>
+
+                  {loading && (
+                    <div className="flex justify-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    </div>
+                  )}
+
+                  {/* Transaction Details */}
+                  {(orderDetails || depositId) && (
+                    <div className="bg-white rounded-lg p-6 border border-gray-200 space-y-4">
+                      <h3 className="font-semibold text-gray-900">Order Details</h3>
+                      
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        {orderDetails?.id && (
+                          <div>
+                            <span className="text-gray-600">Order ID:</span>
+                            <p className="font-mono text-xs">{orderDetails.id}</p>
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-gray-600">Amount:</span>
+                          <p className="font-semibold">
+                            {orderDetails?.total_amount} {orderDetails?.currency}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Status:</span>
+                          <Badge 
+                            variant={
+                              paymentStatus === 'completed' ? 'default' :
+                              paymentStatus === 'pending' ? 'secondary' :
+                              'destructive'
+                            }
+                          >
+                            {paymentStatus}
+                          </Badge>
+                        </div>
+                        {depositId && (
+                          <div>
+                            <span className="text-gray-600">Reference:</span>
+                            <p className="font-mono text-xs">{depositId}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center mt-6">
+              {paymentStatus === 'pending' && (
+                <Button
+                  onClick={() => depositId && startPolling(depositId)}
+                  disabled={loading}
+                  variant="outline"
+                >
+                  {loading ? 'Checking...' : 'Check Status Again'}
+                </Button>
+              )}
+
+              {paymentStatus === 'failed' && (
+                <Button
+                  onClick={() => navigate('/')}
+                  className="bg-gradient-to-r from-orange-500 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg"
+                >
+                  Try Again
+                </Button>
+              )}
+
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/')}
+              >
+                <Home className="h-4 w-4 mr-2" />
+                Back to Home
+              </Button>
+            </div>
+
+            {/* Help Text */}
+            {paymentStatus === 'pending' && (
+              <Card className="bg-blue-50 border-blue-200 mt-6">
+                <CardContent className="pt-6">
+                  <div className="text-center text-blue-800">
+                    <p className="font-semibold">Payment Processing</p>
+                    <p className="text-sm mt-1">
+                      Mobile money payments can take 1-5 minutes to process. 
+                      This page will automatically update when your payment is complete.
+                      {depositId && (
+                        <span className="block mt-1 font-mono text-xs">
+                          Deposit ID: {depositId}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       </Layout>
     );
   }
 
+  // Show success page only when payment is completed
   return (
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
