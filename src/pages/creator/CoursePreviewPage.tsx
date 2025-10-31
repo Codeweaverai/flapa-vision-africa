@@ -175,7 +175,7 @@ const CoursePreviewPage = () => {
           .order('order_index', { ascending: true })
       ]);
 
-      // Process data
+      // Process data with proper error handling
       const creatorData = creatorResult.status === 'fulfilled' && !creatorResult.value.error ? 
         creatorResult.value.data : { 
           id: courseData.creator_id, 
@@ -187,14 +187,19 @@ const CoursePreviewPage = () => {
       const previewData = previewResult.status === 'fulfilled' && !previewResult.value.error ? 
         previewResult.value.data : undefined;
 
+      // FIX: Ensure modules and lessons are always arrays
       const modulesData = modulesResult.status === 'fulfilled' && !modulesResult.value.error ? 
-        modulesResult.value.data : [];
+        (modulesResult.value.data || []).map(module => ({
+          ...module,
+          lessons: module.lessons || [] // Ensure lessons is always an array
+        })) : [];
 
       const outcomesData = outcomesResult.status === 'fulfilled' && !outcomesResult.value.error ? 
-        outcomesResult.value.data : [];
+        (outcomesResult.value.data || []) : [];
 
+      // FIX: Corrected the skills result reference
       const skillsData = skillsResult.status === 'fulfilled' && !skillsResult.value.error ? 
-        previewResult.value.data : [];
+        (skillsResult.value.data || []) : [];
 
       const completeCourse: Course = {
         ...courseData,
@@ -220,6 +225,27 @@ const CoursePreviewPage = () => {
       {children}
     </div>
   );
+
+  // Safe calculation of total lessons
+  const getTotalLessons = () => {
+    if (!course?.course_modules) return 0;
+    return course.course_modules.reduce((total, module) => {
+      return total + (module.lessons?.length || 0);
+    }, 0);
+  };
+
+  // Safe array accessors
+  const getModules = () => {
+    return course?.course_modules || [];
+  };
+
+  const getLearningOutcomes = () => {
+    return course?.course_learning_outcomes || [];
+  };
+
+  const getSkillOutcomes = () => {
+    return course?.course_skill_outcomes || [];
+  };
 
   if (loading) {
     return (
@@ -253,7 +279,7 @@ const CoursePreviewPage = () => {
     );
   }
 
-  const totalLessons = course.course_modules.reduce((total, module) => total + module.lessons.length, 0);
+  const totalLessons = getTotalLessons();
 
   return (
     <Layout>
@@ -399,12 +425,12 @@ const CoursePreviewPage = () => {
                     </CardContent>
                   </Card>
 
-                  {course.course_learning_outcomes.length > 0 && (
+                  {getLearningOutcomes().length > 0 && (
                     <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
                       <CardContent className="p-6">
                         <h3 className="text-xl font-semibold mb-4">What you'll learn</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {course.course_learning_outcomes.map((outcome) => (
+                          {getLearningOutcomes().map((outcome) => (
                             <div key={outcome.id} className="flex items-start gap-3 p-3 rounded-lg bg-gradient-to-r from-orange-50 to-purple-50">
                               <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
                               <span className="text-gray-700">{outcome.outcome}</span>
@@ -421,33 +447,39 @@ const CoursePreviewPage = () => {
                     <CardContent className="p-6">
                       <h3 className="text-xl font-semibold mb-4">Course curriculum</h3>
                       <div className="space-y-4">
-                        {course.course_modules.map((module, moduleIndex) => (
-                          <div key={module.id} className="border border-gray-200 rounded-lg p-4 bg-white/80 backdrop-blur-sm">
-                            <div className="flex items-center gap-3 mb-2">
-                              <GradientIcon>
-                                <BookOpen className="w-4 h-4" />
-                              </GradientIcon>
-                              <h4 className="font-semibold text-lg text-gray-900">
-                                Module {moduleIndex + 1}: {module.title}
-                              </h4>
+                        {getModules().length > 0 ? (
+                          getModules().map((module, moduleIndex) => (
+                            <div key={module.id} className="border border-gray-200 rounded-lg p-4 bg-white/80 backdrop-blur-sm">
+                              <div className="flex items-center gap-3 mb-2">
+                                <GradientIcon>
+                                  <BookOpen className="w-4 h-4" />
+                                </GradientIcon>
+                                <h4 className="font-semibold text-lg text-gray-900">
+                                  Module {moduleIndex + 1}: {module.title}
+                                </h4>
+                              </div>
+                              {module.description && (
+                                <p className="text-gray-600 text-sm mb-3">{module.description}</p>
+                              )}
+                              <div className="space-y-2">
+                                {(module.lessons || []).map((lesson, lessonIndex) => (
+                                  <div key={lesson.id} className="flex items-center gap-3 p-3 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 rounded-lg transition-all duration-200">
+                                    <GradientIcon>
+                                      <Play className="w-3 h-3" />
+                                    </GradientIcon>
+                                    <span className="text-sm text-gray-700">
+                                      {moduleIndex + 1}.{lessonIndex + 1} {lesson.title}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                            {module.description && (
-                              <p className="text-gray-600 text-sm mb-3">{module.description}</p>
-                            )}
-                            <div className="space-y-2">
-                              {module.lessons.map((lesson, lessonIndex) => (
-                                <div key={lesson.id} className="flex items-center gap-3 p-3 hover:bg-gradient-to-r hover:from-orange-50 hover:to-purple-50 rounded-lg transition-all duration-200">
-                                  <GradientIcon>
-                                    <Play className="w-3 h-3" />
-                                  </GradientIcon>
-                                  <span className="text-sm text-gray-700">
-                                    {moduleIndex + 1}.{lessonIndex + 1} {lesson.title}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center py-8 text-gray-500">
+                            No modules added yet.
                           </div>
-                        ))}
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -457,9 +489,9 @@ const CoursePreviewPage = () => {
                   <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
                     <CardContent className="p-6">
                       <h3 className="text-xl font-semibold mb-4">Skills You'll Gain</h3>
-                      {course.course_skill_outcomes.length > 0 ? (
+                      {getSkillOutcomes().length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {course.course_skill_outcomes.map((skill) => (
+                          {getSkillOutcomes().map((skill) => (
                             <div key={skill.id} className="bg-gradient-to-r from-orange-50 to-purple-50 rounded-xl border border-orange-200 p-4">
                               <div className="flex items-center gap-3 mb-2">
                                 <GradientIcon>
