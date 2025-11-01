@@ -203,7 +203,7 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md bg-white rounded-2xl shadow-xl border-0">
+      <DialogContent className="sm:max-w-lg bg-white rounded-2xl shadow-2xl border-0">
         <DialogHeader className="space-y-4 pb-2">
           <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full mx-auto mb-2">
             <Smartphone className="h-6 w-6 text-white" />
@@ -226,10 +226,10 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
           )}
 
           {/* Amount Summary */}
-          <div className="p-6 bg-gradient-to-r from-orange-50 to-purple-50 rounded-xl border border-orange-100">
+          <div className="p-6 bg-gradient-to-r from-orange-500 to-purple-600 rounded-xl shadow-lg">
             <div className="text-center">
-              <p className="text-sm font-medium text-gray-600 mb-1">Total Amount</p>
-              <p className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+              <p className="text-sm font-medium text-white/90 mb-1">Total Amount</p>
+              <p className="text-3xl font-bold text-white">
                 <PriceDisplay amount={amount} originalCurrency={currency as any} />
               </p>
             </div>
@@ -258,7 +258,7 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
                   </span>
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent className="rounded-xl border-0 shadow-lg min-w-[300px]">
+              <SelectContent className="rounded-xl border-0 shadow-lg min-w-[320px]">
                 {Object.entries(PAWAPAY_COUNTRY_CODES).map(([country, info]) => (
                   <SelectItem 
                     key={country} 
