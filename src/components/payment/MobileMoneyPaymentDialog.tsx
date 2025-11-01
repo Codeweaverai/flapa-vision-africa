@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -8,9 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PAWAPAY_COUNTRY_CODES, PawapayCountryCode } from '@/constants/pawapayCountries';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import { Smartphone, AlertCircle } from 'lucide-react';
+import { Smartphone, AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { currencyService } from '@/services/currencyService';
+import ReactCountryFlag from "react-country-flag";
 
 interface MobileMoneyPaymentDialogProps {
   isOpen: boolean;
@@ -174,13 +174,15 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Smartphone className="h-5 w-5" />
+      <DialogContent className="sm:max-w-md bg-white rounded-2xl shadow-xl border-0">
+        <DialogHeader className="space-y-4 pb-2">
+          <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full mx-auto mb-2">
+            <Smartphone className="h-6 w-6 text-white" />
+          </div>
+          <DialogTitle className="text-xl font-bold text-center text-gray-900">
             Mobile Money Payment
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-center text-gray-600 text-sm leading-relaxed">
             Complete your payment using mobile money. Select your country and enter your mobile number to proceed.
           </DialogDescription>
         </DialogHeader>
@@ -188,41 +190,61 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
         <div className="space-y-6">
           {/* Error Display */}
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-md flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+            <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
               <div className="text-sm text-red-700">{error}</div>
             </div>
           )}
 
           {/* Amount Summary */}
-          <div className="p-4 bg-gray-50 rounded-lg">
+          <div className="p-6 bg-gradient-to-r from-orange-50 to-purple-50 rounded-xl border border-orange-100">
             <div className="text-center">
-              <p className="text-sm text-gray-600">Total Amount</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-sm font-medium text-gray-600 mb-1">Total Amount</p>
+              <p className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
                 <PriceDisplay amount={amount} originalCurrency={currency as any} />
               </p>
             </div>
           </div>
 
           {/* Country Selection */}
-          <div className="space-y-2">
-            <Label>Select Country</Label>
+          <div className="space-y-3">
+            <Label className="text-sm font-medium text-gray-700">Select Country</Label>
             <Select value={selectedCountry} onValueChange={(value: PawapayCountryCode) => setSelectedCountry(value)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-12 border-gray-300 rounded-xl hover:border-gray-400 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors">
                 <SelectValue>
-                  <span className="flex items-center gap-2">
-                    <span>{selectedCountryInfo.flag}</span>
-                    <span>{selectedCountry}</span>
+                  <span className="flex items-center gap-3">
+                    <ReactCountryFlag
+                      countryCode={selectedCountryInfo.code}
+                      svg
+                      style={{
+                        width: '1.5em',
+                        height: '1.5em',
+                      }}
+                      title={selectedCountry}
+                    />
+                    <span className="font-medium text-gray-900">{selectedCountry}</span>
                     <span className="text-gray-500">{selectedCountryInfo.dialCode}</span>
                   </span>
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="rounded-xl border-0 shadow-lg">
                 {Object.entries(PAWAPAY_COUNTRY_CODES).map(([country, info]) => (
-                  <SelectItem key={country} value={country}>
-                    <span className="flex items-center gap-2">
-                      <span>{info.flag}</span>
-                      <span>{country}</span>
+                  <SelectItem 
+                    key={country} 
+                    value={country}
+                    className="rounded-lg focus:bg-orange-50/50"
+                  >
+                    <span className="flex items-center gap-3 py-1">
+                      <ReactCountryFlag
+                        countryCode={info.code}
+                        svg
+                        style={{
+                          width: '1.5em',
+                          height: '1.5em',
+                        }}
+                        title={country}
+                      />
+                      <span className="font-medium text-gray-900">{country}</span>
                       <span className="text-gray-500">{info.dialCode}</span>
                     </span>
                   </SelectItem>
@@ -232,43 +254,67 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
           </div>
 
           {/* Phone Number Input */}
-          <div className="space-y-2">
-            <Label>Mobile Number</Label>
-            <div className="flex">
-              <div className="flex items-center px-3 border border-r-0 rounded-l-md bg-gray-50">
-                <span className="text-sm font-medium">
-                  {selectedCountryInfo.flag} {selectedCountryInfo.dialCode}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium text-gray-700">Mobile Number</Label>
+            <div className="flex rounded-xl overflow-hidden shadow-sm border border-gray-300 hover:border-gray-400 focus-within:ring-2 focus-within:ring-orange-500/20 focus-within:border-orange-500 transition-all">
+              <div className="flex items-center px-4 bg-gray-50 border-r border-gray-300">
+                <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                  <ReactCountryFlag
+                    countryCode={selectedCountryInfo.code}
+                    svg
+                    style={{
+                      width: '1.2em',
+                      height: '1.2em',
+                    }}
+                    title={selectedCountry}
+                  />
+                  {selectedCountryInfo.dialCode}
                 </span>
               </div>
               <Input
                 placeholder="Enter your mobile number"
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
-                className="rounded-l-none"
+                className="flex-1 border-0 focus:ring-0 rounded-l-none h-12 text-gray-900 placeholder-gray-500"
                 disabled={loading}
               />
             </div>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 leading-relaxed">
               Enter your number without the country code (e.g., 968554225 for {selectedCountryInfo.dialCode}968554225)
             </p>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={onClose} className="flex-1" disabled={loading}>
+          <div className="flex gap-3 pt-2">
+            <Button 
+              variant="outline" 
+              onClick={onClose} 
+              className="flex-1 h-12 rounded-xl border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors font-medium"
+              disabled={loading}
+            >
               Cancel
             </Button>
             <Button 
               onClick={handlePayment} 
               disabled={loading || !phoneNumber.trim()}
-              className="flex-1 bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700"
+              className="flex-1 h-12 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Processing...' : 'Proceed to Pay'}
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  Proceed to Pay
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </>
+              )}
             </Button>
           </div>
 
           {/* Payment Info */}
-          <div className="text-xs text-gray-500 text-center">
+          <div className="text-xs text-gray-500 text-center leading-relaxed bg-gray-50 rounded-lg p-3 border border-gray-200">
             You will be redirected to complete the payment on your mobile device.
             Please ensure you have sufficient balance in your mobile money account.
           </div>
