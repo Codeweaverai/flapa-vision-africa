@@ -194,18 +194,6 @@ const obfuscateGiftCode = (code: string): string => {
   return `${start}${middle}${end}`;
 };
 
-// FIXED: Format amount properly without incorrect rounding
-const formatAmount = (amount: number, currency: string = 'USD'): string => {
-  const amountNum = safeNumber(amount);
-  
-  // For display purposes, show the actual amount without division
-  if (currency === 'ZMW') {
-    return `K${amountNum.toFixed(2)}`;
-  } else {
-    return `$${amountNum.toFixed(2)}`;
-  }
-};
-
 const computeTypeSubtotalsFull = (order: Order) => {
   const subtotals = { event: 0, course: 0, gift: 0 };
   
@@ -606,7 +594,356 @@ const MyOrdersPage = () => {
     setShowReceiptModal(true);
   };
 
-  // FIXED: Calculate receipt totals with proper amount handling
+  const handlePrintTickets = () => {
+    const printContent = document.getElementById('tickets-print-content');
+    if (printContent) {
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Event Tickets</title>
+            <style>
+              @page {
+                size: A4;
+                margin: 15mm;
+              }
+              
+              body { 
+                font-family: 'Arial', sans-serif; 
+                margin: 0; 
+                padding: 0; 
+                background: white;
+                color: #1f2937;
+                line-height: 1.4;
+              }
+              
+              .ticket-container { 
+                page-break-after: always; 
+                margin-bottom: 20px;
+                background: white;
+                border-radius: 20px;
+                overflow: hidden;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+                max-width: 180mm;
+                margin: 0 auto 20px auto;
+              }
+              
+              .ticket-container:last-child { 
+                page-break-after: avoid; 
+              }
+              
+              .ticket-header {
+                background: linear-gradient(135deg, #f97316 0%, #a855f7 100%);
+                padding: 30px;
+                text-align: center;
+                color: white;
+                position: relative;
+              }
+              
+              .ticket-header h1 {
+                margin: 0 0 10px 0;
+                font-size: 28px;
+                font-weight: bold;
+              }
+              
+              .ticket-code-badge {
+                background: rgba(255,255,255,0.2);
+                padding: 8px 16px;
+                border-radius: 20px;
+                display: inline-block;
+                font-size: 14px;
+                font-weight: 500;
+              }
+              
+              .ticket-content {
+                padding: 30px;
+              }
+              
+              .event-image {
+                width: 120px;
+                height: 120px;
+                border-radius: 15px;
+                object-fit: cover;
+                float: left;
+                margin-right: 20px;
+                margin-bottom: 15px;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+              }
+              
+              .event-title {
+                font-size: 24px;
+                font-weight: bold;
+                color: #1f2937;
+                margin: 0 0 15px 0;
+                clear: both;
+              }
+              
+              .ticket-info-badge {
+                background: linear-gradient(135deg, #fef7ed, #faf5ff);
+                padding: 12px 16px;
+                border-radius: 10px;
+                border-left: 4px solid #f97316;
+                margin-bottom: 25px;
+                clear: both;
+              }
+              
+              .details-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 25px;
+                margin-bottom: 30px;
+              }
+              
+              .detail-item {
+                margin-bottom: 20px;
+              }
+              
+              .detail-label {
+                font-weight: bold;
+                color: #374151;
+                margin-bottom: 8px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+              }
+              
+              .detail-value {
+                color: #6b7280;
+                font-size: 16px;
+                line-height: 1.4;
+              }
+              
+              .qr-section {
+                text-align: center;
+                padding: 25px;
+                background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+                border-radius: 15px;
+                margin-bottom: 20px;
+              }
+              
+              .qr-container {
+                width: 140px;
+                height: 140px;
+                margin: 0 auto 15px;
+                padding: 15px;
+                background: white;
+                border-radius: 15px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              }
+              
+              .ticket-code {
+                font-family: 'Courier New', monospace;
+                font-size: 18px;
+                font-weight: bold;
+                color: #f97316;
+                letter-spacing: 2px;
+                margin-top: 10px;
+              }
+              
+              .footer-notes {
+                text-align: center;
+                padding: 20px;
+                border-top: 2px dashed #e5e7eb;
+                color: #6b7280;
+                font-size: 14px;
+                line-height: 1.6;
+              }
+              
+              .status-badge {
+                background: #dcfce7;
+                color: #166534;
+                padding: 6px 12px;
+                border-radius: 20px;
+                font-size: 14px;
+                font-weight: 500;
+                display: inline-block;
+              }
+              
+              @media print {
+                body { 
+                  background: white !important;
+                  -webkit-print-color-adjust: exact;
+                  print-color-adjust: exact;
+                }
+                
+                .ticket-container {
+                  box-shadow: none;
+                  border: 1px solid #e5e7eb;
+                }
+                
+                .ticket-header {
+                  background: linear-gradient(135deg, #f97316 0%, #a855f7 100%) !important;
+                  -webkit-print-color-adjust: exact;
+                  print-color-adjust: exact;
+                }
+                
+                .ticket-info-badge {
+                  background: linear-gradient(135deg, #fef7ed, #faf5ff) !important;
+                  -webkit-print-color-adjust: exact;
+                  print-color-adjust: exact;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            ${printContent.innerHTML}
+          </body>
+          </html>
+        `);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+        }, 500);
+      }
+    }
+  };
+
+  const handleDownloadTicketsPDF = async () => {
+    const element = document.getElementById('tickets-print-content');
+    if (!element) {
+      toast.error('Tickets content not found');
+      return;
+    }
+
+    toast.info('Generating PDF... This may take a moment');
+
+    const opt = {
+      margin: 10,
+      filename: `event-tickets-${new Date().toISOString().split('T')[0]}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { 
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        scrollX: 0,
+        scrollY: 0
+      },
+      jsPDF: { 
+        unit: 'mm', 
+        format: 'a4', 
+        orientation: 'portrait' 
+      },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+
+    try {
+      await html2pdf().set(opt).from(element).save();
+      toast.success('PDF downloaded successfully!');
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      toast.error('Failed to generate PDF. Please try again.');
+    }
+  };
+
+  const generateTicketHTML = (ticket: TicketData, index: number) => {
+    return `
+      <div style="max-width: 800px; margin: 0 auto 30px; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1); font-family: Arial, sans-serif;">
+        <!-- Header with gradient -->
+        <div style="background: linear-gradient(135deg, #f97316 0%, #a855f7 100%); padding: 30px; text-align: center; color: white;">
+          <h1 style="margin: 0 0 10px 0; font-size: 28px; font-weight: bold;">🎫 EVENT TICKET</h1>
+          <div style="background: rgba(255,255,255,0.2); padding: 8px 16px; border-radius: 20px; display: inline-block;">
+            <span style="font-size: 14px; font-weight: 500;">#${ticket.ticket_code || ticket.booking_code}</span>
+          </div>
+        </div>
+
+        <div style="padding: 40px;">
+  <!-- Event Title -->
+  <div style="margin-bottom: 30px;">
+    <div style="flex: 1;">
+      <h2 style="margin: 0 0 10px 0; font-size: 24px; color: #1f2937; font-weight: bold;">${ticket.event?.title || 'Event Title'}</h2>
+      <div style="background: linear-gradient(135deg, #fef7ed, #faf5ff); padding: 12px 16px; border-radius: 10px; border-left: 4px solid #f97316;">
+        <div style="font-weight: 600; color: #ea580c; margin-bottom: 5px;">${ticket.event_ticket?.name || 'Standard Ticket'}</div>
+        <div style="font-size: 14px; color: #7c2d12;">${ticket.event_ticket?.ticket_type || 'Regular'}</div>
+      </div>
+    </div>
+        </div>
+
+          <!-- Event Details Grid -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 30px;">
+            <div>
+              <div style="margin-bottom: 20px;">
+                <div style="font-weight: bold; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                  📅 Date & Time
+                </div>
+                <div style="color: #6b7280; font-size: 16px; line-height: 1.4;">
+                  ${ticket.event?.start_time ? format(new Date(ticket.event.start_time), 'EEEE, MMMM do, yyyy') : 'TBD'}<br>
+                  ${ticket.event?.start_time ? format(new Date(ticket.event.start_time), 'h:mm a') : ''} ${ticket.event?.end_time ? '- ' + format(new Date(ticket.event.end_time), 'h:mm a') : ''}
+                </div>
+              </div>
+              
+              <div style="margin-bottom: 20px;">
+                <div style="font-weight: bold; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                  📍 Location
+                </div>
+                <div style="color: #6b7280; font-size: 16px; line-height: 1.4;">
+                  ${ticket.event?.location || 'TBD'}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div style="margin-bottom: 20px;">
+                <div style="font-weight: bold; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                  👤 Ticket Holder
+                </div>
+                <div style="color: #6b7280; font-size: 16px; line-height: 1.4;">
+                  ${ticket.ticket_holder_name || ticket.user_name || 'Ticket Holder'}
+                  ${ticket.ticket_holder_email ? `<br><span style="font-size: 14px;">${ticket.ticket_holder_email}</span>` : ''}
+                </div>
+              </div>
+              
+              <div style="margin-bottom: 20px;">
+                <div style="font-weight: bold; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                  ✅ Status
+                </div>
+                <div>
+                  <span style="background: #dcfce7; color: #166534; padding: 6px 12px; border-radius: 20px; font-size: 14px; font-weight: 500;">
+                    ${(ticket.status || 'confirmed').toUpperCase()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- QR Code Section -->
+          <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #f8fafc, #f1f5f9); border-radius: 15px; margin-bottom: 20px;">
+            <div style="margin-bottom: 15px;">
+              <div style="width: 150px; height: 150px; margin: 0 auto; padding: 15px; background: white; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
+                <div id="qr-code-${ticket.ticket_code || ticket.booking_code}-${index}" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                  <div style="width: 100%; height: 100%; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6b7280;">
+                    Loading QR...
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style="font-size: 14px; color: #6b7280; margin-bottom: 10px;">Scan this code at the event entrance</div>
+            <div style="font-family: monospace; font-size: 16px; font-weight: bold; color: #f97316; letter-spacing: 1px;">
+              ${ticket.ticket_code || ticket.booking_code}
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div style="text-align: center; padding: 20px; border-top: 2px dashed #e5e7eb; color: #6b7280; font-size: 14px; line-height: 1.6;">
+            <div style="margin-bottom: 10px;">
+              <strong style="color: #374151;">Important:</strong> Please bring this ticket (digital or printed) to the event.
+            </div>
+            <div>
+              For questions, contact us at support@skillpulse.com
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  };
+
+  // Calculate tax and totals for receipt
   const calculateReceiptTotals = (order: Order, type: 'event' | 'course' | 'gift') => {
     const filteredItems = order.order_items.filter(item => {
       if (type === 'event') return item.item_type === 'event' || item.item_type === 'event_ticket';
@@ -627,7 +964,6 @@ const MyOrdersPage = () => {
     if (!selectedOrder) return;
     
     const { subtotal, taxAmount, total, filteredItems } = calculateReceiptTotals(selectedOrder, selectedType);
-    const orderCurrency = safeCurrency(selectedOrder.currency);
     
     const receiptHTML = `
       <!DOCTYPE html>
@@ -929,7 +1265,7 @@ const MyOrdersPage = () => {
               </div>
               <div class="info-item">
                 <div class="info-label">Currency</div>
-                <div class="info-value">${orderCurrency}</div>
+                <div class="info-value">${safeCurrency(selectedOrder.currency)}</div>
               </div>
             </div>
           </div>
@@ -946,19 +1282,17 @@ const MyOrdersPage = () => {
                 </tr>
               </thead>
               <tbody>
-                ${filteredItems.map(item => {
-                  const currencySymbol = orderCurrency === 'ZMW' ? 'K' : '$';
-                  return `
+                ${filteredItems.map(item => `
                   <tr>
                     <td>
                       <div style="font-weight: 600; color: #1f2937;">${item.item_name}</div>
                       <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">${item.item_type.replace('_', ' ').toUpperCase()}</div>
                     </td>
                     <td>${item.quantity}</td>
-                    <td>${currencySymbol}${safeNumber(item.unit_price).toFixed(2)}</td>
-                    <td style="font-weight: 600; color: #f97316;">${currencySymbol}${safeNumber(item.total_price).toFixed(2)}</td>
+                    <td>$${safeNumber(item.unit_price).toFixed(2)}</td>
+                    <td style="font-weight: 600; color: #f97316;">$${safeNumber(item.total_price).toFixed(2)}</td>
                   </tr>
-                `}).join('')}
+                `).join('')}
               </tbody>
             </table>
           </div>
@@ -966,9 +1300,7 @@ const MyOrdersPage = () => {
           ${selectedType === 'gift' && selectedOrder.gift_cards && selectedOrder.gift_cards.length > 0 ? `
             <div class="items-section">
               <h3 class="section-title">Gift Card Details</h3>
-              ${selectedOrder.gift_cards.map(gift => {
-                const currencySymbol = safeCurrency(gift.currency) === 'ZMW' ? 'K' : '$';
-                return `
+              ${selectedOrder.gift_cards.map(gift => `
                 <div style="background: #f8fafc; padding: 20px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #e2e8f0;">
                   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                     <div>
@@ -977,7 +1309,7 @@ const MyOrdersPage = () => {
                     </div>
                     <div>
                       <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Amount</div>
-                      <div style="font-weight: 600; color: #f97316;">${currencySymbol}${safeNumber(gift.amount).toFixed(2)}</div>
+                      <div style="font-weight: 600; color: #f97316;">$${safeNumber(gift.amount).toFixed(2)}</div>
                     </div>
                     <div>
                       <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Recipient</div>
@@ -996,7 +1328,7 @@ const MyOrdersPage = () => {
                     </div>
                   ` : ''}
                 </div>
-              `}).join('')}
+              `).join('')}
             </div>
           ` : ''}
 
@@ -1005,17 +1337,17 @@ const MyOrdersPage = () => {
             
             <div class="total-row">
               <span class="total-label">Subtotal</span>
-              <span class="total-value">${orderCurrency === 'ZMW' ? 'K' : '$$'}{subtotal.toFixed(2)}</span>
+              <span class="total-value">$${subtotal.toFixed(2)}</span>
             </div>
             
             <div class="total-row">
               <span class="total-label">Tax (15%)</span>
-              <span class="total-value">${orderCurrency === 'ZMW' ? 'K' : '$$'}{taxAmount.toFixed(2)}</span>
+              <span class="total-value">$${taxAmount.toFixed(2)}</span>
             </div>
             
             <div class="total-row total-amount">
               <span>Total Amount</span>
-              <span>${orderCurrency === 'ZMW' ? 'K' : '$$'}{total.toFixed(2)}</span>
+              <span>$${total.toFixed(2)}</span>
             </div>
             
             <div class="tax-breakdown">
@@ -1051,255 +1383,6 @@ const MyOrdersPage = () => {
       setTimeout(() => {
         printWindow.print();
       }, 500);
-    }
-  };
-
-  // FIXED: Ticket printing functions remain the same
-  const handlePrintTickets = () => {
-    const printContent = document.getElementById('tickets-print-content');
-    if (printContent) {
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>Event Tickets</title>
-            <style>
-              @page {
-                size: A4;
-                margin: 15mm;
-              }
-              
-              body { 
-                font-family: 'Arial', sans-serif; 
-                margin: 0; 
-                padding: 0; 
-                background: white;
-                color: #1f2937;
-                line-height: 1.4;
-              }
-              
-              .ticket-container { 
-                page-break-after: always; 
-                margin-bottom: 20px;
-                background: white;
-                border-radius: 20px;
-                overflow: hidden;
-                box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-                max-width: 180mm;
-                margin: 0 auto 20px auto;
-              }
-              
-              .ticket-container:last-child { 
-                page-break-after: avoid; 
-              }
-              
-              .ticket-header {
-                background: linear-gradient(135deg, #f97316 0%, #a855f7 100%);
-                padding: 30px;
-                text-align: center;
-                color: white;
-                position: relative;
-              }
-              
-              .ticket-header h1 {
-                margin: 0 0 10px 0;
-                font-size: 28px;
-                font-weight: bold;
-              }
-              
-              .ticket-code-badge {
-                background: rgba(255,255,255,0.2);
-                padding: 8px 16px;
-                border-radius: 20px;
-                display: inline-block;
-                font-size: 14px;
-                font-weight: 500;
-              }
-              
-              .ticket-content {
-                padding: 30px;
-              }
-              
-              .event-image {
-                width: 120px;
-                height: 120px;
-                border-radius: 15px;
-                object-fit: cover;
-                float: left;
-                margin-right: 20px;
-                margin-bottom: 15px;
-                box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-              }
-              
-              .event-title {
-                font-size: 24px;
-                font-weight: bold;
-                color: #1f2937;
-                margin: 0 0 15px 0;
-                clear: both;
-              }
-              
-              .ticket-info-badge {
-                background: linear-gradient(135deg, #fef7ed, #faf5ff);
-                padding: 12px 16px;
-                border-radius: 10px;
-                border-left: 4px solid #f97316;
-                margin-bottom: 25px;
-                clear: both;
-              }
-              
-              .details-grid {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 25px;
-                margin-bottom: 30px;
-              }
-              
-              .detail-item {
-                margin-bottom: 20px;
-              }
-              
-              .detail-label {
-                font-weight: bold;
-                color: #374151;
-                margin-bottom: 8px;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-              }
-              
-              .detail-value {
-                color: #6b7280;
-                font-size: 16px;
-                line-height: 1.4;
-              }
-              
-              .qr-section {
-                text-align: center;
-                padding: 25px;
-                background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-                border-radius: 15px;
-                margin-bottom: 20px;
-              }
-              
-              .qr-container {
-                width: 140px;
-                height: 140px;
-                margin: 0 auto 15px;
-                padding: 15px;
-                background: white;
-                border-radius: 15px;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-              }
-              
-              .ticket-code {
-                font-family: 'Courier New', monospace;
-                font-size: 18px;
-                font-weight: bold;
-                color: #f97316;
-                letter-spacing: 2px;
-                margin-top: 10px;
-              }
-              
-              .footer-notes {
-                text-align: center;
-                padding: 20px;
-                border-top: 2px dashed #e5e7eb;
-                color: #6b7280;
-                font-size: 14px;
-                line-height: 1.6;
-              }
-              
-              .status-badge {
-                background: #dcfce7;
-                color: #166534;
-                padding: 6px 12px;
-                border-radius: 20px;
-                font-size: 14px;
-                font-weight: 500;
-                display: inline-block;
-              }
-              
-              @media print {
-                body { 
-                  background: white !important;
-                  -webkit-print-color-adjust: exact;
-                  print-color-adjust: exact;
-                }
-                
-                .ticket-container {
-                  box-shadow: none;
-                  border: 1px solid #e5e7eb;
-                }
-                
-                .ticket-header {
-                  background: linear-gradient(135deg, #f97316 0%, #a855f7 100%) !important;
-                  -webkit-print-color-adjust: exact;
-                  print-color-adjust: exact;
-                }
-                
-                .ticket-info-badge {
-                  background: linear-gradient(135deg, #fef7ed, #faf5ff) !important;
-                  -webkit-print-color-adjust: exact;
-                  print-color-adjust: exact;
-                }
-              }
-            </style>
-          </head>
-          <body>
-            ${printContent.innerHTML}
-          </body>
-          </html>
-        `);
-        printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => {
-          printWindow.print();
-        }, 500);
-      }
-    }
-  };
-
-  const handleDownloadTicketsPDF = async () => {
-    const element = document.getElementById('tickets-print-content');
-    if (!element) {
-      toast.error('Tickets content not found');
-      return;
-    }
-
-    toast.info('Generating PDF... This may take a moment');
-
-    const opt = {
-      margin: 10,
-      filename: `event-tickets-${new Date().toISOString().split('T')[0]}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { 
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        scrollX: 0,
-        scrollY: 0
-      },
-      jsPDF: { 
-        unit: 'mm', 
-        format: 'a4', 
-        orientation: 'portrait' 
-      },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-    };
-
-    try {
-      await html2pdf().set(opt).from(element).save();
-      toast.success('PDF downloaded successfully!');
-    } catch (error) {
-      console.error('PDF generation error:', error);
-      toast.error('Failed to generate PDF. Please try again.');
     }
   };
 
@@ -1343,11 +1426,7 @@ const MyOrdersPage = () => {
             ) : (
               <>
                 <div className="space-y-6">
-                  {paginatedCards.map((card) => {
-                    const orderCurrency = safeCurrency(card.order.currency);
-                    const currencySymbol = orderCurrency === 'ZMW' ? 'K' : '$';
-                    
-                    return (
+                  {paginatedCards.map((card) => (
                     <Card key={card.key} className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
                       <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
                         <div className="flex justify-between items-start">
@@ -1358,9 +1437,12 @@ const MyOrdersPage = () => {
                             </p>
                           </div>
                           <div className="text-right">
-                            {/* FIXED: Display actual amount without incorrect formatting */}
                             <div className="text-2xl font-bold">
-                              {currencySymbol}{card.subtotal.toFixed(2)}
+                              <PriceDisplay 
+                                amount={card.subtotal} 
+                                originalCurrency="USD"
+                                showOriginal={true}
+                              />
                             </div>
                             {getStatusBadge(card.order.payment_status)}
                           </div>
@@ -1369,11 +1451,7 @@ const MyOrdersPage = () => {
                       
                       <CardContent className="p-6">
                         {/* Event content */}
-                        {card.type === 'event' && card.items.map((booking: any) => {
-                          const eventCurrency = safeCurrency(booking.event?.currency);
-                          const eventCurrencySymbol = eventCurrency === 'ZMW' ? 'K' : '$';
-                          
-                          return (
+                        {card.type === 'event' && card.items.map((booking: any) => (
                           <div key={booking.id} className="border-b border-gray-200 last:border-b-0 pb-6 last:pb-0 mb-6 last:mb-0">
                             <div className="flex flex-col lg:flex-row gap-6">
                               {booking.event?.image_url && (
@@ -1418,7 +1496,11 @@ const MyOrdersPage = () => {
                                       </p>
                                       {booking.event_ticket?.price && (
                                         <p className="text-sm text-orange-700 font-semibold">
-                                          Price: {eventCurrencySymbol}{safeNumber(booking.event_ticket.price).toFixed(2)}
+                                          Price: <PriceDisplay 
+                                            amount={safeNumber(booking.event_ticket.price)} 
+                                            originalCurrency={safeCurrency(booking.event?.currency) || "USD"}
+                                            showOriginal={true}
+                                          />
                                         </p>
                                       )}
                                     </div>
@@ -1432,14 +1514,10 @@ const MyOrdersPage = () => {
                               </div>
                             </div>
                           </div>
-                        )})}
+                        ))}
 
                         {/* Course content */}
-                        {card.type === 'course' && card.items.map((enrollment: any) => {
-                          const courseCurrency = safeCurrency(card.order.currency);
-                          const courseCurrencySymbol = courseCurrency === 'ZMW' ? 'K' : '$';
-                          
-                          return (
+                        {card.type === 'course' && card.items.map((enrollment: any) => (
                           <div key={enrollment.id} className="border-b border-gray-200 last:border-b-0 pb-6 last:pb-0 mb-6 last:mb-0">
                             <div className="flex flex-col lg:flex-row gap-6">
                               {enrollment.course?.thumbnail_url && (
@@ -1466,7 +1544,11 @@ const MyOrdersPage = () => {
 
                                 {enrollment.course?.price && (
                                   <p className="text-sm text-purple-700 font-semibold mb-4">
-                                    Price: {courseCurrencySymbol}{safeNumber(enrollment.course.price).toFixed(2)}
+                                    Price: <PriceDisplay 
+                                      amount={safeNumber(enrollment.course.price)} 
+                                      originalCurrency="USD"
+                                      showOriginal={true}
+                                    />
                                   </p>
                                 )}
                                 
@@ -1481,23 +1563,23 @@ const MyOrdersPage = () => {
                               </div>
                             </div>
                           </div>
-                        )})}
+                        ))}
 
                         {/* Gift card content */}
                         {card.type === 'gift' && (
                           <div className="bg-gradient-to-r from-orange-50 via-purple-50 to-pink-50 p-6 rounded-lg border border-orange-200">
                             <h4 className="text-lg font-semibold text-gray-900 mb-4">Gift Cards</h4>
                             <div className="space-y-4">
-                              {(card.items as GiftCard[]).map((gift) => {
-                                const giftCurrency = safeCurrency(gift.currency);
-                                const giftCurrencySymbol = giftCurrency === 'ZMW' ? 'K' : '$';
-                                
-                                return (
+                              {(card.items as GiftCard[]).map((gift) => (
                                 <div key={gift.id} className="bg-white p-4 rounded-lg shadow-sm">
                                   <div className="flex justify-between items-start mb-3">
                                     <div>
                                       <div className="text-xl font-semibold text-gray-900 mb-1">
-                                        {giftCurrencySymbol}{safeNumber(gift.amount).toFixed(2)}
+                                        <PriceDisplay 
+                                          amount={safeNumber(gift.amount)} 
+                                          originalCurrency={safeCurrency(gift.currency)} 
+                                          showOriginal={true}
+                                        />
                                       </div>
                                       <p className="font-mono text-sm text-gray-600">
                                         Code: {obfuscateGiftCode(gift.gift_card_code)}
@@ -1528,7 +1610,7 @@ const MyOrdersPage = () => {
                                     </div>
                                   )}
                                 </div>
-                              )})}
+                              ))}
                             </div>
                           </div>
                         )}
@@ -1555,7 +1637,7 @@ const MyOrdersPage = () => {
                         </div>
                       </CardContent>
                     </Card>
-                  )})}
+                  ))}
                 </div>
 
                 {/* Pagination Controls */}
@@ -1759,90 +1841,81 @@ const MyOrdersPage = () => {
             </Button>
           }
         >
-          {selectedOrder && (() => {
-            const { subtotal, taxAmount, total, filteredItems } = calculateReceiptTotals(selectedOrder, selectedType);
-            const orderCurrency = safeCurrency(selectedOrder.currency);
-            const currencySymbol = orderCurrency === 'ZMW' ? 'K' : '$';
-            
-            return (
-              <div className="space-y-4">
-                <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg">
-                  <h3 className="font-semibold text-lg mb-2">Order #{selectedOrder.id.slice(0, 8)} - {selectedType.toUpperCase()}</h3>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p><strong>Date:</strong> {format(new Date(selectedOrder.created_at), 'PPP')}</p>
-                      <p><strong>Status:</strong> {selectedOrder.payment_status}</p>
-                    </div>
-                    <div>
-                      <p><strong>Payment:</strong> {selectedOrder.payment_method}</p>
-                      <p>
-                        <strong>Total:</strong> {currencySymbol}{computeTypeSubtotalsFull(selectedOrder)[selectedType].toFixed(2)}
-                      </p>
-                    </div>
+          {selectedOrder && (
+            <div className="space-y-4">
+              <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg">
+                <h3 className="font-semibold text-lg mb-2">Order #{selectedOrder.id.slice(0, 8)} - {selectedType.toUpperCase()}</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p><strong>Date:</strong> {format(new Date(selectedOrder.created_at), 'PPP')}</p>
+                    <p><strong>Status:</strong> {selectedOrder.payment_status}</p>
+                  </div>
+                  <div>
+                    <p><strong>Payment:</strong> {selectedOrder.payment_method}</p>
+                    <p>
+                      <strong>Total:</strong> 
+                      <PriceDisplay 
+                        amount={computeTypeSubtotalsFull(selectedOrder)[selectedType]} 
+                        originalCurrency="USD"
+                        showOriginal={true}
+                      />
+                    </p>
                   </div>
                 </div>
-                
-                <div>
-                  <h4 className="font-semibold mb-2">Items:</h4>
-                  <div className="space-y-2">
-                    {filteredItems.map((item) => (
+              </div>
+              
+              <div>
+                <h4 className="font-semibold mb-2">Items:</h4>
+                <div className="space-y-2">
+                  {selectedOrder.order_items
+                    .filter(item => {
+                      if (selectedType === 'event') return item.item_type === 'event' || item.item_type === 'event_ticket';
+                      if (selectedType === 'course') return item.item_type === 'course';
+                      if (selectedType === 'gift') return item.item_type === 'gift_card';
+                      return true;
+                    })
+                    .map((item) => (
                       <div key={item.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
                         <div>
                           <p className="font-medium">{item.item_name}</p>
                           <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
                         </div>
                         <p className="font-semibold">
-                          {currencySymbol}{safeNumber(item.total_price).toFixed(2)}
+                          <PriceDisplay 
+                            amount={safeNumber(item.total_price)} 
+                            originalCurrency="USD"
+                            showOriginal={true}
+                          />
                         </p>
                       </div>
                     ))}
-                  </div>
-                  
-                  {selectedType === 'gift' && selectedOrder.gift_cards && selectedOrder.gift_cards.length > 0 && (
-                    <div className="mt-4">
-                      <h5 className="font-semibold mb-2">Gift Card Details:</h5>
-                      <div className="space-y-2">
-                        {selectedOrder.gift_cards.map((gift) => {
-                          const giftCurrency = safeCurrency(gift.currency);
-                          const giftCurrencySymbol = giftCurrency === 'ZMW' ? 'K' : '$';
-                          
-                          return (
-                          <div key={gift.id} className="p-3 bg-gray-50 rounded">
-                            <p className="font-medium">Code: {obfuscateGiftCode(gift.gift_card_code)}</p>
-                            <p className="text-sm text-gray-600">Recipient: {gift.recipient_name} ({gift.recipient_email})</p>
-                            <p className="text-sm text-gray-600">Status: {gift.status.toUpperCase()}</p>
-                            <p className="text-sm text-gray-600">Expires: {format(new Date(gift.expires_at), 'PPP')}</p>
-                            <p className="font-semibold">
-                              Amount: {giftCurrencySymbol}{safeNumber(gift.amount).toFixed(2)}
-                            </p>
-                          </div>
-                        )})}
-                      </div>
-                    </div>
-                  )}
                 </div>
-
-                {/* Receipt Summary */}
-                <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg mt-4">
-                  <h4 className="font-semibold mb-3">Receipt Summary</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>Subtotal:</span>
-                      <span>{currencySymbol}{subtotal.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Tax (15%):</span>
-                      <span>{currencySymbol}{taxAmount.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between font-semibold border-t pt-2">
-                      <span>Total:</span>
-                      <span>{currencySymbol}{total.toFixed(2)}</span>
+                
+                {selectedType === 'gift' && selectedOrder.gift_cards && selectedOrder.gift_cards.length > 0 && (
+                  <div className="mt-4">
+                    <h5 className="font-semibold mb-2">Gift Card Details:</h5>
+                    <div className="space-y-2">
+                      {selectedOrder.gift_cards.map((gift) => (
+                        <div key={gift.id} className="p-3 bg-gray-50 rounded">
+                          <p className="font-medium">Code: {obfuscateGiftCode(gift.gift_card_code)}</p>
+                          <p className="text-sm text-gray-600">Recipient: {gift.recipient_name} ({gift.recipient_email})</p>
+                          <p className="text-sm text-gray-600">Status: {gift.status.toUpperCase()}</p>
+                          <p className="text-sm text-gray-600">Expires: {format(new Date(gift.expires_at), 'PPP')}</p>
+                          <p className="font-semibold">
+                            Amount: <PriceDisplay 
+                              amount={safeNumber(gift.amount)} 
+                              originalCurrency={safeCurrency(gift.currency)} 
+                              showOriginal={true}
+                            />
+                          </p>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </div>
+                )}
               </div>
-            );
-          })()}
+            </div>
+          )}
         </Modal>
       </div>
     </Layout>
