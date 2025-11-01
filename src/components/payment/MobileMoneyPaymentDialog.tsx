@@ -23,6 +23,30 @@ interface MobileMoneyPaymentDialogProps {
   promoCode: string;
 }
 
+// Country code mapping for ReactCountryFlag (3-letter to 2-letter)
+const COUNTRY_CODE_MAP: { [key: string]: string } = {
+  'ZMB': 'ZM',
+  'KEN': 'KE',
+  'UGA': 'UG',
+  'TZA': 'TZ',
+  'GHA': 'GH',
+  'NGA': 'NG',
+  'RWA': 'RW',
+  'MWI': 'MW',
+  'MOZ': 'MZ',
+  'SEN': 'SN',
+  'BEN': 'BJ',
+  'BFA': 'BF',
+  'CMR': 'CM',
+  'COG': 'CG',
+  'COD': 'CD',
+  'GAB': 'GA',
+  'CIV': 'CI',
+  'LSO': 'LS',
+  'SLE': 'SL',
+  'USA': 'US'
+};
+
 const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
   isOpen,
   onClose,
@@ -172,6 +196,11 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
 
   const selectedCountryInfo = PAWAPAY_COUNTRY_CODES[selectedCountry];
 
+  // Helper function to get 2-letter country code for ReactCountryFlag
+  const getCountryCode = (countryCode: string): string => {
+    return COUNTRY_CODE_MAP[countryCode] || countryCode;
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md bg-white rounded-2xl shadow-xl border-0">
@@ -214,11 +243,13 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
                 <SelectValue>
                   <span className="flex items-center gap-3">
                     <ReactCountryFlag
-                      countryCode={selectedCountryInfo.code}
+                      countryCode={getCountryCode(selectedCountryInfo.code)}
                       svg
                       style={{
                         width: '1.5em',
                         height: '1.5em',
+                        borderRadius: '4px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                       }}
                       title={selectedCountry}
                     />
@@ -227,7 +258,7 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
                   </span>
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent className="rounded-xl border-0 shadow-lg">
+              <SelectContent className="rounded-xl border-0 shadow-lg min-w-[300px]">
                 {Object.entries(PAWAPAY_COUNTRY_CODES).map(([country, info]) => (
                   <SelectItem 
                     key={country} 
@@ -236,16 +267,20 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
                   >
                     <span className="flex items-center gap-3 py-1">
                       <ReactCountryFlag
-                        countryCode={info.code}
+                        countryCode={getCountryCode(info.code)}
                         svg
                         style={{
                           width: '1.5em',
                           height: '1.5em',
+                          borderRadius: '4px',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                         }}
                         title={country}
                       />
-                      <span className="font-medium text-gray-900">{country}</span>
-                      <span className="text-gray-500">{info.dialCode}</span>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-gray-900 text-sm">{country}</span>
+                        <span className="text-xs text-gray-500">{info.dialCode}</span>
+                      </div>
                     </span>
                   </SelectItem>
                 ))}
@@ -260,11 +295,13 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
               <div className="flex items-center px-4 bg-gray-50 border-r border-gray-300">
                 <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
                   <ReactCountryFlag
-                    countryCode={selectedCountryInfo.code}
+                    countryCode={getCountryCode(selectedCountryInfo.code)}
                     svg
                     style={{
                       width: '1.2em',
                       height: '1.2em',
+                      borderRadius: '3px',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
                     }}
                     title={selectedCountry}
                   />
