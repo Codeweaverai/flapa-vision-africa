@@ -453,6 +453,80 @@ const MyOrdersPage = () => {
     }
   };
 
+  // Add the missing functions here
+  const handleDownloadTicketsPDF = () => {
+    if (selectedBookings.length === 0) return;
+    
+    const element = document.getElementById('tickets-print-content');
+    if (!element) {
+      toast.error('Could not find ticket content to download');
+      return;
+    }
+
+    const options = {
+      margin: 10,
+      filename: `tickets-${selectedBookings[0].event?.title || 'event'}-${Date.now()}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(options).from(element).save()
+      .then(() => {
+        toast.success('Tickets downloaded successfully');
+      })
+      .catch((error) => {
+        console.error('PDF download error:', error);
+        toast.error('Failed to download tickets');
+      });
+  };
+
+  const handlePrintTickets = () => {
+    if (selectedBookings.length === 0) return;
+    
+    const printContent = document.getElementById('tickets-print-content');
+    if (!printContent) {
+      toast.error('Could not find ticket content to print');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Print Tickets</title>
+          <style>
+            body { 
+              margin: 0; 
+              padding: 20px; 
+              font-family: Arial, sans-serif; 
+              background: white;
+            }
+            .ticket-container { 
+              margin-bottom: 30px; 
+              page-break-inside: avoid;
+            }
+          </style>
+        </head>
+        <body>
+          ${printContent.innerHTML}
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      
+      setTimeout(() => {
+        printWindow.print();
+        // printWindow.close(); // Optional: close after printing
+      }, 500);
+    } else {
+      toast.error('Please allow popups to print tickets');
+    }
+  };
+
   // Use the PulseLoading component instead of simple spinner
   if (loading) {
     return <PulseLoading />;
