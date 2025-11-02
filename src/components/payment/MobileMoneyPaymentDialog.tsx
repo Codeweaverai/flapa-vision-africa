@@ -145,7 +145,7 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
         ? `${window.location.origin}/account/orders`
         : `${window.location.origin}/payment/success`;
 
-      const { data, error } = await supabase.functions.invoke('create-pawapay-session', {
+      const { data, error } = await supabase.functions.invoke('create-pawapay-session-checkout', {
         body: {
           amount: Math.round(finalAmount * 100), // Convert to cents
           currency: finalCurrency,
