@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PAWAPAY_COUNTRY_CODES, PawapayCountryCode } from '@/constants/pawapayCountries';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import { Smartphone, AlertCircle, ArrowRight, Loader2, Shield, CheckCircle2, Zap } from 'lucide-react';
+import { Smartphone, AlertCircle, ArrowRight, Loader2, Shield, CheckCircle2, Zap, Lock, Globe, Clock } from 'lucide-react';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { currencyService } from '@/services/currencyService';
 import ReactCountryFlag from "react-country-flag";
@@ -203,50 +203,93 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-4xl bg-white rounded-2xl shadow-2xl border-0 p-0 overflow-hidden">
-        <div className="flex">
-          {/* Left Side - Payment Form */}
-          <div className="flex-1 p-6">
-            <DialogHeader className="space-y-4 pb-2">
-              <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full mx-auto mb-2">
-                <Smartphone className="h-6 w-6 text-white" />
+      <DialogContent className="sm:max-w-lg bg-white rounded-2xl shadow-2xl border-0 max-h-[90vh] overflow-hidden">
+        <DialogHeader className="space-y-4 pb-2 px-6 pt-6">
+          <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full mx-auto mb-2">
+            <Smartphone className="h-6 w-6 text-white" />
+          </div>
+          <DialogTitle className="text-xl font-bold text-center text-gray-900">
+            Mobile Money Payment
+          </DialogTitle>
+          <DialogDescription className="text-center text-gray-600 text-sm leading-relaxed">
+            Complete your payment using mobile money. Select your country and enter your mobile number to proceed.
+          </DialogDescription>
+        </DialogHeader>
+        
+        {/* Scrollable Content Area */}
+        <div className="overflow-y-auto px-6 pb-6" style={{ maxHeight: 'calc(90vh - 200px)' }}>
+          <div className="space-y-6">
+            {/* Error Display */}
+            {error && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-red-700">{error}</div>
               </div>
-              <DialogTitle className="text-xl font-bold text-center text-gray-900">
-                Mobile Money Payment
-              </DialogTitle>
-              <DialogDescription className="text-center text-gray-600 text-sm leading-relaxed">
-                Complete your payment using mobile money. Select your country and enter your mobile number to proceed.
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-6">
-              {/* Error Display */}
-              {error && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
-                  <div className="text-sm text-red-700">{error}</div>
-                </div>
-              )}
+            )}
 
-              {/* Amount Summary */}
-              <div className="p-6 bg-gradient-to-r from-orange-500 to-purple-600 rounded-xl shadow-lg">
-                <div className="text-center">
-                  <p className="text-sm font-medium text-white/90 mb-1">Total Amount</p>
-                  <p className="text-3xl font-bold text-white">
-                    <PriceDisplay amount={amount} originalCurrency={currency as any} />
-                  </p>
-                </div>
+            {/* Amount Summary */}
+            <div className="p-6 bg-gradient-to-r from-orange-500 to-purple-600 rounded-xl shadow-lg">
+              <div className="text-center">
+                <p className="text-sm font-medium text-white/90 mb-1">Total Amount</p>
+                <p className="text-3xl font-bold text-white">
+                  <PriceDisplay amount={amount} originalCurrency={currency as any} />
+                </p>
               </div>
+            </div>
 
-              {/* Country Selection */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium text-gray-700">Select Country</Label>
-                <Select value={selectedCountry} onValueChange={(value: PawapayCountryCode) => setSelectedCountry(value)}>
-                  <SelectTrigger className="h-12 border-gray-300 rounded-xl hover:border-gray-400 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors">
-                    <SelectValue>
-                      <span className="flex items-center gap-3">
+            {/* Security Features */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                <Lock className="h-4 w-4 text-green-600" />
+                <span className="text-xs font-medium text-green-800">Secure</span>
+              </div>
+              <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <Zap className="h-4 w-4 text-blue-600" />
+                <span className="text-xs font-medium text-blue-800">Instant</span>
+              </div>
+              <div className="flex items-center gap-2 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                <Globe className="h-4 w-4 text-purple-600" />
+                <span className="text-xs font-medium text-purple-800">Multi-Country</span>
+              </div>
+              <div className="flex items-center gap-2 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                <Clock className="h-4 w-4 text-orange-600" />
+                <span className="text-xs font-medium text-orange-800">24/7</span>
+              </div>
+            </div>
+
+            {/* Country Selection */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium text-gray-700">Select Country</Label>
+              <Select value={selectedCountry} onValueChange={(value: PawapayCountryCode) => setSelectedCountry(value)}>
+                <SelectTrigger className="h-12 border-gray-300 rounded-xl hover:border-gray-400 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors">
+                  <SelectValue>
+                    <span className="flex items-center gap-3">
+                      <ReactCountryFlag
+                        countryCode={getCountryCode(selectedCountryInfo.code)}
+                        svg
+                        style={{
+                          width: '1.5em',
+                          height: '1.5em',
+                          borderRadius: '4px',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        }}
+                        title={selectedCountry}
+                      />
+                      <span className="font-medium text-gray-900">{selectedCountry}</span>
+                      <span className="text-gray-500">{selectedCountryInfo.dialCode}</span>
+                    </span>
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-0 shadow-lg min-w-[320px]">
+                  {Object.entries(PAWAPAY_COUNTRY_CODES).map(([country, info]) => (
+                    <SelectItem 
+                      key={country} 
+                      value={country}
+                      className="rounded-lg focus:bg-orange-50/50"
+                    >
+                      <span className="flex items-center gap-3 py-1">
                         <ReactCountryFlag
-                          countryCode={getCountryCode(selectedCountryInfo.code)}
+                          countryCode={getCountryCode(info.code)}
                           svg
                           style={{
                             width: '1.5em',
@@ -254,78 +297,103 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
                             borderRadius: '4px',
                             boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                           }}
-                          title={selectedCountry}
+                          title={country}
                         />
-                        <span className="font-medium text-gray-900">{selectedCountry}</span>
-                        <span className="text-gray-500">{selectedCountryInfo.dialCode}</span>
+                        <div className="flex flex-col">
+                          <span className="font-medium text-gray-900 text-sm">{country}</span>
+                          <span className="text-xs text-gray-500">{info.dialCode}</span>
+                        </div>
                       </span>
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-0 shadow-lg min-w-[320px]">
-                    {Object.entries(PAWAPAY_COUNTRY_CODES).map(([country, info]) => (
-                      <SelectItem 
-                        key={country} 
-                        value={country}
-                        className="rounded-lg focus:bg-orange-50/50"
-                      >
-                        <span className="flex items-center gap-3 py-1">
-                          <ReactCountryFlag
-                            countryCode={getCountryCode(info.code)}
-                            svg
-                            style={{
-                              width: '1.5em',
-                              height: '1.5em',
-                              borderRadius: '4px',
-                              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                            }}
-                            title={country}
-                          />
-                          <div className="flex flex-col">
-                            <span className="font-medium text-gray-900 text-sm">{country}</span>
-                            <span className="text-xs text-gray-500">{info.dialCode}</span>
-                          </div>
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-              {/* Phone Number Input */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium text-gray-700">Mobile Number</Label>
-                <div className="flex rounded-xl overflow-hidden shadow-sm border border-gray-300 hover:border-gray-400 focus-within:ring-2 focus-within:ring-orange-500/20 focus-within:border-orange-500 transition-all">
-                  <div className="flex items-center px-4 bg-gray-50 border-r border-gray-300">
-                    <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                      <ReactCountryFlag
-                        countryCode={getCountryCode(selectedCountryInfo.code)}
-                        svg
-                        style={{
-                          width: '1.2em',
-                          height: '1.2em',
-                          borderRadius: '3px',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                        }}
-                        title={selectedCountry}
-                      />
-                      {selectedCountryInfo.dialCode}
-                    </span>
-                  </div>
-                  <Input
-                    placeholder="Enter your mobile number"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    className="flex-1 border-0 focus:ring-0 rounded-l-none h-12 text-gray-900 placeholder-gray-500"
-                    disabled={loading}
-                  />
+            {/* Phone Number Input */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium text-gray-700">Mobile Number</Label>
+              <div className="flex rounded-xl overflow-hidden shadow-sm border border-gray-300 hover:border-gray-400 focus-within:ring-2 focus-within:ring-orange-500/20 focus-within:border-orange-500 transition-all">
+                <div className="flex items-center px-4 bg-gray-50 border-r border-gray-300">
+                  <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <ReactCountryFlag
+                      countryCode={getCountryCode(selectedCountryInfo.code)}
+                      svg
+                      style={{
+                        width: '1.2em',
+                        height: '1.2em',
+                        borderRadius: '3px',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                      }}
+                      title={selectedCountry}
+                    />
+                    {selectedCountryInfo.dialCode}
+                  </span>
                 </div>
-                <p className="text-xs text-gray-500 leading-relaxed">
-                  Enter your number without the country code (e.g., 968554225 for {selectedCountryInfo.dialCode}968554225)
-                </p>
+                <Input
+                  placeholder="Enter your mobile number"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  className="flex-1 border-0 focus:ring-0 rounded-l-none h-12 text-gray-900 placeholder-gray-500"
+                  disabled={loading}
+                />
               </div>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Enter your number without the country code (e.g., 968554225 for {selectedCountryInfo.dialCode}968554225)
+              </p>
+            </div>
 
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-2">
+            {/* Benefits Section */}
+            <div className="bg-gradient-to-br from-orange-50 to-purple-50 rounded-xl p-4 border border-orange-100">
+              <h4 className="font-semibold text-sm text-gray-900 mb-3 flex items-center gap-2">
+                <Shield className="h-4 w-4 text-orange-600" />
+                Why Pay with Mobile Money?
+              </h4>
+              <div className="space-y-3">
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-xs text-gray-700">Instant payment processing and confirmation</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-xs text-gray-700">Bank-level security and encryption</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-xs text-gray-700">Available in multiple African countries</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-xs text-gray-700">No additional fees or charges</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Supported Countries Preview */}
+            <div className="bg-white rounded-lg p-4 border border-gray-200">
+              <h4 className="font-semibold text-sm text-gray-900 mb-3 text-center">Supported in {Object.keys(PAWAPAY_COUNTRY_CODES).length}+ Countries</h4>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {Object.entries(PAWAPAY_COUNTRY_CODES).slice(0, 8).map(([country, info]) => (
+                  <div key={country} className="flex items-center gap-1 px-2 py-1 rounded-md bg-gray-50 border border-gray-200">
+                    <ReactCountryFlag
+                      countryCode={getCountryCode(info.code)}
+                      svg
+                      style={{
+                        width: '14px',
+                        height: '10px',
+                        borderRadius: '1px',
+                      }}
+                      title={country}
+                    />
+                    <span className="text-xs font-medium text-gray-700">{country}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Action Buttons - Fixed at bottom of scrollable area */}
+            <div className="space-y-4 pt-4 border-t border-gray-200">
+              <div className="flex gap-3">
                 <Button 
                   variant="outline" 
                   onClick={onClose} 
@@ -357,98 +425,6 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
               <div className="text-xs text-gray-500 text-center leading-relaxed bg-gray-50 rounded-lg p-3 border border-gray-200">
                 You will be redirected to complete the payment on your mobile device.
                 Please ensure you have sufficient balance in your mobile money account.
-              </div>
-            </div>
-          </div>
-
-          {/* Right Side - Scrollable Benefits Section */}
-          <div className="w-80 bg-gradient-to-b from-orange-50 to-purple-50 border-l border-orange-100">
-            <div className="p-6 h-full overflow-y-auto">
-              <div className="space-y-6">
-                {/* Header */}
-                <div className="text-center">
-                  <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <Shield className="h-5 w-5 text-white" />
-                  </div>
-                  <h3 className="font-bold text-lg bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                    Why Pay with Mobile Money?
-                  </h3>
-                </div>
-
-                {/* Benefits List */}
-                <div className="space-y-4">
-                  <div className="flex items-start gap-3 p-3 bg-white rounded-lg shadow-sm border border-orange-100">
-                    <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-sm text-gray-900">Instant Processing</h4>
-                      <p className="text-xs text-gray-600 mt-1">Payments are processed instantly with real-time confirmation.</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 p-3 bg-white rounded-lg shadow-sm border border-orange-100">
-                    <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Shield className="h-4 w-4 text-blue-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-sm text-gray-900">Bank-Level Security</h4>
-                      <p className="text-xs text-gray-600 mt-1">Your payment details are encrypted and secure.</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 p-3 bg-white rounded-lg shadow-sm border border-orange-100">
-                    <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Zap className="h-4 w-4 text-purple-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-sm text-gray-900">Quick & Easy</h4>
-                      <p className="text-xs text-gray-600 mt-1">Complete payments in just a few taps on your phone.</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 p-3 bg-white rounded-lg shadow-sm border border-orange-100">
-                    <div className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Smartphone className="h-4 w-4 text-orange-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-sm text-gray-900">Wide Coverage</h4>
-                      <p className="text-xs text-gray-600 mt-1">Available in multiple countries across Africa.</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Supported Countries */}
-                <div className="bg-white rounded-lg p-4 border border-orange-100">
-                  <h4 className="font-semibold text-sm text-gray-900 mb-3 text-center">Supported Countries</h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    {Object.entries(PAWAPAY_COUNTRY_CODES).slice(0, 6).map(([country, info]) => (
-                      <div key={country} className="flex items-center gap-2 p-2 rounded-md bg-gray-50">
-                        <ReactCountryFlag
-                          countryCode={getCountryCode(info.code)}
-                          svg
-                          style={{
-                            width: '16px',
-                            height: '12px',
-                            borderRadius: '2px',
-                          }}
-                          title={country}
-                        />
-                        <span className="text-xs font-medium text-gray-700">{country}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-xs text-gray-500 text-center mt-3">
-                    and {Object.keys(PAWAPAY_COUNTRY_CODES).length - 6} more countries
-                  </p>
-                </div>
-
-                {/* Security Badge */}
-                <div className="text-center p-4 bg-gradient-to-r from-orange-500 to-purple-600 rounded-lg">
-                  <Shield className="h-6 w-6 text-white mx-auto mb-2" />
-                  <p className="text-white text-sm font-semibold">Secure Payment</p>
-                  <p className="text-white/80 text-xs mt-1">256-bit SSL Encryption</p>
-                </div>
               </div>
             </div>
           </div>
