@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
-import { Calendar, MapPin, Download, Eye, Ticket, BookOpen, Printer, X, FileText, QrCode, ChevronLeft, ChevronRight, Heart } from 'lucide-react';
+import { Calendar, MapPin, Download, Eye, Ticket, BookOpen, Printer, X, FileText, QrCode, ChevronLeft, ChevronRight, Heart, CreditCard } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
@@ -40,6 +40,8 @@ interface GiftCard {
 interface Order {
   id: string;
   total_amount: number;
+  tax_amount: number;
+  processing_fee: number;
   currency: string;
   payment_status: string;
   payment_method: string;
@@ -259,14 +261,16 @@ const buildCards = (orders: Order[]): OrderCard[] => {
   orders.forEach(order => {
     const subtotals = computeTypeSubtotalsFull(order);
     
-    // Event card
-    if ((order.event_bookings && order.event_bookings.length > 0) || subtotals.event > 0) {
-      cards.push({
-        key: `${order.id}-event`,
-        type: 'event',
-        order,
-        items: order.event_bookings || [],
-        subtotal: subtotals.event
+    // Create separate cards for each event booking
+    if (order.event_bookings && order.event_bookings.length > 0) {
+      order.event_bookings.forEach((booking, index) => {
+        cards.push({
+          key: `${order.id}-event-${index}`,
+          type: 'event',
+          order,
+          items: [booking],
+          subtotal: subtotals.event / order.event_bookings.length // Distribute subtotal evenly
+        });
       });
     }
     
@@ -409,6 +413,8 @@ const MyOrdersPage = () => {
       const transformedOrders: Order[] = (data || []).map(order => ({
         ...order,
         total_amount: safeNumber(order.total_amount),
+        tax_amount: safeNumber(order.tax_amount || 0),
+        processing_fee: safeNumber(order.processing_fee || 0),
         user_name: user?.email || 'Customer',
         gift_cards: giftCardsData.filter(gc => gc.order_id === order.id).map(gc => ({
           ...gc,
@@ -471,9 +477,9 @@ const MyOrdersPage = () => {
     );
   };
 
-  const fetchDetailedTickets = async (order: Order): Promise<TicketData[]> => {
+  const fetchDetailedTickets = async (order: Order, bookingId?: string): Promise<TicketData[]> => {
     try {
-      const { data: detailedBookings, error } = await supabase
+      let query = supabase
         .from('event_bookings')
         .select(`
           *,
@@ -500,6 +506,12 @@ const MyOrdersPage = () => {
           )
         `)
         .eq('order_id', order.id);
+
+      if (bookingId) {
+        query = query.eq('id', bookingId);
+      }
+
+      const { data: detailedBookings, error } = await query;
 
       if (error) throw error;
 
@@ -558,8 +570,8 @@ const MyOrdersPage = () => {
     }
   };
 
-  const handleViewTickets = async (order: Order) => {
-    const tickets = await fetchDetailedTickets(order);
+  const handleViewTickets = async (order: Order, bookingId?: string) => {
+    const tickets = await fetchDetailedTickets(order, bookingId);
     setSelectedBookings(tickets);
     setShowTicketModal(true);
     
@@ -594,356 +606,7 @@ const MyOrdersPage = () => {
     setShowReceiptModal(true);
   };
 
-  const handlePrintTickets = () => {
-    const printContent = document.getElementById('tickets-print-content');
-    if (printContent) {
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>Event Tickets</title>
-            <style>
-              @page {
-                size: A4;
-                margin: 15mm;
-              }
-              
-              body { 
-                font-family: 'Arial', sans-serif; 
-                margin: 0; 
-                padding: 0; 
-                background: white;
-                color: #1f2937;
-                line-height: 1.4;
-              }
-              
-              .ticket-container { 
-                page-break-after: always; 
-                margin-bottom: 20px;
-                background: white;
-                border-radius: 20px;
-                overflow: hidden;
-                box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-                max-width: 180mm;
-                margin: 0 auto 20px auto;
-              }
-              
-              .ticket-container:last-child { 
-                page-break-after: avoid; 
-              }
-              
-              .ticket-header {
-                background: linear-gradient(135deg, #f97316 0%, #a855f7 100%);
-                padding: 30px;
-                text-align: center;
-                color: white;
-                position: relative;
-              }
-              
-              .ticket-header h1 {
-                margin: 0 0 10px 0;
-                font-size: 28px;
-                font-weight: bold;
-              }
-              
-              .ticket-code-badge {
-                background: rgba(255,255,255,0.2);
-                padding: 8px 16px;
-                border-radius: 20px;
-                display: inline-block;
-                font-size: 14px;
-                font-weight: 500;
-              }
-              
-              .ticket-content {
-                padding: 30px;
-              }
-              
-              .event-image {
-                width: 120px;
-                height: 120px;
-                border-radius: 15px;
-                object-fit: cover;
-                float: left;
-                margin-right: 20px;
-                margin-bottom: 15px;
-                box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-              }
-              
-              .event-title {
-                font-size: 24px;
-                font-weight: bold;
-                color: #1f2937;
-                margin: 0 0 15px 0;
-                clear: both;
-              }
-              
-              .ticket-info-badge {
-                background: linear-gradient(135deg, #fef7ed, #faf5ff);
-                padding: 12px 16px;
-                border-radius: 10px;
-                border-left: 4px solid #f97316;
-                margin-bottom: 25px;
-                clear: both;
-              }
-              
-              .details-grid {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 25px;
-                margin-bottom: 30px;
-              }
-              
-              .detail-item {
-                margin-bottom: 20px;
-              }
-              
-              .detail-label {
-                font-weight: bold;
-                color: #374151;
-                margin-bottom: 8px;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-              }
-              
-              .detail-value {
-                color: #6b7280;
-                font-size: 16px;
-                line-height: 1.4;
-              }
-              
-              .qr-section {
-                text-align: center;
-                padding: 25px;
-                background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-                border-radius: 15px;
-                margin-bottom: 20px;
-              }
-              
-              .qr-container {
-                width: 140px;
-                height: 140px;
-                margin: 0 auto 15px;
-                padding: 15px;
-                background: white;
-                border-radius: 15px;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-              }
-              
-              .ticket-code {
-                font-family: 'Courier New', monospace;
-                font-size: 18px;
-                font-weight: bold;
-                color: #f97316;
-                letter-spacing: 2px;
-                margin-top: 10px;
-              }
-              
-              .footer-notes {
-                text-align: center;
-                padding: 20px;
-                border-top: 2px dashed #e5e7eb;
-                color: #6b7280;
-                font-size: 14px;
-                line-height: 1.6;
-              }
-              
-              .status-badge {
-                background: #dcfce7;
-                color: #166534;
-                padding: 6px 12px;
-                border-radius: 20px;
-                font-size: 14px;
-                font-weight: 500;
-                display: inline-block;
-              }
-              
-              @media print {
-                body { 
-                  background: white !important;
-                  -webkit-print-color-adjust: exact;
-                  print-color-adjust: exact;
-                }
-                
-                .ticket-container {
-                  box-shadow: none;
-                  border: 1px solid #e5e7eb;
-                }
-                
-                .ticket-header {
-                  background: linear-gradient(135deg, #f97316 0%, #a855f7 100%) !important;
-                  -webkit-print-color-adjust: exact;
-                  print-color-adjust: exact;
-                }
-                
-                .ticket-info-badge {
-                  background: linear-gradient(135deg, #fef7ed, #faf5ff) !important;
-                  -webkit-print-color-adjust: exact;
-                  print-color-adjust: exact;
-                }
-              }
-            </style>
-          </head>
-          <body>
-            ${printContent.innerHTML}
-          </body>
-          </html>
-        `);
-        printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => {
-          printWindow.print();
-        }, 500);
-      }
-    }
-  };
-
-  const handleDownloadTicketsPDF = async () => {
-    const element = document.getElementById('tickets-print-content');
-    if (!element) {
-      toast.error('Tickets content not found');
-      return;
-    }
-
-    toast.info('Generating PDF... This may take a moment');
-
-    const opt = {
-      margin: 10,
-      filename: `event-tickets-${new Date().toISOString().split('T')[0]}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { 
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        scrollX: 0,
-        scrollY: 0
-      },
-      jsPDF: { 
-        unit: 'mm', 
-        format: 'a4', 
-        orientation: 'portrait' 
-      },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-    };
-
-    try {
-      await html2pdf().set(opt).from(element).save();
-      toast.success('PDF downloaded successfully!');
-    } catch (error) {
-      console.error('PDF generation error:', error);
-      toast.error('Failed to generate PDF. Please try again.');
-    }
-  };
-
-  const generateTicketHTML = (ticket: TicketData, index: number) => {
-    return `
-      <div style="max-width: 800px; margin: 0 auto 30px; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1); font-family: Arial, sans-serif;">
-        <!-- Header with gradient -->
-        <div style="background: linear-gradient(135deg, #f97316 0%, #a855f7 100%); padding: 30px; text-align: center; color: white;">
-          <h1 style="margin: 0 0 10px 0; font-size: 28px; font-weight: bold;">🎫 EVENT TICKET</h1>
-          <div style="background: rgba(255,255,255,0.2); padding: 8px 16px; border-radius: 20px; display: inline-block;">
-            <span style="font-size: 14px; font-weight: 500;">#${ticket.ticket_code || ticket.booking_code}</span>
-          </div>
-        </div>
-
-        <div style="padding: 40px;">
-  <!-- Event Title -->
-  <div style="margin-bottom: 30px;">
-    <div style="flex: 1;">
-      <h2 style="margin: 0 0 10px 0; font-size: 24px; color: #1f2937; font-weight: bold;">${ticket.event?.title || 'Event Title'}</h2>
-      <div style="background: linear-gradient(135deg, #fef7ed, #faf5ff); padding: 12px 16px; border-radius: 10px; border-left: 4px solid #f97316;">
-        <div style="font-weight: 600; color: #ea580c; margin-bottom: 5px;">${ticket.event_ticket?.name || 'Standard Ticket'}</div>
-        <div style="font-size: 14px; color: #7c2d12;">${ticket.event_ticket?.ticket_type || 'Regular'}</div>
-      </div>
-    </div>
-        </div>
-
-          <!-- Event Details Grid -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 30px;">
-            <div>
-              <div style="margin-bottom: 20px;">
-                <div style="font-weight: bold; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
-                  📅 Date & Time
-                </div>
-                <div style="color: #6b7280; font-size: 16px; line-height: 1.4;">
-                  ${ticket.event?.start_time ? format(new Date(ticket.event.start_time), 'EEEE, MMMM do, yyyy') : 'TBD'}<br>
-                  ${ticket.event?.start_time ? format(new Date(ticket.event.start_time), 'h:mm a') : ''} ${ticket.event?.end_time ? '- ' + format(new Date(ticket.event.end_time), 'h:mm a') : ''}
-                </div>
-              </div>
-              
-              <div style="margin-bottom: 20px;">
-                <div style="font-weight: bold; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
-                  📍 Location
-                </div>
-                <div style="color: #6b7280; font-size: 16px; line-height: 1.4;">
-                  ${ticket.event?.location || 'TBD'}
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <div style="margin-bottom: 20px;">
-                <div style="font-weight: bold; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
-                  👤 Ticket Holder
-                </div>
-                <div style="color: #6b7280; font-size: 16px; line-height: 1.4;">
-                  ${ticket.ticket_holder_name || ticket.user_name || 'Ticket Holder'}
-                  ${ticket.ticket_holder_email ? `<br><span style="font-size: 14px;">${ticket.ticket_holder_email}</span>` : ''}
-                </div>
-              </div>
-              
-              <div style="margin-bottom: 20px;">
-                <div style="font-weight: bold; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
-                  ✅ Status
-                </div>
-                <div>
-                  <span style="background: #dcfce7; color: #166534; padding: 6px 12px; border-radius: 20px; font-size: 14px; font-weight: 500;">
-                    ${(ticket.status || 'confirmed').toUpperCase()}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- QR Code Section -->
-          <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #f8fafc, #f1f5f9); border-radius: 15px; margin-bottom: 20px;">
-            <div style="margin-bottom: 15px;">
-              <div style="width: 150px; height: 150px; margin: 0 auto; padding: 15px; background: white; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
-                <div id="qr-code-${ticket.ticket_code || ticket.booking_code}-${index}" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
-                  <div style="width: 100%; height: 100%; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6b7280;">
-                    Loading QR...
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div style="font-size: 14px; color: #6b7280; margin-bottom: 10px;">Scan this code at the event entrance</div>
-            <div style="font-family: monospace; font-size: 16px; font-weight: bold; color: #f97316; letter-spacing: 1px;">
-              ${ticket.ticket_code || ticket.booking_code}
-            </div>
-          </div>
-
-          <!-- Footer -->
-          <div style="text-align: center; padding: 20px; border-top: 2px dashed #e5e7eb; color: #6b7280; font-size: 14px; line-height: 1.6;">
-            <div style="margin-bottom: 10px;">
-              <strong style="color: #374151;">Important:</strong> Please bring this ticket (digital or printed) to the event.
-            </div>
-            <div>
-              For questions, contact us at support@skillpulse.com
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-  };
-
-  // Calculate tax and totals for receipt
+  // Calculate receipt totals with tax and processing fee
   const calculateReceiptTotals = (order: Order, type: 'event' | 'course' | 'gift') => {
     const filteredItems = order.order_items.filter(item => {
       if (type === 'event') return item.item_type === 'event' || item.item_type === 'event_ticket';
@@ -953,17 +616,19 @@ const MyOrdersPage = () => {
     });
     
     const subtotal = filteredItems.reduce((sum, item) => sum + safeNumber(item.total_price), 0);
-    const taxRate = 0.15; // 15% tax
-    const taxAmount = subtotal * taxRate;
-    const total = subtotal + taxAmount;
+    const taxAmount = safeNumber(order.tax_amount) || 0;
+    const processingFee = safeNumber(order.processing_fee) || 0;
+    const total = safeNumber(order.total_amount) || 0;
     
-    return { subtotal, taxAmount, total, filteredItems };
+    return { subtotal, taxAmount, processingFee, total, filteredItems };
   };
 
   const handlePrintReceipt = () => {
     if (!selectedOrder) return;
     
-    const { subtotal, taxAmount, total, filteredItems } = calculateReceiptTotals(selectedOrder, selectedType);
+    const { subtotal, taxAmount, processingFee, total, filteredItems } = calculateReceiptTotals(selectedOrder, selectedType);
+    const orderCurrency = safeCurrency(selectedOrder.currency);
+    const currencySymbol = orderCurrency === 'ZMW' ? 'K' : '$';
     
     const receiptHTML = `
       <!DOCTYPE html>
@@ -1255,7 +920,7 @@ const MyOrdersPage = () => {
             <div>
               <div class="info-item">
                 <div class="info-label">Payment Method</div>
-                <div class="info-value">${selectedOrder.payment_method || 'Credit Card'}</div>
+                <div class="info-value">${selectedOrder.payment_method || 'Mobile Money'}</div>
               </div>
               <div class="info-item">
                 <div class="info-label">Payment Status</div>
@@ -1265,7 +930,7 @@ const MyOrdersPage = () => {
               </div>
               <div class="info-item">
                 <div class="info-label">Currency</div>
-                <div class="info-value">${safeCurrency(selectedOrder.currency)}</div>
+                <div class="info-value">${orderCurrency}</div>
               </div>
             </div>
           </div>
@@ -1289,8 +954,8 @@ const MyOrdersPage = () => {
                       <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">${item.item_type.replace('_', ' ').toUpperCase()}</div>
                     </td>
                     <td>${item.quantity}</td>
-                    <td>$${safeNumber(item.unit_price).toFixed(2)}</td>
-                    <td style="font-weight: 600; color: #f97316;">$${safeNumber(item.total_price).toFixed(2)}</td>
+                    <td>${currencySymbol}${safeNumber(item.unit_price).toFixed(2)}</td>
+                    <td style="font-weight: 600; color: #f97316;">${currencySymbol}${safeNumber(item.total_price).toFixed(2)}</td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -1309,7 +974,7 @@ const MyOrdersPage = () => {
                     </div>
                     <div>
                       <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Amount</div>
-                      <div style="font-weight: 600; color: #f97316;">$${safeNumber(gift.amount).toFixed(2)}</div>
+                      <div style="font-weight: 600; color: #f97316;">${currencySymbol}${safeNumber(gift.amount).toFixed(2)}</div>
                     </div>
                     <div>
                       <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Recipient</div>
@@ -1337,23 +1002,28 @@ const MyOrdersPage = () => {
             
             <div class="total-row">
               <span class="total-label">Subtotal</span>
-              <span class="total-value">$${subtotal.toFixed(2)}</span>
+              <span class="total-value">${currencySymbol}${subtotal.toFixed(2)}</span>
             </div>
             
             <div class="total-row">
-              <span class="total-label">Tax (15%)</span>
-              <span class="total-value">$${taxAmount.toFixed(2)}</span>
+              <span class="total-label">Tax (1.5%)</span>
+              <span class="total-value">${currencySymbol}${taxAmount.toFixed(2)}</span>
+            </div>
+
+            <div class="total-row">
+              <span class="total-label">Processing Fee (2.9%)</span>
+              <span class="total-value">${currencySymbol}${processingFee.toFixed(2)}</span>
             </div>
             
             <div class="total-row total-amount">
               <span>Total Amount</span>
-              <span>$${total.toFixed(2)}</span>
+              <span>${currencySymbol}${total.toFixed(2)}</span>
             </div>
             
             <div class="tax-breakdown">
-              <div class="tax-title">Tax Breakdown</div>
+              <div class="tax-title">Fee Breakdown</div>
               <div style="font-size: 13px; color: #6b7280; line-height: 1.5;">
-                This receipt includes 15% Value Added Tax (VAT) as required by law. 
+                This receipt includes 1.5% Value Added Tax (VAT) and 2.9% payment processing fee as required by law. 
                 Tax registration number: VAT-${selectedOrder.id.slice(0, 8).toUpperCase()}-SL
               </div>
             </div>
@@ -1426,7 +1096,11 @@ const MyOrdersPage = () => {
             ) : (
               <>
                 <div className="space-y-6">
-                  {paginatedCards.map((card) => (
+                  {paginatedCards.map((card) => {
+                    const orderCurrency = safeCurrency(card.order.currency);
+                    const currencySymbol = orderCurrency === 'ZMW' ? 'K' : '$';
+                    
+                    return (
                     <Card key={card.key} className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
                       <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
                         <div className="flex justify-between items-start">
@@ -1438,11 +1112,7 @@ const MyOrdersPage = () => {
                           </div>
                           <div className="text-right">
                             <div className="text-2xl font-bold">
-                              <PriceDisplay 
-                                amount={card.subtotal} 
-                                originalCurrency="USD"
-                                showOriginal={true}
-                              />
+                              {currencySymbol}{card.subtotal.toFixed(2)}
                             </div>
                             {getStatusBadge(card.order.payment_status)}
                           </div>
@@ -1450,7 +1120,7 @@ const MyOrdersPage = () => {
                       </CardHeader>
                       
                       <CardContent className="p-6">
-                        {/* Event content */}
+                        {/* Event content - Show individual tickets */}
                         {card.type === 'event' && card.items.map((booking: any) => (
                           <div key={booking.id} className="border-b border-gray-200 last:border-b-0 pb-6 last:pb-0 mb-6 last:mb-0">
                             <div className="flex flex-col lg:flex-row gap-6">
@@ -1496,11 +1166,7 @@ const MyOrdersPage = () => {
                                       </p>
                                       {booking.event_ticket?.price && (
                                         <p className="text-sm text-orange-700 font-semibold">
-                                          Price: <PriceDisplay 
-                                            amount={safeNumber(booking.event_ticket.price)} 
-                                            originalCurrency={safeCurrency(booking.event?.currency) || "USD"}
-                                            showOriginal={true}
-                                          />
+                                          Price: {currencySymbol}{safeNumber(booking.event_ticket.price).toFixed(2)}
                                         </p>
                                       )}
                                     </div>
@@ -1510,6 +1176,25 @@ const MyOrdersPage = () => {
                                       </p>
                                     </div>
                                   </div>
+                                </div>
+
+                                {/* Individual ticket actions */}
+                                <div className="flex gap-3">
+                                  <Button
+                                    onClick={() => handleViewReceipt(card.order, card.type)}
+                                    className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                                  >
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    View Receipt
+                                  </Button>
+                                  
+                                  <Button 
+                                    onClick={() => handleViewTickets(card.order, booking.id)}
+                                    className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                                  >
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Ticket
+                                  </Button>
                                 </div>
                               </div>
                             </div>
@@ -1544,11 +1229,7 @@ const MyOrdersPage = () => {
 
                                 {enrollment.course?.price && (
                                   <p className="text-sm text-purple-700 font-semibold mb-4">
-                                    Price: <PriceDisplay 
-                                      amount={safeNumber(enrollment.course.price)} 
-                                      originalCurrency="USD"
-                                      showOriginal={true}
-                                    />
+                                    Price: {currencySymbol}{safeNumber(enrollment.course.price).toFixed(2)}
                                   </p>
                                 )}
                                 
@@ -1559,6 +1240,13 @@ const MyOrdersPage = () => {
                                       Start Learning
                                     </Button>
                                   </Link>
+                                  <Button
+                                    onClick={() => handleViewReceipt(card.order, card.type)}
+                                    className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                                  >
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    View Receipt
+                                  </Button>
                                 </div>
                               </div>
                             </div>
@@ -1575,11 +1263,7 @@ const MyOrdersPage = () => {
                                   <div className="flex justify-between items-start mb-3">
                                     <div>
                                       <div className="text-xl font-semibold text-gray-900 mb-1">
-                                        <PriceDisplay 
-                                          amount={safeNumber(gift.amount)} 
-                                          originalCurrency={safeCurrency(gift.currency)} 
-                                          showOriginal={true}
-                                        />
+                                        {currencySymbol}{safeNumber(gift.amount).toFixed(2)}
                                       </div>
                                       <p className="font-mono text-sm text-gray-600">
                                         Code: {obfuscateGiftCode(gift.gift_card_code)}
@@ -1612,32 +1296,20 @@ const MyOrdersPage = () => {
                                 </div>
                               ))}
                             </div>
+                            <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
+                              <Button
+                                onClick={() => handleViewReceipt(card.order, card.type)}
+                                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                              >
+                                <FileText className="h-4 w-4 mr-2" />
+                                View Receipt
+                              </Button>
+                            </div>
                           </div>
                         )}
-
-                        {/* Action Buttons */}
-                        <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
-                          <Button
-                            onClick={() => handleViewReceipt(card.order, card.type)}
-                            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
-                          >
-                            <FileText className="h-4 w-4 mr-2" />
-                            View Receipt
-                          </Button>
-                          
-                          {card.type === 'event' && (
-                            <Button 
-                              onClick={() => handleViewTickets(card.order)}
-                              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                            >
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Tickets
-                            </Button>
-                          )}
-                        </div>
                       </CardContent>
                     </Card>
-                  ))}
+                  )})}
                 </div>
 
                 {/* Pagination Controls */}
@@ -1841,81 +1513,94 @@ const MyOrdersPage = () => {
             </Button>
           }
         >
-          {selectedOrder && (
-            <div className="space-y-4">
-              <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-lg mb-2">Order #{selectedOrder.id.slice(0, 8)} - {selectedType.toUpperCase()}</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p><strong>Date:</strong> {format(new Date(selectedOrder.created_at), 'PPP')}</p>
-                    <p><strong>Status:</strong> {selectedOrder.payment_status}</p>
-                  </div>
-                  <div>
-                    <p><strong>Payment:</strong> {selectedOrder.payment_method}</p>
-                    <p>
-                      <strong>Total:</strong> 
-                      <PriceDisplay 
-                        amount={computeTypeSubtotalsFull(selectedOrder)[selectedType]} 
-                        originalCurrency="USD"
-                        showOriginal={true}
-                      />
-                    </p>
+          {selectedOrder && (() => {
+            const { subtotal, taxAmount, processingFee, total, filteredItems } = calculateReceiptTotals(selectedOrder, selectedType);
+            const orderCurrency = safeCurrency(selectedOrder.currency);
+            const currencySymbol = orderCurrency === 'ZMW' ? 'K' : '$';
+            
+            return (
+              <div className="space-y-4">
+                <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg">
+                  <h3 className="font-semibold text-lg mb-2">Order #{selectedOrder.id.slice(0, 8)} - {selectedType.toUpperCase()}</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p><strong>Date:</strong> {format(new Date(selectedOrder.created_at), 'PPP')}</p>
+                      <p><strong>Status:</strong> {selectedOrder.payment_status}</p>
+                    </div>
+                    <div>
+                      <p><strong>Payment:</strong> {selectedOrder.payment_method}</p>
+                      <p>
+                        <strong>Total:</strong> {currencySymbol}{computeTypeSubtotalsFull(selectedOrder)[selectedType].toFixed(2)}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-              
-              <div>
-                <h4 className="font-semibold mb-2">Items:</h4>
-                <div className="space-y-2">
-                  {selectedOrder.order_items
-                    .filter(item => {
-                      if (selectedType === 'event') return item.item_type === 'event' || item.item_type === 'event_ticket';
-                      if (selectedType === 'course') return item.item_type === 'course';
-                      if (selectedType === 'gift') return item.item_type === 'gift_card';
-                      return true;
-                    })
-                    .map((item) => (
+                
+                <div>
+                  <h4 className="font-semibold mb-2">Items:</h4>
+                  <div className="space-y-2">
+                    {filteredItems.map((item) => (
                       <div key={item.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
                         <div>
                           <p className="font-medium">{item.item_name}</p>
-                          <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                          <p className="text-sm text-gray-600">Qty: {item.quantity} × {currencySymbol}{safeNumber(item.unit_price).toFixed(2)}</p>
                         </div>
                         <p className="font-semibold">
-                          <PriceDisplay 
-                            amount={safeNumber(item.total_price)} 
-                            originalCurrency="USD"
-                            showOriginal={true}
-                          />
+                          {currencySymbol}{safeNumber(item.total_price).toFixed(2)}
                         </p>
                       </div>
                     ))}
+                  </div>
+                  
+                  {selectedType === 'gift' && selectedOrder.gift_cards && selectedOrder.gift_cards.length > 0 && (
+                    <div className="mt-4">
+                      <h5 className="font-semibold mb-2">Gift Card Details:</h5>
+                      <div className="space-y-2">
+                        {selectedOrder.gift_cards.map((gift) => {
+                          const giftCurrency = safeCurrency(gift.currency);
+                          const giftCurrencySymbol = giftCurrency === 'ZMW' ? 'K' : '$';
+                          
+                          return (
+                          <div key={gift.id} className="p-3 bg-gray-50 rounded">
+                            <p className="font-medium">Code: {obfuscateGiftCode(gift.gift_card_code)}</p>
+                            <p className="text-sm text-gray-600">Recipient: {gift.recipient_name} ({gift.recipient_email})</p>
+                            <p className="text-sm text-gray-600">Status: {gift.status.toUpperCase()}</p>
+                            <p className="text-sm text-gray-600">Expires: {format(new Date(gift.expires_at), 'PPP')}</p>
+                            <p className="font-semibold">
+                              Amount: {giftCurrencySymbol}{safeNumber(gift.amount).toFixed(2)}
+                            </p>
+                          </div>
+                        )})}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                
-                {selectedType === 'gift' && selectedOrder.gift_cards && selectedOrder.gift_cards.length > 0 && (
-                  <div className="mt-4">
-                    <h5 className="font-semibold mb-2">Gift Card Details:</h5>
-                    <div className="space-y-2">
-                      {selectedOrder.gift_cards.map((gift) => (
-                        <div key={gift.id} className="p-3 bg-gray-50 rounded">
-                          <p className="font-medium">Code: {obfuscateGiftCode(gift.gift_card_code)}</p>
-                          <p className="text-sm text-gray-600">Recipient: {gift.recipient_name} ({gift.recipient_email})</p>
-                          <p className="text-sm text-gray-600">Status: {gift.status.toUpperCase()}</p>
-                          <p className="text-sm text-gray-600">Expires: {format(new Date(gift.expires_at), 'PPP')}</p>
-                          <p className="font-semibold">
-                            Amount: <PriceDisplay 
-                              amount={safeNumber(gift.amount)} 
-                              originalCurrency={safeCurrency(gift.currency)} 
-                              showOriginal={true}
-                            />
-                          </p>
-                        </div>
-                      ))}
+
+                {/* Receipt Summary */}
+                <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg mt-4">
+                  <h4 className="font-semibold mb-3">Receipt Summary</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>Subtotal:</span>
+                      <span>{currencySymbol}{subtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Tax (1.5%):</span>
+                      <span>{currencySymbol}{taxAmount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Processing Fee (2.9%):</span>
+                      <span>{currencySymbol}{processingFee.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold border-t pt-2">
+                      <span>Total:</span>
+                      <span>{currencySymbol}{total.toFixed(2)}</span>
                     </div>
                   </div>
-                )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </Modal>
       </div>
     </Layout>
