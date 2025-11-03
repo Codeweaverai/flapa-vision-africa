@@ -126,6 +126,21 @@ interface TicketData {
   ticket_status?: string;
 }
 
+// Custom PriceDisplay component for React Native PDF
+const PDFPriceDisplay: React.FC<{
+  amount: string;
+  originalCurrency: CurrencyCode;
+  style?: any;
+  showOriginalCurrency?: boolean;
+}> = ({ amount, originalCurrency, style, showOriginalCurrency = true }) => {
+  return (
+    <Text style={style}>
+      {amount}
+      {showOriginalCurrency && originalCurrency && ` ${originalCurrency}`}
+    </Text>
+  );
+};
+
 // PDF Styles
 const styles = StyleSheet.create({
   page: {
@@ -466,10 +481,18 @@ const ReceiptPDF: React.FC<{
                 <Text>{item.quantity}</Text>
               </View>
               <View style={styles.colUnitPrice}>
-                <Text>{formatCurrencyForPDF(safeNumber(item.unit_price), orderCurrency)}</Text>
+                <PDFPriceDisplay 
+                  amount={formatCurrencyForPDF(safeNumber(item.unit_price), orderCurrency)}
+                  originalCurrency={orderCurrency}
+                  showOriginalCurrency={false}
+                />
               </View>
               <View style={styles.colAmount}>
-                <Text>{formatCurrencyForPDF(safeNumber(item.total_price), orderCurrency)}</Text>
+                <PDFPriceDisplay 
+                  amount={formatCurrencyForPDF(safeNumber(item.total_price), orderCurrency)}
+                  originalCurrency={orderCurrency}
+                  showOriginalCurrency={false}
+                />
               </View>
             </View>
           ))}
@@ -489,9 +512,12 @@ const ReceiptPDF: React.FC<{
                 </View>
                 <View style={styles.giftCardRow}>
                   <Text>Amount:</Text>
-                  <Text style={{ fontWeight: 'bold' }}>
-                    {formatCurrencyForPDF(safeNumber(gift.amount), safeCurrency(gift.currency))}
-                  </Text>
+                  <PDFPriceDisplay 
+                    amount={formatCurrencyForPDF(safeNumber(gift.amount), safeCurrency(gift.currency))}
+                    originalCurrency={safeCurrency(gift.currency)}
+                    showOriginalCurrency={false}
+                    style={{ fontWeight: 'bold' }}
+                  />
                 </View>
                 <View style={styles.giftCardRow}>
                   <Text>Recipient:</Text>
@@ -519,21 +545,36 @@ const ReceiptPDF: React.FC<{
           <View style={styles.totalsGrid}>
             <View style={styles.totalRow}>
               <Text>Subtotal:</Text>
-              <Text>{formatCurrencyForPDF(subtotal, "USD")}</Text>
+              <PDFPriceDisplay 
+                amount={formatCurrencyForPDF(subtotal, "USD")}
+                originalCurrency="USD"
+                showOriginalCurrency={false}
+              />
             </View>
             <View style={styles.totalRow}>
               <Text>Tax (1.5%):</Text>
-              <Text>{formatCurrencyForPDF(taxAmount, "USD")}</Text>
+              <PDFPriceDisplay 
+                amount={formatCurrencyForPDF(taxAmount, "USD")}
+                originalCurrency="USD"
+                showOriginalCurrency={false}
+              />
             </View>
             <View style={styles.totalRow}>
               <Text>Processing Fee (2.9%):</Text>
-              <Text>{formatCurrencyForPDF(processingFee, "USD")}</Text>
+              <PDFPriceDisplay 
+                amount={formatCurrencyForPDF(processingFee, "USD")}
+                originalCurrency="USD"
+                showOriginalCurrency={false}
+              />
             </View>
             <View style={[styles.totalRow, styles.grandTotal]}>
               <Text style={{ fontWeight: 'bold' }}>TOTAL AMOUNT:</Text>
-              <Text style={styles.grandTotalAmount}>
-                {formatCurrencyForPDF(total, orderCurrency)}
-              </Text>
+              <PDFPriceDisplay 
+                amount={formatCurrencyForPDF(total, orderCurrency)}
+                originalCurrency={orderCurrency}
+                showOriginalCurrency={false}
+                style={styles.grandTotalAmount}
+              />
             </View>
           </View>
         </View>
@@ -1125,7 +1166,7 @@ const MyOrdersPage = () => {
                           <div className="text-right">
                             <PriceDisplay 
                               amount={card.subtotal} 
-                              originalCurrency="USD"
+                              originalCurrency={orderCurrency}
                               className="text-2xl font-bold text-white"
                             />
                             {getStatusBadge(card.order.payment_status)}
@@ -1291,7 +1332,7 @@ const MyOrdersPage = () => {
                                     <div>
                                       <PriceDisplay 
                                         amount={safeNumber(gift.amount)} 
-                                        originalCurrency="USD"
+                                        originalCurrency={giftCurrency}
                                         className="text-xl font-semibold text-gray-900 mb-1"
                                       />
                                       <p className="font-mono text-sm text-gray-600">
@@ -1488,7 +1529,7 @@ const MyOrdersPage = () => {
                       <p>
                         <strong>Total:</strong> <PriceDisplay 
                           amount={computeTypeSubtotalsFull(selectedOrder)[selectedType]} 
-                          originalCurrency="USD"
+                          originalCurrency={orderCurrency}
                           className="font-semibold"
                         />
                       </p>
@@ -1506,14 +1547,14 @@ const MyOrdersPage = () => {
                           <p className="text-sm text-gray-600">
                             Qty: {item.quantity} × <PriceDisplay 
                               amount={safeNumber(item.unit_price)} 
-                              originalCurrency="USD"
+                              originalCurrency={orderCurrency}
                               className="inline"
                             />
                           </p>
                         </div>
                         <PriceDisplay 
                           amount={safeNumber(item.total_price)} 
-                          originalCurrency="USD"
+                          originalCurrency={orderCurrency}
                           className="font-semibold"
                         />
                       </div>
@@ -1534,7 +1575,7 @@ const MyOrdersPage = () => {
                             <p className="text-sm text-gray-600">Expires: {format(new Date(gift.expires_at), 'PPP')}</p>
                             <PriceDisplay 
                               amount={safeNumber(gift.amount)} 
-                              originalCurrency="USD"
+                              originalCurrency={giftCurrency}
                               className="font-semibold"
                             />
                           </div>
@@ -1552,7 +1593,7 @@ const MyOrdersPage = () => {
                       <span>Subtotal:</span>
                       <PriceDisplay 
                         amount={subtotal} 
-                        originalCurrency="USD"
+                        originalCurrency={orderCurrency}
                         className="font-medium"
                       />
                     </div>
@@ -1560,7 +1601,7 @@ const MyOrdersPage = () => {
                       <span>Tax (1.5%):</span>
                       <PriceDisplay 
                         amount={taxAmount} 
-                        originalCurrency="USD"
+                        originalCurrency={orderCurrency}
                         className="font-medium"
                       />
                     </div>
@@ -1568,7 +1609,7 @@ const MyOrdersPage = () => {
                       <span>Processing Fee (2.9%):</span>
                       <PriceDisplay 
                         amount={processingFee} 
-                        originalCurrency="USD"
+                        originalCurrency={orderCurrency}
                         className="font-medium"
                       />
                     </div>
