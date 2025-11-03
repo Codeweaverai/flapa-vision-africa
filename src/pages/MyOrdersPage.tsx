@@ -14,8 +14,7 @@ import PriceDisplay from '@/components/currency/PriceDisplay';
 import { CurrencyCode, SUPPORTED_CURRENCIES } from '@/constants/currencies';
 
 // React PDF Components
-import { Document, Page, Text, View, StyleSheet, pdf, Font, Image } from '@react-pdf/renderer';
-import { saveAs } from 'file-saver';
+import { Document, Page, Text, View, StyleSheet, pdf, Font } from '@react-pdf/renderer';
 
 declare global {
   interface Window {
@@ -730,6 +729,18 @@ const buildCards = (orders: Order[]): OrderCard[] => {
   return cards;
 };
 
+// Native file download utility
+const downloadPDF = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 const MyOrdersPage = () => {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -1045,7 +1056,7 @@ const MyOrdersPage = () => {
         />
       ).toBlob();
       
-      saveAs(blob, `invoice-${selectedOrder.id.slice(0, 8)}.pdf`);
+      downloadPDF(blob, `invoice-${selectedOrder.id.slice(0, 8)}.pdf`);
       toast.success('Invoice downloaded successfully!');
     } catch (error) {
       console.error('Error generating PDF:', error);
