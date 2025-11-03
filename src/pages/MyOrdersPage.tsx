@@ -702,7 +702,6 @@ const MyOrdersPage = () => {
     
     const { subtotal, taxAmount, processingFee, total, filteredItems } = calculateReceiptTotals(selectedOrder, selectedType);
     const orderCurrency = safeCurrency(selectedOrder.currency);
-    const currencySymbol = orderCurrency === 'ZMW' ? 'K' : '$';
     
     const receiptHTML = `
       <!DOCTYPE html>
@@ -1028,8 +1027,8 @@ const MyOrdersPage = () => {
                       <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">${item.item_type.replace('_', ' ').toUpperCase()}</div>
                     </td>
                     <td>${item.quantity}</td>
-                    <td>${currencySymbol}${safeNumber(item.unit_price).toFixed(2)}</td>
-                    <td style="font-weight: 600; color: #f97316;">${currencySymbol}${safeNumber(item.total_price).toFixed(2)}</td>
+                    <td>${new Intl.NumberFormat('en-US', { style: 'currency', currency: orderCurrency }).format(safeNumber(item.unit_price))}</td>
+                    <td style="font-weight: 600; color: #f97316;">${new Intl.NumberFormat('en-US', { style: 'currency', currency: orderCurrency }).format(safeNumber(item.total_price))}</td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -1039,7 +1038,9 @@ const MyOrdersPage = () => {
           ${selectedType === 'gift' && selectedOrder.gift_cards && selectedOrder.gift_cards.length > 0 ? `
             <div class="items-section">
               <h3 class="section-title">Gift Card Details</h3>
-              ${selectedOrder.gift_cards.map(gift => `
+              ${selectedOrder.gift_cards.map(gift => {
+                const giftCurrency = safeCurrency(gift.currency);
+                return `
                 <div style="background: #f8fafc; padding: 20px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #e2e8f0;">
                   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                     <div>
@@ -1048,7 +1049,7 @@ const MyOrdersPage = () => {
                     </div>
                     <div>
                       <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Amount</div>
-                      <div style="font-weight: 600; color: #f97316;">${currencySymbol}${safeNumber(gift.amount).toFixed(2)}</div>
+                      <div style="font-weight: 600; color: #f97316;">${new Intl.NumberFormat('en-US', { style: 'currency', currency: giftCurrency }).format(safeNumber(gift.amount))}</div>
                     </div>
                     <div>
                       <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Recipient</div>
@@ -1067,7 +1068,7 @@ const MyOrdersPage = () => {
                     </div>
                   ` : ''}
                 </div>
-              `).join('')}
+              `}).join('')}
             </div>
           ` : ''}
 
@@ -1076,22 +1077,22 @@ const MyOrdersPage = () => {
             
             <div class="total-row">
               <span class="total-label">Subtotal</span>
-              <span class="total-value">${currencySymbol}${subtotal.toFixed(2)}</span>
+              <span class="total-value">${new Intl.NumberFormat('en-US', { style: 'currency', currency: orderCurrency }).format(subtotal)}</span>
             </div>
             
             <div class="total-row">
               <span class="total-label">Tax (1.5%)</span>
-              <span class="total-value">${currencySymbol}${taxAmount.toFixed(2)}</span>
+              <span class="total-value">${new Intl.NumberFormat('en-US', { style: 'currency', currency: orderCurrency }).format(taxAmount)}</span>
             </div>
 
             <div class="total-row">
               <span class="total-label">Processing Fee (2.9%)</span>
-              <span class="total-value">${currencySymbol}${processingFee.toFixed(2)}</span>
+              <span class="total-value">${new Intl.NumberFormat('en-US', { style: 'currency', currency: orderCurrency }).format(processingFee)}</span>
             </div>
             
             <div class="total-row total-amount">
               <span>Total Amount</span>
-              <span>${currencySymbol}${total.toFixed(2)}</span>
+              <span>${new Intl.NumberFormat('en-US', { style: 'currency', currency: orderCurrency }).format(total)}</span>
             </div>
             
             <div class="tax-breakdown">
@@ -1172,7 +1173,6 @@ const MyOrdersPage = () => {
                 <div className="space-y-6">
                   {paginatedCards.map((card) => {
                     const orderCurrency = safeCurrency(card.order.currency);
-                    const currencySymbol = orderCurrency === 'ZMW' ? 'K' : '$';
                     
                     return (
                     <Card key={card.key} className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
@@ -1185,9 +1185,11 @@ const MyOrdersPage = () => {
                             </p>
                           </div>
                           <div className="text-right">
-                            <div className="text-2xl font-bold">
-                              {currencySymbol}{card.subtotal.toFixed(2)}
-                            </div>
+                            <PriceDisplay 
+                              amount={card.subtotal} 
+                              currency={orderCurrency}
+                              className="text-2xl font-bold text-white"
+                            />
                             {getStatusBadge(card.order.payment_status)}
                           </div>
                         </div>
@@ -1195,7 +1197,9 @@ const MyOrdersPage = () => {
                       
                       <CardContent className="p-6">
                         {/* Event content - Show individual tickets */}
-                        {card.type === 'event' && card.items.map((booking: any) => (
+                        {card.type === 'event' && card.items.map((booking: any) => {
+                          const eventCurrency = safeCurrency(booking.event?.currency || card.order.currency);
+                          return (
                           <div key={booking.id} className="border-b border-gray-200 last:border-b-0 pb-6 last:pb-0 mb-6 last:mb-0">
                             <div className="flex flex-col lg:flex-row gap-6">
                               {booking.event?.image_url && (
@@ -1240,7 +1244,11 @@ const MyOrdersPage = () => {
                                       </p>
                                       {booking.event_ticket?.price && (
                                         <p className="text-sm text-orange-700 font-semibold">
-                                          Price: {currencySymbol}{safeNumber(booking.event_ticket.price).toFixed(2)}
+                                          Price: <PriceDisplay 
+                                            amount={safeNumber(booking.event_ticket.price)} 
+                                            currency={eventCurrency}
+                                            className="inline"
+                                          />
                                         </p>
                                       )}
                                     </div>
@@ -1273,10 +1281,12 @@ const MyOrdersPage = () => {
                               </div>
                             </div>
                           </div>
-                        ))}
+                        )})}
 
                         {/* Course content */}
-                        {card.type === 'course' && card.items.map((enrollment: any) => (
+                        {card.type === 'course' && card.items.map((enrollment: any) => {
+                          const courseCurrency = safeCurrency(card.order.currency);
+                          return (
                           <div key={enrollment.id} className="border-b border-gray-200 last:border-b-0 pb-6 last:pb-0 mb-6 last:mb-0">
                             <div className="flex flex-col lg:flex-row gap-6">
                               {enrollment.course?.thumbnail_url && (
@@ -1303,7 +1313,11 @@ const MyOrdersPage = () => {
 
                                 {enrollment.course?.price && (
                                   <p className="text-sm text-purple-700 font-semibold mb-4">
-                                    Price: {currencySymbol}{safeNumber(enrollment.course.price).toFixed(2)}
+                                    Price: <PriceDisplay 
+                                      amount={safeNumber(enrollment.course.price)} 
+                                      currency={courseCurrency}
+                                      className="inline"
+                                    />
                                   </p>
                                 )}
                                 
@@ -1325,20 +1339,24 @@ const MyOrdersPage = () => {
                               </div>
                             </div>
                           </div>
-                        ))}
+                        )})}
 
                         {/* Gift card content */}
                         {card.type === 'gift' && (
                           <div className="bg-gradient-to-r from-orange-50 via-purple-50 to-pink-50 p-6 rounded-lg border border-orange-200">
                             <h4 className="text-lg font-semibold text-gray-900 mb-4">Gift Cards</h4>
                             <div className="space-y-4">
-                              {(card.items as GiftCard[]).map((gift) => (
+                              {(card.items as GiftCard[]).map((gift) => {
+                                const giftCurrency = safeCurrency(gift.currency || card.order.currency);
+                                return (
                                 <div key={gift.id} className="bg-white p-4 rounded-lg shadow-sm">
                                   <div className="flex justify-between items-start mb-3">
                                     <div>
-                                      <div className="text-xl font-semibold text-gray-900 mb-1">
-                                        {currencySymbol}{safeNumber(gift.amount).toFixed(2)}
-                                      </div>
+                                      <PriceDisplay 
+                                        amount={safeNumber(gift.amount)} 
+                                        currency={giftCurrency}
+                                        className="text-xl font-semibold text-gray-900 mb-1"
+                                      />
                                       <p className="font-mono text-sm text-gray-600">
                                         Code: {obfuscateGiftCode(gift.gift_card_code)}
                                       </p>
@@ -1368,7 +1386,7 @@ const MyOrdersPage = () => {
                                     </div>
                                   )}
                                 </div>
-                              ))}
+                              )})}
                             </div>
                             <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
                               <Button
@@ -1590,7 +1608,6 @@ const MyOrdersPage = () => {
           {selectedOrder && (() => {
             const { subtotal, taxAmount, processingFee, total, filteredItems } = calculateReceiptTotals(selectedOrder, selectedType);
             const orderCurrency = safeCurrency(selectedOrder.currency);
-            const currencySymbol = orderCurrency === 'ZMW' ? 'K' : '$';
             
             return (
               <div className="space-y-4">
@@ -1604,7 +1621,11 @@ const MyOrdersPage = () => {
                     <div>
                       <p><strong>Payment:</strong> {selectedOrder.payment_method}</p>
                       <p>
-                        <strong>Total:</strong> {currencySymbol}{computeTypeSubtotalsFull(selectedOrder)[selectedType].toFixed(2)}
+                        <strong>Total:</strong> <PriceDisplay 
+                          amount={computeTypeSubtotalsFull(selectedOrder)[selectedType]} 
+                          currency={orderCurrency}
+                          className="font-semibold"
+                        />
                       </p>
                     </div>
                   </div>
@@ -1617,11 +1638,19 @@ const MyOrdersPage = () => {
                       <div key={item.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
                         <div>
                           <p className="font-medium">{item.item_name}</p>
-                          <p className="text-sm text-gray-600">Qty: {item.quantity} × {currencySymbol}{safeNumber(item.unit_price).toFixed(2)}</p>
+                          <p className="text-sm text-gray-600">
+                            Qty: {item.quantity} × <PriceDisplay 
+                              amount={safeNumber(item.unit_price)} 
+                              currency={orderCurrency}
+                              className="inline"
+                            />
+                          </p>
                         </div>
-                        <p className="font-semibold">
-                          {currencySymbol}{safeNumber(item.total_price).toFixed(2)}
-                        </p>
+                        <PriceDisplay 
+                          amount={safeNumber(item.total_price)} 
+                          currency={orderCurrency}
+                          className="font-semibold"
+                        />
                       </div>
                     ))}
                   </div>
@@ -1631,18 +1660,18 @@ const MyOrdersPage = () => {
                       <h5 className="font-semibold mb-2">Gift Card Details:</h5>
                       <div className="space-y-2">
                         {selectedOrder.gift_cards.map((gift) => {
-                          const giftCurrency = safeCurrency(gift.currency);
-                          const giftCurrencySymbol = giftCurrency === 'ZMW' ? 'K' : '$';
-                          
+                          const giftCurrency = safeCurrency(gift.currency || selectedOrder.currency);
                           return (
                           <div key={gift.id} className="p-3 bg-gray-50 rounded">
                             <p className="font-medium">Code: {obfuscateGiftCode(gift.gift_card_code)}</p>
                             <p className="text-sm text-gray-600">Recipient: {gift.recipient_name} ({gift.recipient_email})</p>
                             <p className="text-sm text-gray-600">Status: {gift.status.toUpperCase()}</p>
                             <p className="text-sm text-gray-600">Expires: {format(new Date(gift.expires_at), 'PPP')}</p>
-                            <p className="font-semibold">
-                              Amount: {giftCurrencySymbol}{safeNumber(gift.amount).toFixed(2)}
-                            </p>
+                            <PriceDisplay 
+                              amount={safeNumber(gift.amount)} 
+                              currency={giftCurrency}
+                              className="font-semibold"
+                            />
                           </div>
                         )})}
                       </div>
@@ -1656,19 +1685,35 @@ const MyOrdersPage = () => {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>Subtotal:</span>
-                      <span>{currencySymbol}{subtotal.toFixed(2)}</span>
+                      <PriceDisplay 
+                        amount={subtotal} 
+                        currency={orderCurrency}
+                        className="font-medium"
+                      />
                     </div>
                     <div className="flex justify-between">
                       <span>Tax (1.5%):</span>
-                      <span>{currencySymbol}{taxAmount.toFixed(2)}</span>
+                      <PriceDisplay 
+                        amount={taxAmount} 
+                        currency={orderCurrency}
+                        className="font-medium"
+                      />
                     </div>
                     <div className="flex justify-between">
                       <span>Processing Fee (2.9%):</span>
-                      <span>{currencySymbol}{processingFee.toFixed(2)}</span>
+                      <PriceDisplay 
+                        amount={processingFee} 
+                        currency={orderCurrency}
+                        className="font-medium"
+                      />
                     </div>
                     <div className="flex justify-between font-semibold border-t pt-2">
                       <span>Total:</span>
-                      <span>{currencySymbol}{total.toFixed(2)}</span>
+                      <PriceDisplay 
+                        amount={total} 
+                        currency={orderCurrency}
+                        className="font-bold"
+                      />
                     </div>
                   </div>
                 </div>
