@@ -123,7 +123,7 @@ interface TicketData {
   ticket_status?: string;
 }
 
-// Receipt Component for Printing
+// Professional Invoice-style Receipt Component
 const ReceiptPrintComponent: React.FC<{
   selectedOrder: Order;
   selectedType: 'event' | 'course' | 'gift';
@@ -161,214 +161,182 @@ const ReceiptPrintComponent: React.FC<{
   const orderCurrency = safeCurrency(selectedOrder.currency);
   
   return (
-    <div className="receipt-print-container">
-      <div className="receipt-container">
-        <div className="receipt-watermark">SKILLPULSE</div>
-        
-        <div className="receipt-header">
-          <div className="company-logo">SkillPulse Innovations Limited</div>
-          <div className="company-subtitle">Elevating Skills, Empowering Futures</div>
-          <div className="receipt-title">PAYMENT RECEIPT</div>
-          <div className="order-type-badge">{selectedType.toUpperCase()} ORDER</div>
-        </div>
-        
-        <div className="order-info">
-          <div>
-            <div className="info-item">
-              <div className="info-label">Order Date</div>
-              <div className="info-value">{format(new Date(selectedOrder.created_at), 'PPPP')}</div>
-            </div>
-            <div className="info-item">
-              <div className="info-label">Order Number</div>
-              <div className="info-value">#{selectedOrder.id.slice(0, 8).toUpperCase()}</div>
-            </div>
-            <div className="info-item">
-              <div className="info-label">Customer</div>
-              <div className="info-value">{selectedOrder.user_name || selectedOrder.email}</div>
-            </div>
-          </div>
-          <div>
-            <div className="info-item">
-              <div className="info-label">Payment Method</div>
-              <div className="info-value">{selectedOrder.payment_method || 'Mobile Money'}</div>
-            </div>
-            <div className="info-item">
-              <div className="info-label">Payment Status</div>
-              <div className="info-value">
-                <span style={{ color: '#16a34a', fontWeight: '600' }}>
-                  {selectedOrder.payment_status.toUpperCase()}
-                </span>
-              </div>
-            </div>
-            <div className="info-item">
-              <div className="info-label">Currency</div>
-              <div className="info-value">{orderCurrency}</div>
-            </div>
+    <div className="invoice-container">
+      {/* Header Section */}
+      <div className="invoice-header">
+        <div className="company-info">
+          <h1 className="company-name">SKILLPULSE INNOVATIONS LIMITED</h1>
+          <div className="company-details">
+            <p>Elevating Skills, Empowering Futures</p>
+            <p>support@skillpulse.cloud | +260976972874</p>
+            <p>www.skillpulse.cloud</p>
           </div>
         </div>
+        <div className="invoice-title-section">
+          <h2 className="invoice-title">INVOICE</h2>
+          <div className="invoice-badge">{selectedType.toUpperCase()} ORDER</div>
+        </div>
+      </div>
 
-        <div className="items-section">
-          <h3 className="section-title">Order Items</h3>
-          <table className="items-table">
-            <thead>
-              <tr>
-                <th>Item Description</th>
-                <th>Qty</th>
-                <th>Unit Price</th>
-                <th>Amount</th>
+      {/* Invoice Details */}
+      <div className="invoice-details">
+        <div className="detail-section">
+          <h3>BILL TO:</h3>
+          <p className="customer-name">{selectedOrder.user_name || selectedOrder.email}</p>
+          <p>{selectedOrder.email}</p>
+        </div>
+        <div className="detail-section">
+          <div className="detail-row">
+            <span className="detail-label">INVOICE NO:</span>
+            <span className="detail-value">#{selectedOrder.id.slice(0, 8).toUpperCase()}</span>
+          </div>
+          <div className="detail-row">
+            <span className="detail-label">DATE ISSUED:</span>
+            <span className="detail-value">{format(new Date(selectedOrder.created_at), 'dd/MM/yyyy')}</span>
+          </div>
+          <div className="detail-row">
+            <span className="detail-label">PAYMENT STATUS:</span>
+            <span className={`status-badge ${selectedOrder.payment_status}`}>
+              {selectedOrder.payment_status.toUpperCase()}
+            </span>
+          </div>
+          <div className="detail-row">
+            <span className="detail-label">PAYMENT METHOD:</span>
+            <span className="detail-value">{selectedOrder.payment_method || 'Mobile Money'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Items Table */}
+      <div className="items-section">
+        <table className="items-table">
+          <thead>
+            <tr>
+              <th className="text-left">DESCRIPTION</th>
+              <th className="text-center">QTY</th>
+              <th className="text-right">UNIT PRICE</th>
+              <th className="text-right">AMOUNT</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredItems.map((item, index) => (
+              <tr key={item.id} className={index % 2 === 0 ? 'even' : 'odd'}>
+                <td className="item-description">
+                  <div className="item-name">{item.item_name}</div>
+                  <div className="item-type">{item.item_type.replace('_', ' ').toUpperCase()}</div>
+                </td>
+                <td className="text-center">{item.quantity}</td>
+                <td className="text-right">
+                  <PriceDisplay 
+                    amount={safeNumber(item.unit_price)} 
+                    originalCurrency="USD"
+                    className="unit-price"
+                  />
+                </td>
+                <td className="text-right">
+                  <PriceDisplay 
+                    amount={safeNumber(item.total_price)} 
+                    originalCurrency="USD"
+                    className="amount"
+                  />
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {filteredItems.map((item) => (
-                <tr key={item.id}>
-                  <td>
-                    <div style={{ fontWeight: '600', color: '#1f2937' }}>{item.item_name}</div>
-                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
-                      {item.item_type.replace('_', ' ').toUpperCase()}
-                    </div>
-                  </td>
-                  <td>{item.quantity}</td>
-                  <td>
-                    <PriceDisplay 
-                      amount={safeNumber(item.unit_price)} 
-                      originalCurrency="USD"
-                      className="text-sm"
-                    />
-                  </td>
-                  <td style={{ fontWeight: '600', color: '#f97316' }}>
-                    <PriceDisplay 
-                      amount={safeNumber(item.total_price)} 
-                      originalCurrency="USD"
-                      className="text-sm"
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-        {selectedType === 'gift' && selectedOrder.gift_cards && selectedOrder.gift_cards.length > 0 && (
-          <div className="items-section">
-            <h3 className="section-title">Gift Card Details</h3>
-            {selectedOrder.gift_cards.map((gift) => {
-              const giftCurrency = safeCurrency(gift.currency);
-              return (
-                <div key={gift.id} style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', marginBottom: '10px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                    <div>
-                      <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>Gift Card Code</div>
-                      <div style={{ fontFamily: 'monospace', fontWeight: '600', color: '#1f2937', fontSize: '12px' }}>
-                        {obfuscateGiftCode(gift.gift_card_code)}
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>Amount</div>
-                      <div style={{ fontWeight: '600', color: '#f97316', fontSize: '12px' }}>
-                        <PriceDisplay 
-                          amount={safeNumber(gift.amount)} 
-                          originalCurrency="USD"
-                          className="text-xs"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>Recipient</div>
-                      <div style={{ fontWeight: '500', color: '#1f2937', fontSize: '12px' }}>{gift.recipient_name}</div>
-                      <div style={{ fontSize: '11px', color: '#6b7280' }}>{gift.recipient_email}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>Expires</div>
-                      <div style={{ fontWeight: '500', color: '#1f2937', fontSize: '12px' }}>
-                        {format(new Date(gift.expires_at), 'PP')}
-                      </div>
-                    </div>
-                  </div>
-                  {gift.personal_message && (
-                    <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed #e2e8f0' }}>
-                      <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>Personal Message</div>
-                      <div style={{ fontStyle: 'italic', color: '#475569', fontSize: '11px' }}>"{gift.personal_message}"</div>
-                    </div>
-                  )}
+      {/* Gift Card Details */}
+      {selectedType === 'gift' && selectedOrder.gift_cards && selectedOrder.gift_cards.length > 0 && (
+        <div className="gift-cards-section">
+          <h3>GIFT CARD DETAILS</h3>
+          <div className="gift-cards-grid">
+            {selectedOrder.gift_cards.map((gift) => (
+              <div key={gift.id} className="gift-card">
+                <div className="gift-card-row">
+                  <span>Gift Card Code:</span>
+                  <strong>{obfuscateGiftCode(gift.gift_card_code)}</strong>
                 </div>
-              );
-            })}
-          </div>
-        )}
-
-        <div className="total-section">
-          <h3 className="section-title" style={{ borderBottom: 'none', marginBottom: '0' }}>Payment Summary</h3>
-          
-          <div className="total-row">
-            <span className="total-label">Subtotal</span>
-            <span className="total-value">
-              <PriceDisplay 
-                amount={subtotal} 
-                originalCurrency="USD"
-                className="font-medium text-sm"
-              />
-            </span>
-          </div>
-          
-          <div className="total-row">
-            <span className="total-label">Tax (1.5%)</span>
-            <span className="total-value">
-              <PriceDisplay 
-                amount={taxAmount} 
-                originalCurrency="USD"
-                className="font-medium text-sm"
-              />
-            </span>
-          </div>
-
-          <div className="total-row">
-            <span className="total-label">Processing Fee (2.9%)</span>
-            <span className="total-value">
-              <PriceDisplay 
-                amount={processingFee} 
-                originalCurrency="USD"
-                className="font-medium text-sm"
-              />
-            </span>
-          </div>
-          
-          <div className="total-row total-amount">
-            <span>Total Amount</span>
-            <span>
-              <PriceDisplay 
-                amount={total} 
-                originalCurrency={orderCurrency}
-                className="font-bold text-lg"
-              />
-            </span>
-          </div>
-          
-          <div className="tax-breakdown">
-            <div className="tax-title">Fee Breakdown</div>
-            <div style={{ fontSize: '11px', color: '#6b7280', lineHeight: '1.4' }}>
-              This receipt is inclusive of tax and payment processing fee. 
-              Tax registration number: VAT-{selectedOrder.id.slice(0, 8).toUpperCase()}-SL
-            </div>
+                <div className="gift-card-row">
+                  <span>Amount:</span>
+                  <PriceDisplay 
+                    amount={safeNumber(gift.amount)} 
+                    originalCurrency="USD"
+                    className="gift-amount"
+                  />
+                </div>
+                <div className="gift-card-row">
+                  <span>Recipient:</span>
+                  <span>{gift.recipient_name} ({gift.recipient_email})</span>
+                </div>
+                <div className="gift-card-row">
+                  <span>Expires:</span>
+                  <span>{format(new Date(gift.expires_at), 'dd/MM/yyyy')}</span>
+                </div>
+                {gift.personal_message && (
+                  <div className="gift-message">
+                    <span>Personal Message:</span>
+                    <em>"{gift.personal_message}"</em>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
+      )}
 
-        <div className="footer">
-          <div className="thank-you">Thank you for your business!</div>
-          <div style={{ marginBottom: '10px', fontSize: '11px' }}>
-            SkillPulse Innovations Limited • support@skillpulse.cloud<br />
-            +260976972874 • www.skillpulse.cloud
+      {/* Totals Section */}
+      <div className="totals-section">
+        <div className="totals-grid">
+          <div className="total-row">
+            <span>Subtotal:</span>
+            <PriceDisplay 
+              amount={subtotal} 
+              originalCurrency="USD"
+              className="total-amount"
+            />
           </div>
-          <div style={{ fontSize: '10px' }}>
-            This receipt is computer generated and does not require a physical signature.<br />
-            For questions about this receipt, please contact our support team.
+          <div className="total-row">
+            <span>Tax (1.5%):</span>
+            <PriceDisplay 
+              amount={taxAmount} 
+              originalCurrency="USD"
+              className="total-amount"
+            />
           </div>
+          <div className="total-row">
+            <span>Processing Fee (2.9%):</span>
+            <PriceDisplay 
+              amount={processingFee} 
+              originalCurrency="USD"
+              className="total-amount"
+            />
+          </div>
+          <div className="total-row grand-total">
+            <span>TOTAL AMOUNT:</span>
+            <PriceDisplay 
+              amount={total} 
+              originalCurrency={orderCurrency}
+              className="grand-total-amount"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Footer Section */}
+      <div className="invoice-footer">
+        <div className="thank-you">Thank you for your business!</div>
+        <div className="footer-notes">
+          <p>This is a computer-generated invoice and does not require a physical signature.</p>
+          <p>Tax Registration Number: VAT-{selectedOrder.id.slice(0, 8).toUpperCase()}-SL</p>
+          <p>For questions about this invoice, please contact our support team at support@skillpulse.cloud</p>
         </div>
       </div>
     </div>
   );
 };
 
-// Print styles for the receipt
+// Professional Black & White Invoice Styles
 const printStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
   
@@ -379,250 +347,349 @@ const printStyles = `
       padding: 0;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
+      font-family: 'Inter', sans-serif;
     }
     
-    .receipt-container { 
-      box-shadow: none;
-      border: 1px solid #e5e7eb;
-      margin: 0 auto;
-      max-width: 100%;
-      page-break-inside: avoid;
-    }
-    
-    .receipt-print-container {
-      position: absolute;
-      left: 0;
-      top: 0;
-      width: 100%;
-      padding: 10px;
+    .invoice-container {
+      box-shadow: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
     }
   }
 
-  .receipt-print-container {
+  .invoice-container {
     font-family: 'Inter', sans-serif;
-    margin: 0;
-    padding: 20px 10px;
-    background: linear-gradient(135deg, #fef7ed 0%, #faf5ff 100%);
-    min-height: 100vh;
-    box-sizing: border-box;
-  }
-
-  .receipt-container {
-    max-width: 500px;
+    max-width: 800px;
     margin: 0 auto;
+    padding: 30px;
     background: white;
-    border-radius: 12px;
-    padding: 25px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-    position: relative;
-    overflow: hidden;
+    color: #000000;
+    line-height: 1.4;
   }
 
-  .receipt-watermark {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) rotate(-45deg);
-    font-size: 80px;
-    font-weight: 900;
-    color: rgba(249, 115, 22, 0.03);
-    z-index: 0;
-    white-space: nowrap;
-  }
-
-  .receipt-header {
-    text-align: center;
-    margin-bottom: 25px;
+  /* Header Styles */
+  .invoice-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 2px solid #000000;
     padding-bottom: 20px;
-    border-bottom: 2px solid #f97316;
-    position: relative;
-    z-index: 1;
+    margin-bottom: 30px;
   }
 
-  .company-logo {
+  .company-info {
+    flex: 1;
+  }
+
+  .company-name {
     font-size: 24px;
-    font-weight: 800;
-    background: linear-gradient(135deg, #f97316, #a855f7);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    margin-bottom: 5px;
-    letter-spacing: -0.5px;
+    font-weight: 700;
+    margin: 0 0 8px 0;
+    color: #000000;
+    letter-spacing: 0.5px;
   }
 
-  .company-subtitle {
-    color: #6b7280;
+  .company-details {
     font-size: 12px;
-    font-weight: 500;
-    margin-bottom: 15px;
+    color: #666666;
+    line-height: 1.5;
   }
 
-  .receipt-title {
-    font-size: 24px;
+  .invoice-title-section {
+    text-align: right;
+  }
+
+  .invoice-title {
+    font-size: 32px;
     font-weight: 800;
-    background: linear-gradient(135deg, #f97316, #a855f7);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    margin-bottom: 8px;
+    margin: 0 0 8px 0;
+    color: #000000;
+    letter-spacing: 1px;
   }
 
-  .order-type-badge {
-    background: linear-gradient(135deg, #f97316, #a855f7);
+  .invoice-badge {
+    background: #000000;
     color: white;
-    padding: 6px 15px;
-    border-radius: 15px;
-    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 11px;
     font-weight: 600;
     display: inline-block;
-    margin-bottom: 10px;
-  }
-
-  .order-info {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 15px;
-    margin-bottom: 25px;
-    padding: 20px;
-    background: linear-gradient(135deg, #fef7ed, #faf5ff);
-    border-radius: 12px;
-    border: 1px solid rgba(249, 115, 22, 0.1);
-    position: relative;
-    z-index: 1;
-  }
-
-  .info-item {
-    margin-bottom: 8px;
-  }
-
-  .info-label {
-    font-weight: 600;
-    color: #7c2d12;
-    font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    margin-bottom: 2px;
   }
 
-  .info-value {
-    color: #1f2937;
-    font-size: 13px;
-    font-weight: 500;
+  /* Invoice Details */
+  .invoice-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    margin-bottom: 30px;
   }
 
-  .items-section {
-    margin-bottom: 20px;
-    position: relative;
-    z-index: 1;
+  .detail-section h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 12px 0;
+    color: #000000;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
 
-  .section-title {
+  .customer-name {
     font-size: 16px;
-    font-weight: 700;
-    color: #1f2937;
-    margin-bottom: 15px;
-    padding-bottom: 8px;
-    border-bottom: 2px solid #f97316;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    color: #000000;
+  }
+
+  .detail-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 13px;
+  }
+
+  .detail-label {
+    font-weight: 500;
+    color: #666666;
+  }
+
+  .detail-value {
+    font-weight: 600;
+    color: #000000;
+  }
+
+  .status-badge {
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .status-badge.confirmed,
+  .status-badge.completed,
+  .status-badge.active {
+    background: #f0f0f0;
+    color: #000000;
+    border: 1px solid #000000;
+  }
+
+  .status-badge.pending {
+    background: #f0f0f0;
+    color: #666666;
+    border: 1px solid #666666;
+  }
+
+  /* Items Table */
+  .items-section {
+    margin-bottom: 30px;
   }
 
   .items-table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 8px;
-    background: white;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     font-size: 12px;
   }
 
   .items-table th {
-    background: linear-gradient(135deg, #f97316, #a855f7);
-    color: white;
+    background: #f8f8f8;
+    color: #000000;
     padding: 12px 8px;
-    text-align: left;
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #000000;
     font-size: 11px;
+  }
+
+  .items-table td {
+    padding: 12px 8px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  .items-table tr.even {
+    background: #fafafa;
+  }
+
+  .items-table tr.odd {
+    background: white;
+  }
+
+  .items-table tr:last-child td {
+    border-bottom: 2px solid #000000;
+  }
+
+  .item-description {
+    max-width: 250px;
+  }
+
+  .item-name {
+    font-weight: 600;
+    color: #000000;
+    margin-bottom: 2px;
+  }
+
+  .item-type {
+    font-size: 10px;
+    color: #666666;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .text-left { text-align: left; }
+  .text-center { text-align: center; }
+  .text-right { text-align: right; }
+
+  .unit-price,
+  .amount {
+    font-weight: 600;
+    color: #000000;
+  }
+
+  /* Gift Cards */
+  .gift-cards-section {
+    margin-bottom: 30px;
+    padding: 20px;
+    background: #f8f8f8;
+    border-radius: 4px;
+  }
+
+  .gift-cards-section h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 15px 0;
+    color: #000000;
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
 
-  .items-table td {
-    padding: 10px 8px;
-    border-bottom: 1px solid #f3f4f6;
+  .gift-cards-grid {
+    display: grid;
+    gap: 15px;
+  }
+
+  .gift-card {
+    padding: 15px;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+  }
+
+  .gift-card-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
     font-size: 12px;
   }
 
-  .items-table tr:last-child td {
-    border-bottom: none;
+  .gift-card-row span:first-child {
+    color: #666666;
+    font-weight: 500;
   }
 
-  .total-section {
-    background: linear-gradient(135deg, #fef7ed, #faf5ff);
-    padding: 20px;
-    border-radius: 12px;
-    border: 1px solid rgba(249, 115, 22, 0.1);
-    margin-top: 20px;
-    position: relative;
-    z-index: 1;
+  .gift-card-row span:last-child {
+    color: #000000;
+    font-weight: 600;
+  }
+
+  .gift-amount {
+    font-weight: 600;
+    color: #000000;
+  }
+
+  .gift-message {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed #e0e0e0;
+    font-size: 11px;
+    color: #666666;
+  }
+
+  .gift-message span {
+    font-weight: 500;
+    color: #666666;
+  }
+
+  .gift-message em {
+    color: #000000;
+    font-style: italic;
+  }
+
+  /* Totals Section */
+  .totals-section {
+    margin-bottom: 30px;
+  }
+
+  .totals-grid {
+    max-width: 300px;
+    margin-left: auto;
   }
 
   .total-row {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    padding: 6px 0;
+    padding: 8px 0;
     font-size: 13px;
+    border-bottom: 1px solid #e0e0e0;
   }
 
-  .total-label {
-    color: #6b7280;
+  .total-row:last-child {
+    border-bottom: none;
+  }
+
+  .total-row span {
+    color: #666666;
     font-weight: 500;
   }
 
-  .total-value {
-    color: #1f2937;
-    font-weight: 600;
-  }
-
   .total-amount {
-    font-size: 20px;
-    font-weight: 800;
-    color: #f97316;
-    margin-top: 8px;
-    padding-top: 12px;
-    border-top: 2px dashed #e5e7eb;
-  }
-
-  .tax-breakdown {
-    background: rgba(255,255,255,0.7);
-    padding: 15px;
-    border-radius: 8px;
-    margin-top: 15px;
-    border: 1px solid rgba(0,0,0,0.05);
-  }
-
-  .tax-title {
     font-weight: 600;
-    color: #374151;
-    margin-bottom: 8px;
-    font-size: 12px;
+    color: #000000;
   }
 
-  .footer {
-    text-align: center;
-    margin-top: 25px;
+  .grand-total {
+    font-size: 16px;
+    font-weight: 700;
+    padding-top: 12px;
+    border-top: 2px solid #000000;
+    margin-top: 8px;
+  }
+
+  .grand-total span {
+    color: #000000;
+    font-weight: 700;
+  }
+
+  .grand-total-amount {
+    font-size: 18px;
+    font-weight: 800;
+    color: #000000;
+  }
+
+  /* Footer */
+  .invoice-footer {
+    border-top: 2px solid #000000;
     padding-top: 20px;
-    border-top: 1px solid #e5e7eb;
-    color: #6b7280;
-    font-size: 11px;
-    position: relative;
-    z-index: 1;
+    text-align: center;
   }
 
   .thank-you {
+    font-size: 16px;
     font-weight: 600;
-    color: #f97316;
-    margin-bottom: 8px;
-    font-size: 14px;
+    color: #000000;
+    margin-bottom: 15px;
+  }
+
+  .footer-notes {
+    font-size: 10px;
+    color: #666666;
+    line-height: 1.5;
+  }
+
+  .footer-notes p {
+    margin: 4px 0;
   }
 `;
 
@@ -813,9 +880,9 @@ const MyOrdersPage = () => {
   
   // PDF Hook
   const { toPDF, targetRef } = usePDF({ 
-    filename: `receipt-${selectedOrder?.id.slice(0, 8) || 'order'}.pdf`,
+    filename: `invoice-${selectedOrder?.id.slice(0, 8) || 'order'}.pdf`,
     page: { 
-      margin: 10,
+      margin: 15,
       format: 'a4',
       orientation: 'portrait'
     }
@@ -1250,7 +1317,7 @@ const MyOrdersPage = () => {
                                     className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
                                   >
                                     <FileText className="h-4 w-4 mr-2" />
-                                    View Receipt
+                                    View Invoice
                                   </Button>
                                   
                                   <Link to="/my-events">
@@ -1315,7 +1382,7 @@ const MyOrdersPage = () => {
                                     className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
                                   >
                                     <FileText className="h-4 w-4 mr-2" />
-                                    View Receipt
+                                    View Invoice
                                   </Button>
                                 </div>
                               </div>
@@ -1376,7 +1443,7 @@ const MyOrdersPage = () => {
                                 className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
                               >
                                 <FileText className="h-4 w-4 mr-2" />
-                                View Receipt
+                                View Invoice
                               </Button>
                             </div>
                           </div>
@@ -1489,19 +1556,19 @@ const MyOrdersPage = () => {
           </div>
         </Modal>
 
-        {/* Enhanced Receipt Modal */}
+        {/* Enhanced Invoice Modal */}
         <Modal 
           isOpen={showReceiptModal}
           onClose={() => setShowReceiptModal(false)}
-          title="Order Receipt"
+          title="Order Invoice"
           actions={
             <Button 
               onClick={handlePrintReceipt} 
               size="sm"
               className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
             >
-              <Printer className="h-4 w-4 mr-2" />
-              Download PDF
+              <Download className="h-4 w-4 mr-2" />
+              Download Invoice
             </Button>
           }
         >
@@ -1511,7 +1578,7 @@ const MyOrdersPage = () => {
             
             return (
               <div>
-                {/* Hidden receipt for PDF generation */}
+                {/* Hidden invoice for PDF generation */}
                 <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
                   <div ref={targetRef}>
                     <ReceiptPrintComponent
@@ -1526,10 +1593,10 @@ const MyOrdersPage = () => {
                   </div>
                 </div>
 
-                {/* Visible receipt preview */}
+                {/* Visible invoice preview */}
                 <div className="space-y-4">
                   <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg">
-                    <h3 className="font-semibold text-lg mb-2">Order #{selectedOrder.id.slice(0, 8)} - {selectedType.toUpperCase()}</h3>
+                    <h3 className="font-semibold text-lg mb-2">Invoice #{selectedOrder.id.slice(0, 8)} - {selectedType.toUpperCase()}</h3>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <p><strong>Date:</strong> {format(new Date(selectedOrder.created_at), 'PPP')}</p>
@@ -1596,9 +1663,9 @@ const MyOrdersPage = () => {
                     )}
                   </div>
 
-                  {/* Receipt Summary */}
+                  {/* Invoice Summary */}
                   <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg mt-4">
-                    <h4 className="font-semibold mb-3">Receipt Summary</h4>
+                    <h4 className="font-semibold mb-3">Invoice Summary</h4>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span>Subtotal:</span>
