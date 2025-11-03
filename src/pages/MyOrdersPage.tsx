@@ -519,15 +519,15 @@ const ReceiptPDF: React.FC<{
           <View style={styles.totalsGrid}>
             <View style={styles.totalRow}>
               <Text>Subtotal:</Text>
-              <Text>{formatCurrencyForPDF(subtotal, orderCurrency)}</Text>
+              <Text>{formatCurrencyForPDF(subtotal, "USD")}</Text>
             </View>
             <View style={styles.totalRow}>
               <Text>Tax (1.5%):</Text>
-              <Text>{formatCurrencyForPDF(taxAmount, orderCurrency)}</Text>
+              <Text>{formatCurrencyForPDF(taxAmount, "USD")}</Text>
             </View>
             <View style={styles.totalRow}>
               <Text>Processing Fee (2.9%):</Text>
-              <Text>{formatCurrencyForPDF(processingFee, orderCurrency)}</Text>
+              <Text>{formatCurrencyForPDF(processingFee, "USD")}</Text>
             </View>
             <View style={[styles.totalRow, styles.grandTotal]}>
               <Text style={{ fontWeight: 'bold' }}>TOTAL AMOUNT:</Text>
