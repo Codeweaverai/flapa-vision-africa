@@ -126,21 +126,6 @@ interface TicketData {
   ticket_status?: string;
 }
 
-// Custom PriceDisplay component for React Native PDF
-const PDFPriceDisplay: React.FC<{
-  amount: string;
-  originalCurrency: CurrencyCode;
-  style?: any;
-  showOriginalCurrency?: boolean;
-}> = ({ amount, originalCurrency, style, showOriginalCurrency = true }) => {
-  return (
-    <Text style={style}>
-      {amount}
-      {showOriginalCurrency && originalCurrency && ` ${originalCurrency}`}
-    </Text>
-  );
-};
-
 // PDF Styles
 const styles = StyleSheet.create({
   page: {
@@ -394,7 +379,7 @@ const ReceiptPDF: React.FC<{
           <View style={styles.companyInfo}>
             <Text style={styles.companyName}>SKILLPULSE INNOVATIONS LIMITED</Text>
             <Text style={styles.companyDetails}>
-              BUILT FOR THE SKILL DRIVEN GENERATION
+              Elevating Skills, Empowering Futures
               {"\n"}
               support@skillpulse.cloud | +260976972874
               {"\n"}
@@ -418,7 +403,7 @@ const ReceiptPDF: React.FC<{
           </View>
           <View style={styles.detailSection}>
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>ORDER NO:</Text>
+              <Text style={styles.detailLabel}>RECEIPT NO:</Text>
               <Text style={styles.detailValue}>
                 #{selectedOrder.id.slice(0, 8).toUpperCase()}
               </Text>
@@ -481,18 +466,10 @@ const ReceiptPDF: React.FC<{
                 <Text>{item.quantity}</Text>
               </View>
               <View style={styles.colUnitPrice}>
-                <PDFPriceDisplay 
-                  amount={formatCurrencyForPDF(safeNumber(item.unit_price), orderCurrency)}
-                  originalCurrency={orderCurrency}
-                  showOriginalCurrency={false}
-                />
+                <Text>{formatCurrencyForPDF(safeNumber(item.unit_price), orderCurrency)}</Text>
               </View>
               <View style={styles.colAmount}>
-                <PDFPriceDisplay 
-                  amount={formatCurrencyForPDF(safeNumber(item.total_price), orderCurrency)}
-                  originalCurrency={orderCurrency}
-                  showOriginalCurrency={false}
-                />
+                <Text>{formatCurrencyForPDF(safeNumber(item.total_price), orderCurrency)}</Text>
               </View>
             </View>
           ))}
@@ -512,12 +489,9 @@ const ReceiptPDF: React.FC<{
                 </View>
                 <View style={styles.giftCardRow}>
                   <Text>Amount:</Text>
-                  <PDFPriceDisplay 
-                    amount={formatCurrencyForPDF(safeNumber(gift.amount), safeCurrency(gift.currency))}
-                    originalCurrency={safeCurrency(gift.currency)}
-                    showOriginalCurrency={false}
-                    style={{ fontWeight: 'bold' }}
-                  />
+                  <Text style={{ fontWeight: 'bold' }}>
+                    {formatCurrencyForPDF(safeNumber(gift.amount), safeCurrency(gift.currency))}
+                  </Text>
                 </View>
                 <View style={styles.giftCardRow}>
                   <Text>Recipient:</Text>
@@ -545,36 +519,21 @@ const ReceiptPDF: React.FC<{
           <View style={styles.totalsGrid}>
             <View style={styles.totalRow}>
               <Text>Subtotal:</Text>
-              <PDFPriceDisplay 
-                amount={formatCurrencyForPDF(subtotal, "USD")}
-                originalCurrency="USD"
-                showOriginalCurrency={false}
-              />
+              <Text>{formatCurrencyForPDF(subtotal, orderCurrency)}</Text>
             </View>
             <View style={styles.totalRow}>
               <Text>Tax (1.5%):</Text>
-              <PDFPriceDisplay 
-                amount={formatCurrencyForPDF(taxAmount, "USD")}
-                originalCurrency="USD"
-                showOriginalCurrency={false}
-              />
+              <Text>{formatCurrencyForPDF(taxAmount, orderCurrency)}</Text>
             </View>
             <View style={styles.totalRow}>
               <Text>Processing Fee (2.9%):</Text>
-              <PDFPriceDisplay 
-                amount={formatCurrencyForPDF(processingFee, "USD")}
-                originalCurrency="USD"
-                showOriginalCurrency={false}
-              />
+              <Text>{formatCurrencyForPDF(processingFee, orderCurrency)}</Text>
             </View>
             <View style={[styles.totalRow, styles.grandTotal]}>
               <Text style={{ fontWeight: 'bold' }}>TOTAL AMOUNT:</Text>
-              <PDFPriceDisplay 
-                amount={formatCurrencyForPDF(total, orderCurrency)}
-                originalCurrency={orderCurrency}
-                showOriginalCurrency={false}
-                style={styles.grandTotalAmount}
-              />
+              <Text style={styles.grandTotalAmount}>
+                {formatCurrencyForPDF(total, orderCurrency)}
+              </Text>
             </View>
           </View>
         </View>
@@ -1082,15 +1041,35 @@ const MyOrdersPage = () => {
       setIsGeneratingPDF(true);
       
       const { subtotal, taxAmount, processingFee, total, filteredItems } = calculateReceiptTotals(selectedOrder, selectedType);
+      const orderCurrency = safeCurrency(selectedOrder.currency);
+      
+      // Convert ALL amounts from USD to order currency using currencyService
+      let convertedSubtotal = subtotal;
+      let convertedTaxAmount = taxAmount;
+      let convertedProcessingFee = processingFee;
+      let convertedTotal = total;
+      
+      if (orderCurrency !== 'USD') {
+        try {
+          // Convert all amounts from USD to order currency (same as PriceDisplay)
+          convertedSubtotal = await currencyService.convertPrice(subtotal, 'USD', orderCurrency);
+          convertedTaxAmount = await currencyService.convertPrice(taxAmount, 'USD', orderCurrency);
+          convertedProcessingFee = await currencyService.convertPrice(processingFee, 'USD', orderCurrency);
+          convertedTotal = await currencyService.convertPrice(total, 'USD', orderCurrency);
+        } catch (error) {
+          console.error('Error converting amounts:', error);
+          // Fallback to original amounts if conversion fails
+        }
+      }
       
       const blob = await pdf(
         <ReceiptPDF
           selectedOrder={selectedOrder}
           selectedType={selectedType}
-          subtotal={subtotal}
-          taxAmount={taxAmount}
-          processingFee={processingFee}
-          total={total}
+          subtotal={convertedSubtotal}
+          taxAmount={convertedTaxAmount}
+          processingFee={convertedProcessingFee}
+          total={convertedTotal}
           filteredItems={filteredItems}
         />
       ).toBlob();
@@ -1166,7 +1145,7 @@ const MyOrdersPage = () => {
                           <div className="text-right">
                             <PriceDisplay 
                               amount={card.subtotal} 
-                              originalCurrency={orderCurrency}
+                              originalCurrency="USD"
                               className="text-2xl font-bold text-white"
                             />
                             {getStatusBadge(card.order.payment_status)}
@@ -1332,7 +1311,7 @@ const MyOrdersPage = () => {
                                     <div>
                                       <PriceDisplay 
                                         amount={safeNumber(gift.amount)} 
-                                        originalCurrency={giftCurrency}
+                                        originalCurrency="USD"
                                         className="text-xl font-semibold text-gray-900 mb-1"
                                       />
                                       <p className="font-mono text-sm text-gray-600">
@@ -1451,7 +1430,7 @@ const MyOrdersPage = () => {
                   {getStatusBadge(ticket.status)}
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3}>
                   <div>
                     <p className="text-sm text-gray-600">
                       <strong>Ticket Holder:</strong> {ticket.ticket_holder_name || ticket.user_name}
@@ -1529,7 +1508,7 @@ const MyOrdersPage = () => {
                       <p>
                         <strong>Total:</strong> <PriceDisplay 
                           amount={computeTypeSubtotalsFull(selectedOrder)[selectedType]} 
-                          originalCurrency={orderCurrency}
+                          originalCurrency="USD"
                           className="font-semibold"
                         />
                       </p>
@@ -1547,14 +1526,14 @@ const MyOrdersPage = () => {
                           <p className="text-sm text-gray-600">
                             Qty: {item.quantity} × <PriceDisplay 
                               amount={safeNumber(item.unit_price)} 
-                              originalCurrency={orderCurrency}
+                              originalCurrency="USD"
                               className="inline"
                             />
                           </p>
                         </div>
                         <PriceDisplay 
                           amount={safeNumber(item.total_price)} 
-                          originalCurrency={orderCurrency}
+                          originalCurrency="USD"
                           className="font-semibold"
                         />
                       </div>
@@ -1575,7 +1554,7 @@ const MyOrdersPage = () => {
                             <p className="text-sm text-gray-600">Expires: {format(new Date(gift.expires_at), 'PPP')}</p>
                             <PriceDisplay 
                               amount={safeNumber(gift.amount)} 
-                              originalCurrency={giftCurrency}
+                              originalCurrency="USD"
                               className="font-semibold"
                             />
                           </div>
@@ -1593,7 +1572,7 @@ const MyOrdersPage = () => {
                       <span>Subtotal:</span>
                       <PriceDisplay 
                         amount={subtotal} 
-                        originalCurrency={orderCurrency}
+                        originalCurrency="USD"
                         className="font-medium"
                       />
                     </div>
@@ -1601,7 +1580,7 @@ const MyOrdersPage = () => {
                       <span>Tax (1.5%):</span>
                       <PriceDisplay 
                         amount={taxAmount} 
-                        originalCurrency={orderCurrency}
+                        originalCurrency="USD"
                         className="font-medium"
                       />
                     </div>
@@ -1609,7 +1588,7 @@ const MyOrdersPage = () => {
                       <span>Processing Fee (2.9%):</span>
                       <PriceDisplay 
                         amount={processingFee} 
-                        originalCurrency={orderCurrency}
+                        originalCurrency="USD"
                         className="font-medium"
                       />
                     </div>
