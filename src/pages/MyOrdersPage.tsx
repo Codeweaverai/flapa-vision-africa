@@ -519,15 +519,15 @@ const ReceiptPDF: React.FC<{
           <View style={styles.totalsGrid}>
             <View style={styles.totalRow}>
               <Text>Subtotal:</Text>
-              <Text>{formatCurrencyForPDF(subtotal, "USD")}</Text>
+              <Text>{formatCurrencyForPDF(subtotal, orderCurrency)}</Text>
             </View>
             <View style={styles.totalRow}>
               <Text>Tax (1.5%):</Text>
-              <Text>{formatCurrencyForPDF(taxAmount, "USD")}</Text>
+              <Text>{formatCurrencyForPDF(taxAmount, orderCurrency)}</Text>
             </View>
             <View style={styles.totalRow}>
               <Text>Processing Fee (2.9%):</Text>
-              <Text>{formatCurrencyForPDF(processingFee, "USD")}</Text>
+              <Text>{formatCurrencyForPDF(processingFee, orderCurrency)}</Text>
             </View>
             <View style={[styles.totalRow, styles.grandTotal]}>
               <Text style={{ fontWeight: 'bold' }}>TOTAL AMOUNT:</Text>
@@ -1041,15 +1041,35 @@ const MyOrdersPage = () => {
       setIsGeneratingPDF(true);
       
       const { subtotal, taxAmount, processingFee, total, filteredItems } = calculateReceiptTotals(selectedOrder, selectedType);
+      const orderCurrency = safeCurrency(selectedOrder.currency);
+      
+      // Convert ALL amounts from USD to order currency using currencyService
+      let convertedSubtotal = subtotal;
+      let convertedTaxAmount = taxAmount;
+      let convertedProcessingFee = processingFee;
+      let convertedTotal = total;
+      
+      if (orderCurrency !== 'USD') {
+        try {
+          // Convert all amounts from USD to order currency (same as PriceDisplay)
+          convertedSubtotal = await currencyService.convertPrice(subtotal, 'USD', orderCurrency);
+          convertedTaxAmount = await currencyService.convertPrice(taxAmount, 'USD', orderCurrency);
+          convertedProcessingFee = await currencyService.convertPrice(processingFee, 'USD', orderCurrency);
+          convertedTotal = await currencyService.convertPrice(total, 'USD', orderCurrency);
+        } catch (error) {
+          console.error('Error converting amounts:', error);
+          // Fallback to original amounts if conversion fails
+        }
+      }
       
       const blob = await pdf(
         <ReceiptPDF
           selectedOrder={selectedOrder}
           selectedType={selectedType}
-          subtotal={subtotal}
-          taxAmount={taxAmount}
-          processingFee={processingFee}
-          total={total}
+          subtotal={convertedSubtotal}
+          taxAmount={convertedTaxAmount}
+          processingFee={convertedProcessingFee}
+          total={convertedTotal}
           filteredItems={filteredItems}
         />
       ).toBlob();
@@ -1410,7 +1430,7 @@ const MyOrdersPage = () => {
                   {getStatusBadge(ticket.status)}
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3}>
                   <div>
                     <p className="text-sm text-gray-600">
                       <strong>Ticket Holder:</strong> {ticket.ticket_holder_name || ticket.user_name}
