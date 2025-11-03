@@ -1748,7 +1748,7 @@ const MyOrdersPage = () => {
                           <p className="text-sm text-gray-600">
                             Qty: {item.quantity} × <PriceDisplay 
                               amount={safeNumber(item.unit_price)} 
-                              originalCurrency={orderCurrency}
+                              originalCurrency="USD"
                               className="inline"
                             />
                           </p>
