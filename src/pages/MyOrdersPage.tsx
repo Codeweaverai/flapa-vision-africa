@@ -1187,7 +1187,7 @@ const MyOrdersPage = () => {
                           <div className="text-right">
                             <PriceDisplay 
                               amount={card.subtotal} 
-                              originalCurrency={orderCurrency}
+                              originalCurrency="USD"
                               className="text-2xl font-bold text-white"
                             />
                             {getStatusBadge(card.order.payment_status)}
@@ -1623,7 +1623,7 @@ const MyOrdersPage = () => {
                       <p>
                         <strong>Total:</strong> <PriceDisplay 
                           amount={computeTypeSubtotalsFull(selectedOrder)[selectedType]} 
-                          originalCurrency={orderCurrency}
+                          originalCurrency="USD"
                           className="font-semibold"
                         />
                       </p>
