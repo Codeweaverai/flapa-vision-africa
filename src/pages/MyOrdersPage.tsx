@@ -379,7 +379,7 @@ const ReceiptPDF: React.FC<{
           <View style={styles.companyInfo}>
             <Text style={styles.companyName}>SKILLPULSE INNOVATIONS LIMITED</Text>
             <Text style={styles.companyDetails}>
-              Elevating Skills, Empowering Futures
+              BUILT FOR THE SKILL DRIVEN GENERATION
               {"\n"}
               support@skillpulse.cloud | +260976972874
               {"\n"}
@@ -403,7 +403,7 @@ const ReceiptPDF: React.FC<{
           </View>
           <View style={styles.detailSection}>
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>RECEIPT NO:</Text>
+              <Text style={styles.detailLabel}>ORDER NO:</Text>
               <Text style={styles.detailValue}>
                 #{selectedOrder.id.slice(0, 8).toUpperCase()}
               </Text>
