@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import Layout from '@/components/layout/Layout';
@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { CurrencyCode, SUPPORTED_CURRENCIES } from '@/constants/currencies';
-import ReactDOM from 'react-dom/client';
+import { usePDF } from 'react-to-pdf';
 
 declare global {
   interface Window {
@@ -368,7 +368,7 @@ const ReceiptPrintComponent: React.FC<{
   );
 };
 
-// Print styles for the receipt - Updated for single page
+// Print styles for the receipt
 const printStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
   
@@ -379,7 +379,6 @@ const printStyles = `
       padding: 0;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
-      height: 100vh;
     }
     
     .receipt-container { 
@@ -390,29 +389,12 @@ const printStyles = `
       page-break-inside: avoid;
     }
     
-    /* Hide everything except the receipt when printing */
-    body * {
-      visibility: hidden;
-    }
-    
-    .receipt-print-container,
-    .receipt-print-container * {
-      visibility: visible;
-    }
-    
     .receipt-print-container {
       position: absolute;
       left: 0;
       top: 0;
       width: 100%;
-      height: 100%;
       padding: 10px;
-    }
-
-    /* Ensure it fits on one page */
-    .receipt-container {
-      transform: scale(0.9);
-      transform-origin: top center;
     }
   }
 
@@ -829,6 +811,16 @@ const MyOrdersPage = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedType, setSelectedType] = useState<'event' | 'course' | 'gift'>('event');
   
+  // PDF Hook
+  const { toPDF, targetRef } = usePDF({ 
+    filename: `receipt-${selectedOrder?.id.slice(0, 8) || 'order'}.pdf`,
+    page: { 
+      margin: 10,
+      format: 'a4',
+      orientation: 'portrait'
+    }
+  });
+  
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
@@ -1114,62 +1106,7 @@ const MyOrdersPage = () => {
   };
 
   const handlePrintReceipt = () => {
-    if (!selectedOrder) return;
-    
-    const { subtotal, taxAmount, processingFee, total, filteredItems } = calculateReceiptTotals(selectedOrder, selectedType);
-    
-    // Create a new window for printing
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast.error('Please allow popups to print receipts');
-      return;
-    }
-
-    // Write the basic HTML structure first
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Receipt - Order #${selectedOrder.id.slice(0, 8)}</title>
-        <style>${printStyles}</style>
-      </head>
-      <body>
-        <div id="receipt-root"></div>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
-
-    // Wait a bit for the DOM to be ready, then render the React component
-    setTimeout(() => {
-      try {
-        const container = printWindow.document.getElementById('receipt-root');
-        if (container) {
-          const root = ReactDOM.createRoot(container);
-          root.render(
-            <ReceiptPrintComponent
-              selectedOrder={selectedOrder}
-              selectedType={selectedType}
-              subtotal={subtotal}
-              taxAmount={taxAmount}
-              processingFee={processingFee}
-              total={total}
-              filteredItems={filteredItems}
-            />
-          );
-
-          // Wait for React to render, then print
-          setTimeout(() => {
-            printWindow.focus();
-            printWindow.print();
-          }, 1000);
-        }
-      } catch (error) {
-        console.error('Error rendering receipt:', error);
-        toast.error('Failed to generate receipt');
-        printWindow.close();
-      }
-    }, 100);
+    toPDF();
   };
 
   const handlePageChange = (page: number) => {
@@ -1564,7 +1501,7 @@ const MyOrdersPage = () => {
               className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
             >
               <Printer className="h-4 w-4 mr-2" />
-              Print Receipt
+              Download PDF
             </Button>
           }
         >
@@ -1573,110 +1510,128 @@ const MyOrdersPage = () => {
             const orderCurrency = safeCurrency(selectedOrder.currency);
             
             return (
-              <div className="space-y-4">
-                <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg">
-                  <h3 className="font-semibold text-lg mb-2">Order #{selectedOrder.id.slice(0, 8)} - {selectedType.toUpperCase()}</h3>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p><strong>Date:</strong> {format(new Date(selectedOrder.created_at), 'PPP')}</p>
-                      <p><strong>Status:</strong> {selectedOrder.payment_status}</p>
-                    </div>
-                    <div>
-                      <p><strong>Payment:</strong> {selectedOrder.payment_method}</p>
-                      <p>
-                        <strong>Total:</strong> <PriceDisplay 
-                          amount={computeTypeSubtotalsFull(selectedOrder)[selectedType]} 
-                          originalCurrency="USD"
-                          className="font-semibold"
-                        />
-                      </p>
-                    </div>
+              <div>
+                {/* Hidden receipt for PDF generation */}
+                <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
+                  <div ref={targetRef}>
+                    <ReceiptPrintComponent
+                      selectedOrder={selectedOrder}
+                      selectedType={selectedType}
+                      subtotal={subtotal}
+                      taxAmount={taxAmount}
+                      processingFee={processingFee}
+                      total={total}
+                      filteredItems={filteredItems}
+                    />
                   </div>
-                </div>
-                
-                <div>
-                  <h4 className="font-semibold mb-2">Items:</h4>
-                  <div className="space-y-2">
-                    {filteredItems.map((item) => (
-                      <div key={item.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                        <div>
-                          <p className="font-medium">{item.item_name}</p>
-                          <p className="text-sm text-gray-600">
-                            Qty: {item.quantity} × <PriceDisplay 
-                              amount={safeNumber(item.unit_price)} 
-                              originalCurrency="USD"
-                              className="inline"
-                            />
-                          </p>
-                        </div>
-                        <PriceDisplay 
-                          amount={safeNumber(item.total_price)} 
-                          originalCurrency="USD"
-                          className="font-semibold"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {selectedType === 'gift' && selectedOrder.gift_cards && selectedOrder.gift_cards.length > 0 && (
-                    <div className="mt-4">
-                      <h5 className="font-semibold mb-2">Gift Card Details:</h5>
-                      <div className="space-y-2">
-                        {selectedOrder.gift_cards.map((gift) => {
-                          const giftCurrency = safeCurrency(gift.currency || selectedOrder.currency);
-                          return (
-                          <div key={gift.id} className="p-3 bg-gray-50 rounded">
-                            <p className="font-medium">Code: {obfuscateGiftCode(gift.gift_card_code)}</p>
-                            <p className="text-sm text-gray-600">Recipient: {gift.recipient_name} ({gift.recipient_email})</p>
-                            <p className="text-sm text-gray-600">Status: {gift.status.toUpperCase()}</p>
-                            <p className="text-sm text-gray-600">Expires: {format(new Date(gift.expires_at), 'PPP')}</p>
-                            <PriceDisplay 
-                              amount={safeNumber(gift.amount)} 
-                              originalCurrency="USD"
-                              className="font-semibold"
-                            />
-                          </div>
-                        )})}
-                      </div>
-                    </div>
-                  )}
                 </div>
 
-                {/* Receipt Summary */}
-                <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg mt-4">
-                  <h4 className="font-semibold mb-3">Receipt Summary</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>Subtotal:</span>
-                      <PriceDisplay 
-                        amount={subtotal} 
-                        originalCurrency="USD"
-                        className="font-medium"
-                      />
+                {/* Visible receipt preview */}
+                <div className="space-y-4">
+                  <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg">
+                    <h3 className="font-semibold text-lg mb-2">Order #{selectedOrder.id.slice(0, 8)} - {selectedType.toUpperCase()}</h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p><strong>Date:</strong> {format(new Date(selectedOrder.created_at), 'PPP')}</p>
+                        <p><strong>Status:</strong> {selectedOrder.payment_status}</p>
+                      </div>
+                      <div>
+                        <p><strong>Payment:</strong> {selectedOrder.payment_method}</p>
+                        <p>
+                          <strong>Total:</strong> <PriceDisplay 
+                            amount={computeTypeSubtotalsFull(selectedOrder)[selectedType]} 
+                            originalCurrency="USD"
+                            className="font-semibold"
+                          />
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Tax (1.5%):</span>
-                      <PriceDisplay 
-                        amount={taxAmount} 
-                        originalCurrency="USD"
-                        className="font-medium"
-                      />
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-semibold mb-2">Items:</h4>
+                    <div className="space-y-2">
+                      {filteredItems.map((item) => (
+                        <div key={item.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                          <div>
+                            <p className="font-medium">{item.item_name}</p>
+                            <p className="text-sm text-gray-600">
+                              Qty: {item.quantity} × <PriceDisplay 
+                                amount={safeNumber(item.unit_price)} 
+                                originalCurrency="USD"
+                                className="inline"
+                              />
+                            </p>
+                          </div>
+                          <PriceDisplay 
+                            amount={safeNumber(item.total_price)} 
+                            originalCurrency="USD"
+                            className="font-semibold"
+                          />
+                        </div>
+                      ))}
                     </div>
-                    <div className="flex justify-between">
-                      <span>Processing Fee (2.9%):</span>
-                      <PriceDisplay 
-                        amount={processingFee} 
-                        originalCurrency="USD"
-                        className="font-medium"
-                      />
-                    </div>
-                    <div className="flex justify-between font-semibold border-t pt-2">
-                      <span>Total:</span>
-                      <PriceDisplay 
-                        amount={total} 
-                        originalCurrency={orderCurrency}
-                        className="font-bold"
-                      />
+                    
+                    {selectedType === 'gift' && selectedOrder.gift_cards && selectedOrder.gift_cards.length > 0 && (
+                      <div className="mt-4">
+                        <h5 className="font-semibold mb-2">Gift Card Details:</h5>
+                        <div className="space-y-2">
+                          {selectedOrder.gift_cards.map((gift) => {
+                            const giftCurrency = safeCurrency(gift.currency || selectedOrder.currency);
+                            return (
+                            <div key={gift.id} className="p-3 bg-gray-50 rounded">
+                              <p className="font-medium">Code: {obfuscateGiftCode(gift.gift_card_code)}</p>
+                              <p className="text-sm text-gray-600">Recipient: {gift.recipient_name} ({gift.recipient_email})</p>
+                              <p className="text-sm text-gray-600">Status: {gift.status.toUpperCase()}</p>
+                              <p className="text-sm text-gray-600">Expires: {format(new Date(gift.expires_at), 'PPP')}</p>
+                              <PriceDisplay 
+                                amount={safeNumber(gift.amount)} 
+                                originalCurrency="USD"
+                                className="font-semibold"
+                              />
+                            </div>
+                          )})}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Receipt Summary */}
+                  <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg mt-4">
+                    <h4 className="font-semibold mb-3">Receipt Summary</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Subtotal:</span>
+                        <PriceDisplay 
+                          amount={subtotal} 
+                          originalCurrency="USD"
+                          className="font-medium"
+                        />
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Tax (1.5%):</span>
+                        <PriceDisplay 
+                          amount={taxAmount} 
+                          originalCurrency="USD"
+                          className="font-medium"
+                        />
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Processing Fee (2.9%):</span>
+                        <PriceDisplay 
+                          amount={processingFee} 
+                          originalCurrency="USD"
+                          className="font-medium"
+                        />
+                      </div>
+                      <div className="flex justify-between font-semibold border-t pt-2">
+                        <span>Total:</span>
+                        <PriceDisplay 
+                          amount={total} 
+                          originalCurrency={orderCurrency}
+                          className="font-bold"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
