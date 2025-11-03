@@ -22,11 +22,38 @@ import { Link } from 'react-router-dom';
 import YouTubeModal from '@/components/video/YouTubeModal';
 import { supabase } from '@/integrations/supabase/client';
 import CreatorsSection from '@/components/home/CreatorsSection';
+import ReactCountryFlag from "react-country-flag";
 
 const BecomeCreatorPage = () => {
   const [showDemoVideo, setShowDemoVideo] = useState(false);
   const [creators, setCreators] = useState([]);
   const demoVideoUrl = "https://youtu.be/B8ay-17oP_0?si=4qFRvqzRSLq_gfTH";
+
+  // Supported countries data
+  const supportedCountries = [
+    { name: 'Zambia', code: 'ZM' },
+    { name: 'Kenya', code: 'KE' },
+    { name: 'Uganda', code: 'UG' },
+    { name: 'Tanzania', code: 'TZ' },
+    { name: 'Ghana', code: 'GH' },
+    { name: 'Nigeria', code: 'NG' },
+    { name: 'Rwanda', code: 'RW' },
+    { name: 'Malawi', code: 'MW' },
+    { name: 'Mozambique', code: 'MZ' },
+    { name: 'Senegal', code: 'SN' },
+    { name: 'Benin', code: 'BJ' },
+    { name: 'Burkina Faso', code: 'BF' },
+    { name: 'Cameroon', code: 'CM' },
+    { name: 'Congo-Brazzaville', code: 'CG' },
+    { name: 'DRC', code: 'CD' },
+    { name: 'Gabon', code: 'GA' },
+    { name: 'Ivory Coast', code: 'CI' },
+    { name: 'Lesotho', code: 'LS' },
+    { name: 'Sierra Leone', code: 'SL' }
+  ];
+
+  const featuredCountries = supportedCountries.slice(0, 6);
+  const additionalCountries = supportedCountries.slice(6);
 
   const benefits = [
     {
@@ -437,6 +464,120 @@ const BecomeCreatorPage = () => {
 
         {/* Creators Section */}
         <CreatorsSection />
+
+        {/* Global Reach Section */}
+        <section className="py-20 bg-gradient-to-r from-purple-50 via-orange-50 to-purple-50">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                Reach Learners Across Africa
+              </h2>
+              <p className="text-xl text-gray-700 max-w-2xl mx-auto">
+                Your courses and events are accessible to students in {supportedCountries.length}+ African countries with localized payment solutions
+              </p>
+            </div>
+
+            <div className="max-w-4xl mx-auto">
+              {/* Featured Countries Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                {featuredCountries.map((country, index) => (
+                  <Card 
+                    key={country.code}
+                    className="bg-white/90 backdrop-blur-sm border-2 border-gray-200 shadow-lg hover:shadow-xl transition-all duration-300 animate-fade-in hover-scale group"
+                    style={{ animationDelay: `${index * 100}ms` }}
+                  >
+                    <CardContent className="p-6 text-center">
+                      <div className="flex justify-center mb-3">
+                        <ReactCountryFlag
+                          countryCode={country.code}
+                          svg
+                          style={{
+                            width: '32px',
+                            height: '24px',
+                            borderRadius: '4px',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                          }}
+                          title={country.name}
+                        />
+                      </div>
+                      <h3 className="font-semibold text-gray-800 group-hover:text-orange-600 transition-colors duration-200">
+                        {country.name}
+                      </h3>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Additional Countries */}
+              {additionalCountries.length > 0 && (
+                <>
+                  <div className="text-center mb-6">
+                    <p className="text-lg font-semibold text-muted-foreground">
+                      And {additionalCountries.length} more countries across Africa...
+                    </p>
+                  </div>
+                  
+                  <Card className="bg-white/90 backdrop-blur-sm border-2 border-purple-200 shadow-lg">
+                    <CardContent className="p-6">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                        {additionalCountries.map((country, index) => (
+                          <div 
+                            key={country.code}
+                            className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-gray-50 to-purple-50 hover:from-orange-50 hover:to-purple-50 transition-all duration-200 group"
+                            style={{ animationDelay: `${index * 50}ms` }}
+                          >
+                            <ReactCountryFlag
+                              countryCode={country.code}
+                              svg
+                              style={{
+                                width: '24px',
+                                height: '18px',
+                                borderRadius: '3px',
+                                boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+                              }}
+                              title={country.name}
+                            />
+                            <span className="text-sm font-medium text-gray-700 group-hover:text-orange-600 transition-colors duration-200">
+                              {country.name}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </div>
+
+            {/* Payment Features */}
+            <div className="mt-12 text-center">
+              <Card className="bg-gradient-to-r from-orange-500 to-purple-600 border-0 shadow-2xl max-w-2xl mx-auto">
+                <CardContent className="p-8 text-white">
+                  <div className="flex items-center justify-center gap-4 mb-4">
+                    <DollarSign className="h-8 w-8" />
+                    <Shield className="h-8 w-8" />
+                    <Globe className="h-8 w-8" />
+                  </div>
+                  <h3 className="text-2xl font-bold mb-2">Localized Payment Solutions</h3>
+                  <p className="text-white/90 mb-4">
+                    We support mobile money, bank transfers, and local payment methods across all {supportedCountries.length}+ countries, making it easy for students to enroll in your courses.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center text-sm">
+                    <Badge variant="secondary" className="bg-white/20 text-white border-0 backdrop-blur-sm">
+                      Mobile Money
+                    </Badge>
+                    <Badge variant="secondary" className="bg-white/20 text-white border-0 backdrop-blur-sm">
+                      Bank Transfers
+                    </Badge>
+                    <Badge variant="secondary" className="bg-white/20 text-white border-0 backdrop-blur-sm">
+                      Multi-Currency
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </section>
 
         {/* CTA Section */}
         <section className="py-20">
