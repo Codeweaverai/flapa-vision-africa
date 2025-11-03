@@ -133,6 +133,31 @@ const ReceiptPrintComponent: React.FC<{
   total: number;
   filteredItems: any[];
 }> = ({ selectedOrder, selectedType, subtotal, taxAmount, processingFee, total, filteredItems }) => {
+  
+  // Helper functions inside the component
+  const safeCurrency = (value: string | null | undefined): CurrencyCode => {
+    if (!value) return 'USD';
+    const normalized = value.toString().toUpperCase();
+    return SUPPORTED_CURRENCIES[normalized as CurrencyCode] ? normalized as CurrencyCode : 'USD';
+  };
+
+  const safeNumber = (value: any): number => {
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
+  };
+
+  const obfuscateGiftCode = (code: string): string => {
+    if (!code || code.length < 8) return code;
+    const start = code.slice(0, 4);
+    const end = code.slice(-4);
+    const middle = '*'.repeat(Math.max(0, code.length - 8));
+    return `${start}${middle}${end}`;
+  };
+
   const orderCurrency = safeCurrency(selectedOrder.currency);
   
   return (
@@ -1100,66 +1125,51 @@ const MyOrdersPage = () => {
       return;
     }
 
-    // Create a container for React rendering
-    const printContainer = document.createElement('div');
-    printContainer.id = 'receipt-print-root';
-    
-    // Add styles to the print window
-    const styles = `
-      <style>
-        ${printStyles}
-        @media print {
-          body { 
-            margin: 0;
-            padding: 0;
-            background: white !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-          }
-          .no-print { display: none !important; }
-        }
-        body {
-          font-family: 'Inter', sans-serif;
-          margin: 0;
-          padding: 10px;
-          background: white;
-        }
-      </style>
-    `;
-
+    // Write the basic HTML structure first
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
       <head>
         <title>Receipt - Order #${selectedOrder.id.slice(0, 8)}</title>
-        ${styles}
+        <style>${printStyles}</style>
       </head>
       <body>
-        <div id="receipt-print-root"></div>
+        <div id="receipt-root"></div>
       </body>
       </html>
     `);
     printWindow.document.close();
 
-    // Use ReactDOM to render the component
-    const root = ReactDOM.createRoot(printWindow.document.getElementById('receipt-print-root')!);
-    
-    root.render(
-      <ReceiptPrintComponent
-        selectedOrder={selectedOrder}
-        selectedType={selectedType}
-        subtotal={subtotal}
-        taxAmount={taxAmount}
-        processingFee={processingFee}
-        total={total}
-        filteredItems={filteredItems}
-      />
-    );
-
-    // Wait for React to render, then print
+    // Wait a bit for the DOM to be ready, then render the React component
     setTimeout(() => {
-      printWindow.print();
-    }, 500);
+      try {
+        const container = printWindow.document.getElementById('receipt-root');
+        if (container) {
+          const root = ReactDOM.createRoot(container);
+          root.render(
+            <ReceiptPrintComponent
+              selectedOrder={selectedOrder}
+              selectedType={selectedType}
+              subtotal={subtotal}
+              taxAmount={taxAmount}
+              processingFee={processingFee}
+              total={total}
+              filteredItems={filteredItems}
+            />
+          );
+
+          // Wait for React to render, then print
+          setTimeout(() => {
+            printWindow.focus();
+            printWindow.print();
+          }, 1000);
+        }
+      } catch (error) {
+        console.error('Error rendering receipt:', error);
+        toast.error('Failed to generate receipt');
+        printWindow.close();
+      }
+    }, 100);
   };
 
   const handlePageChange = (page: number) => {
