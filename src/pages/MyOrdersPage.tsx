@@ -1641,14 +1641,14 @@ const MyOrdersPage = () => {
                           <p className="text-sm text-gray-600">
                             Qty: {item.quantity} × <PriceDisplay 
                               amount={safeNumber(item.unit_price)} 
-                              originalCurrency={orderCurrency}
+                              originalCurrency="USD"
                               className="inline"
                             />
                           </p>
                         </div>
                         <PriceDisplay 
                           amount={safeNumber(item.total_price)} 
-                          originalCurrency={orderCurrency}
+                          originalCurrency="USD"
                           className="font-semibold"
                         />
                       </div>
@@ -1669,7 +1669,7 @@ const MyOrdersPage = () => {
                             <p className="text-sm text-gray-600">Expires: {format(new Date(gift.expires_at), 'PPP')}</p>
                             <PriceDisplay 
                               amount={safeNumber(gift.amount)} 
-                              originalCurrency={giftCurrency}
+                              originalCurrency="USD"
                               className="font-semibold"
                             />
                           </div>
@@ -1711,7 +1711,7 @@ const MyOrdersPage = () => {
                       <span>Total:</span>
                       <PriceDisplay 
                         amount={total} 
-                        originalCurrency="USD"
+                        originalCurrency={orderCurrency}
                         className="font-bold"
                       />
                     </div>
