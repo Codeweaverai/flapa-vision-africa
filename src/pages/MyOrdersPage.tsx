@@ -12,7 +12,10 @@ import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { CurrencyCode, SUPPORTED_CURRENCIES } from '@/constants/currencies';
-import { usePDF } from 'react-to-pdf';
+
+// React PDF Components
+import { Document, Page, Text, View, StyleSheet, pdf, Font, Image } from '@react-pdf/renderer';
+import { saveAs } from 'file-saver';
 
 declare global {
   interface Window {
@@ -123,8 +126,212 @@ interface TicketData {
   ticket_status?: string;
 }
 
-// Professional Invoice-style Receipt Component
-const ReceiptPrintComponent: React.FC<{
+// PDF Styles
+const styles = StyleSheet.create({
+  page: {
+    flexDirection: 'column',
+    backgroundColor: '#FFFFFF',
+    padding: 30,
+    fontFamily: 'Helvetica',
+    fontSize: 10,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    borderBottom: '2pt solid #000000',
+    paddingBottom: 15,
+  },
+  companyInfo: {
+    flex: 1,
+  },
+  companyName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    color: '#000000',
+  },
+  companyDetails: {
+    fontSize: 8,
+    color: '#666666',
+    lineHeight: 1.4,
+  },
+  invoiceTitleSection: {
+    alignItems: 'flex-end',
+  },
+  invoiceTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 6,
+    color: '#000000',
+  },
+  invoiceBadge: {
+    backgroundColor: '#000000',
+    color: '#FFFFFF',
+    padding: '4pt 8pt',
+    borderRadius: 3,
+    fontSize: 8,
+    fontWeight: 'bold',
+  },
+  invoiceDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  detailSection: {
+    flex: 1,
+  },
+  sectionTitle: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#000000',
+    textTransform: 'uppercase',
+  },
+  customerName: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    color: '#000000',
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  detailLabel: {
+    fontWeight: 'bold',
+    color: '#666666',
+  },
+  detailValue: {
+    fontWeight: 'bold',
+    color: '#000000',
+  },
+  statusBadge: {
+    padding: '2pt 6pt',
+    borderRadius: 2,
+    fontSize: 7,
+    fontWeight: 'bold',
+  },
+  itemsTable: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#F8F8F8',
+    padding: 8,
+    borderBottom: '1pt solid #000000',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    padding: 8,
+    borderBottom: '1pt solid #E0E0E0',
+  },
+  tableRowEven: {
+    backgroundColor: '#FAFAFA',
+  },
+  colDescription: {
+    flex: 3,
+    textAlign: 'left',
+  },
+  colQty: {
+    flex: 1,
+    textAlign: 'center',
+  },
+  colUnitPrice: {
+    flex: 1.5,
+    textAlign: 'right',
+  },
+  colAmount: {
+    flex: 1.5,
+    textAlign: 'right',
+  },
+  headerText: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#000000',
+    textTransform: 'uppercase',
+  },
+  itemName: {
+    fontWeight: 'bold',
+    color: '#000000',
+    marginBottom: 2,
+  },
+  itemType: {
+    fontSize: 8,
+    color: '#666666',
+    textTransform: 'uppercase',
+  },
+  giftCardsSection: {
+    marginBottom: 20,
+    padding: 15,
+    backgroundColor: '#F8F8F8',
+    borderRadius: 4,
+  },
+  giftCard: {
+    padding: 10,
+    backgroundColor: '#FFFFFF',
+    border: '1pt solid #E0E0E0',
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  giftCardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  giftMessage: {
+    marginTop: 6,
+    paddingTop: 6,
+    borderTop: '1pt dashed #E0E0E0',
+    fontSize: 8,
+    color: '#666666',
+  },
+  totalsSection: {
+    marginBottom: 20,
+  },
+  totalsGrid: {
+    width: '40%',
+    marginLeft: 'auto',
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: '6pt 0',
+    borderBottom: '1pt solid #E0E0E0',
+  },
+  grandTotal: {
+    borderTop: '2pt solid #000000',
+    marginTop: 6,
+    paddingTop: 8,
+    fontSize: 12,
+  },
+  grandTotalAmount: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  invoiceFooter: {
+    borderTop: '2pt solid #000000',
+    paddingTop: 15,
+    alignItems: 'center',
+  },
+  thankYou: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#000000',
+  },
+  footerNotes: {
+    fontSize: 8,
+    color: '#666666',
+    textAlign: 'center',
+    lineHeight: 1.4,
+  },
+});
+
+// Professional Invoice PDF Component
+const InvoicePDF: React.FC<{
   selectedOrder: Order;
   selectedType: 'event' | 'course' | 'gift';
   subtotal: number;
@@ -134,7 +341,6 @@ const ReceiptPrintComponent: React.FC<{
   filteredItems: any[];
 }> = ({ selectedOrder, selectedType, subtotal, taxAmount, processingFee, total, filteredItems }) => {
   
-  // Helper functions inside the component
   const safeCurrency = (value: string | null | undefined): CurrencyCode => {
     if (!value) return 'USD';
     const normalized = value.toString().toUpperCase();
@@ -158,540 +364,196 @@ const ReceiptPrintComponent: React.FC<{
     return `${start}${middle}${end}`;
   };
 
+  const formatCurrency = (amount: number, currency: string = 'USD'): string => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 2,
+    }).format(amount);
+  };
+
   const orderCurrency = safeCurrency(selectedOrder.currency);
-  
+
   return (
-    <div className="invoice-container">
-      {/* Header Section */}
-      <div className="invoice-header">
-        <div className="company-info">
-          <h1 className="company-name">SKILLPULSE INNOVATIONS LIMITED</h1>
-          <div className="company-details">
-            <p>Elevating Skills, Empowering Futures</p>
-            <p>support@skillpulse.cloud | +260976972874</p>
-            <p>www.skillpulse.cloud</p>
-          </div>
-        </div>
-        <div className="invoice-title-section">
-          <h2 className="invoice-title">INVOICE</h2>
-          <div className="invoice-badge">{selectedType.toUpperCase()} ORDER</div>
-        </div>
-      </div>
+    <Document>
+      <Page size="A4" style={styles.page}>
+        {/* Header Section */}
+        <View style={styles.header}>
+          <View style={styles.companyInfo}>
+            <Text style={styles.companyName}>SKILLPULSE INNOVATIONS LIMITED</Text>
+            <Text style={styles.companyDetails}>
+              Elevating Skills, Empowering Futures
+              {"\n"}
+              support@skillpulse.cloud | +260976972874
+              {"\n"}
+              www.skillpulse.cloud
+            </Text>
+          </View>
+          <View style={styles.invoiceTitleSection}>
+            <Text style={styles.invoiceTitle}>INVOICE</Text>
+            <Text style={styles.invoiceBadge}>{selectedType.toUpperCase()} ORDER</Text>
+          </View>
+        </View>
 
-      {/* Invoice Details */}
-      <div className="invoice-details">
-        <div className="detail-section">
-          <h3>BILL TO:</h3>
-          <p className="customer-name">{selectedOrder.user_name || selectedOrder.email}</p>
-          <p>{selectedOrder.email}</p>
-        </div>
-        <div className="detail-section">
-          <div className="detail-row">
-            <span className="detail-label">INVOICE NO:</span>
-            <span className="detail-value">#{selectedOrder.id.slice(0, 8).toUpperCase()}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-label">DATE ISSUED:</span>
-            <span className="detail-value">{format(new Date(selectedOrder.created_at), 'dd/MM/yyyy')}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-label">PAYMENT STATUS:</span>
-            <span className={`status-badge ${selectedOrder.payment_status}`}>
-              {selectedOrder.payment_status.toUpperCase()}
-            </span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-label">PAYMENT METHOD:</span>
-            <span className="detail-value">{selectedOrder.payment_method || 'Mobile Money'}</span>
-          </div>
-        </div>
-      </div>
+        {/* Invoice Details */}
+        <View style={styles.invoiceDetails}>
+          <View style={styles.detailSection}>
+            <Text style={styles.sectionTitle}>BILL TO:</Text>
+            <Text style={styles.customerName}>
+              {selectedOrder.user_name || selectedOrder.email}
+            </Text>
+            <Text>{selectedOrder.email}</Text>
+          </View>
+          <View style={styles.detailSection}>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>INVOICE NO:</Text>
+              <Text style={styles.detailValue}>
+                #{selectedOrder.id.slice(0, 8).toUpperCase()}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>DATE ISSUED:</Text>
+              <Text style={styles.detailValue}>
+                {format(new Date(selectedOrder.created_at), 'dd/MM/yyyy')}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>PAYMENT STATUS:</Text>
+              <Text style={styles.detailValue}>
+                {selectedOrder.payment_status.toUpperCase()}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>PAYMENT METHOD:</Text>
+              <Text style={styles.detailValue}>
+                {selectedOrder.payment_method || 'Mobile Money'}
+              </Text>
+            </View>
+          </View>
+        </View>
 
-      {/* Items Table */}
-      <div className="items-section">
-        <table className="items-table">
-          <thead>
-            <tr>
-              <th className="text-left">DESCRIPTION</th>
-              <th className="text-center">QTY</th>
-              <th className="text-right">UNIT PRICE</th>
-              <th className="text-right">AMOUNT</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredItems.map((item, index) => (
-              <tr key={item.id} className={index % 2 === 0 ? 'even' : 'odd'}>
-                <td className="item-description">
-                  <div className="item-name">{item.item_name}</div>
-                  <div className="item-type">{item.item_type.replace('_', ' ').toUpperCase()}</div>
-                </td>
-                <td className="text-center">{item.quantity}</td>
-                <td className="text-right">
-                  <PriceDisplay 
-                    amount={safeNumber(item.unit_price)} 
-                    originalCurrency="USD"
-                    className="unit-price"
-                  />
-                </td>
-                <td className="text-right">
-                  <PriceDisplay 
-                    amount={safeNumber(item.total_price)} 
-                    originalCurrency="USD"
-                    className="amount"
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+        {/* Items Table */}
+        <View style={styles.itemsTable}>
+          {/* Table Header */}
+          <View style={styles.tableHeader}>
+            <View style={styles.colDescription}>
+              <Text style={styles.headerText}>DESCRIPTION</Text>
+            </View>
+            <View style={styles.colQty}>
+              <Text style={styles.headerText}>QTY</Text>
+            </View>
+            <View style={styles.colUnitPrice}>
+              <Text style={styles.headerText}>UNIT PRICE</Text>
+            </View>
+            <View style={styles.colAmount}>
+              <Text style={styles.headerText}>AMOUNT</Text>
+            </View>
+          </View>
 
-      {/* Gift Card Details */}
-      {selectedType === 'gift' && selectedOrder.gift_cards && selectedOrder.gift_cards.length > 0 && (
-        <div className="gift-cards-section">
-          <h3>GIFT CARD DETAILS</h3>
-          <div className="gift-cards-grid">
+          {/* Table Rows */}
+          {filteredItems.map((item, index) => (
+            <View 
+              key={item.id} 
+              style={[
+                styles.tableRow,
+                index % 2 === 0 ? styles.tableRowEven : {}
+              ]}
+            >
+              <View style={styles.colDescription}>
+                <Text style={styles.itemName}>{item.item_name}</Text>
+                <Text style={styles.itemType}>
+                  {item.item_type.replace('_', ' ').toUpperCase()}
+                </Text>
+              </View>
+              <View style={styles.colQty}>
+                <Text>{item.quantity}</Text>
+              </View>
+              <View style={styles.colUnitPrice}>
+                <Text>{formatCurrency(safeNumber(item.unit_price), orderCurrency)}</Text>
+              </View>
+              <View style={styles.colAmount}>
+                <Text>{formatCurrency(safeNumber(item.total_price), orderCurrency)}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        {/* Gift Card Details */}
+        {selectedType === 'gift' && selectedOrder.gift_cards && selectedOrder.gift_cards.length > 0 && (
+          <View style={styles.giftCardsSection}>
+            <Text style={styles.sectionTitle}>GIFT CARD DETAILS</Text>
             {selectedOrder.gift_cards.map((gift) => (
-              <div key={gift.id} className="gift-card">
-                <div className="gift-card-row">
-                  <span>Gift Card Code:</span>
-                  <strong>{obfuscateGiftCode(gift.gift_card_code)}</strong>
-                </div>
-                <div className="gift-card-row">
-                  <span>Amount:</span>
-                  <PriceDisplay 
-                    amount={safeNumber(gift.amount)} 
-                    originalCurrency="USD"
-                    className="gift-amount"
-                  />
-                </div>
-                <div className="gift-card-row">
-                  <span>Recipient:</span>
-                  <span>{gift.recipient_name} ({gift.recipient_email})</span>
-                </div>
-                <div className="gift-card-row">
-                  <span>Expires:</span>
-                  <span>{format(new Date(gift.expires_at), 'dd/MM/yyyy')}</span>
-                </div>
+              <View key={gift.id} style={styles.giftCard}>
+                <View style={styles.giftCardRow}>
+                  <Text>Gift Card Code:</Text>
+                  <Text style={{ fontWeight: 'bold' }}>
+                    {obfuscateGiftCode(gift.gift_card_code)}
+                  </Text>
+                </View>
+                <View style={styles.giftCardRow}>
+                  <Text>Amount:</Text>
+                  <Text style={{ fontWeight: 'bold' }}>
+                    {formatCurrency(safeNumber(gift.amount), safeCurrency(gift.currency))}
+                  </Text>
+                </View>
+                <View style={styles.giftCardRow}>
+                  <Text>Recipient:</Text>
+                  <Text>
+                    {gift.recipient_name} ({gift.recipient_email})
+                  </Text>
+                </View>
+                <View style={styles.giftCardRow}>
+                  <Text>Expires:</Text>
+                  <Text>{format(new Date(gift.expires_at), 'dd/MM/yyyy')}</Text>
+                </View>
                 {gift.personal_message && (
-                  <div className="gift-message">
-                    <span>Personal Message:</span>
-                    <em>"{gift.personal_message}"</em>
-                  </div>
+                  <View style={styles.giftMessage}>
+                    <Text>Personal Message:</Text>
+                    <Text>"{gift.personal_message}"</Text>
+                  </View>
                 )}
-              </div>
+              </View>
             ))}
-          </div>
-        </div>
-      )}
+          </View>
+        )}
 
-      {/* Totals Section */}
-      <div className="totals-section">
-        <div className="totals-grid">
-          <div className="total-row">
-            <span>Subtotal:</span>
-            <PriceDisplay 
-              amount={subtotal} 
-              originalCurrency="USD"
-              className="total-amount"
-            />
-          </div>
-          <div className="total-row">
-            <span>Tax (1.5%):</span>
-            <PriceDisplay 
-              amount={taxAmount} 
-              originalCurrency="USD"
-              className="total-amount"
-            />
-          </div>
-          <div className="total-row">
-            <span>Processing Fee (2.9%):</span>
-            <PriceDisplay 
-              amount={processingFee} 
-              originalCurrency="USD"
-              className="total-amount"
-            />
-          </div>
-          <div className="total-row grand-total">
-            <span>TOTAL AMOUNT:</span>
-            <PriceDisplay 
-              amount={total} 
-              originalCurrency={orderCurrency}
-              className="grand-total-amount"
-            />
-          </div>
-        </div>
-      </div>
+        {/* Totals Section */}
+        <View style={styles.totalsSection}>
+          <View style={styles.totalsGrid}>
+            <View style={styles.totalRow}>
+              <Text>Subtotal:</Text>
+              <Text>{formatCurrency(subtotal, orderCurrency)}</Text>
+            </View>
+            <View style={styles.totalRow}>
+              <Text>Tax (1.5%):</Text>
+              <Text>{formatCurrency(taxAmount, orderCurrency)}</Text>
+            </View>
+            <View style={styles.totalRow}>
+              <Text>Processing Fee (2.9%):</Text>
+              <Text>{formatCurrency(processingFee, orderCurrency)}</Text>
+            </View>
+            <View style={[styles.totalRow, styles.grandTotal]}>
+              <Text style={{ fontWeight: 'bold' }}>TOTAL AMOUNT:</Text>
+              <Text style={styles.grandTotalAmount}>
+                {formatCurrency(total, orderCurrency)}
+              </Text>
+            </View>
+          </View>
+        </View>
 
-      {/* Footer Section */}
-      <div className="invoice-footer">
-        <div className="thank-you">Thank you for your business!</div>
-        <div className="footer-notes">
-          <p>This is a computer-generated invoice and does not require a physical signature.</p>
-          <p>Tax Registration Number: VAT-{selectedOrder.id.slice(0, 8).toUpperCase()}-SL</p>
-          <p>For questions about this invoice, please contact our support team at support@skillpulse.cloud</p>
-        </div>
-      </div>
-    </div>
+        {/* Footer Section */}
+        <View style={styles.invoiceFooter}>
+          <Text style={styles.thankYou}>Thank you for your business!</Text>
+          <View style={styles.footerNotes}>
+            <Text>This is a computer-generated invoice and does not require a physical signature.</Text>
+            <Text>Tax Registration Number: VAT-{selectedOrder.id.slice(0, 8).toUpperCase()}-SL</Text>
+            <Text>For questions about this invoice, please contact our support team at support@skillpulse.cloud</Text>
+          </View>
+        </View>
+      </Page>
+    </Document>
   );
 };
-
-// Professional Black & White Invoice Styles
-const printStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-  
-  @media print {
-    body { 
-      background: white !important;
-      margin: 0;
-      padding: 0;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-      font-family: 'Inter', sans-serif;
-    }
-    
-    .invoice-container {
-      box-shadow: none !important;
-      margin: 0 !important;
-      padding: 0 !important;
-    }
-  }
-
-  .invoice-container {
-    font-family: 'Inter', sans-serif;
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 30px;
-    background: white;
-    color: #000000;
-    line-height: 1.4;
-  }
-
-  /* Header Styles */
-  .invoice-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    border-bottom: 2px solid #000000;
-    padding-bottom: 20px;
-    margin-bottom: 30px;
-  }
-
-  .company-info {
-    flex: 1;
-  }
-
-  .company-name {
-    font-size: 24px;
-    font-weight: 700;
-    margin: 0 0 8px 0;
-    color: #000000;
-    letter-spacing: 0.5px;
-  }
-
-  .company-details {
-    font-size: 12px;
-    color: #666666;
-    line-height: 1.5;
-  }
-
-  .invoice-title-section {
-    text-align: right;
-  }
-
-  .invoice-title {
-    font-size: 32px;
-    font-weight: 800;
-    margin: 0 0 8px 0;
-    color: #000000;
-    letter-spacing: 1px;
-  }
-
-  .invoice-badge {
-    background: #000000;
-    color: white;
-    padding: 6px 12px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: 600;
-    display: inline-block;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  /* Invoice Details */
-  .invoice-details {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 40px;
-    margin-bottom: 30px;
-  }
-
-  .detail-section h3 {
-    font-size: 14px;
-    font-weight: 600;
-    margin: 0 0 12px 0;
-    color: #000000;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .customer-name {
-    font-size: 16px;
-    font-weight: 600;
-    margin: 0 0 4px 0;
-    color: #000000;
-  }
-
-  .detail-row {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 6px;
-    font-size: 13px;
-  }
-
-  .detail-label {
-    font-weight: 500;
-    color: #666666;
-  }
-
-  .detail-value {
-    font-weight: 600;
-    color: #000000;
-  }
-
-  .status-badge {
-    padding: 2px 8px;
-    border-radius: 3px;
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-  }
-
-  .status-badge.confirmed,
-  .status-badge.completed,
-  .status-badge.active {
-    background: #f0f0f0;
-    color: #000000;
-    border: 1px solid #000000;
-  }
-
-  .status-badge.pending {
-    background: #f0f0f0;
-    color: #666666;
-    border: 1px solid #666666;
-  }
-
-  /* Items Table */
-  .items-section {
-    margin-bottom: 30px;
-  }
-
-  .items-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-  }
-
-  .items-table th {
-    background: #f8f8f8;
-    color: #000000;
-    padding: 12px 8px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border-bottom: 2px solid #000000;
-    font-size: 11px;
-  }
-
-  .items-table td {
-    padding: 12px 8px;
-    border-bottom: 1px solid #e0e0e0;
-  }
-
-  .items-table tr.even {
-    background: #fafafa;
-  }
-
-  .items-table tr.odd {
-    background: white;
-  }
-
-  .items-table tr:last-child td {
-    border-bottom: 2px solid #000000;
-  }
-
-  .item-description {
-    max-width: 250px;
-  }
-
-  .item-name {
-    font-weight: 600;
-    color: #000000;
-    margin-bottom: 2px;
-  }
-
-  .item-type {
-    font-size: 10px;
-    color: #666666;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-  }
-
-  .text-left { text-align: left; }
-  .text-center { text-align: center; }
-  .text-right { text-align: right; }
-
-  .unit-price,
-  .amount {
-    font-weight: 600;
-    color: #000000;
-  }
-
-  /* Gift Cards */
-  .gift-cards-section {
-    margin-bottom: 30px;
-    padding: 20px;
-    background: #f8f8f8;
-    border-radius: 4px;
-  }
-
-  .gift-cards-section h3 {
-    font-size: 14px;
-    font-weight: 600;
-    margin: 0 0 15px 0;
-    color: #000000;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .gift-cards-grid {
-    display: grid;
-    gap: 15px;
-  }
-
-  .gift-card {
-    padding: 15px;
-    background: white;
-    border: 1px solid #e0e0e0;
-    border-radius: 4px;
-  }
-
-  .gift-card-row {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 6px;
-    font-size: 12px;
-  }
-
-  .gift-card-row span:first-child {
-    color: #666666;
-    font-weight: 500;
-  }
-
-  .gift-card-row span:last-child {
-    color: #000000;
-    font-weight: 600;
-  }
-
-  .gift-amount {
-    font-weight: 600;
-    color: #000000;
-  }
-
-  .gift-message {
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px dashed #e0e0e0;
-    font-size: 11px;
-    color: #666666;
-  }
-
-  .gift-message span {
-    font-weight: 500;
-    color: #666666;
-  }
-
-  .gift-message em {
-    color: #000000;
-    font-style: italic;
-  }
-
-  /* Totals Section */
-  .totals-section {
-    margin-bottom: 30px;
-  }
-
-  .totals-grid {
-    max-width: 300px;
-    margin-left: auto;
-  }
-
-  .total-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 8px 0;
-    font-size: 13px;
-    border-bottom: 1px solid #e0e0e0;
-  }
-
-  .total-row:last-child {
-    border-bottom: none;
-  }
-
-  .total-row span {
-    color: #666666;
-    font-weight: 500;
-  }
-
-  .total-amount {
-    font-weight: 600;
-    color: #000000;
-  }
-
-  .grand-total {
-    font-size: 16px;
-    font-weight: 700;
-    padding-top: 12px;
-    border-top: 2px solid #000000;
-    margin-top: 8px;
-  }
-
-  .grand-total span {
-    color: #000000;
-    font-weight: 700;
-  }
-
-  .grand-total-amount {
-    font-size: 18px;
-    font-weight: 800;
-    color: #000000;
-  }
-
-  /* Footer */
-  .invoice-footer {
-    border-top: 2px solid #000000;
-    padding-top: 20px;
-    text-align: center;
-  }
-
-  .thank-you {
-    font-size: 16px;
-    font-weight: 600;
-    color: #000000;
-    margin-bottom: 15px;
-  }
-
-  .footer-notes {
-    font-size: 10px;
-    color: #666666;
-    line-height: 1.5;
-  }
-
-  .footer-notes p {
-    margin: 4px 0;
-  }
-`;
 
 // Pulse Loading Component
 const PulseLoading = () => {
@@ -877,16 +739,7 @@ const MyOrdersPage = () => {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedType, setSelectedType] = useState<'event' | 'course' | 'gift'>('event');
-  
-  // PDF Hook
-  const { toPDF, targetRef } = usePDF({ 
-    filename: `invoice-${selectedOrder?.id.slice(0, 8) || 'order'}.pdf`,
-    page: { 
-      margin: 15,
-      format: 'a4',
-      orientation: 'portrait'
-    }
-  });
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -1172,8 +1025,34 @@ const MyOrdersPage = () => {
     return { subtotal, taxAmount, processingFee, total, filteredItems };
   };
 
-  const handlePrintReceipt = () => {
-    toPDF();
+  const handleDownloadPDF = async () => {
+    if (!selectedOrder) return;
+    
+    try {
+      setIsGeneratingPDF(true);
+      
+      const { subtotal, taxAmount, processingFee, total, filteredItems } = calculateReceiptTotals(selectedOrder, selectedType);
+      
+      const blob = await pdf(
+        <InvoicePDF
+          selectedOrder={selectedOrder}
+          selectedType={selectedType}
+          subtotal={subtotal}
+          taxAmount={taxAmount}
+          processingFee={processingFee}
+          total={total}
+          filteredItems={filteredItems}
+        />
+      ).toBlob();
+      
+      saveAs(blob, `invoice-${selectedOrder.id.slice(0, 8)}.pdf`);
+      toast.success('Invoice downloaded successfully!');
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error('Failed to generate invoice');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
   };
 
   const handlePageChange = (page: number) => {
@@ -1563,12 +1442,22 @@ const MyOrdersPage = () => {
           title="Order Invoice"
           actions={
             <Button 
-              onClick={handlePrintReceipt} 
+              onClick={handleDownloadPDF}
+              disabled={isGeneratingPDF}
               size="sm"
               className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
             >
-              <Download className="h-4 w-4 mr-2" />
-              Download Invoice
+              {isGeneratingPDF ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Invoice
+                </>
+              )}
             </Button>
           }
         >
@@ -1577,130 +1466,118 @@ const MyOrdersPage = () => {
             const orderCurrency = safeCurrency(selectedOrder.currency);
             
             return (
-              <div>
-                {/* Hidden invoice for PDF generation */}
-                <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
-                  <div ref={targetRef}>
-                    <ReceiptPrintComponent
-                      selectedOrder={selectedOrder}
-                      selectedType={selectedType}
-                      subtotal={subtotal}
-                      taxAmount={taxAmount}
-                      processingFee={processingFee}
-                      total={total}
-                      filteredItems={filteredItems}
-                    />
+              <div className="space-y-4">
+                <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg">
+                  <h3 className="font-semibold text-lg mb-2">Invoice #{selectedOrder.id.slice(0, 8)} - {selectedType.toUpperCase()}</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p><strong>Date:</strong> {format(new Date(selectedOrder.created_at), 'PPP')}</p>
+                      <p><strong>Status:</strong> {selectedOrder.payment_status}</p>
+                    </div>
+                    <div>
+                      <p><strong>Payment:</strong> {selectedOrder.payment_method}</p>
+                      <p>
+                        <strong>Total:</strong> <PriceDisplay 
+                          amount={computeTypeSubtotalsFull(selectedOrder)[selectedType]} 
+                          originalCurrency="USD"
+                          className="font-semibold"
+                        />
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <h4 className="font-semibold mb-2">Items:</h4>
+                  <div className="space-y-2">
+                    {filteredItems.map((item) => (
+                      <div key={item.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                        <div>
+                          <p className="font-medium">{item.item_name}</p>
+                          <p className="text-sm text-gray-600">
+                            Qty: {item.quantity} × <PriceDisplay 
+                              amount={safeNumber(item.unit_price)} 
+                              originalCurrency="USD"
+                              className="inline"
+                            />
+                          </p>
+                        </div>
+                        <PriceDisplay 
+                          amount={safeNumber(item.total_price)} 
+                          originalCurrency="USD"
+                          className="font-semibold"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {selectedType === 'gift' && selectedOrder.gift_cards && selectedOrder.gift_cards.length > 0 && (
+                    <div className="mt-4">
+                      <h5 className="font-semibold mb-2">Gift Card Details:</h5>
+                      <div className="space-y-2">
+                        {selectedOrder.gift_cards.map((gift) => {
+                          const giftCurrency = safeCurrency(gift.currency || selectedOrder.currency);
+                          return (
+                          <div key={gift.id} className="p-3 bg-gray-50 rounded">
+                            <p className="font-medium">Code: {obfuscateGiftCode(gift.gift_card_code)}</p>
+                            <p className="text-sm text-gray-600">Recipient: {gift.recipient_name} ({gift.recipient_email})</p>
+                            <p className="text-sm text-gray-600">Status: {gift.status.toUpperCase()}</p>
+                            <p className="text-sm text-gray-600">Expires: {format(new Date(gift.expires_at), 'PPP')}</p>
+                            <PriceDisplay 
+                              amount={safeNumber(gift.amount)} 
+                              originalCurrency="USD"
+                              className="font-semibold"
+                            />
+                          </div>
+                        )})}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Invoice Summary */}
+                <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg mt-4">
+                  <h4 className="font-semibold mb-3">Invoice Summary</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>Subtotal:</span>
+                      <PriceDisplay 
+                        amount={subtotal} 
+                        originalCurrency="USD"
+                        className="font-medium"
+                      />
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Tax (1.5%):</span>
+                      <PriceDisplay 
+                        amount={taxAmount} 
+                        originalCurrency="USD"
+                        className="font-medium"
+                      />
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Processing Fee (2.9%):</span>
+                      <PriceDisplay 
+                        amount={processingFee} 
+                        originalCurrency="USD"
+                        className="font-medium"
+                      />
+                    </div>
+                    <div className="flex justify-between font-semibold border-t pt-2">
+                      <span>Total:</span>
+                      <PriceDisplay 
+                        amount={total} 
+                        originalCurrency={orderCurrency}
+                        className="font-bold"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                {/* Visible invoice preview */}
-                <div className="space-y-4">
-                  <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg">
-                    <h3 className="font-semibold text-lg mb-2">Invoice #{selectedOrder.id.slice(0, 8)} - {selectedType.toUpperCase()}</h3>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p><strong>Date:</strong> {format(new Date(selectedOrder.created_at), 'PPP')}</p>
-                        <p><strong>Status:</strong> {selectedOrder.payment_status}</p>
-                      </div>
-                      <div>
-                        <p><strong>Payment:</strong> {selectedOrder.payment_method}</p>
-                        <p>
-                          <strong>Total:</strong> <PriceDisplay 
-                            amount={computeTypeSubtotalsFull(selectedOrder)[selectedType]} 
-                            originalCurrency="USD"
-                            className="font-semibold"
-                          />
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-semibold mb-2">Items:</h4>
-                    <div className="space-y-2">
-                      {filteredItems.map((item) => (
-                        <div key={item.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                          <div>
-                            <p className="font-medium">{item.item_name}</p>
-                            <p className="text-sm text-gray-600">
-                              Qty: {item.quantity} × <PriceDisplay 
-                                amount={safeNumber(item.unit_price)} 
-                                originalCurrency="USD"
-                                className="inline"
-                              />
-                            </p>
-                          </div>
-                          <PriceDisplay 
-                            amount={safeNumber(item.total_price)} 
-                            originalCurrency="USD"
-                            className="font-semibold"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                    
-                    {selectedType === 'gift' && selectedOrder.gift_cards && selectedOrder.gift_cards.length > 0 && (
-                      <div className="mt-4">
-                        <h5 className="font-semibold mb-2">Gift Card Details:</h5>
-                        <div className="space-y-2">
-                          {selectedOrder.gift_cards.map((gift) => {
-                            const giftCurrency = safeCurrency(gift.currency || selectedOrder.currency);
-                            return (
-                            <div key={gift.id} className="p-3 bg-gray-50 rounded">
-                              <p className="font-medium">Code: {obfuscateGiftCode(gift.gift_card_code)}</p>
-                              <p className="text-sm text-gray-600">Recipient: {gift.recipient_name} ({gift.recipient_email})</p>
-                              <p className="text-sm text-gray-600">Status: {gift.status.toUpperCase()}</p>
-                              <p className="text-sm text-gray-600">Expires: {format(new Date(gift.expires_at), 'PPP')}</p>
-                              <PriceDisplay 
-                                amount={safeNumber(gift.amount)} 
-                                originalCurrency="USD"
-                                className="font-semibold"
-                              />
-                            </div>
-                          )})}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Invoice Summary */}
-                  <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg mt-4">
-                    <h4 className="font-semibold mb-3">Invoice Summary</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span>Subtotal:</span>
-                        <PriceDisplay 
-                          amount={subtotal} 
-                          originalCurrency="USD"
-                          className="font-medium"
-                        />
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Tax (1.5%):</span>
-                        <PriceDisplay 
-                          amount={taxAmount} 
-                          originalCurrency="USD"
-                          className="font-medium"
-                        />
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Processing Fee (2.9%):</span>
-                        <PriceDisplay 
-                          amount={processingFee} 
-                          originalCurrency="USD"
-                          className="font-medium"
-                        />
-                      </div>
-                      <div className="flex justify-between font-semibold border-t pt-2">
-                        <span>Total:</span>
-                        <PriceDisplay 
-                          amount={total} 
-                          originalCurrency={orderCurrency}
-                          className="font-bold"
-                        />
-                      </div>
-                    </div>
-                  </div>
+                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <p className="text-sm text-blue-700 text-center">
+                    Click "Download Invoice" to get a professional PDF version of this invoice
+                  </p>
                 </div>
               </div>
             );
