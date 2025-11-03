@@ -10,9 +10,6 @@ import { Calendar, MapPin, Download, Eye, Ticket, BookOpen, Printer, X, FileText
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
-import TicketDisplay from '@/components/tickets/TicketDisplay';
-import { QRCodeSVG } from 'qrcode.react';
-import html2pdf from 'html2pdf.js';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { CurrencyCode, SUPPORTED_CURRENCIES } from '@/constants/currencies';
 
@@ -124,226 +121,6 @@ interface TicketData {
   booking_id?: string;
   ticket_status?: string;
 }
-
-// Receipt Print Component
-const ReceiptPrint = React.forwardRef<HTMLDivElement, {
-  selectedOrder: Order;
-  selectedType: 'event' | 'course' | 'gift';
-  subtotal: number;
-  taxAmount: number;
-  processingFee: number;
-  total: number;
-  filteredItems: any[];
-}>(({ selectedOrder, selectedType, subtotal, taxAmount, processingFee, total, filteredItems }, ref) => {
-  const orderCurrency = safeCurrency(selectedOrder.currency);
-  
-  return (
-    <div ref={ref} className="receipt-print-container">
-      <div className="receipt-container">
-        <div className="receipt-watermark">SKILLPULSE</div>
-        
-        <div className="receipt-header">
-          <div className="company-logo">SkillPulse Innovations Limited</div>
-          <div className="company-subtitle">Elevating Skills, Empowering Futures</div>
-          <div className="receipt-title">PAYMENT RECEIPT</div>
-          <div className="order-type-badge">{selectedType.toUpperCase()} ORDER</div>
-        </div>
-        
-        <div className="order-info">
-          <div>
-            <div className="info-item">
-              <div className="info-label">Order Date</div>
-              <div className="info-value">{format(new Date(selectedOrder.created_at), 'PPPP')}</div>
-            </div>
-            <div className="info-item">
-              <div className="info-label">Order Number</div>
-              <div className="info-value">#{selectedOrder.id.slice(0, 8).toUpperCase()}</div>
-            </div>
-            <div className="info-item">
-              <div className="info-label">Customer</div>
-              <div className="info-value">{selectedOrder.user_name || selectedOrder.email}</div>
-            </div>
-          </div>
-          <div>
-            <div className="info-item">
-              <div className="info-label">Payment Method</div>
-              <div className="info-value">{selectedOrder.payment_method || 'Mobile Money'}</div>
-            </div>
-            <div className="info-item">
-              <div className="info-label">Payment Status</div>
-              <div className="info-value">
-                <span style={{ color: '#16a34a', fontWeight: '600' }}>
-                  {selectedOrder.payment_status.toUpperCase()}
-                </span>
-              </div>
-            </div>
-            <div className="info-item">
-              <div className="info-label">Currency</div>
-              <div className="info-value">{orderCurrency}</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="items-section">
-          <h3 className="section-title">Order Items</h3>
-          <table className="items-table">
-            <thead>
-              <tr>
-                <th>Item Description</th>
-                <th>Qty</th>
-                <th>Unit Price</th>
-                <th>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredItems.map((item) => (
-                <tr key={item.id}>
-                  <td>
-                    <div style={{ fontWeight: '600', color: '#1f2937' }}>{item.item_name}</div>
-                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
-                      {item.item_type.replace('_', ' ').toUpperCase()}
-                    </div>
-                  </td>
-                  <td>{item.quantity}</td>
-                  <td>
-                    <PriceDisplay 
-                      amount={safeNumber(item.unit_price)} 
-                      originalCurrency="USD"
-                      className="text-sm"
-                    />
-                  </td>
-                  <td style={{ fontWeight: '600', color: '#f97316' }}>
-                    <PriceDisplay 
-                      amount={safeNumber(item.total_price)} 
-                      originalCurrency="USD"
-                      className="text-sm"
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {selectedType === 'gift' && selectedOrder.gift_cards && selectedOrder.gift_cards.length > 0 && (
-          <div className="items-section">
-            <h3 className="section-title">Gift Card Details</h3>
-            {selectedOrder.gift_cards.map((gift) => {
-              const giftCurrency = safeCurrency(gift.currency);
-              return (
-                <div key={gift.id} style={{ background: '#f8fafc', padding: '20px', borderRadius: '12px', marginBottom: '15px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-                    <div>
-                      <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>Gift Card Code</div>
-                      <div style={{ fontFamily: 'monospace', fontWeight: '600', color: '#1f2937' }}>
-                        {obfuscateGiftCode(gift.gift_card_code)}
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>Amount</div>
-                      <div style={{ fontWeight: '600', color: '#f97316' }}>
-                        <PriceDisplay 
-                          amount={safeNumber(gift.amount)} 
-                          originalCurrency="USD"
-                          className="text-sm"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>Recipient</div>
-                      <div style={{ fontWeight: '500', color: '#1f2937' }}>{gift.recipient_name}</div>
-                      <div style={{ fontSize: '12px', color: '#6b7280' }}>{gift.recipient_email}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>Expires</div>
-                      <div style={{ fontWeight: '500', color: '#1f2937' }}>
-                        {format(new Date(gift.expires_at), 'PPP')}
-                      </div>
-                    </div>
-                  </div>
-                  {gift.personal_message && (
-                    <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px dashed #e2e8f0' }}>
-                      <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>Personal Message</div>
-                      <div style={{ fontStyle: 'italic', color: '#475569' }}>"{gift.personal_message}"</div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        <div className="total-section">
-          <h3 className="section-title" style={{ borderBottom: 'none', marginBottom: '0' }}>Payment Summary</h3>
-          
-          <div className="total-row">
-            <span className="total-label">Subtotal</span>
-            <span className="total-value">
-              <PriceDisplay 
-                amount={subtotal} 
-                originalCurrency="USD"
-                className="font-medium"
-              />
-            </span>
-          </div>
-          
-          <div className="total-row">
-            <span className="total-label">Tax (1.5%)</span>
-            <span className="total-value">
-              <PriceDisplay 
-                amount={taxAmount} 
-                originalCurrency="USD"
-                className="font-medium"
-              />
-            </span>
-          </div>
-
-          <div className="total-row">
-            <span className="total-label">Processing Fee (2.9%)</span>
-            <span className="total-value">
-              <PriceDisplay 
-                amount={processingFee} 
-                originalCurrency="USD"
-                className="font-medium"
-              />
-            </span>
-          </div>
-          
-          <div className="total-row total-amount">
-            <span>Total Amount</span>
-            <span>
-              <PriceDisplay 
-                amount={total} 
-                originalCurrency={orderCurrency}
-                className="font-bold text-2xl"
-              />
-            </span>
-          </div>
-          
-          <div className="tax-breakdown">
-            <div className="tax-title">Fee Breakdown</div>
-            <div style={{ fontSize: '13px', color: '#6b7280', lineHeight: '1.5' }}>
-              This receipt is inclusive of tax and payment processing fee. 
-              Tax registration number: VAT-{selectedOrder.id.slice(0, 8).toUpperCase()}-SL
-            </div>
-          </div>
-        </div>
-
-        <div className="footer">
-          <div className="thank-you">Thank you for your business!</div>
-          <div style={{ marginBottom: '15px' }}>
-            SkillPulse Innovations Limited • support@skillpulse.cloud<br />
-            +260976972874 • www.skillpulse.cloud
-          </div>
-          <div>
-            This receipt is computer generated and does not require a physical signature.<br />
-            For questions about this receipt, please contact our support team.
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-});
 
 // Print styles for the receipt
 const printStyles = `
@@ -941,85 +718,6 @@ const MyOrdersPage = () => {
     }
   };
 
-  // Add the missing functions here
-  const handleDownloadTicketsPDF = () => {
-    if (selectedBookings.length === 0) return;
-    
-    const element = document.getElementById('tickets-print-content');
-    if (!element) {
-      toast.error('Could not find ticket content to download');
-      return;
-    }
-
-    const options = {
-      margin: 10,
-      filename: `tickets-${selectedBookings[0].event?.title || 'event'}-${Date.now()}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
-
-    html2pdf().set(options).from(element).save()
-      .then(() => {
-        toast.success('Tickets downloaded successfully');
-      })
-      .catch((error) => {
-        console.error('PDF download error:', error);
-        toast.error('Failed to download tickets');
-      });
-  };
-
-  const handlePrintTickets = () => {
-    if (selectedBookings.length === 0) return;
-    
-    const printContent = document.getElementById('tickets-print-content');
-    if (!printContent) {
-      toast.error('Could not find ticket content to print');
-      return;
-    }
-
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Print Tickets</title>
-          <style>
-            body { 
-              margin: 0; 
-              padding: 20px; 
-              font-family: Arial, sans-serif; 
-              background: white;
-            }
-            .ticket-container { 
-              margin-bottom: 30px; 
-              page-break-inside: avoid;
-            }
-          </style>
-        </head>
-        <body>
-          ${printContent.innerHTML}
-        </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.focus();
-      
-      setTimeout(() => {
-        printWindow.print();
-        // printWindow.close(); // Optional: close after printing
-      }, 500);
-    } else {
-      toast.error('Please allow popups to print tickets');
-    }
-  };
-
-  // Use the PulseLoading component instead of simple spinner
-  if (loading) {
-    return <PulseLoading />;
-  }
-
   const getStatusBadge = (status: string) => {
     const statusMap = {
       confirmed: { color: 'bg-green-100 text-green-800', label: 'Confirmed' },
@@ -1136,30 +834,6 @@ const MyOrdersPage = () => {
     const tickets = await fetchDetailedTickets(order, bookingId);
     setSelectedBookings(tickets);
     setShowTicketModal(true);
-    
-    setTimeout(() => {
-      tickets.forEach((ticket, index) => {
-        const qrContainer = document.getElementById(`qr-code-${ticket.ticket_code || ticket.booking_code}-${index}`);
-        if (qrContainer && window.QRCode) {
-          qrContainer.innerHTML = '';
-          try {
-            new window.QRCode(qrContainer, {
-              text: ticket.qr_code_data,
-              width: 150,
-              height: 150,
-              colorDark: "#000000",
-              colorLight: "#ffffff",
-              correctLevel: window.QRCode.CorrectLevel.M
-            });
-          } catch (err) {
-            console.error('QR Code generation error:', err);
-            qrContainer.innerHTML = '<div style="width: 150px; height: 150px; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6b7280;">QR Code Error</div>';
-          }
-        } else if (qrContainer) {
-          qrContainer.innerHTML = '<div style="width: 150px; height: 150px; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6b7280;">Loading QR...</div>';
-        }
-      });
-    }, 100);
   };
 
   const handleViewReceipt = (order: Order, type: 'event' | 'course' | 'gift') => {
@@ -1190,58 +864,231 @@ const MyOrdersPage = () => {
     
     const { subtotal, taxAmount, processingFee, total, filteredItems } = calculateReceiptTotals(selectedOrder, selectedType);
     
-    // Create a new window and render the React component
+    // Create a new window for printing
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       toast.error('Please allow popups to print receipts');
       return;
     }
 
-    // Create a temporary container to render the React component
-    const tempDiv = document.createElement('div');
-    const root = ReactDOM.createRoot(tempDiv);
-    
-    root.render(
-      React.createElement(ReceiptPrint, {
-        selectedOrder,
-        selectedType,
-        subtotal,
-        taxAmount,
-        processingFee,
-        total,
-        filteredItems
-      })
-    );
+    // Create the receipt HTML content directly
+    const receiptHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Receipt - Order #${selectedOrder.id.slice(0, 8)}</title>
+        <style>
+          ${printStyles}
+          
+          /* Additional print-specific styles */
+          @media print {
+            body { 
+              margin: 0;
+              padding: 0;
+              background: white !important;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .no-print { display: none !important; }
+          }
+          
+          body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: white;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="receipt-print-container">
+          <div class="receipt-container">
+            <div class="receipt-watermark">SKILLPULSE</div>
+            
+            <div class="receipt-header">
+              <div class="company-logo">SkillPulse Innovations Limited</div>
+              <div class="company-subtitle">Elevating Skills, Empowering Futures</div>
+              <div class="receipt-title">PAYMENT RECEIPT</div>
+              <div class="order-type-badge">${selectedType.toUpperCase()} ORDER</div>
+            </div>
+            
+            <div class="order-info">
+              <div>
+                <div class="info-item">
+                  <div class="info-label">Order Date</div>
+                  <div class="info-value">${format(new Date(selectedOrder.created_at), 'PPPP')}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Order Number</div>
+                  <div class="info-value">#${selectedOrder.id.slice(0, 8).toUpperCase()}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Customer</div>
+                  <div class="info-value">${selectedOrder.user_name || selectedOrder.email}</div>
+                </div>
+              </div>
+              <div>
+                <div class="info-item">
+                  <div class="info-label">Payment Method</div>
+                  <div class="info-value">${selectedOrder.payment_method || 'Mobile Money'}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Payment Status</div>
+                  <div class="info-value">
+                    <span style="color: #16a34a; font-weight: 600;">
+                      ${selectedOrder.payment_status.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Currency</div>
+                  <div class="info-value">${safeCurrency(selectedOrder.currency)}</div>
+                </div>
+              </div>
+            </div>
 
-    // Wait for React to render, then get the HTML
-    setTimeout(() => {
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Receipt - Order #${selectedOrder.id.slice(0, 8)}</title>
-          <style>${printStyles}</style>
-        </head>
-        <body>
-          ${tempDiv.innerHTML}
-          <script>
-            window.onload = function() {
-              window.print();
-            };
-          </script>
-        </body>
-        </html>
-      `;
+            <div class="items-section">
+              <h3 class="section-title">Order Items</h3>
+              <table class="items-table">
+                <thead>
+                  <tr>
+                    <th>Item Description</th>
+                    <th>Qty</th>
+                    <th>Unit Price</th>
+                    <th>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${filteredItems.map((item) => `
+                    <tr key="${item.id}">
+                      <td>
+                        <div style="font-weight: 600; color: #1f2937;">${item.item_name}</div>
+                        <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">
+                          ${item.item_type.replace('_', ' ').toUpperCase()}
+                        </div>
+                      </td>
+                      <td>${item.quantity}</td>
+                      <td>
+                        $${safeNumber(item.unit_price).toFixed(2)}
+                      </td>
+                      <td style="font-weight: 600; color: #f97316;">
+                        $${safeNumber(item.total_price).toFixed(2)}
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
 
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-    }, 100);
+            ${selectedType === 'gift' && selectedOrder.gift_cards && selectedOrder.gift_cards.length > 0 ? `
+              <div class="items-section">
+                <h3 class="section-title">Gift Card Details</h3>
+                ${selectedOrder.gift_cards.map((gift) => `
+                  <div key="${gift.id}" style="background: #f8fafc; padding: 20px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #e2e8f0">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                      <div>
+                        <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Gift Card Code</div>
+                        <div style="font-family: monospace; font-weight: 600; color: #1f2937;">
+                          ${obfuscateGiftCode(gift.gift_card_code)}
+                        </div>
+                      </div>
+                      <div>
+                        <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Amount</div>
+                        <div style="font-weight: 600; color: #f97316;">
+                          $${safeNumber(gift.amount).toFixed(2)}
+                        </div>
+                      </div>
+                      <div>
+                        <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Recipient</div>
+                        <div style="font-weight: 500; color: #1f2937;">${gift.recipient_name}</div>
+                        <div style="font-size: 12px; color: #6b7280;">${gift.recipient_email}</div>
+                      </div>
+                      <div>
+                        <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Expires</div>
+                        <div style="font-weight: 500; color: #1f2937;">
+                          ${format(new Date(gift.expires_at), 'PPP')}
+                        </div>
+                      </div>
+                    </div>
+                    ${gift.personal_message ? `
+                      <div style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed #e2e8f0">
+                        <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Personal Message</div>
+                        <div style="font-style: italic; color: #475569;">"${gift.personal_message}"</div>
+                      </div>
+                    ` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+
+            <div class="total-section">
+              <h3 class="section-title" style="border-bottom: none; margin-bottom: 0;">Payment Summary</h3>
+              
+              <div class="total-row">
+                <span class="total-label">Subtotal</span>
+                <span class="total-value">$${subtotal.toFixed(2)}</span>
+              </div>
+              
+              <div class="total-row">
+                <span class="total-label">Tax (1.5%)</span>
+                <span class="total-value">$${taxAmount.toFixed(2)}</span>
+              </div>
+
+              <div class="total-row">
+                <span class="total-label">Processing Fee (2.9%)</span>
+                <span class="total-value">$${processingFee.toFixed(2)}</span>
+              </div>
+              
+              <div class="total-row total-amount">
+                <span>Total Amount</span>
+                <span>$${total.toFixed(2)}</span>
+              </div>
+              
+              <div class="tax-breakdown">
+                <div class="tax-title">Fee Breakdown</div>
+                <div style="font-size: 13px; color: #6b7280; line-height: 1.5;">
+                  This receipt is inclusive of tax and payment processing fee. 
+                  Tax registration number: VAT-${selectedOrder.id.slice(0, 8).toUpperCase()}-SL
+                </div>
+              </div>
+            </div>
+
+            <div class="footer">
+              <div class="thank-you">Thank you for your business!</div>
+              <div style="margin-bottom: 15px;">
+                SkillPulse Innovations Limited • support@skillpulse.cloud<br />
+                +260976972874 • www.skillpulse.cloud
+              </div>
+              <div>
+                This receipt is computer generated and does not require a physical signature.<br />
+                For questions about this receipt, please contact our support team.
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <script>
+          window.onload = function() {
+            window.print();
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(receiptHtml);
+    printWindow.document.close();
   };
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Use the PulseLoading component instead of simple spinner
+  if (loading) {
+    return <PulseLoading />;
+  }
 
   return (
     <Layout>
@@ -1377,13 +1224,12 @@ const MyOrdersPage = () => {
                                     View Receipt
                                   </Button>
                                   
-                                  <Button 
-                                    onClick={() => handleViewTickets(card.order, booking.id)}
-                                    className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                                  >
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    View Ticket
-                                  </Button>
+                                  <Link to="/my-events">
+                                    <Button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700">
+                                      <Eye className="h-4 w-4 mr-2" />
+                                      View in My Events
+                                    </Button>
+                                  </Link>
                                 </div>
                               </div>
                             </div>
@@ -1395,7 +1241,7 @@ const MyOrdersPage = () => {
                           const courseCurrency = safeCurrency(card.order.currency);
                           return (
                           <div key={enrollment.id} className="border-b border-gray-200 last:border-b-0 pb-6 last:pb-0 mb-6 last:mb-0">
-                            <div className="flex flex-col lg:flex-row gap=6">
+                            <div className="flex flex-col lg:flex-row gap-6">
                               {enrollment.course?.thumbnail_url && (
                                 <div className="lg:w-48 h-32 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
                                   <img
@@ -1557,139 +1403,57 @@ const MyOrdersPage = () => {
           </div>
         </div>
 
-        {/* Enhanced Tickets Modal */}
+        {/* Simplified Tickets Modal - Just for viewing basic info */}
         <Modal 
           isOpen={showTicketModal}
           onClose={() => setShowTicketModal(false)}
           title="Event Tickets"
           actions={
-            <div className="flex gap-3">
-              <Button 
-                onClick={handleDownloadTicketsPDF}
-                size="sm"
-                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download PDF
-              </Button>
-              <Button 
-                onClick={handlePrintTickets} 
-                size="sm"
-                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-              >
-                <Printer className="h-4 w-4 mr-2" />
-                Print All Tickets
-              </Button>
-            </div>
+            <Button 
+              onClick={() => setShowTicketModal(false)}
+              size="sm"
+              className="bg-gradient-to-r from-blue-500 to-blue-600"
+            >
+              Close
+            </Button>
           }
         >
-          <div id="tickets-print-content" className="space-y-8 max-h-[70vh] overflow-y-auto">
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
             {selectedBookings.filter(ticket => ticket.event).map((ticket, index) => (
-              <div key={ticket.id || index} className="ticket-container">
-                {/* Header with gradient */}
-                <div className="ticket-header">
-                  <h1>🎫 EVENT TICKET</h1>
-                  <div className="ticket-code-badge">
-                    #{ticket.ticket_code || ticket.booking_code}
+              <div key={ticket.id || index} className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg border border-orange-200">
+                <div className="flex justify-between items-start mb-3">
+                  <h3 className="font-semibold text-lg">{ticket.event?.title || 'Event'}</h3>
+                  {getStatusBadge(ticket.status)}
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                  <div>
+                    <p className="text-sm text-gray-600">
+                      <strong>Ticket Holder:</strong> {ticket.ticket_holder_name || ticket.user_name}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      <strong>Ticket Type:</strong> {ticket.event_ticket?.name || 'Standard'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">
+                      <strong>Booking Code:</strong> {ticket.booking_code}
+                    </p>
+                    {ticket.ticket_code && (
+                      <p className="text-sm text-gray-600">
+                        <strong>Ticket Code:</strong> {ticket.ticket_code}
+                      </p>
+                    )}
                   </div>
                 </div>
-
-                <div className="ticket-content">
-                  {/* Event Image and Title */}
-                  <div style={{ marginBottom: '25px', overflow: 'hidden' }}>
-                    {ticket.event?.image_url && (
-                      <img 
-                        src={ticket.event.image_url} 
-                        alt={ticket.event?.title || 'Event'} 
-                        className="event-image"
-                      />
-                    )}
-                    <div>
-                      <h2 className="event-title">{ticket.event?.title || 'Event Title'}</h2>
-                      <div className="ticket-info-badge">
-                        <div style={{ fontWeight: '600', color: '#ea580c', marginBottom: '5px' }}>
-                          {ticket.event_ticket?.name || 'Standard Ticket'}
-                        </div>
-                        <div style={{ fontSize: '14px', color: '#7c2d12' }}>
-                          {ticket.event_ticket?.ticket_type || 'Regular'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Event Details Grid */}
-                  <div className="details-grid">
-                    <div>
-                      <div className="detail-item">
-                        <div className="detail-label">📅 Date & Time</div>
-                        <div className="detail-value">
-                          {ticket.event?.start_time ? format(new Date(ticket.event.start_time), 'EEEE, MMMM do, yyyy') : 'TBD'}<br/>
-                          {ticket.event?.start_time ? format(new Date(ticket.event.start_time), 'h:mm a') : ''} {ticket.event?.end_time ? '- ' + format(new Date(ticket.event.end_time), 'h:mm a') : ''}
-                        </div>
-                      </div>
-                      
-                      <div className="detail-item">
-                        <div className="detail-label">📍 Location</div>
-                        <div className="detail-value">
-                          {ticket.event?.location || 'TBD'}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="detail-item">
-                        <div className="detail-label">👤 Ticket Holder</div>
-                        <div className="detail-value">
-                          {ticket.ticket_holder_name || ticket.user_name || 'Ticket Holder'}
-                          {ticket.ticket_holder_email && (
-                            <>
-                              <br/>
-                              <span style={{ fontSize: '14px' }}>{ticket.ticket_holder_email}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="detail-item">
-                        <div className="detail-label">✅ Status</div>
-                        <div>
-                          <span className="status-badge">
-                            {(ticket.status || 'confirmed').toUpperCase()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* QR Code Section */}
-                  <div className="qr-section">
-                    <div className="qr-container">
-                      <div 
-                        id={`qr-code-${ticket.ticket_code || ticket.booking_code}-${index}`} 
-                        style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                      >
-                        <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center text-xs text-gray-500">
-                          Loading QR...
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '10px' }}>
-                      Scan this code at the event entrance
-                    </div>
-                    <div className="ticket-code">
-                      {ticket.ticket_code || ticket.booking_code}
-                    </div>
-                  </div>
-
-                  {/* Footer */}
-                  <div className="footer-notes">
-                    <div style={{ marginBottom: '10px' }}>
-                      <strong style={{ color: '#374151' }}>Important:</strong> Please bring this ticket (digital or printed) to the event.
-                    </div>
-                    <div>
-                      For questions, contact us at support@skillpulse.cloud
-                    </div>
-                  </div>
+                
+                <div className="text-center mt-4">
+                  <Link to="/my-events">
+                    <Button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700">
+                      <Eye className="h-4 w-4 mr-2" />
+                      Manage in My Events
+                    </Button>
+                  </Link>
                 </div>
               </div>
             ))}
