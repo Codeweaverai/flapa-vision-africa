@@ -155,16 +155,16 @@ const styles = StyleSheet.create({
     color: '#666666',
     lineHeight: 1.4,
   },
-  invoiceTitleSection: {
+  ReceiptTitleSection: {
     alignItems: 'flex-end',
   },
-  invoiceTitle: {
+  ReceiptTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 6,
     color: '#000000',
   },
-  invoiceBadge: {
+  ReceiptBadge: {
     backgroundColor: '#000000',
     color: '#FFFFFF',
     padding: '4pt 8pt',
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontWeight: 'bold',
   },
-  invoiceDetails: {
+  ReceiptDetails: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 20,
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },
-  invoiceFooter: {
+  ReceiptFooter: {
     borderTop: '2pt solid #000000',
     paddingTop: 15,
     alignItems: 'center',
@@ -329,8 +329,8 @@ const styles = StyleSheet.create({
   },
 });
 
-// Professional Invoice PDF Component
-const InvoicePDF: React.FC<{
+// Professional Receipt PDF Component
+const ReceiptPDF: React.FC<{
   selectedOrder: Order;
   selectedType: 'event' | 'course' | 'gift';
   subtotal: number;
@@ -388,14 +388,14 @@ const InvoicePDF: React.FC<{
               www.skillpulse.cloud
             </Text>
           </View>
-          <View style={styles.invoiceTitleSection}>
-            <Text style={styles.invoiceTitle}>INVOICE</Text>
-            <Text style={styles.invoiceBadge}>{selectedType.toUpperCase()} ORDER</Text>
+          <View style={styles.ReceiptTitleSection}>
+            <Text style={styles.ReceiptTitle}>Receipt</Text>
+            <Text style={styles.ReceiptBadge}>{selectedType.toUpperCase()} ORDER</Text>
           </View>
         </View>
 
-        {/* Invoice Details */}
-        <View style={styles.invoiceDetails}>
+        {/* Receipt Details */}
+        <View style={styles.ReceiptDetails}>
           <View style={styles.detailSection}>
             <Text style={styles.sectionTitle}>BILL TO:</Text>
             <Text style={styles.customerName}>
@@ -405,7 +405,7 @@ const InvoicePDF: React.FC<{
           </View>
           <View style={styles.detailSection}>
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>INVOICE NO:</Text>
+              <Text style={styles.detailLabel}>Receipt NO:</Text>
               <Text style={styles.detailValue}>
                 #{selectedOrder.id.slice(0, 8).toUpperCase()}
               </Text>
@@ -541,12 +541,12 @@ const InvoicePDF: React.FC<{
         </View>
 
         {/* Footer Section */}
-        <View style={styles.invoiceFooter}>
+        <View style={styles.ReceiptFooter}>
           <Text style={styles.thankYou}>Thank you for your business!</Text>
           <View style={styles.footerNotes}>
-            <Text>This is a computer-generated invoice and does not require a physical signature.</Text>
+            <Text>This is a computer-generated Receipt and does not require a physical signature.</Text>
             <Text>Tax Registration Number: VAT-{selectedOrder.id.slice(0, 8).toUpperCase()}-SL</Text>
-            <Text>For questions about this invoice, please contact our support team at support@skillpulse.cloud</Text>
+            <Text>For questions about this Receipt, please contact our support team at support@skillpulse.cloud</Text>
           </View>
         </View>
       </Page>
@@ -1045,7 +1045,7 @@ const MyOrdersPage = () => {
       const { subtotal, taxAmount, processingFee, total, filteredItems } = calculateReceiptTotals(selectedOrder, selectedType);
       
       const blob = await pdf(
-        <InvoicePDF
+        <ReceiptPDF
           selectedOrder={selectedOrder}
           selectedType={selectedType}
           subtotal={subtotal}
@@ -1056,11 +1056,11 @@ const MyOrdersPage = () => {
         />
       ).toBlob();
       
-      downloadPDF(blob, `invoice-${selectedOrder.id.slice(0, 8)}.pdf`);
-      toast.success('Invoice downloaded successfully!');
+      downloadPDF(blob, `Receipt-${selectedOrder.id.slice(0, 8)}.pdf`);
+      toast.success('Receipt downloaded successfully!');
     } catch (error) {
       console.error('Error generating PDF:', error);
-      toast.error('Failed to generate invoice');
+      toast.error('Failed to generate Receipt');
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -1207,7 +1207,7 @@ const MyOrdersPage = () => {
                                     className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
                                   >
                                     <FileText className="h-4 w-4 mr-2" />
-                                    View Invoice
+                                    View Receipt
                                   </Button>
                                   
                                   <Link to="/my-events">
@@ -1272,7 +1272,7 @@ const MyOrdersPage = () => {
                                     className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
                                   >
                                     <FileText className="h-4 w-4 mr-2" />
-                                    View Invoice
+                                    View Receipt
                                   </Button>
                                 </div>
                               </div>
@@ -1333,7 +1333,7 @@ const MyOrdersPage = () => {
                                 className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
                               >
                                 <FileText className="h-4 w-4 mr-2" />
-                                View Invoice
+                                View Receipt
                               </Button>
                             </div>
                           </div>
@@ -1446,11 +1446,11 @@ const MyOrdersPage = () => {
           </div>
         </Modal>
 
-        {/* Enhanced Invoice Modal */}
+        {/* Enhanced Receipt Modal */}
         <Modal 
           isOpen={showReceiptModal}
           onClose={() => setShowReceiptModal(false)}
-          title="Order Invoice"
+          title="Order Receipt"
           actions={
             <Button 
               onClick={handleDownloadPDF}
@@ -1466,7 +1466,7 @@ const MyOrdersPage = () => {
               ) : (
                 <>
                   <Download className="h-4 w-4 mr-2" />
-                  Download Invoice
+                  Download Receipt
                 </>
               )}
             </Button>
@@ -1479,7 +1479,7 @@ const MyOrdersPage = () => {
             return (
               <div className="space-y-4">
                 <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg">
-                  <h3 className="font-semibold text-lg mb-2">Invoice #{selectedOrder.id.slice(0, 8)} - {selectedType.toUpperCase()}</h3>
+                  <h3 className="font-semibold text-lg mb-2">Receipt #{selectedOrder.id.slice(0, 8)} - {selectedType.toUpperCase()}</h3>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <p><strong>Date:</strong> {format(new Date(selectedOrder.created_at), 'PPP')}</p>
@@ -1546,9 +1546,9 @@ const MyOrdersPage = () => {
                   )}
                 </div>
 
-                {/* Invoice Summary */}
+                {/* Receipt Summary */}
                 <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg mt-4">
-                  <h4 className="font-semibold mb-3">Invoice Summary</h4>
+                  <h4 className="font-semibold mb-3">Receipt Summary</h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>Subtotal:</span>
@@ -1587,7 +1587,7 @@ const MyOrdersPage = () => {
 
                 <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
                   <p className="text-sm text-blue-700 text-center">
-                    Click "Download Invoice" to get a professional PDF version of this invoice
+                    Click "Download Receipt" to get a professional PDF version of this Receipt
                   </p>
                 </div>
               </div>
