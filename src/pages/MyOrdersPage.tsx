@@ -1687,7 +1687,7 @@ const MyOrdersPage = () => {
                       <span>Subtotal:</span>
                       <PriceDisplay 
                         amount={subtotal} 
-                        originalCurrency={orderCurrency}
+                        originalCurrency="USD"
                         className="font-medium"
                       />
                     </div>
@@ -1695,7 +1695,7 @@ const MyOrdersPage = () => {
                       <span>Tax (1.5%):</span>
                       <PriceDisplay 
                         amount={taxAmount} 
-                        originalCurrency={orderCurrency}
+                        originalCurrency="USD"
                         className="font-medium"
                       />
                     </div>
@@ -1703,7 +1703,7 @@ const MyOrdersPage = () => {
                       <span>Processing Fee (2.9%):</span>
                       <PriceDisplay 
                         amount={processingFee} 
-                        originalCurrency={orderCurrency}
+                        originalCurrency="USD"
                         className="font-medium"
                       />
                     </div>
@@ -1711,7 +1711,7 @@ const MyOrdersPage = () => {
                       <span>Total:</span>
                       <PriceDisplay 
                         amount={total} 
-                        originalCurrency={orderCurrency}
+                        originalCurrency="USD"
                         className="font-bold"
                       />
                     </div>
