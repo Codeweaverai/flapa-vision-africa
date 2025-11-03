@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { CurrencyCode, SUPPORTED_CURRENCIES } from '@/constants/currencies';
+import ReactDOM from 'react-dom/client';
 
 declare global {
   interface Window {
@@ -122,23 +123,246 @@ interface TicketData {
   ticket_status?: string;
 }
 
-// Print styles for the receipt
+// Receipt Component for Printing
+const ReceiptPrintComponent: React.FC<{
+  selectedOrder: Order;
+  selectedType: 'event' | 'course' | 'gift';
+  subtotal: number;
+  taxAmount: number;
+  processingFee: number;
+  total: number;
+  filteredItems: any[];
+}> = ({ selectedOrder, selectedType, subtotal, taxAmount, processingFee, total, filteredItems }) => {
+  const orderCurrency = safeCurrency(selectedOrder.currency);
+  
+  return (
+    <div className="receipt-print-container">
+      <div className="receipt-container">
+        <div className="receipt-watermark">SKILLPULSE</div>
+        
+        <div className="receipt-header">
+          <div className="company-logo">SkillPulse Innovations Limited</div>
+          <div className="company-subtitle">Elevating Skills, Empowering Futures</div>
+          <div className="receipt-title">PAYMENT RECEIPT</div>
+          <div className="order-type-badge">{selectedType.toUpperCase()} ORDER</div>
+        </div>
+        
+        <div className="order-info">
+          <div>
+            <div className="info-item">
+              <div className="info-label">Order Date</div>
+              <div className="info-value">{format(new Date(selectedOrder.created_at), 'PPPP')}</div>
+            </div>
+            <div className="info-item">
+              <div className="info-label">Order Number</div>
+              <div className="info-value">#{selectedOrder.id.slice(0, 8).toUpperCase()}</div>
+            </div>
+            <div className="info-item">
+              <div className="info-label">Customer</div>
+              <div className="info-value">{selectedOrder.user_name || selectedOrder.email}</div>
+            </div>
+          </div>
+          <div>
+            <div className="info-item">
+              <div className="info-label">Payment Method</div>
+              <div className="info-value">{selectedOrder.payment_method || 'Mobile Money'}</div>
+            </div>
+            <div className="info-item">
+              <div className="info-label">Payment Status</div>
+              <div className="info-value">
+                <span style={{ color: '#16a34a', fontWeight: '600' }}>
+                  {selectedOrder.payment_status.toUpperCase()}
+                </span>
+              </div>
+            </div>
+            <div className="info-item">
+              <div className="info-label">Currency</div>
+              <div className="info-value">{orderCurrency}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="items-section">
+          <h3 className="section-title">Order Items</h3>
+          <table className="items-table">
+            <thead>
+              <tr>
+                <th>Item Description</th>
+                <th>Qty</th>
+                <th>Unit Price</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredItems.map((item) => (
+                <tr key={item.id}>
+                  <td>
+                    <div style={{ fontWeight: '600', color: '#1f2937' }}>{item.item_name}</div>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+                      {item.item_type.replace('_', ' ').toUpperCase()}
+                    </div>
+                  </td>
+                  <td>{item.quantity}</td>
+                  <td>
+                    <PriceDisplay 
+                      amount={safeNumber(item.unit_price)} 
+                      originalCurrency="USD"
+                      className="text-sm"
+                    />
+                  </td>
+                  <td style={{ fontWeight: '600', color: '#f97316' }}>
+                    <PriceDisplay 
+                      amount={safeNumber(item.total_price)} 
+                      originalCurrency="USD"
+                      className="text-sm"
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {selectedType === 'gift' && selectedOrder.gift_cards && selectedOrder.gift_cards.length > 0 && (
+          <div className="items-section">
+            <h3 className="section-title">Gift Card Details</h3>
+            {selectedOrder.gift_cards.map((gift) => {
+              const giftCurrency = safeCurrency(gift.currency);
+              return (
+                <div key={gift.id} style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', marginBottom: '10px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>Gift Card Code</div>
+                      <div style={{ fontFamily: 'monospace', fontWeight: '600', color: '#1f2937', fontSize: '12px' }}>
+                        {obfuscateGiftCode(gift.gift_card_code)}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>Amount</div>
+                      <div style={{ fontWeight: '600', color: '#f97316', fontSize: '12px' }}>
+                        <PriceDisplay 
+                          amount={safeNumber(gift.amount)} 
+                          originalCurrency="USD"
+                          className="text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>Recipient</div>
+                      <div style={{ fontWeight: '500', color: '#1f2937', fontSize: '12px' }}>{gift.recipient_name}</div>
+                      <div style={{ fontSize: '11px', color: '#6b7280' }}>{gift.recipient_email}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>Expires</div>
+                      <div style={{ fontWeight: '500', color: '#1f2937', fontSize: '12px' }}>
+                        {format(new Date(gift.expires_at), 'PP')}
+                      </div>
+                    </div>
+                  </div>
+                  {gift.personal_message && (
+                    <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed #e2e8f0' }}>
+                      <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>Personal Message</div>
+                      <div style={{ fontStyle: 'italic', color: '#475569', fontSize: '11px' }}>"{gift.personal_message}"</div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="total-section">
+          <h3 className="section-title" style={{ borderBottom: 'none', marginBottom: '0' }}>Payment Summary</h3>
+          
+          <div className="total-row">
+            <span className="total-label">Subtotal</span>
+            <span className="total-value">
+              <PriceDisplay 
+                amount={subtotal} 
+                originalCurrency="USD"
+                className="font-medium text-sm"
+              />
+            </span>
+          </div>
+          
+          <div className="total-row">
+            <span className="total-label">Tax (1.5%)</span>
+            <span className="total-value">
+              <PriceDisplay 
+                amount={taxAmount} 
+                originalCurrency="USD"
+                className="font-medium text-sm"
+              />
+            </span>
+          </div>
+
+          <div className="total-row">
+            <span className="total-label">Processing Fee (2.9%)</span>
+            <span className="total-value">
+              <PriceDisplay 
+                amount={processingFee} 
+                originalCurrency="USD"
+                className="font-medium text-sm"
+              />
+            </span>
+          </div>
+          
+          <div className="total-row total-amount">
+            <span>Total Amount</span>
+            <span>
+              <PriceDisplay 
+                amount={total} 
+                originalCurrency={orderCurrency}
+                className="font-bold text-lg"
+              />
+            </span>
+          </div>
+          
+          <div className="tax-breakdown">
+            <div className="tax-title">Fee Breakdown</div>
+            <div style={{ fontSize: '11px', color: '#6b7280', lineHeight: '1.4' }}>
+              This receipt is inclusive of tax and payment processing fee. 
+              Tax registration number: VAT-{selectedOrder.id.slice(0, 8).toUpperCase()}-SL
+            </div>
+          </div>
+        </div>
+
+        <div className="footer">
+          <div className="thank-you">Thank you for your business!</div>
+          <div style={{ marginBottom: '10px', fontSize: '11px' }}>
+            SkillPulse Innovations Limited • support@skillpulse.cloud<br />
+            +260976972874 • www.skillpulse.cloud
+          </div>
+          <div style={{ fontSize: '10px' }}>
+            This receipt is computer generated and does not require a physical signature.<br />
+            For questions about this receipt, please contact our support team.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Print styles for the receipt - Updated for single page
 const printStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
   
   @media print {
     body { 
       background: white !important;
+      margin: 0;
       padding: 0;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
+      height: 100vh;
     }
     
     .receipt-container { 
       box-shadow: none;
       border: 1px solid #e5e7eb;
-      margin: 0;
-      max-width: none;
+      margin: 0 auto;
+      max-width: 100%;
+      page-break-inside: avoid;
     }
     
     /* Hide everything except the receipt when printing */
@@ -156,24 +380,33 @@ const printStyles = `
       left: 0;
       top: 0;
       width: 100%;
+      height: 100%;
+      padding: 10px;
+    }
+
+    /* Ensure it fits on one page */
+    .receipt-container {
+      transform: scale(0.9);
+      transform-origin: top center;
     }
   }
 
   .receipt-print-container {
     font-family: 'Inter', sans-serif;
     margin: 0;
-    padding: 40px 20px;
+    padding: 20px 10px;
     background: linear-gradient(135deg, #fef7ed 0%, #faf5ff 100%);
     min-height: 100vh;
+    box-sizing: border-box;
   }
 
   .receipt-container {
-    max-width: 600px;
+    max-width: 500px;
     margin: 0 auto;
     background: white;
-    border-radius: 20px;
-    padding: 40px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+    border-radius: 12px;
+    padding: 25px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
     position: relative;
     overflow: hidden;
   }
@@ -183,7 +416,7 @@ const printStyles = `
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%) rotate(-45deg);
-    font-size: 120px;
+    font-size: 80px;
     font-weight: 900;
     color: rgba(249, 115, 22, 0.03);
     z-index: 0;
@@ -192,139 +425,135 @@ const printStyles = `
 
   .receipt-header {
     text-align: center;
-    margin-bottom: 40px;
-    padding-bottom: 30px;
+    margin-bottom: 25px;
+    padding-bottom: 20px;
     border-bottom: 2px solid #f97316;
     position: relative;
     z-index: 1;
   }
 
   .company-logo {
-    font-size: 32px;
+    font-size: 24px;
     font-weight: 800;
     background: linear-gradient(135deg, #f97316, #a855f7);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    margin-bottom: 10px;
-    letter-spacing: -1px;
+    margin-bottom: 5px;
+    letter-spacing: -0.5px;
   }
 
   .company-subtitle {
     color: #6b7280;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 500;
-    margin-bottom: 20px;
+    margin-bottom: 15px;
   }
 
   .receipt-title {
-    font-size: 36px;
+    font-size: 24px;
     font-weight: 800;
     background: linear-gradient(135deg, #f97316, #a855f7);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    margin-bottom: 10px;
-    letter-spacing: -1px;
+    margin-bottom: 8px;
   }
 
   .order-type-badge {
     background: linear-gradient(135deg, #f97316, #a855f7);
     color: white;
-    padding: 8px 20px;
-    border-radius: 20px;
-    font-size: 14px;
+    padding: 6px 15px;
+    border-radius: 15px;
+    font-size: 12px;
     font-weight: 600;
     display: inline-block;
-    margin-bottom: 15px;
+    margin-bottom: 10px;
   }
 
   .order-info {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 25px;
-    margin-bottom: 40px;
-    padding: 30px;
+    gap: 15px;
+    margin-bottom: 25px;
+    padding: 20px;
     background: linear-gradient(135deg, #fef7ed, #faf5ff);
-    border-radius: 16px;
+    border-radius: 12px;
     border: 1px solid rgba(249, 115, 22, 0.1);
     position: relative;
     z-index: 1;
   }
 
   .info-item {
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
   .info-label {
     font-weight: 600;
     color: #7c2d12;
-    font-size: 13px;
+    font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
   }
 
   .info-value {
     color: #1f2937;
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 500;
   }
 
   .items-section {
-    margin-bottom: 30px;
+    margin-bottom: 20px;
     position: relative;
     z-index: 1;
   }
 
   .section-title {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 700;
     color: #1f2937;
-    margin-bottom: 20px;
-    padding-bottom: 10px;
+    margin-bottom: 15px;
+    padding-bottom: 8px;
     border-bottom: 2px solid #f97316;
   }
 
   .items-table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     background: white;
-    border-radius: 12px;
+    border-radius: 8px;
     overflow: hidden;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    font-size: 12px;
   }
 
   .items-table th {
     background: linear-gradient(135deg, #f97316, #a855f7);
     color: white;
-    padding: 16px 12px;
+    padding: 12px 8px;
     text-align: left;
     font-weight: 600;
-    font-size: 13px;
+    font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
 
   .items-table td {
-    padding: 14px 12px;
+    padding: 10px 8px;
     border-bottom: 1px solid #f3f4f6;
-    font-size: 14px;
+    font-size: 12px;
   }
 
   .items-table tr:last-child td {
     border-bottom: none;
   }
 
-  .items-table tr:hover {
-    background: #fafafa;
-  }
-
   .total-section {
     background: linear-gradient(135deg, #fef7ed, #faf5ff);
-    padding: 30px;
-    border-radius: 16px;
+    padding: 20px;
+    border-radius: 12px;
     border: 1px solid rgba(249, 115, 22, 0.1);
-    margin-top: 30px;
+    margin-top: 20px;
     position: relative;
     z-index: 1;
   }
@@ -333,8 +562,8 @@ const printStyles = `
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 0;
-    font-size: 15px;
+    padding: 6px 0;
+    font-size: 13px;
   }
 
   .total-label {
@@ -348,36 +577,36 @@ const printStyles = `
   }
 
   .total-amount {
-    font-size: 28px;
+    font-size: 20px;
     font-weight: 800;
     color: #f97316;
-    margin-top: 10px;
-    padding-top: 15px;
+    margin-top: 8px;
+    padding-top: 12px;
     border-top: 2px dashed #e5e7eb;
   }
 
   .tax-breakdown {
     background: rgba(255,255,255,0.7);
-    padding: 20px;
-    border-radius: 12px;
-    margin-top: 20px;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 15px;
     border: 1px solid rgba(0,0,0,0.05);
   }
 
   .tax-title {
     font-weight: 600;
     color: #374151;
-    margin-bottom: 10px;
-    font-size: 14px;
+    margin-bottom: 8px;
+    font-size: 12px;
   }
 
   .footer {
     text-align: center;
-    margin-top: 40px;
-    padding-top: 30px;
+    margin-top: 25px;
+    padding-top: 20px;
     border-top: 1px solid #e5e7eb;
     color: #6b7280;
-    font-size: 12px;
+    font-size: 11px;
     position: relative;
     z-index: 1;
   }
@@ -385,8 +614,8 @@ const printStyles = `
   .thank-you {
     font-weight: 600;
     color: #f97316;
-    margin-bottom: 10px;
-    font-size: 16px;
+    margin-bottom: 8px;
+    font-size: 14px;
   }
 `;
 
@@ -871,213 +1100,66 @@ const MyOrdersPage = () => {
       return;
     }
 
-    // Create the receipt HTML content directly
-    const receiptHtml = `
+    // Create a container for React rendering
+    const printContainer = document.createElement('div');
+    printContainer.id = 'receipt-print-root';
+    
+    // Add styles to the print window
+    const styles = `
+      <style>
+        ${printStyles}
+        @media print {
+          body { 
+            margin: 0;
+            padding: 0;
+            background: white !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .no-print { display: none !important; }
+        }
+        body {
+          font-family: 'Inter', sans-serif;
+          margin: 0;
+          padding: 10px;
+          background: white;
+        }
+      </style>
+    `;
+
+    printWindow.document.write(`
       <!DOCTYPE html>
       <html>
       <head>
         <title>Receipt - Order #${selectedOrder.id.slice(0, 8)}</title>
-        <style>
-          ${printStyles}
-          
-          /* Additional print-specific styles */
-          @media print {
-            body { 
-              margin: 0;
-              padding: 0;
-              background: white !important;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-            .no-print { display: none !important; }
-          }
-          
-          body {
-            font-family: 'Inter', sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: white;
-          }
-        </style>
+        ${styles}
       </head>
       <body>
-        <div class="receipt-print-container">
-          <div class="receipt-container">
-            <div class="receipt-watermark">SKILLPULSE</div>
-            
-            <div class="receipt-header">
-              <div class="company-logo">SkillPulse Innovations Limited</div>
-              <div class="company-subtitle">Elevating Skills, Empowering Futures</div>
-              <div class="receipt-title">PAYMENT RECEIPT</div>
-              <div class="order-type-badge">${selectedType.toUpperCase()} ORDER</div>
-            </div>
-            
-            <div class="order-info">
-              <div>
-                <div class="info-item">
-                  <div class="info-label">Order Date</div>
-                  <div class="info-value">${format(new Date(selectedOrder.created_at), 'PPPP')}</div>
-                </div>
-                <div class="info-item">
-                  <div class="info-label">Order Number</div>
-                  <div class="info-value">#${selectedOrder.id.slice(0, 8).toUpperCase()}</div>
-                </div>
-                <div class="info-item">
-                  <div class="info-label">Customer</div>
-                  <div class="info-value">${selectedOrder.user_name || selectedOrder.email}</div>
-                </div>
-              </div>
-              <div>
-                <div class="info-item">
-                  <div class="info-label">Payment Method</div>
-                  <div class="info-value">${selectedOrder.payment_method || 'Mobile Money'}</div>
-                </div>
-                <div class="info-item">
-                  <div class="info-label">Payment Status</div>
-                  <div class="info-value">
-                    <span style="color: #16a34a; font-weight: 600;">
-                      ${selectedOrder.payment_status.toUpperCase()}
-                    </span>
-                  </div>
-                </div>
-                <div class="info-item">
-                  <div class="info-label">Currency</div>
-                  <div class="info-value">${safeCurrency(selectedOrder.currency)}</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="items-section">
-              <h3 class="section-title">Order Items</h3>
-              <table class="items-table">
-                <thead>
-                  <tr>
-                    <th>Item Description</th>
-                    <th>Qty</th>
-                    <th>Unit Price</th>
-                    <th>Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${filteredItems.map((item) => `
-                    <tr key="${item.id}">
-                      <td>
-                        <div style="font-weight: 600; color: #1f2937;">${item.item_name}</div>
-                        <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">
-                          ${item.item_type.replace('_', ' ').toUpperCase()}
-                        </div>
-                      </td>
-                      <td>${item.quantity}</td>
-                      <td>
-                        $${safeNumber(item.unit_price).toFixed(2)}
-                      </td>
-                      <td style="font-weight: 600; color: #f97316;">
-                        $${safeNumber(item.total_price).toFixed(2)}
-                      </td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            </div>
-
-            ${selectedType === 'gift' && selectedOrder.gift_cards && selectedOrder.gift_cards.length > 0 ? `
-              <div class="items-section">
-                <h3 class="section-title">Gift Card Details</h3>
-                ${selectedOrder.gift_cards.map((gift) => `
-                  <div key="${gift.id}" style="background: #f8fafc; padding: 20px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #e2e8f0">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                      <div>
-                        <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Gift Card Code</div>
-                        <div style="font-family: monospace; font-weight: 600; color: #1f2937;">
-                          ${obfuscateGiftCode(gift.gift_card_code)}
-                        </div>
-                      </div>
-                      <div>
-                        <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Amount</div>
-                        <div style="font-weight: 600; color: #f97316;">
-                          $${safeNumber(gift.amount).toFixed(2)}
-                        </div>
-                      </div>
-                      <div>
-                        <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Recipient</div>
-                        <div style="font-weight: 500; color: #1f2937;">${gift.recipient_name}</div>
-                        <div style="font-size: 12px; color: #6b7280;">${gift.recipient_email}</div>
-                      </div>
-                      <div>
-                        <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Expires</div>
-                        <div style="font-weight: 500; color: #1f2937;">
-                          ${format(new Date(gift.expires_at), 'PPP')}
-                        </div>
-                      </div>
-                    </div>
-                    ${gift.personal_message ? `
-                      <div style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed #e2e8f0">
-                        <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Personal Message</div>
-                        <div style="font-style: italic; color: #475569;">"${gift.personal_message}"</div>
-                      </div>
-                    ` : ''}
-                  </div>
-                `).join('')}
-              </div>
-            ` : ''}
-
-            <div class="total-section">
-              <h3 class="section-title" style="border-bottom: none; margin-bottom: 0;">Payment Summary</h3>
-              
-              <div class="total-row">
-                <span class="total-label">Subtotal</span>
-                <span class="total-value">$${subtotal.toFixed(2)}</span>
-              </div>
-              
-              <div class="total-row">
-                <span class="total-label">Tax (1.5%)</span>
-                <span class="total-value">$${taxAmount.toFixed(2)}</span>
-              </div>
-
-              <div class="total-row">
-                <span class="total-label">Processing Fee (2.9%)</span>
-                <span class="total-value">$${processingFee.toFixed(2)}</span>
-              </div>
-              
-              <div class="total-row total-amount">
-                <span>Total Amount</span>
-                <span>$${total.toFixed(2)}</span>
-              </div>
-              
-              <div class="tax-breakdown">
-                <div class="tax-title">Fee Breakdown</div>
-                <div style="font-size: 13px; color: #6b7280; line-height: 1.5;">
-                  This receipt is inclusive of tax and payment processing fee. 
-                  Tax registration number: VAT-${selectedOrder.id.slice(0, 8).toUpperCase()}-SL
-                </div>
-              </div>
-            </div>
-
-            <div class="footer">
-              <div class="thank-you">Thank you for your business!</div>
-              <div style="margin-bottom: 15px;">
-                SkillPulse Innovations Limited • support@skillpulse.cloud<br />
-                +260976972874 • www.skillpulse.cloud
-              </div>
-              <div>
-                This receipt is computer generated and does not require a physical signature.<br />
-                For questions about this receipt, please contact our support team.
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <script>
-          window.onload = function() {
-            window.print();
-          };
-        </script>
+        <div id="receipt-print-root"></div>
       </body>
       </html>
-    `;
-
-    printWindow.document.write(receiptHtml);
+    `);
     printWindow.document.close();
+
+    // Use ReactDOM to render the component
+    const root = ReactDOM.createRoot(printWindow.document.getElementById('receipt-print-root')!);
+    
+    root.render(
+      <ReceiptPrintComponent
+        selectedOrder={selectedOrder}
+        selectedType={selectedType}
+        subtotal={subtotal}
+        taxAmount={taxAmount}
+        processingFee={processingFee}
+        total={total}
+        filteredItems={filteredItems}
+      />
+    );
+
+    // Wait for React to render, then print
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
   };
 
   const handlePageChange = (page: number) => {
