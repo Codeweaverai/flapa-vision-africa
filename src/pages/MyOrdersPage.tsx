@@ -1187,7 +1187,7 @@ const MyOrdersPage = () => {
                           <div className="text-right">
                             <PriceDisplay 
                               amount={card.subtotal} 
-                              currency={orderCurrency}
+                              originalCurrency={orderCurrency}
                               className="text-2xl font-bold text-white"
                             />
                             {getStatusBadge(card.order.payment_status)}
@@ -1246,7 +1246,7 @@ const MyOrdersPage = () => {
                                         <p className="text-sm text-orange-700 font-semibold">
                                           Price: <PriceDisplay 
                                             amount={safeNumber(booking.event_ticket.price)} 
-                                            currency={eventCurrency}
+                                            originalCurrency={eventCurrency}
                                             className="inline"
                                           />
                                         </p>
@@ -1315,7 +1315,7 @@ const MyOrdersPage = () => {
                                   <p className="text-sm text-purple-700 font-semibold mb-4">
                                     Price: <PriceDisplay 
                                       amount={safeNumber(enrollment.course.price)} 
-                                      currency={courseCurrency}
+                                      originalCurrency={courseCurrency}
                                       className="inline"
                                     />
                                   </p>
@@ -1354,7 +1354,7 @@ const MyOrdersPage = () => {
                                     <div>
                                       <PriceDisplay 
                                         amount={safeNumber(gift.amount)} 
-                                        currency={giftCurrency}
+                                        originalCurrency={giftCurrency}
                                         className="text-xl font-semibold text-gray-900 mb-1"
                                       />
                                       <p className="font-mono text-sm text-gray-600">
@@ -1623,7 +1623,7 @@ const MyOrdersPage = () => {
                       <p>
                         <strong>Total:</strong> <PriceDisplay 
                           amount={computeTypeSubtotalsFull(selectedOrder)[selectedType]} 
-                          currency={orderCurrency}
+                          originalCurrency={orderCurrency}
                           className="font-semibold"
                         />
                       </p>
@@ -1641,14 +1641,14 @@ const MyOrdersPage = () => {
                           <p className="text-sm text-gray-600">
                             Qty: {item.quantity} × <PriceDisplay 
                               amount={safeNumber(item.unit_price)} 
-                              currency={orderCurrency}
+                              originalCurrency={orderCurrency}
                               className="inline"
                             />
                           </p>
                         </div>
                         <PriceDisplay 
                           amount={safeNumber(item.total_price)} 
-                          currency={orderCurrency}
+                          originalCurrency={orderCurrency}
                           className="font-semibold"
                         />
                       </div>
@@ -1669,7 +1669,7 @@ const MyOrdersPage = () => {
                             <p className="text-sm text-gray-600">Expires: {format(new Date(gift.expires_at), 'PPP')}</p>
                             <PriceDisplay 
                               amount={safeNumber(gift.amount)} 
-                              currency={giftCurrency}
+                              originalCurrency={giftCurrency}
                               className="font-semibold"
                             />
                           </div>
@@ -1687,7 +1687,7 @@ const MyOrdersPage = () => {
                       <span>Subtotal:</span>
                       <PriceDisplay 
                         amount={subtotal} 
-                        currency={orderCurrency}
+                        originalCurrency={orderCurrency}
                         className="font-medium"
                       />
                     </div>
@@ -1695,7 +1695,7 @@ const MyOrdersPage = () => {
                       <span>Tax (1.5%):</span>
                       <PriceDisplay 
                         amount={taxAmount} 
-                        currency={orderCurrency}
+                        originalCurrency={orderCurrency}
                         className="font-medium"
                       />
                     </div>
@@ -1703,7 +1703,7 @@ const MyOrdersPage = () => {
                       <span>Processing Fee (2.9%):</span>
                       <PriceDisplay 
                         amount={processingFee} 
-                        currency={orderCurrency}
+                        originalCurrency={orderCurrency}
                         className="font-medium"
                       />
                     </div>
@@ -1711,7 +1711,7 @@ const MyOrdersPage = () => {
                       <span>Total:</span>
                       <PriceDisplay 
                         amount={total} 
-                        currency={orderCurrency}
+                        originalCurrency={orderCurrency}
                         className="font-bold"
                       />
                     </div>
