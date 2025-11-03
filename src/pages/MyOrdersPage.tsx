@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { CurrencyCode, SUPPORTED_CURRENCIES } from '@/constants/currencies';
+import { currencyService } from '@/services/currencyService';
 
 // React PDF Components
 import { Document, Page, Text, View, StyleSheet, pdf, Font } from '@react-pdf/renderer';
@@ -363,12 +364,9 @@ const ReceiptPDF: React.FC<{
     return `${start}${middle}${end}`;
   };
 
-  const formatCurrency = (amount: number, currency: string = 'USD'): string => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 2,
-    }).format(amount);
+  // Use currencyService for proper currency formatting
+  const formatCurrencyForPDF = (amount: number, currency: CurrencyCode): string => {
+    return currencyService.formatCurrency(amount, currency);
   };
 
   const orderCurrency = safeCurrency(selectedOrder.currency);
@@ -389,7 +387,7 @@ const ReceiptPDF: React.FC<{
             </Text>
           </View>
           <View style={styles.ReceiptTitleSection}>
-            <Text style={styles.ReceiptTitle}>Receipt</Text>
+            <Text style={styles.ReceiptTitle}>RECEIPT</Text>
             <Text style={styles.ReceiptBadge}>{selectedType.toUpperCase()} ORDER</Text>
           </View>
         </View>
@@ -405,7 +403,7 @@ const ReceiptPDF: React.FC<{
           </View>
           <View style={styles.detailSection}>
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Receipt NO:</Text>
+              <Text style={styles.detailLabel}>RECEIPT NO:</Text>
               <Text style={styles.detailValue}>
                 #{selectedOrder.id.slice(0, 8).toUpperCase()}
               </Text>
@@ -468,10 +466,10 @@ const ReceiptPDF: React.FC<{
                 <Text>{item.quantity}</Text>
               </View>
               <View style={styles.colUnitPrice}>
-                <Text>{formatCurrency(safeNumber(item.unit_price), orderCurrency)}</Text>
+                <Text>{formatCurrencyForPDF(safeNumber(item.unit_price), orderCurrency)}</Text>
               </View>
               <View style={styles.colAmount}>
-                <Text>{formatCurrency(safeNumber(item.total_price), orderCurrency)}</Text>
+                <Text>{formatCurrencyForPDF(safeNumber(item.total_price), orderCurrency)}</Text>
               </View>
             </View>
           ))}
@@ -492,7 +490,7 @@ const ReceiptPDF: React.FC<{
                 <View style={styles.giftCardRow}>
                   <Text>Amount:</Text>
                   <Text style={{ fontWeight: 'bold' }}>
-                    {formatCurrency(safeNumber(gift.amount), safeCurrency(gift.currency))}
+                    {formatCurrencyForPDF(safeNumber(gift.amount), safeCurrency(gift.currency))}
                   </Text>
                 </View>
                 <View style={styles.giftCardRow}>
@@ -521,20 +519,20 @@ const ReceiptPDF: React.FC<{
           <View style={styles.totalsGrid}>
             <View style={styles.totalRow}>
               <Text>Subtotal:</Text>
-              <Text>{formatCurrency(subtotal, orderCurrency)}</Text>
+              <Text>{formatCurrencyForPDF(subtotal, orderCurrency)}</Text>
             </View>
             <View style={styles.totalRow}>
               <Text>Tax (1.5%):</Text>
-              <Text>{formatCurrency(taxAmount, orderCurrency)}</Text>
+              <Text>{formatCurrencyForPDF(taxAmount, orderCurrency)}</Text>
             </View>
             <View style={styles.totalRow}>
               <Text>Processing Fee (2.9%):</Text>
-              <Text>{formatCurrency(processingFee, orderCurrency)}</Text>
+              <Text>{formatCurrencyForPDF(processingFee, orderCurrency)}</Text>
             </View>
             <View style={[styles.totalRow, styles.grandTotal]}>
               <Text style={{ fontWeight: 'bold' }}>TOTAL AMOUNT:</Text>
               <Text style={styles.grandTotalAmount}>
-                {formatCurrency(total, orderCurrency)}
+                {formatCurrencyForPDF(total, orderCurrency)}
               </Text>
             </View>
           </View>
@@ -544,9 +542,9 @@ const ReceiptPDF: React.FC<{
         <View style={styles.ReceiptFooter}>
           <Text style={styles.thankYou}>Thank you for your business!</Text>
           <View style={styles.footerNotes}>
-            <Text>This is a computer-generated Receipt and does not require a physical signature.</Text>
+            <Text>This is a computer-generated receipt and does not require a physical signature.</Text>
             <Text>Tax Registration Number: VAT-{selectedOrder.id.slice(0, 8).toUpperCase()}-SL</Text>
-            <Text>For questions about this Receipt, please contact our support team at support@skillpulse.cloud</Text>
+            <Text>For questions about this receipt, please contact our support team at support@skillpulse.cloud</Text>
           </View>
         </View>
       </Page>
@@ -1056,11 +1054,11 @@ const MyOrdersPage = () => {
         />
       ).toBlob();
       
-      downloadPDF(blob, `Receipt-${selectedOrder.id.slice(0, 8)}.pdf`);
+      downloadPDF(blob, `receipt-${selectedOrder.id.slice(0, 8)}.pdf`);
       toast.success('Receipt downloaded successfully!');
     } catch (error) {
       console.error('Error generating PDF:', error);
-      toast.error('Failed to generate Receipt');
+      toast.error('Failed to generate receipt');
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -1587,7 +1585,7 @@ const MyOrdersPage = () => {
 
                 <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
                   <p className="text-sm text-blue-700 text-center">
-                    Click "Download Receipt" to get a professional PDF version of this Receipt
+                    Click "Download Receipt" to get a professional PDF version of this receipt
                   </p>
                 </div>
               </div>
