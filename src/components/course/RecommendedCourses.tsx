@@ -336,9 +336,10 @@ const RecommendedCourses = ({ currentCourseId, category }: RecommendedCoursesPro
                         </div>
                       </div>
                       
-                      {/* View Course Button */}
+                      {/* View Course Button with Video Icon */}
                       <Link to={`/learning/course-detail/${course.id}`} className="block mt-3">
-                        <Button className="w-full bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600 text-white border-0 text-sm font-semibold py-2 h-10 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5">
+                        <Button className="w-full bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600 text-white border-0 text-sm font-semibold py-2 h-10 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
+                          <Play className="h-4 w-4 text-white fill-current" />
                           View Course
                         </Button>
                       </Link>
