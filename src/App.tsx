@@ -155,6 +155,7 @@ import VerifyCertificatePage from '@/pages/VerifyCertificatePage';
 import TermsOfServicePage from '@/pages/TermsOfServicePage';
 import PrivacyPolicyPage from '@/pages/PrivacyPolicyPage';
 import NotFoundPage from '@/pages/NotFoundPage';
+import CardSuccessPage from '@/pages/CardSuccessPage';
 
 // Import components
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -223,6 +224,7 @@ function App() {
                   <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
                   <Route path="/checkout-success" element={<ProtectedRoute><CheckoutSuccessPage /></ProtectedRoute>} />
                   <Route path="/payment-success" element={<ProtectedRoute><PaymentSuccessPage /></ProtectedRoute>} />
+                   <Route path="/card-success" element={<ProtectedRoute><CardSuccessPage /></ProtectedRoute>} />
                   <Route path="/payment-cancel" element={<ProtectedRoute><PaymentCancelPage /></ProtectedRoute>} />
                   <Route path="/my-orders" element={<ProtectedRoute><MyOrdersPage /></ProtectedRoute>} />
                   <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
