@@ -192,7 +192,7 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
               <div className="text-left">
                 <h1 className="text-xl font-black tracking-wider mb-1">EVENT TICKET</h1>
                 <h2 className="text-base font-medium tracking-widest">
-                  {formattedEventType.toUpperCase()}
+                  {event.event_type.toUpperCase()}
                 </h2>
               </div>
             </div>
