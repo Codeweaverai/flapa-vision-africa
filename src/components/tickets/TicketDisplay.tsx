@@ -104,6 +104,53 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
     });
   };
 
+  // Proper event type formatting for your database schema
+  const formatEventType = (eventType: string): string => {
+    if (!eventType) {
+      return 'EVENT';
+    }
+
+    // Direct mapping for your specific database event types
+    const eventTypeMap: { [key: string]: string } = {
+      // Your exact database values from the check constraint
+      'webinar': 'Webinar',
+      'conferences': 'Conference',
+      'conference': 'Conference',
+      'live-music': 'Live Music',
+      'sports-events': 'Sports Event',
+      'night-life': 'Night Life',
+      'concerts': 'Concert',
+      'comedy-shows': 'Comedy Show',
+      'business-events': 'Business Event',
+      'wellness-events': 'Wellness Event',
+      'summit': 'Summit',
+      'picnic': 'Picnic',
+      'workshops': 'Workshop',
+      'workshop': 'Workshop',
+      'festivals': 'Festival',
+      'gaming-events': 'Gaming Event',
+      'food-drink': 'Food & Drink',
+      'art-exhibitions': 'Art Exhibition',
+      'travel-events': 'Travel Event',
+      'tech-meetups': 'Tech Meetup',
+      'science-fairs': 'Science Fair',
+      'cultural-events': 'Cultural Event',
+      'auto-shows': 'Auto Show',
+      'science-events': 'Science Event',
+      'community-events': 'Community Event',
+      'meetup': 'Meetup',
+      'seminar': 'Seminar',
+      'training': 'Training',
+      'other': 'Other'
+    };
+
+    // Return formatted type or the original in uppercase if not found
+    return eventTypeMap[eventType] || eventType.toUpperCase();
+  };
+
+  // Safe event type with formatting
+  const displayEventType = event?.event_type ? formatEventType(event.event_type) : 'EVENT';
+
   return (
     <div className={`ticket-container ${showPrintStyles ? 'print-ticket' : ''}`}>
       {/* Action buttons */}
@@ -153,7 +200,7 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
               <div className="text-left">
                 <h1 className="text-xl font-black tracking-wider mb-1">EVENT TICKET</h1>
                 <h2 className="text-base font-medium tracking-widest">
-                  {event?.event_type ? event.event_type.toUpperCase() : 'EVENT'}
+                  {displayEventType.toUpperCase()}
                 </h2>
               </div>
             </div>
