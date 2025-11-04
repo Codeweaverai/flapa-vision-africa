@@ -38,6 +38,12 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
   const eventTicket = ticket.booking.event_ticket;
   const ticketRef = React.useRef<HTMLDivElement>(null);
 
+  // Debug data
+  console.log('Full ticket data:', ticket);
+  console.log('Event data:', event);
+  console.log('Event type:', event?.event_type);
+  console.log('Ticket type:', eventTicket?.ticket_type);
+
   const handlePrint = useReactToPrint({
     contentRef: ticketRef,
     pageStyle: `
@@ -98,51 +104,6 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
     });
   };
 
-  // Enhanced event type formatting with all your event types
-  const formatEventType = (eventType: string): string => {
-    if (!eventType) {
-      return 'EVENT';
-    }
-
-    try {
-      // Handle different event type formats from your schema
-      const formatted = eventType
-        .split('-')
-        .map(word => {
-          // Special cases for specific event types
-          if (word === 'tech') return 'Tech';
-          if (word === 'live') return 'Live';
-          if (word === 'science') return 'Science';
-          if (word === 'business') return 'Business';
-          if (word === 'wellness') return 'Wellness';
-          if (word === 'cultural') return 'Cultural';
-          if (word === 'community') return 'Community';
-          if (word === 'gaming') return 'Gaming';
-          if (word === 'food') return 'Food';
-          if (word === 'art') return 'Art';
-          if (word === 'travel') return 'Travel';
-          if (word === 'auto') return 'Auto';
-          if (word === 'night') return 'Night';
-          if (word === 'comedy') return 'Comedy';
-          if (word === 'sports') return 'Sports';
-          
-          // Default capitalization
-          return word.charAt(0).toUpperCase() + word.slice(1);
-        })
-        .join(' ');
-
-      return formatted;
-
-    } catch (error) {
-      console.error('Error formatting event type:', error, 'Raw:', eventType);
-      return eventType.toUpperCase();
-    }
-  };
-
-  // Direct access to event_type - it should always exist based on your schema
-  const eventType = event.event_type;
-  const formattedEventType = formatEventType(eventType);
-
   return (
     <div className={`ticket-container ${showPrintStyles ? 'print-ticket' : ''}`}>
       {/* Action buttons */}
@@ -188,11 +149,11 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
                 <Ticket className="h-12 w-12 text-white" />
               </div>
               
-              {/* Text Content */}
+              {/* Text Content - FIXED */}
               <div className="text-left">
                 <h1 className="text-xl font-black tracking-wider mb-1">EVENT TICKET</h1>
                 <h2 className="text-base font-medium tracking-widest">
-                  {event.event_type.toUpperCase()}
+                  {event?.event_type ? event.event_type.toUpperCase() : 'EVENT'}
                 </h2>
               </div>
             </div>
@@ -256,7 +217,7 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
             <div className="flex justify-between pb-2 border-b border-dashed border-gray-300">
               <span className="font-semibold text-gray-600 text-sm">Ticket Type:</span>
               <span className="font-semibold text-gray-900 text-sm">
-                {eventTicket.ticket_type}
+                {eventTicket?.ticket_type || 'General Admission'}
               </span>
             </div>
           </div>
