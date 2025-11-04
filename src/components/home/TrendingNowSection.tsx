@@ -411,13 +411,20 @@ const TrendingNowSection = () => {
                         </>
                       )}
                       
-                      {/* View Button */}
+                      {/* View Button with Video Icon for Courses */}
                       <Link 
                         to={item.type === 'course' ? `/learning/course-detail/${item.id}` : `/event-detail/${item.id}`} 
                         className="block mt-3"
                       >
-                        <Button className="w-full bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600 text-white border-0 text-sm font-semibold py-2 h-10 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5">
-                          {item.type === 'course' ? 'View Course' : 'View Event'}
+                        <Button className="w-full bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600 text-white border-0 text-sm font-semibold py-2 h-10 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
+                          {item.type === 'course' ? (
+                            <>
+                              <Play className="h-4 w-4 text-white fill-current" />
+                              View Course
+                            </>
+                          ) : (
+                            'View Event'
+                          )}
                         </Button>
                       </Link>
                     </CardContent>
