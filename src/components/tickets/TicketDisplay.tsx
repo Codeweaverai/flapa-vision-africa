@@ -256,7 +256,7 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
             <div className="flex justify-between pb-2 border-b border-dashed border-gray-300">
               <span className="font-semibold text-gray-600 text-sm">Ticket Type:</span>
               <span className="font-semibold text-gray-900 text-sm">
-                {eventTicket.name}
+                {eventTicket.ticket_type}
               </span>
             </div>
           </div>
