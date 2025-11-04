@@ -22,7 +22,7 @@ interface TicketProps {
         location: string;
         image_url?: string;
         description?: string;
-        event_type: string;
+        event_type?: string; // Make this optional since it's missing
       };
       event_ticket: {
         name: string;
@@ -37,12 +37,6 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
   const event = ticket.booking.event;
   const eventTicket = ticket.booking.event_ticket;
   const ticketRef = React.useRef<HTMLDivElement>(null);
-
-  // Debug data
-  console.log('Full ticket data:', ticket);
-  console.log('Event data:', event);
-  console.log('Event type:', event?.event_type);
-  console.log('Ticket type:', eventTicket?.ticket_type);
 
   const handlePrint = useReactToPrint({
     contentRef: ticketRef,
@@ -104,15 +98,53 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
     });
   };
 
-  // Proper event type formatting for your database schema
-  const formatEventType = (eventType: string): string => {
-    if (!eventType) {
-      return 'EVENT';
+  // Smart event type detection since event_type field is missing
+  const getEventType = (): string => {
+    // If event_type exists, use it
+    if (event.event_type) {
+      return event.event_type;
     }
+    
+    // Otherwise, infer from title or description
+    const title = event.title?.toLowerCase() || '';
+    const description = event.description?.toLowerCase() || '';
+    
+    // Check for keywords in title and description
+    if (title.includes('tech') || title.includes('gitex') || description.includes('tech')) {
+      return 'tech-meetups';
+    }
+    if (title.includes('music') || description.includes('music')) {
+      return 'live-music';
+    }
+    if (title.includes('sports') || description.includes('sports')) {
+      return 'sports-events';
+    }
+    if (title.includes('business') || description.includes('business')) {
+      return 'business-events';
+    }
+    if (title.includes('food') || description.includes('food') || description.includes('drink')) {
+      return 'food-drink';
+    }
+    if (title.includes('art') || description.includes('art')) {
+      return 'art-exhibitions';
+    }
+    if (title.includes('comedy') || description.includes('comedy')) {
+      return 'comedy-shows';
+    }
+    if (title.includes('workshop') || description.includes('workshop')) {
+      return 'workshop';
+    }
+    if (title.includes('conference') || description.includes('conference')) {
+      return 'conference';
+    }
+    
+    // Default fallback
+    return 'other';
+  };
 
-    // Direct mapping for your specific database event types
+  // Format event type for display
+  const formatEventType = (eventType: string): string => {
     const eventTypeMap: { [key: string]: string } = {
-      // Your exact database values from the check constraint
       'webinar': 'Webinar',
       'conferences': 'Conference',
       'conference': 'Conference',
@@ -144,12 +176,12 @@ const TicketDisplay: React.FC<TicketProps> = ({ ticket, showPrintStyles = false 
       'other': 'Other'
     };
 
-    // Return formatted type or the original in uppercase if not found
     return eventTypeMap[eventType] || eventType.toUpperCase();
   };
 
-  // Safe event type with formatting
-  const displayEventType = event?.event_type ? formatEventType(event.event_type) : 'EVENT';
+  // Get and format the event type
+  const eventType = getEventType();
+  const displayEventType = formatEventType(eventType);
 
   return (
     <div className={`ticket-container ${showPrintStyles ? 'print-ticket' : ''}`}>
