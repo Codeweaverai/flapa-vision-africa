@@ -25,37 +25,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [otpRequired, setOtpRequired] = useState(false);
   const [verificationType, setVerificationType] = useState<'login' | 'registration' | 'inactive' | null>(null);
 
-  // Generate and send OTP code
+  // Generate OTP using your existing edge function
   const generateOTP = async (userId: string, email: string, type: 'login' | 'registration' | 'inactive') => {
     try {
-      // Generate 6-digit OTP
-      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      console.log(`Requesting OTP generation for ${email} (${type})`);
       
-      console.log(`Generating OTP for ${email}: ${otpCode} (${type})`);
-
-      // Store OTP in database
-      const { error } = await supabase
-        .from('user_otp_verifications')
-        .insert({
-          user_id: userId,
-          otp_code: otpCode,
-          verification_type: type,
-          expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 minutes
-          attempts: 0,
-          max_attempts: 5
-        });
-
-      if (error) {
-        console.error('Failed to store OTP:', error);
-        throw error;
+      // Get the current session for authentication
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      
+      if (!currentSession?.access_token) {
+        throw new Error('No active session found');
       }
 
-      // TODO: Implement your email service here
-      console.log(`OTP ${otpCode} generated for ${email}. Implement email service to send this code.`);
-      
-      // Example email service call (replace with your actual email service):
-      // await sendOTPEmail(email, otpCode, type);
+      // Call your existing generate-otp edge function
+      const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-otp`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${currentSession.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          verificationType: type
+        }),
+      });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate OTP');
+      }
+
+      const result = await response.json();
+      console.log('OTP generation successful:', result.message);
+      
     } catch (error) {
       console.error('Error generating OTP:', error);
       throw error;
@@ -150,7 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setVerificationType('registration');
           setOtpRequired(true);
           
-          // Generate OTP for registration
+          // Generate OTP for registration using your edge function
           await generateOTP(currentUser.id, currentUser.email!, 'registration');
           return;
         }
@@ -176,7 +177,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setVerificationType(type);
           setOtpRequired(true);
           
-          // Generate OTP for the determined type
+          // Generate OTP for the determined type using your edge function
           await generateOTP(currentUser.id, currentUser.email!, type);
           
           // Update profile to mark OTP as required
@@ -200,7 +201,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setVerificationType('registration');
           setOtpRequired(true);
           
-          // Generate OTP for registration
+          // Generate OTP for registration using your edge function
           await generateOTP(currentUser.id, currentUser.email!, 'registration');
         }
       } else {
