@@ -13,8 +13,7 @@ import { supabase } from '@/lib/supabaseClient';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import ProfilePictureUpload from '@/components/user/ProfilePictureUpload';
 import ReactCountryFlag from "react-country-flag";
-import { Smartphone, Sparkles, CheckCircle, AlertCircle, Building2, Shield } from 'lucide-react';
-import OTPVerificationModal from '@/components/auth/OTPVerificationModal';
+import { Smartphone, Sparkles, CheckCircle, AlertCircle, Building2 } from 'lucide-react';
 
 interface Bank {
   id: string;
@@ -199,27 +198,6 @@ const CreatorSettings = () => {
   const [mobileOperator, setMobileOperator] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
 
-  // OTP Verification State
-  const [showOTPModal, setShowOTPModal] = useState(false);
-  const [pendingUpdateData, setPendingUpdateData] = useState<any>(null);
-  const [hasPayoutChanges, setHasPayoutChanges] = useState(false);
-
-  // Track original payout details for comparison
-  const [originalPayoutMethod, setOriginalPayoutMethod] = useState<string>('');
-  const [originalMobileDetails, setOriginalMobileDetails] = useState({
-    country: '',
-    operator: '',
-    number: ''
-  });
-  const [originalBankDetails, setOriginalBankDetails] = useState<BankAccountDetails>({
-    account_name: '',
-    account_number: '',
-    bank_name: '',
-    bank_id: '',
-    branch_code: '',
-    verified: false
-  });
-
   useEffect(() => {
     if (user) {
       loadProfile();
@@ -272,17 +250,9 @@ const CreatorSettings = () => {
 
         setProfile(profileData);
 
-        // Store original payout details for comparison
-        setOriginalPayoutMethod(data.payout_method || 'stripe');
-
         // Set mobile money data if exists
         if (data.mobile_money_country) {
           setMobileCountry(data.mobile_money_country);
-          setOriginalMobileDetails({
-            country: data.mobile_money_country,
-            operator: data.mobile_money_operator || '',
-            number: data.mobile_money_number || ''
-          });
         }
         if (data.mobile_money_operator) {
           setMobileOperator(data.mobile_money_operator);
@@ -294,7 +264,7 @@ const CreatorSettings = () => {
         // Set bank details if exists
         if (data.bank_account_details && typeof data.bank_account_details === 'object') {
           const existingDetails = data.bank_account_details as any;
-          const bankDetailsData = {
+          setBankDetails({
             account_name: existingDetails.account_name || '',
             account_number: existingDetails.account_number || '',
             bank_name: existingDetails.bank_name || '',
@@ -302,45 +272,13 @@ const CreatorSettings = () => {
             branch_code: existingDetails.branch_code || '',
             verified: existingDetails.verified || false,
             recipient_id: existingDetails.recipient_id || ''
-          };
-          setBankDetails(bankDetailsData);
-          setOriginalBankDetails(bankDetailsData);
+          });
         }
       }
     } catch (error) {
       console.error('Error loading profile:', error);
       toast.error('Failed to load profile');
     }
-  };
-
-  const hasPayoutDetailsChanged = (): boolean => {
-    if (!profile) return false;
-
-    // Check if payout method changed
-    if (profile.payout_method !== originalPayoutMethod) {
-      return true;
-    }
-
-    // Check mobile money details changes
-    if (profile.payout_method === 'mobile_money') {
-      return (
-        mobileCountry !== originalMobileDetails.country ||
-        mobileOperator !== originalMobileDetails.operator ||
-        mobileNumber !== originalMobileDetails.number
-      );
-    }
-
-    // Check bank details changes
-    if (profile.payout_method === 'bank') {
-      return (
-        bankDetails.account_number !== originalBankDetails.account_number ||
-        bankDetails.bank_id !== originalBankDetails.bank_id ||
-        bankDetails.account_name !== originalBankDetails.account_name ||
-        bankDetails.branch_code !== originalBankDetails.branch_code
-      );
-    }
-
-    return false;
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -455,104 +393,55 @@ const CreatorSettings = () => {
     setMobileOperator('');
   };
 
-  const prepareUpdateData = () => {
-    if (!user || !profile) return null;
-
-    const updateData: any = {
-      username: profile.username,
-      full_name: profile.full_name,
-      bio: profile.bio,
-      is_creator: profile.is_creator,
-      payout_method: profile.payout_method,
-      updated_at: new Date().toISOString()
-    };
-
-    // Add mobile money data if selected
-    if (profile.payout_method === 'mobile_money') {
-      updateData.mobile_money_country = mobileCountry;
-      updateData.mobile_money_operator = mobileOperator;
-      updateData.mobile_money_number = mobileNumber;
-    }
-
-    // Add bank data if selected
-    if (profile.payout_method === 'bank') {
-      let recipientId = bankDetails.recipient_id;
-
-      // Create recipient in Lenco system if verified but not created yet
-      if (bankDetails.verified && !recipientId) {
-        updateData.recipient_id_pending = true; // Flag to indicate recipient creation needed
-      }
-
-      updateData.bank_account_details = {
-        ...bankDetails,
-        recipient_id: recipientId
-      };
-    }
-
-    return updateData;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !profile) return;
 
-    // Check if payout details have changed
-    const payoutChanges = hasPayoutDetailsChanged();
-    setHasPayoutChanges(payoutChanges);
-
-    if (payoutChanges) {
-      // Prepare update data and show OTP modal
-      const updateData = prepareUpdateData();
-      setPendingUpdateData(updateData);
-      setShowOTPModal(true);
-    } else {
-      // No payout changes, proceed with normal update
-      await performProfileUpdate(prepareUpdateData());
-    }
-  };
-
-  const handleOTPVerified = async () => {
-    setShowOTPModal(false);
-    if (pendingUpdateData) {
-      await performProfileUpdate(pendingUpdateData);
-    }
-  };
-
-  const performProfileUpdate = async (updateData: any) => {
     setIsSubmitting(true);
 
     try {
-      // Handle recipient creation if needed for bank transfers
-      if (updateData.recipient_id_pending && profile?.payout_method === 'bank') {
-        try {
-          const recipientId = await createRecipient();
-          updateData.bank_account_details.recipient_id = recipientId;
-        } catch (error) {
-          console.error('Recipient creation failed, but saving bank details anyway:', error);
-          // Continue with saving even if recipient creation fails
+      const updateData: any = {
+        username: profile.username,
+        full_name: profile.full_name,
+        bio: profile.bio,
+        is_creator: profile.is_creator,
+        payout_method: profile.payout_method,
+        updated_at: new Date().toISOString()
+      };
+
+      // Add mobile money data if selected
+      if (profile.payout_method === 'mobile_money') {
+        updateData.mobile_money_country = mobileCountry;
+        updateData.mobile_money_operator = mobileOperator;
+        updateData.mobile_money_number = mobileNumber;
+      }
+
+      // Add bank data if selected
+      if (profile.payout_method === 'bank') {
+        let recipientId = bankDetails.recipient_id;
+
+        // Create recipient in Lenco system if verified but not created yet
+        if (bankDetails.verified && !recipientId) {
+          try {
+            recipientId = await createRecipient();
+          } catch (error) {
+            console.error('Recipient creation failed, but saving bank details anyway:', error);
+            // Continue with saving even if recipient creation fails
+          }
         }
-        delete updateData.recipient_id_pending;
+
+        updateData.bank_account_details = {
+          ...bankDetails,
+          recipient_id: recipientId
+        };
       }
 
       const { error } = await supabase
         .from('profiles')
         .update(updateData)
-        .eq('id', user!.id);
+        .eq('id', user.id);
 
       if (error) throw error;
-
-      // Update original values after successful save
-      setOriginalPayoutMethod(profile?.payout_method || 'stripe');
-      if (profile?.payout_method === 'mobile_money') {
-        setOriginalMobileDetails({
-          country: mobileCountry,
-          operator: mobileOperator,
-          number: mobileNumber
-        });
-      }
-      if (profile?.payout_method === 'bank') {
-        setOriginalBankDetails({ ...bankDetails });
-      }
 
       toast.success('Profile updated successfully!');
     } catch (error) {
@@ -560,7 +449,6 @@ const CreatorSettings = () => {
       toast.error('Failed to update profile');
     } finally {
       setIsSubmitting(false);
-      setPendingUpdateData(null);
     }
   };
 
@@ -674,15 +562,6 @@ const CreatorSettings = () => {
                 <h3 className="text-lg font-semibold mb-4 bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
                   Payout Settings
                 </h3>
-                
-                {/* Security Notice */}
-                <Alert className="bg-blue-50 border-blue-200 mb-6">
-                  <Shield className="h-4 w-4 text-blue-600" />
-                  <AlertDescription className="text-blue-800">
-                    <strong>Security Notice:</strong> Changing payout details requires OTP verification to protect your earnings.
-                  </AlertDescription>
-                </Alert>
-
                 <div className="space-y-6">
                   <div className="space-y-2">
                     <Label htmlFor="payout_method" className="text-sm font-medium text-gray-700">
@@ -939,15 +818,6 @@ const CreatorSettings = () => {
           </CardContent>
         </Card>
       </div>
-
-      {/* OTP Verification Modal */}
-      <OTPVerificationModal
-        isOpen={showOTPModal}
-        onClose={() => setShowOTPModal(false)}
-        onVerified={handleOTPVerified}
-        verificationType="login"
-        userEmail={user?.email || ''}
-      />
     </CreatorLayout>
   );
 };
