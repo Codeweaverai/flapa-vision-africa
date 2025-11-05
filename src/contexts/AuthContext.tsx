@@ -40,7 +40,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentIP, setCurrentIP] = useState<string | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  // Generate OTP using your existing edge function
+  // Generate OTP using your existing edge function - FIXED VERSION
   const generateOTP = async (userId: string, email: string, type: 'login' | 'registration' | 'inactive' | 'suspicious_location') => {
     try {
       console.log(`Requesting OTP generation for ${email} (${type})`);
@@ -51,28 +51,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('No active session found');
       }
 
-      const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-otp`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${currentSession.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          verificationType: type
-        }),
+      // FIX: Use supabase.functions.invoke instead of direct fetch with Deno.env
+      const { data, error } = await supabase.functions.invoke('generate-otp', {
+        body: { verificationType: type }
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate OTP');
+      if (error) {
+        console.error('OTP generation function error:', error);
+        throw new Error(error.message || 'Failed to generate OTP');
       }
 
-      const result = await response.json();
-      console.log('OTP generation successful:', result.message);
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Failed to generate OTP');
+      }
+
+      console.log('OTP generation successful:', data.message);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating OTP:', error);
-      throw error;
+      throw new Error(error.message || 'Failed to generate OTP');
     }
   };
 
