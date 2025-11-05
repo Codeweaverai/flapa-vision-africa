@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { toast } from 'sonner';
-import { Loader2, Mail, RefreshCw, Shield, Clock, AlertCircle } from 'lucide-react';
+import { Loader2, Mail, RefreshCw, Shield, Clock, AlertCircle, MapPin } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { cn } from '@/lib/utils';
 
@@ -11,7 +11,7 @@ interface OTPVerificationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onVerified: () => void;
-  verificationType: 'login' | 'registration' | 'inactive';
+  verificationType: 'login' | 'registration' | 'inactive' | 'suspicious_location';
   userEmail: string;
 }
 
@@ -110,6 +110,8 @@ const OTPVerificationModal = ({
         return 'Welcome to SkillPulse! Verify your email to secure your account.';
       case 'inactive':
         return 'Welcome back! Verify your identity to continue securely.';
+      case 'suspicious_location':
+        return 'We detected a login from a new location. Verify your identity to continue securely.';
       default:
         return 'Secure your account with two-factor verification.';
     }
@@ -121,22 +123,59 @@ const OTPVerificationModal = ({
         return 'Secure Your Account';
       case 'inactive':
         return 'Verify Your Identity';
+      case 'suspicious_location':
+        return 'New Location Detected';
       default:
         return 'Two-Factor Verification';
+    }
+  };
+
+  const getHeaderIcon = () => {
+    switch (verificationType) {
+      case 'registration':
+        return <Shield className="h-8 w-8" />;
+      case 'inactive':
+        return <Clock className="h-8 w-8" />;
+      case 'suspicious_location':
+        return <MapPin className="h-8 w-8" />;
+      default:
+        return <Shield className="h-8 w-8" />;
+    }
+  };
+
+  const getHeaderGradient = () => {
+    switch (verificationType) {
+      case 'registration':
+        return 'bg-gradient-to-r from-green-500 to-blue-500';
+      case 'inactive':
+        return 'bg-gradient-to-r from-amber-500 to-orange-500';
+      case 'suspicious_location':
+        return 'bg-gradient-to-r from-red-500 to-pink-500';
+      default:
+        return 'bg-gradient-to-r from-orange-500 to-purple-600';
+    }
+  };
+
+  const getSecurityNote = () => {
+    switch (verificationType) {
+      case 'suspicious_location':
+        return 'For your security, we require verification when logging in from new locations.';
+      default:
+        return 'Secure verification helps protect your account from unauthorized access.';
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
       <DialogContent className="sm:max-w-md p-0 overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-0 shadow-2xl">
-        {/* Header with gradient */}
-        <div className="bg-gradient-to-r from-orange-500 via-purple-500 to-blue-500 p-6 text-white">
+        {/* Header with dynamic gradient based on verification type */}
+        <div className={cn("p-6 text-white", getHeaderGradient())}>
           <DialogHeader className="text-center space-y-3">
             <div className="flex justify-center">
               <div className="relative">
                 <div className="absolute inset-0 bg-white/20 blur-lg rounded-full"></div>
                 <div className="relative bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-3">
-                  <Shield className="h-8 w-8" />
+                  {getHeaderIcon()}
                 </div>
               </div>
             </div>
@@ -161,6 +200,16 @@ const OTPVerificationModal = ({
             </div>
           </div>
 
+          {/* Security Note for suspicious location */}
+          {verificationType === 'suspicious_location' && (
+            <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+              <p className="text-xs text-blue-800 dark:text-blue-300">
+                {getSecurityNote()}
+              </p>
+            </div>
+          )}
+
           {/* OTP Input */}
           <div className="space-y-4">
             <div className="flex justify-center">
@@ -170,6 +219,11 @@ const OTPVerificationModal = ({
                 onChange={(value) => setOtpCode(value)}
                 disabled={isVerifying}
                 containerClassName="gap-3"
+                onComplete={(value) => {
+                  if (value.length === 6) {
+                    handleVerifyOTP();
+                  }
+                }}
               >
                 <InputOTPGroup className="gap-3">
                   {[0, 1, 2, 3, 4, 5].map((index) => (
@@ -188,13 +242,28 @@ const OTPVerificationModal = ({
               </InputOTP>
             </div>
 
+            {/* Auto-submit notification */}
+            {otpCode.length === 6 && (
+              <div className="text-center">
+                <p className="text-xs text-green-600 dark:text-green-400 animate-pulse">
+                  ✓ Code complete - verifying automatically...
+                </p>
+              </div>
+            )}
+
             {/* Verify Button */}
             <Button 
               onClick={handleVerifyOTP}
               disabled={otpCode.length !== 6 || isVerifying}
               className={cn(
                 "w-full h-12 text-base font-semibold transition-all duration-200",
-                "bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700",
+                verificationType === 'suspicious_location' 
+                  ? "bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700"
+                  : verificationType === 'inactive'
+                  ? "bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
+                  : verificationType === 'registration'
+                  ? "bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700"
+                  : "bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700",
                 "shadow-lg hover:shadow-xl transform hover:scale-[1.02]",
                 "disabled:opacity-50 disabled:transform-none disabled:shadow-none"
               )}
@@ -205,7 +274,7 @@ const OTPVerificationModal = ({
                   Verifying Identity...
                 </>
               ) : (
-                'Verify & Continue'
+                `Verify & ${verificationType === 'registration' ? 'Get Started' : 'Continue'}`
               )}
             </Button>
           </div>
@@ -267,8 +336,15 @@ const OTPVerificationModal = ({
               <div className="w-px h-3 bg-slate-300 dark:bg-slate-600"></div>
               <div className="flex items-center gap-1">
                 <Shield className="h-3 w-3" />
-                <span>Secure verification</span>
+                <span>{verificationType === 'suspicious_location' ? 'Location Security' : 'Secure verification'}</span>
               </div>
+            </div>
+
+            {/* Additional security context */}
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">
+                {getSecurityNote()}
+              </p>
             </div>
           </div>
         </div>
