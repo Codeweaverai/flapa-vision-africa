@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
@@ -14,6 +13,7 @@ interface AuthContextType {
   setOtpRequired: (required: boolean) => void;
   verificationType: 'login' | 'registration' | 'inactive' | null;
   checkOTPRequirement: (userToCheck?: User) => Promise<void>;
+  generateOTP: (userId: string, email: string, type: 'login' | 'registration' | 'inactive') => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,6 +24,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [otpRequired, setOtpRequired] = useState(false);
   const [verificationType, setVerificationType] = useState<'login' | 'registration' | 'inactive' | null>(null);
+
+  // Generate and send OTP code
+  const generateOTP = async (userId: string, email: string, type: 'login' | 'registration' | 'inactive') => {
+    try {
+      // Generate 6-digit OTP
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      console.log(`Generating OTP for ${email}: ${otpCode} (${type})`);
+
+      // Store OTP in database
+      const { error } = await supabase
+        .from('user_otp_verifications')
+        .insert({
+          user_id: userId,
+          otp_code: otpCode,
+          verification_type: type,
+          expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 minutes
+          attempts: 0,
+          max_attempts: 5
+        });
+
+      if (error) {
+        console.error('Failed to store OTP:', error);
+        throw error;
+      }
+
+      // TODO: Implement your email service here
+      console.log(`OTP ${otpCode} generated for ${email}. Implement email service to send this code.`);
+      
+      // Example email service call (replace with your actual email service):
+      // await sendOTPEmail(email, otpCode, type);
+
+    } catch (error) {
+      console.error('Error generating OTP:', error);
+      throw error;
+    }
+  };
 
   useEffect(() => {
     // Get initial session
@@ -94,7 +131,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log('OTP requirement check result:', data);
 
-      if (data === true) {
+      // FORCE OTP FOR EVERY LOGIN - Override database decision if needed
+      const forceOTPForAllLogins = true;
+      const requiresOTP = forceOTPForAllLogins ? true : data;
+
+      if (requiresOTP) {
         // Get user profile to determine verification type
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
@@ -108,6 +149,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('No profile found, setting verification type to registration');
           setVerificationType('registration');
           setOtpRequired(true);
+          
+          // Generate OTP for registration
+          await generateOTP(currentUser.id, currentUser.email!, 'registration');
           return;
         }
 
@@ -132,10 +176,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setVerificationType(type);
           setOtpRequired(true);
           
+          // Generate OTP for the determined type
+          await generateOTP(currentUser.id, currentUser.email!, type);
+          
           // Update profile to mark OTP as required
           await supabase
             .from('profiles')
-            .update({ otp_required: true })
+            .update({ 
+              otp_required: true,
+              last_activity: new Date().toISOString() // Update activity timestamp
+            })
             .eq('id', currentUser.id);
         } else {
           // No profile exists, create one and set as registration
@@ -149,6 +199,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
           setVerificationType('registration');
           setOtpRequired(true);
+          
+          // Generate OTP for registration
+          await generateOTP(currentUser.id, currentUser.email!, 'registration');
         }
       } else {
         console.log('OTP not required, updating last activity');
@@ -171,15 +224,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password: string) => {
     console.log('Attempting sign in for:', email);
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+    
     if (error) {
       console.error('Sign in error:', error);
       throw error;
     }
-    console.log('Sign in successful');
+    
+    console.log('Sign in successful, user:', data.user?.id);
+    
+    // Explicitly trigger OTP requirement check after successful sign-in
+    if (data.user) {
+      setTimeout(async () => {
+        await checkOTPRequirement(data.user);
+      }, 100);
+    }
   };
 
   const signUp = async (email: string, password: string, metadata?: { full_name?: string; username?: string }) => {
@@ -200,12 +262,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
 
-    const { error } = await supabase.auth.signUp(signUpOptions);
+    const { data, error } = await supabase.auth.signUp(signUpOptions);
     if (error) {
       console.error('Sign up error:', error);
       throw error;
     }
-    console.log('Sign up successful');
+    
+    console.log('Sign up successful, user:', data.user?.id);
+    
+    // For new registrations, OTP will be handled when they confirm email and sign in
+    if (data.user) {
+      setTimeout(async () => {
+        await checkOTPRequirement(data.user);
+      }, 100);
+    }
   };
 
   const signOut = async () => {
@@ -232,7 +302,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     otpRequired,
     setOtpRequired,
     verificationType,
-    checkOTPRequirement
+    checkOTPRequirement,
+    generateOTP
   };
 
   return (
