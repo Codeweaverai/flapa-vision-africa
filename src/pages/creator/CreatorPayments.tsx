@@ -1,4 +1,4 @@
-under the creatorpayments page now under the bank Transfer payouts card add a  Button called Verify Settlement Status. which uses the supabase function :  check-transfer-status and the refresh button also on refresh should check for settlement status. maintain  all design and functionality :  import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
