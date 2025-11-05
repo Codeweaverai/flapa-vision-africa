@@ -51,14 +51,19 @@ const OTPVerificationModal = ({
         throw new Error('No active session');
       }
 
-      const { error } = await supabase.functions.invoke('generate-otp', {
-        body: { verificationType },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
+      // FIX: Use proper response handling
+      const { data, error } = await supabase.functions.invoke('generate-otp', {
+        body: { verificationType }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('OTP generation error:', error);
+        throw new Error(error.message || 'Failed to send verification code');
+      }
+
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Failed to send verification code');
+      }
 
       toast.success('Verification code sent!');
       setResendCooldown(60);
@@ -83,14 +88,19 @@ const OTPVerificationModal = ({
         throw new Error('No active session');
       }
 
+      // FIX: Use proper response handling
       const { data, error } = await supabase.functions.invoke('verify-otp', {
-        body: { otpCode },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
+        body: { otpCode }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('OTP verification error:', error);
+        throw new Error(error.message || 'Invalid verification code');
+      }
+
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Invalid verification code');
+      }
 
       toast.success('Identity verified!');
       onVerified();
