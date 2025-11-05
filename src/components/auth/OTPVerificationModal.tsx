@@ -1,11 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { toast } from 'sonner';
-import { Loader2, Mail, RefreshCw } from 'lucide-react';
+import { Loader2, Mail, RefreshCw, Shield, Clock, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
+import { cn } from '@/lib/utils';
 
 interface OTPVerificationModalProps {
   isOpen: boolean;
@@ -26,6 +26,7 @@ const OTPVerificationModal = ({
   const [isVerifying, setIsVerifying] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [attempts, setAttempts] = useState(0);
 
   useEffect(() => {
     if (resendCooldown > 0) {
@@ -36,8 +37,9 @@ const OTPVerificationModal = ({
 
   useEffect(() => {
     if (isOpen) {
-      // Generate OTP when modal opens
       handleGenerateOTP();
+      setOtpCode('');
+      setAttempts(0);
     }
   }, [isOpen]);
 
@@ -58,8 +60,8 @@ const OTPVerificationModal = ({
 
       if (error) throw error;
 
-      toast.success('Verification code sent to your email!');
-      setResendCooldown(60); // 1 minute cooldown
+      toast.success('Verification code sent!');
+      setResendCooldown(60);
     } catch (error: any) {
       console.error('Error generating OTP:', error);
       toast.error(error.message || 'Failed to send verification code');
@@ -90,12 +92,13 @@ const OTPVerificationModal = ({
 
       if (error) throw error;
 
-      toast.success('Verification successful!');
+      toast.success('Identity verified!');
       onVerified();
     } catch (error: any) {
       console.error('Error verifying OTP:', error);
+      setAttempts(prev => prev + 1);
       toast.error(error.message || 'Invalid verification code');
-      setOtpCode(''); // Clear the input on error
+      setOtpCode('');
     } finally {
       setIsVerifying(false);
     }
@@ -104,37 +107,61 @@ const OTPVerificationModal = ({
   const getVerificationMessage = () => {
     switch (verificationType) {
       case 'registration':
-        return 'Welcome to SkillPulse! Please verify your email to complete your registration.';
+        return 'Welcome to SkillPulse! Verify your email to secure your account.';
       case 'inactive':
-        return 'Welcome back! For security, please verify your identity after being away.';
+        return 'Welcome back! Verify your identity to continue securely.';
       default:
-        return 'Please verify your identity to access your account.';
+        return 'Secure your account with two-factor verification.';
+    }
+  };
+
+  const getVerificationTitle = () => {
+    switch (verificationType) {
+      case 'registration':
+        return 'Secure Your Account';
+      case 'inactive':
+        return 'Verify Your Identity';
+      default:
+        return 'Two-Factor Verification';
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader className="text-center">
-          <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-gradient-to-r from-orange-400 to-purple-500 flex items-center justify-center">
-            <Mail className="h-8 w-8 text-white" />
-          </div>
-          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
-            Verify Your Email
-          </DialogTitle>
-          <DialogDescription className="text-base">
-            {getVerificationMessage()}
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-md p-0 overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-0 shadow-2xl">
+        {/* Header with gradient */}
+        <div className="bg-gradient-to-r from-orange-500 via-purple-500 to-blue-500 p-6 text-white">
+          <DialogHeader className="text-center space-y-3">
+            <div className="flex justify-center">
+              <div className="relative">
+                <div className="absolute inset-0 bg-white/20 blur-lg rounded-full"></div>
+                <div className="relative bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-3">
+                  <Shield className="h-8 w-8" />
+                </div>
+              </div>
+            </div>
+            <DialogTitle className="text-2xl font-bold tracking-tight">
+              {getVerificationTitle()}
+            </DialogTitle>
+            <DialogDescription className="text-white/90 text-base">
+              {getVerificationMessage()}
+            </DialogDescription>
+          </DialogHeader>
+        </div>
 
-        <div className="space-y-6 py-4">
-          <div className="text-center">
-            <p className="text-sm text-muted-foreground mb-4">
-              We've sent a 6-digit verification code to:
+        <div className="p-6 space-y-6">
+          {/* Email display */}
+          <div className="text-center space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Code sent to:
             </p>
-            <p className="font-medium text-foreground">{userEmail}</p>
+            <div className="inline-flex items-center gap-2 px-3 py-2 bg-slate-200/50 dark:bg-slate-700/50 rounded-lg">
+              <Mail className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium text-foreground">{userEmail}</span>
+            </div>
           </div>
 
+          {/* OTP Input */}
           <div className="space-y-4">
             <div className="flex justify-center">
               <InputOTP
@@ -142,67 +169,107 @@ const OTPVerificationModal = ({
                 value={otpCode}
                 onChange={(value) => setOtpCode(value)}
                 disabled={isVerifying}
+                containerClassName="gap-3"
               >
-                <InputOTPGroup>
-                  <InputOTPSlot index={0} />
-                  <InputOTPSlot index={1} />
-                  <InputOTPSlot index={2} />
-                  <InputOTPSlot index={3} />
-                  <InputOTPSlot index={4} />
-                  <InputOTPSlot index={5} />
+                <InputOTPGroup className="gap-3">
+                  {[0, 1, 2, 3, 4, 5].map((index) => (
+                    <InputOTPSlot 
+                      key={index}
+                      index={index}
+                      className={cn(
+                        "w-12 h-12 border-2 text-lg font-semibold transition-all duration-200",
+                        "border-slate-300 dark:border-slate-600 hover:border-slate-400",
+                        "data-[state=active]:border-orange-500 data-[state=active]:ring-2 data-[state=active]:ring-orange-200",
+                        "data-[state=active]:shadow-lg data-[state=active]:scale-105"
+                      )}
+                    />
+                  ))}
                 </InputOTPGroup>
               </InputOTP>
             </div>
 
+            {/* Verify Button */}
             <Button 
               onClick={handleVerifyOTP}
               disabled={otpCode.length !== 6 || isVerifying}
-              className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+              className={cn(
+                "w-full h-12 text-base font-semibold transition-all duration-200",
+                "bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700",
+                "shadow-lg hover:shadow-xl transform hover:scale-[1.02]",
+                "disabled:opacity-50 disabled:transform-none disabled:shadow-none"
+              )}
             >
               {isVerifying ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Verifying...
+                  Verifying Identity...
                 </>
               ) : (
-                'Verify Code'
+                'Verify & Continue'
               )}
             </Button>
           </div>
 
-          <div className="text-center space-y-2">
-            <p className="text-sm text-muted-foreground">
-              Didn't receive the code?
-            </p>
+          {/* Resend Code */}
+          <div className="text-center space-y-3">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200 dark:border-slate-700"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-slate-50 dark:bg-slate-900 px-2 text-muted-foreground">
+                  Didn't receive it?
+                </span>
+              </div>
+            </div>
+
             <Button
-              variant="ghost"
+              variant="outline"
               onClick={handleGenerateOTP}
               disabled={resendCooldown > 0 || isGenerating}
-              className="text-sm"
+              className="w-full border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
             >
               {isGenerating ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Sending...
+                  Sending Code...
                 </>
               ) : resendCooldown > 0 ? (
                 <>
-                  <RefreshCw className="mr-2 h-4 w-4" />
+                  <Clock className="mr-2 h-4 w-4" />
                   Resend in {resendCooldown}s
                 </>
               ) : (
                 <>
                   <RefreshCw className="mr-2 h-4 w-4" />
-                  Resend Code
+                  Resend Verification Code
                 </>
               )}
             </Button>
           </div>
 
-          <div className="text-xs text-center text-muted-foreground border-t pt-4">
-            🔒 For your security, this code will expire in 10 minutes.
-            <br />
-            Never share this code with anyone.
+          {/* Security Info */}
+          <div className="space-y-3">
+            {attempts > 2 && (
+              <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                <p className="text-xs text-amber-800 dark:text-amber-300">
+                  Multiple failed attempts detected. Please check your code carefully.
+                </p>
+              </div>
+            )}
+            
+            <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                <span>Expires in 10min</span>
+              </div>
+              <div className="w-px h-3 bg-slate-300 dark:bg-slate-600"></div>
+              <div className="flex items-center gap-1">
+                <Shield className="h-3 w-3" />
+                <span>Secure verification</span>
+              </div>
+            </div>
           </div>
         </div>
       </DialogContent>
