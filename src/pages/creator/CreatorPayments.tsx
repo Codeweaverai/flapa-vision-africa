@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+under the creatorpayments page now under the bank Transfer payouts card add a  Button called Verify Settlement Status. which uses the supabase function :  check-transfer-status and the refresh button also on refresh should check for settlement status. maintain  all design and functionality :  import React, { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -392,6 +392,99 @@ const CreatorPayments: React.FC = () => {
       setPayoutMethod(method);
     } catch (error) {
       console.error('Error loading payout method:', error);
+    }
+  };
+
+  // Function to verify settlement status for all processing bank transfers
+  const verifySettlementStatus = async () => {
+    if (!user) return;
+    
+    try {
+      // Find all processing bank transfer payouts
+      const processingBankTransfers = payouts.filter(
+        payout => payout.payout_method === 'bank' && payout.status === 'processing'
+      );
+
+      if (processingBankTransfers.length === 0) {
+        toast({
+          title: "No Processing Transfers",
+          description: "There are no bank transfers currently processing.",
+          variant: "default"
+        });
+        return;
+      }
+
+      toast({
+        title: "Checking Settlement Status",
+        description: `Checking status for ${processingBankTransfers.length} bank transfer(s)...`,
+      });
+
+      let updatedCount = 0;
+      
+      // Check status for each processing bank transfer
+      for (const payout of processingBankTransfers) {
+        if (!payout.external_reference) continue;
+        
+        try {
+          console.log('🔄 Checking transfer status for:', payout.external_reference);
+          
+          const { data, error } = await supabase.functions.invoke('check-transfer-status', {
+            body: { reference: payout.external_reference }
+          });
+
+          if (error) {
+            console.error('❌ Status check error:', error);
+            continue;
+          }
+
+          if (data.success) {
+            const result = data.results?.find((r: any) => r.reference === payout.external_reference);
+            
+            if (result) {
+              const lencoStatus = result.lenco_status;
+              let newStatus = payout.status;
+              
+              if (lencoStatus === 'successful' || lencoStatus === 'completed') {
+                newStatus = 'completed';
+              } else if (lencoStatus === 'failed' || lencoStatus === 'rejected') {
+                newStatus = 'failed';
+              }
+              
+              // If status changed, increment counter
+              if (newStatus !== payout.status) {
+                updatedCount++;
+              }
+            }
+          }
+        } catch (err) {
+          console.error('💥 Error checking transfer status:', err);
+        }
+      }
+
+      // Reload payouts to reflect any status changes
+      await loadPayouts();
+
+      if (updatedCount > 0) {
+        toast({
+          title: "Status Updated",
+          description: `${updatedCount} transfer status(es) have been updated.`,
+          variant: "default"
+        });
+      } else {
+        toast({
+          title: "No Changes",
+          description: "All transfers are still processing. No status changes detected.",
+          variant: "default"
+        });
+      }
+
+    } catch (error) {
+      console.error('Error verifying settlement status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to verify settlement status",
+        variant: "destructive"
+      });
     }
   };
 
@@ -1018,16 +1111,30 @@ const CreatorPayments: React.FC = () => {
                         Track your withdrawal requests
                       </CardDescription>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={loadPayouts}
-                      disabled={loadingPayouts}
-                      className="flex items-center gap-2 bg-white/80 hover:bg-white shadow-sm"
-                    >
-                      <RefreshCw className={`h-3 w-3 ${loadingPayouts ? 'animate-spin' : ''}`} />
-                      Refresh
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={verifySettlementStatus}
+                        className="flex items-center gap-2 bg-white/80 hover:bg-white shadow-sm"
+                      >
+                        <CheckCircle className="h-3 w-3" />
+                        Verify Settlement Status
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          loadPayouts();
+                          verifySettlementStatus(); // Also check settlement status on refresh
+                        }}
+                        disabled={loadingPayouts}
+                        className="flex items-center gap-2 bg-white/80 hover:bg-white shadow-sm"
+                      >
+                        <RefreshCw className={`h-3 w-3 ${loadingPayouts ? 'animate-spin' : ''}`} />
+                        Refresh
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="w-full">
