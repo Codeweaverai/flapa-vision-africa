@@ -11,33 +11,46 @@ interface AuthContextType {
   loading: boolean;
   otpRequired: boolean;
   setOtpRequired: (required: boolean) => void;
-  verificationType: 'login' | 'registration' | 'inactive' | null;
-  checkOTPRequirement: (userToCheck?: User) => Promise<void>;
-  generateOTP: (userId: string, email: string, type: 'login' | 'registration' | 'inactive') => Promise<void>;
+  verificationType: 'login' | 'registration' | 'inactive' | 'suspicious_location' | null;
+  checkOTPRequirement: (userToCheck?: User, isNewLogin?: boolean) => Promise<void>;
+  generateOTP: (userId: string, email: string, type: 'login' | 'registration' | 'inactive' | 'suspicious_location') => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Helper function to get user's IP address
+const getUserIP = async (): Promise<string> => {
+  try {
+    const response = await fetch('https://api.ipify.org?format=json');
+    const data = await response.json();
+    return data.ip;
+  } catch (error) {
+    console.error('Failed to get IP address:', error);
+    // Fallback: generate a session-based identifier
+    return `session-${Math.random().toString(36).substr(2, 9)}`;
+  }
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [otpRequired, setOtpRequired] = useState(false);
-  const [verificationType, setVerificationType] = useState<'login' | 'registration' | 'inactive' | null>(null);
+  const [verificationType, setVerificationType] = useState<'login' | 'registration' | 'inactive' | 'suspicious_location' | null>(null);
+  const [currentIP, setCurrentIP] = useState<string | null>(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // Generate OTP using your existing edge function
-  const generateOTP = async (userId: string, email: string, type: 'login' | 'registration' | 'inactive') => {
+  const generateOTP = async (userId: string, email: string, type: 'login' | 'registration' | 'inactive' | 'suspicious_location') => {
     try {
       console.log(`Requesting OTP generation for ${email} (${type})`);
       
-      // Get the current session for authentication
       const { data: { session: currentSession } } = await supabase.auth.getSession();
       
       if (!currentSession?.access_token) {
         throw new Error('No active session found');
       }
 
-      // Call your existing generate-otp edge function
       const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-otp`, {
         method: 'POST',
         headers: {
@@ -63,7 +76,75 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Check if IP address has changed and trigger OTP if it has
+  const checkIPChange = async (userId: string): Promise<boolean> => {
+    try {
+      const userIP = await getUserIP();
+      console.log('Current IP:', userIP);
+      
+      // Get the last known IP from user's profile
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('last_known_ip')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching profile for IP check:', error);
+        // First time, store the IP
+        await supabase
+          .from('profiles')
+          .update({ last_known_ip: userIP })
+          .eq('id', userId);
+        return false;
+      }
+
+      // Check if IP has changed
+      const ipChanged = profile.last_known_ip !== userIP;
+      
+      if (ipChanged) {
+        console.log(`IP address changed from ${profile.last_known_ip} to ${userIP}`);
+        // Update the IP in database
+        await supabase
+          .from('profiles')
+          .update({ last_known_ip: userIP })
+          .eq('id', userId);
+        
+        // Trigger OTP for suspicious location
+        setVerificationType('suspicious_location');
+        setOtpRequired(true);
+        await generateOTP(userId, user?.email!, 'suspicious_location');
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Error checking IP change:', error);
+      return false;
+    }
+  };
+
+  // Helper function to update last activity without triggering OTP
+  const updateLastActivity = async (userId: string) => {
+    try {
+      await supabase
+        .from('profiles')
+        .upsert({ 
+          id: userId,
+          last_activity: new Date().toISOString(),
+          otp_required: false 
+        });
+    } catch (error) {
+      console.error('Error updating last activity:', error);
+    }
+  };
+
   useEffect(() => {
+    // Get user's IP address on initial load
+    getUserIP().then(ip => {
+      setCurrentIP(ip);
+    });
+
     // Get initial session
     const getInitialSession = async () => {
       const { data: { session: initialSession } } = await supabase.auth.getSession();
@@ -72,12 +153,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(initialSession?.user ?? null);
       
       if (initialSession?.user) {
-        // Use setTimeout to defer OTP check and prevent deadlocks
-        setTimeout(async () => {
-          await checkOTPRequirement(initialSession.user);
-        }, 100);
+        // Check if this is a fresh login (has recent login timestamp)
+        const hasRecentLogin = localStorage.getItem('hasRecentLogin') === 'true';
+        
+        if (hasRecentLogin) {
+          console.log('Fresh login detected, requiring OTP');
+          // This is a fresh login - require OTP
+          await triggerOTPForLogin(initialSession.user);
+        } else {
+          console.log('Existing session, checking for IP changes only');
+          // This is an existing session - only check IP changes
+          const ipChanged = await checkIPChange(initialSession.user.id);
+          if (!ipChanged) {
+            // No IP change, just update activity and don't show OTP
+            await updateLastActivity(initialSession.user.id);
+          }
+        }
+        
+        // Clear the recent login flag after processing
+        localStorage.removeItem('hasRecentLogin');
       }
       
+      setIsInitialLoad(false);
       setLoading(false);
     };
 
@@ -91,15 +188,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (event === 'SIGNED_IN' && session?.user) {
-          console.log('User signed in, checking OTP requirement');
-          // Use setTimeout to defer OTP check and prevent potential deadlocks
+          console.log('User signed in, setting recent login flag');
+          // Set flag to indicate this is a fresh login
+          localStorage.setItem('hasRecentLogin', 'true');
+          
+          // Trigger OTP for the fresh login
           setTimeout(async () => {
-            await checkOTPRequirement(session.user);
+            await triggerOTPForLogin(session.user!);
           }, 100);
         } else if (event === 'SIGNED_OUT') {
           console.log('User signed out, clearing OTP state');
           setOtpRequired(false);
           setVerificationType(null);
+          localStorage.removeItem('hasRecentLogin');
+        } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+          // Token refresh - check for IP changes but don't trigger OTP for normal refreshes
+          console.log('Token refreshed, checking IP changes');
+          await checkIPChange(session.user.id);
         }
         
         setLoading(false);
@@ -109,7 +214,71 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, []);
 
-  const checkOTPRequirement = async (userToCheck?: User) => {
+  // Separate function to trigger OTP for login scenarios
+  const triggerOTPForLogin = async (currentUser: User) => {
+    try {
+      console.log('Triggering OTP for login:', currentUser.id);
+      
+      // Get user profile to determine verification type
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('otp_verified, last_activity, created_at')
+        .eq('id', currentUser.id)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        setVerificationType('registration');
+        setOtpRequired(true);
+        await generateOTP(currentUser.id, currentUser.email!, 'registration');
+        return;
+      }
+
+      let type: 'login' | 'registration' | 'inactive' | 'suspicious_location' = 'login';
+      
+      if (profile) {
+        if (!profile.otp_verified && !profile.last_activity) {
+          type = 'registration';
+          console.log('New user detected, needs registration verification');
+        } else if (profile.last_activity) {
+          const daysSinceActivity = Math.floor(
+            (Date.now() - new Date(profile.last_activity).getTime()) / (1000 * 60 * 60 * 24)
+          );
+          type = daysSinceActivity >= 10 ? 'inactive' : 'login';
+          console.log('Existing user, days since activity:', daysSinceActivity, 'type:', type);
+        }
+      } else {
+        // No profile exists
+        type = 'registration';
+        await supabase
+          .from('profiles')
+          .insert({ 
+            id: currentUser.id,
+            otp_required: true,
+            otp_verified: false 
+          });
+      }
+
+      console.log('Setting OTP required with type:', type);
+      setVerificationType(type);
+      setOtpRequired(true);
+      await generateOTP(currentUser.id, currentUser.email!, type);
+      
+      // Update profile
+      await supabase
+        .from('profiles')
+        .update({ 
+          otp_required: true,
+          last_activity: new Date().toISOString()
+        })
+        .eq('id', currentUser.id);
+
+    } catch (error) {
+      console.error('Error in triggerOTPForLogin:', error);
+    }
+  };
+
+  const checkOTPRequirement = async (userToCheck?: User, isNewLogin: boolean = false) => {
     const currentUser = userToCheck || user;
     
     if (!currentUser) {
@@ -117,114 +286,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    try {
-      console.log('Checking OTP requirement for user:', currentUser.id);
-      
-      // Check if user needs OTP verification using the database function
-      const { data, error } = await supabase.rpc('user_needs_otp_verification', {
-        user_uuid: currentUser.id
-      });
-
-      if (error) {
-        console.error('Error checking OTP requirement:', error);
-        return;
-      }
-
-      console.log('OTP requirement check result:', data);
-
-      // FORCE OTP FOR EVERY LOGIN - Override database decision if needed
-      const forceOTPForAllLogins = true;
-      const requiresOTP = forceOTPForAllLogins ? true : data;
-
-      if (requiresOTP) {
-        // Get user profile to determine verification type
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('otp_verified, last_activity, created_at')
-          .eq('id', currentUser.id)
-          .maybeSingle();
-
-        if (profileError) {
-          console.error('Error fetching profile:', profileError);
-          // If profile doesn't exist, treat as new user needing registration verification
-          console.log('No profile found, setting verification type to registration');
-          setVerificationType('registration');
-          setOtpRequired(true);
-          
-          // Generate OTP for registration using your edge function
-          await generateOTP(currentUser.id, currentUser.email!, 'registration');
-          return;
-        }
-
-        if (profile) {
-          let type: 'login' | 'registration' | 'inactive';
-          
-          if (!profile.otp_verified && !profile.last_activity) {
-            type = 'registration'; // New user
-            console.log('New user detected, needs registration verification');
-          } else if (profile.last_activity) {
-            const daysSinceActivity = Math.floor(
-              (Date.now() - new Date(profile.last_activity).getTime()) / (1000 * 60 * 60 * 24)
-            );
-            type = daysSinceActivity >= 10 ? 'inactive' : 'login';
-            console.log('Existing user, days since activity:', daysSinceActivity, 'type:', type);
-          } else {
-            type = 'login';
-            console.log('User needs login verification');
-          }
-
-          console.log('Setting OTP required with type:', type);
-          setVerificationType(type);
-          setOtpRequired(true);
-          
-          // Generate OTP for the determined type using your edge function
-          await generateOTP(currentUser.id, currentUser.email!, type);
-          
-          // Update profile to mark OTP as required
-          await supabase
-            .from('profiles')
-            .update({ 
-              otp_required: true,
-              last_activity: new Date().toISOString() // Update activity timestamp
-            })
-            .eq('id', currentUser.id);
-        } else {
-          // No profile exists, create one and set as registration
-          console.log('Creating new profile for user');
-          await supabase
-            .from('profiles')
-            .insert({ 
-              id: currentUser.id,
-              otp_required: true,
-              otp_verified: false 
-            });
-          setVerificationType('registration');
-          setOtpRequired(true);
-          
-          // Generate OTP for registration using your edge function
-          await generateOTP(currentUser.id, currentUser.email!, 'registration');
-        }
-      } else {
-        console.log('OTP not required, updating last activity');
-        setOtpRequired(false);
-        setVerificationType(null);
-        
-        // Update last activity
-        await supabase
-          .from('profiles')
-          .upsert({ 
-            id: currentUser.id,
-            last_activity: new Date().toISOString(),
-            otp_required: false 
-          });
-      }
-    } catch (error) {
-      console.error('Error in checkOTPRequirement:', error);
-    }
+    // For explicit OTP checks, trigger OTP
+    await triggerOTPForLogin(currentUser);
   };
 
   const signIn = async (email: string, password: string) => {
     console.log('Attempting sign in for:', email);
+    
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -237,16 +305,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     console.log('Sign in successful, user:', data.user?.id);
     
-    // Explicitly trigger OTP requirement check after successful sign-in
-    if (data.user) {
-      setTimeout(async () => {
-        await checkOTPRequirement(data.user);
-      }, 100);
-    }
+    // The auth state change listener will handle OTP requirement
   };
 
   const signUp = async (email: string, password: string, metadata?: { full_name?: string; username?: string }) => {
     console.log('Attempting sign up for:', email);
+    
     const signUpOptions: any = {
       email,
       password,
@@ -271,12 +335,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     console.log('Sign up successful, user:', data.user?.id);
     
-    // For new registrations, OTP will be handled when they confirm email and sign in
-    if (data.user) {
-      setTimeout(async () => {
-        await checkOTPRequirement(data.user);
-      }, 100);
-    }
+    // The auth state change listener will handle OTP when they confirm email
   };
 
   const signOut = async () => {
@@ -284,6 +343,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Clean up OTP state
     setOtpRequired(false);
     setVerificationType(null);
+    localStorage.removeItem('hasRecentLogin');
     
     const { error } = await supabase.auth.signOut();
     if (error) {
