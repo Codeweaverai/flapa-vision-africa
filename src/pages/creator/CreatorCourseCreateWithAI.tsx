@@ -94,12 +94,45 @@ const CreatorCourseCreateWithAI = () => {
   // Real-time progress from database
   const [generationProgress, setGenerationProgress] = useState<any>(null);
   const [pastProposals, setPastProposals] = useState<any[]>([]);
+  const [currentProgressId, setCurrentProgressId] = useState<string | null>(null);
   
   // Token usage states
   const [showTokenDialog, setShowTokenDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [requiredTokens, setRequiredTokens] = useState(0);
   const [featureName, setFeatureName] = useState('');
+
+  // Create progress record before starting course generation
+  const createProgressRecord = async (proposalId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('ai_generation_progress')
+        .insert({
+          proposal_id: proposalId,
+          user_id: user!.id,
+          progress_percentage: 0,
+          current_step: 'Initializing Manager Agent...',
+          agent_activity: {
+            manager: { status: 'active', message: 'Starting course creation process...' },
+            structure: { status: 'pending', message: 'Waiting...' },
+            content: { status: 'pending', message: 'Waiting...' },
+            quiz: { status: 'pending', message: 'Waiting...' },
+            transcript: { status: 'pending', message: 'Waiting...' },
+            exam: { status: 'pending', message: 'Waiting...' },
+            image: { status: 'pending', message: 'Waiting...' }
+          }
+        })
+        .select()
+        .single();
+
+      if (error) throw new Error('Failed to create progress record: ' + error.message);
+      
+      return data.id;
+    } catch (error) {
+      console.error('Error creating progress record:', error);
+      throw error;
+    }
+  };
 
   // Subscribe to real-time progress updates
   useEffect(() => {
@@ -119,6 +152,7 @@ const CreatorCourseCreateWithAI = () => {
 
       if (data && !error) {
         setGenerationProgress(data);
+        setCurrentProgressId(data.id);
         setStep('creating');
         
         // Fetch the associated proposal data
@@ -151,8 +185,11 @@ const CreatorCourseCreateWithAI = () => {
           filter: `user_id=eq.${user.id}`
         },
         async (payload) => {
+          console.log('📊 Real-time progress update:', payload);
+          
           if (payload.new.progress_percentage < 100) {
             setGenerationProgress(payload.new);
+            setCurrentProgressId(payload.new.id);
             setStep('creating');
             
             // Fetch proposal data if needed
@@ -168,8 +205,14 @@ const CreatorCourseCreateWithAI = () => {
                 setProposalId(payload.new.proposal_id);
               }
             }
+          } else if (payload.new.progress_percentage === 100) {
+            // Course generation completed
+            setGenerationProgress(null);
+            setCurrentProgressId(null);
+            toast.success('Course generation completed!');
           } else {
             setGenerationProgress(null);
+            setCurrentProgressId(null);
           }
         }
       )
@@ -322,41 +365,24 @@ Please generate a detailed course proposal with modules, lessons, and learning o
     setStep('creating');
 
     try {
-      // Create initial progress record
-      const { data: progressData, error: progressError } = await supabase
-        .from('ai_generation_progress')
-        .insert({
-          proposal_id: proposalId,
-          user_id: user.id,
-          progress_percentage: 0,
-          current_step: 'Initializing Manager Agent...',
-          agent_activity: {
-            manager: { status: 'active', message: 'Coordinating agents...' },
-            structure: { status: 'pending', message: 'Waiting...' },
-            content: { status: 'pending', message: 'Waiting...' },
-            quiz: { status: 'pending', message: 'Waiting...' },
-            transcript: { status: 'pending', message: 'Waiting...' },
-            exam: { status: 'pending', message: 'Waiting...' }
-          }
-        })
-        .select()
-        .single();
-
-      if (progressError) throw new Error('Failed to initialize progress tracking');
+      // Create progress record FIRST
+      const progressId = await createProgressRecord(proposalId);
+      setCurrentProgressId(progressId);
 
       const tokenResult = await deductTokens('full_course', `full_course_${proposalId}`);
       
+      // Call the function with progress_id
       const { data, error } = await supabase.functions.invoke('generate-course', {
         body: {
           creator_id: user.id,
           action: 'generate_full_course',
           proposal_id: proposalId,
-          progress_id: progressData.id
+          progress_id: progressId
         }
       });
 
       if (error) {
-        // Update progress to error state
+        // Update progress to error state if function call fails immediately
         await supabase
           .from('ai_generation_progress')
           .update({
@@ -368,17 +394,20 @@ Please generate a detailed course proposal with modules, lessons, and learning o
               content: { status: 'error', message: 'Failed' },
               quiz: { status: 'error', message: 'Failed' },
               transcript: { status: 'error', message: 'Failed' },
-              exam: { status: 'error', message: 'Failed' }
+              exam: { status: 'error', message: 'Failed' },
+              image: { status: 'error', message: 'Failed' }
             }
           })
-          .eq('id', progressData.id);
+          .eq('id', progressId);
         
         throw new Error(error.message || 'Failed to create course');
       }
 
       if (data?.success) {
-        toast.success(`Course created successfully with AI Agents! ${tokenResult?.wasFree ? '(Used free tokens)' : ''}`);
-        navigate(`/creator/courses/${data.course_id}/content`);
+        // Don't navigate immediately - let the progress tracking handle completion
+        // The real-time subscription will detect when progress reaches 100%
+        console.log('✅ Course creation initiated successfully');
+        // Navigation will happen when progress reaches 100% via the real-time subscription
       } else {
         throw new Error(data?.error || 'Failed to create course');
       }
@@ -399,10 +428,28 @@ Please generate a detailed course proposal with modules, lessons, and learning o
         toast.error(error.message || 'Failed to create course. Please try again.');
         setStep('proposal');
       }
+      
+      // Reset progress on error
+      setGenerationProgress(null);
+      setCurrentProgressId(null);
     } finally {
       setLoading(false);
     }
   };
+
+  // Handle course completion when progress reaches 100%
+  useEffect(() => {
+    if (generationProgress?.progress_percentage === 100 && generationProgress?.current_step === 'Course Creation Completed!') {
+      // Wait a moment for the database to be fully updated
+      setTimeout(() => {
+        toast.success('Course created successfully!');
+        // Navigate to the course content page
+        // Note: We need to get the course_id from somewhere - this might need adjustment
+        // For now, we'll navigate to the courses list
+        navigate('/creator/courses');
+      }, 2000);
+    }
+  }, [generationProgress, navigate]);
 
   const handleGenerateProposal = () => {
     checkTokensAndProceed('proposal', generateProposal);
@@ -461,6 +508,16 @@ Please generate a detailed course proposal with modules, lessons, and learning o
     }
   };
 
+  const getAgentStatusDisplay = (status: string) => {
+    switch (status) {
+      case 'active': return { class: 'bg-orange-100 text-orange-800', text: 'Active' };
+      case 'completed': return { class: 'bg-green-100 text-green-800', text: 'Completed' };
+      case 'processing': return { class: 'bg-purple-100 text-purple-800', text: 'Processing' };
+      case 'error': return { class: 'bg-red-100 text-red-800', text: 'Error' };
+      default: return { class: 'bg-gray-100 text-gray-800', text: 'Pending' };
+    }
+  };
+
   const availableTokens = getAvailableTokens();
 
   return (
@@ -492,9 +549,14 @@ Please generate a detailed course proposal with modules, lessons, and learning o
               <CardTitle className="flex items-center text-xl">
                 <BarChart3 className="h-5 w-5 mr-2 text-orange-500" />
                 Active Course Generation
+                {currentProgressId && (
+                  <Badge variant="outline" className="ml-2 text-xs">
+                    ID: {currentProgressId.slice(0, 8)}...
+                  </Badge>
+                )}
               </CardTitle>
               <CardDescription>
-                Real-time progress from our AI agents
+                Real-time progress from our AI agents - Updates automatically
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -519,7 +581,9 @@ Please generate a detailed course proposal with modules, lessons, and learning o
                   <h4 className="font-semibold text-gray-800">Current Step</h4>
                 </div>
                 <p className="text-lg font-medium text-gray-900">{generationProgress.current_step}</p>
-                <p className="text-sm text-gray-600 mt-1">Updated: {new Date(generationProgress.updated_at).toLocaleTimeString()}</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  Last updated: {new Date(generationProgress.updated_at).toLocaleTimeString()}
+                </p>
               </div>
 
               {/* Agent Activity from Database */}
@@ -530,33 +594,40 @@ Please generate a detailed course proposal with modules, lessons, and learning o
                     AI Agent Activity
                   </h5>
                   <div className="space-y-2 text-sm">
-                    {Object.entries(generationProgress.agent_activity).map(([agent, data]: [string, any]) => (
-                      <div key={agent} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
-                        <div className="flex items-center space-x-2">
-                          <div className={`w-2 h-2 rounded-full ${getAgentStatusColor(data.status)}`}></div>
-                          <span className="capitalize font-medium">{agent} Agent</span>
+                    {Object.entries(generationProgress.agent_activity).map(([agent, data]: [string, any]) => {
+                      const statusInfo = getAgentStatusDisplay(data.status);
+                      return (
+                        <div key={agent} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
+                          <div className="flex items-center space-x-2">
+                            <div className={`w-2 h-2 rounded-full ${getAgentStatusColor(data.status)}`}></div>
+                            <span className="capitalize font-medium">{agent} Agent</span>
+                          </div>
+                          <div className="text-right">
+                            <span className={`text-xs px-2 py-1 rounded-full ${statusInfo.class}`}>
+                              {statusInfo.text}
+                            </span>
+                            <p className="text-xs text-gray-500 mt-1 max-w-xs">{data.message}</p>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <span className={`text-xs px-2 py-1 rounded-full ${
-                            data.status === 'completed' ? 'bg-green-100 text-green-800' :
-                            data.status === 'active' ? 'bg-orange-100 text-orange-800' :
-                            data.status === 'processing' ? 'bg-purple-100 text-purple-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {data.status}
-                          </span>
-                          <p className="text-xs text-gray-500 mt-1">{data.message}</p>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
 
               <div className="text-center pt-4">
                 <p className="text-sm text-gray-500">
-                  This usually takes 2-3 minutes. Progress is saved automatically.
+                  This usually takes 2-3 minutes. Progress is saved automatically and updates in real-time.
                 </p>
+                {generationProgress.progress_percentage === 100 && (
+                  <Button 
+                    onClick={() => navigate('/creator/courses')}
+                    className="mt-2 bg-green-600 hover:bg-green-700"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    View Your Courses
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
