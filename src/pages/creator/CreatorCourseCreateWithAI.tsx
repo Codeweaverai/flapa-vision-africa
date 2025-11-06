@@ -105,28 +105,36 @@ const CreatorCourseCreateWithAI = () => {
   // Create progress record before starting course generation
   const createProgressRecord = async (proposalId: string) => {
     try {
+      console.log('Creating progress record for proposal:', proposalId);
+      
+      const progressData = {
+        proposal_id: proposalId, // Now works with fixed foreign key
+        user_id: user!.id,
+        progress_percentage: 0,
+        current_step: 'Initializing Manager Agent...',
+        agent_activity: {
+          manager: { status: 'active', message: 'Starting course creation process...' },
+          structure: { status: 'pending', message: 'Waiting...' },
+          content: { status: 'pending', message: 'Waiting...' },
+          quiz: { status: 'pending', message: 'Waiting...' },
+          transcript: { status: 'pending', message: 'Waiting...' },
+          exam: { status: 'pending', message: 'Waiting...' },
+          image: { status: 'pending', message: 'Waiting...' }
+        }
+      };
+
       const { data, error } = await supabase
         .from('ai_generation_progress')
-        .insert({
-          proposal_id: proposalId,
-          user_id: user!.id,
-          progress_percentage: 0,
-          current_step: 'Initializing Manager Agent...',
-          agent_activity: {
-            manager: { status: 'active', message: 'Starting course creation process...' },
-            structure: { status: 'pending', message: 'Waiting...' },
-            content: { status: 'pending', message: 'Waiting...' },
-            quiz: { status: 'pending', message: 'Waiting...' },
-            transcript: { status: 'pending', message: 'Waiting...' },
-            exam: { status: 'pending', message: 'Waiting...' },
-            image: { status: 'pending', message: 'Waiting...' }
-          }
-        })
+        .insert(progressData)
         .select()
         .single();
 
-      if (error) throw new Error('Failed to create progress record: ' + error.message);
+      if (error) {
+        console.error('Database error details:', error);
+        throw new Error('Failed to create progress record: ' + error.message);
+      }
       
+      console.log('Progress record created successfully:', data.id);
       return data.id;
     } catch (error) {
       console.error('Error creating progress record:', error);
@@ -140,34 +148,39 @@ const CreatorCourseCreateWithAI = () => {
 
     // Fetch current active progress
     const fetchActiveProgress = async () => {
-      const { data, error } = await supabase
-        .from('ai_generation_progress')
-        .select('*')
-        .eq('user_id', user.id)
-        .gte('progress_percentage', 0)
-        .lt('progress_percentage', 100)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+      try {
+        const { data, error } = await supabase
+          .from('ai_generation_progress')
+          .select('*')
+          .eq('user_id', user.id)
+          .gte('progress_percentage', 0)
+          .lt('progress_percentage', 100)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
 
-      if (data && !error) {
-        setGenerationProgress(data);
-        setCurrentProgressId(data.id);
-        setStep('creating');
-        
-        // Fetch the associated proposal data
-        if (data.proposal_id) {
-          const { data: proposalData } = await supabase
-            .from('ai_course_proposals')
-            .select('proposal_data')
-            .eq('id', data.proposal_id)
-            .single();
+        if (data && !error) {
+          console.log('Found active progress:', data);
+          setGenerationProgress(data);
+          setCurrentProgressId(data.id);
+          setStep('creating');
           
-          if (proposalData) {
-            setProposal(proposalData.proposal_data);
-            setProposalId(data.proposal_id);
+          // Fetch the associated proposal data using the proposal_id
+          if (data.proposal_id) {
+            const { data: proposalData } = await supabase
+              .from('ai_course_proposals')
+              .select('proposal_data')
+              .eq('id', data.proposal_id)
+              .single();
+            
+            if (proposalData) {
+              setProposal(proposalData.proposal_data);
+              setProposalId(data.proposal_id);
+            }
           }
         }
+      } catch (error) {
+        console.log('No active progress found or error:', error);
       }
     };
 
@@ -192,7 +205,7 @@ const CreatorCourseCreateWithAI = () => {
             setCurrentProgressId(payload.new.id);
             setStep('creating');
             
-            // Fetch proposal data if needed
+            // Fetch proposal data if we have a proposal_id but no proposal loaded
             if (payload.new.proposal_id && !proposal) {
               const { data: proposalData } = await supabase
                 .from('ai_course_proposals')
@@ -207,9 +220,15 @@ const CreatorCourseCreateWithAI = () => {
             }
           } else if (payload.new.progress_percentage === 100) {
             // Course generation completed
+            console.log('Course generation completed!');
             setGenerationProgress(null);
             setCurrentProgressId(null);
-            toast.success('Course generation completed!');
+            toast.success('Course created successfully!');
+            
+            // Navigate to courses page after a short delay
+            setTimeout(() => {
+              navigate('/creator/courses');
+            }, 2000);
           } else {
             setGenerationProgress(null);
             setCurrentProgressId(null);
@@ -221,9 +240,9 @@ const CreatorCourseCreateWithAI = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [user?.id, proposal]);
+  }, [user?.id, proposal, navigate]);
 
-  // Fetch past proposals
+  // Fetch past proposals with their progress
   useEffect(() => {
     if (!user?.id) return;
 
@@ -233,9 +252,11 @@ const CreatorCourseCreateWithAI = () => {
         .select(`
           *,
           ai_generation_progress!left (
+            id,
             progress_percentage,
             current_step,
-            updated_at
+            updated_at,
+            agent_activity
           )
         `)
         .eq('creator_id', user.id)
@@ -365,13 +386,16 @@ Please generate a detailed course proposal with modules, lessons, and learning o
     setStep('creating');
 
     try {
-      // Create progress record FIRST
+      // Create progress record FIRST with proposal_id
+      console.log('Creating progress record for proposal:', proposalId);
       const progressId = await createProgressRecord(proposalId);
       setCurrentProgressId(progressId);
+      console.log('Progress record created with ID:', progressId);
 
       const tokenResult = await deductTokens('full_course', `full_course_${proposalId}`);
       
       // Call the function with progress_id
+      console.log('Calling generate-course function with progress_id:', progressId);
       const { data, error } = await supabase.functions.invoke('generate-course', {
         body: {
           creator_id: user.id,
@@ -382,14 +406,15 @@ Please generate a detailed course proposal with modules, lessons, and learning o
       });
 
       if (error) {
+        console.error('Function call error:', error);
         // Update progress to error state if function call fails immediately
         await supabase
           .from('ai_generation_progress')
           .update({
             progress_percentage: 0,
-            current_step: 'Failed',
+            current_step: 'Failed - Function call error',
             agent_activity: {
-              manager: { status: 'error', message: 'Generation failed' },
+              manager: { status: 'error', message: 'Function call failed: ' + error.message },
               structure: { status: 'error', message: 'Failed' },
               content: { status: 'error', message: 'Failed' },
               quiz: { status: 'error', message: 'Failed' },
@@ -404,10 +429,9 @@ Please generate a detailed course proposal with modules, lessons, and learning o
       }
 
       if (data?.success) {
-        // Don't navigate immediately - let the progress tracking handle completion
-        // The real-time subscription will detect when progress reaches 100%
         console.log('✅ Course creation initiated successfully');
-        // Navigation will happen when progress reaches 100% via the real-time subscription
+        toast.success('Course generation started! Tracking progress...');
+        // The real-time subscription will handle completion and navigation
       } else {
         throw new Error(data?.error || 'Failed to create course');
       }
@@ -436,20 +460,6 @@ Please generate a detailed course proposal with modules, lessons, and learning o
       setLoading(false);
     }
   };
-
-  // Handle course completion when progress reaches 100%
-  useEffect(() => {
-    if (generationProgress?.progress_percentage === 100 && generationProgress?.current_step === 'Course Creation Completed!') {
-      // Wait a moment for the database to be fully updated
-      setTimeout(() => {
-        toast.success('Course created successfully!');
-        // Navigate to the course content page
-        // Note: We need to get the course_id from somewhere - this might need adjustment
-        // For now, we'll navigate to the courses list
-        navigate('/creator/courses');
-      }, 2000);
-    }
-  }, [generationProgress, navigate]);
 
   const handleGenerateProposal = () => {
     checkTokensAndProceed('proposal', generateProposal);
