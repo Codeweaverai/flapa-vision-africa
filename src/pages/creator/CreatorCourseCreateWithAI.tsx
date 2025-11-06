@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Bot, Sparkles, BookOpen, Clock, Users, Zap, CheckCircle, ArrowRight, Play, Star, FileText, Target, GraduationCap, Coins, Gift } from 'lucide-react';
+import { Bot, Sparkles, BookOpen, Clock, Users, Zap, CheckCircle, ArrowRight, Play, Star, FileText, Target, GraduationCap, Coins, Gift, History, Calendar, BarChart3, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
@@ -19,7 +19,6 @@ import FreeTrialBanner from '@/components/creator/FreeTrialBanner';
 const useSafeTokens = () => {
   const tokenHook = useTokens();
   
-  // Create safe versions of all functions
   const safeHasEnoughTokens = (cost: number) => {
     if (typeof tokenHook.hasEnoughTokens === 'function') {
       return tokenHook.hasEnoughTokens(cost);
@@ -40,7 +39,6 @@ const useSafeTokens = () => {
     if (typeof tokenHook.getFeatureCost === 'function') {
       return await tokenHook.getFeatureCost(featureType);
     }
-    // Default costs
     return featureType === 'course_proposal' ? 8 : 25;
   };
 
@@ -78,7 +76,7 @@ const CreatorCourseCreateWithAI = () => {
     getFeatureCost, 
     getAvailableTokens, 
     refetch: refetchTokens 
-  } = useSafeTokens(); // Using the safe wrapper
+  } = useSafeTokens();
   
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'input' | 'generating' | 'proposal' | 'creating'>('input');
@@ -92,16 +90,122 @@ const CreatorCourseCreateWithAI = () => {
   });
   const [proposal, setProposal] = useState<any>(null);
   const [proposalId, setProposalId] = useState<string | null>(null);
-  const [creationProgress, setCreationProgress] = useState({
-    percentage: 0,
-    step: 'Initializing...'
-  });
+  
+  // Real-time progress from database
+  const [generationProgress, setGenerationProgress] = useState<any>(null);
+  const [pastProposals, setPastProposals] = useState<any[]>([]);
   
   // Token usage states
   const [showTokenDialog, setShowTokenDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [requiredTokens, setRequiredTokens] = useState(0);
   const [featureName, setFeatureName] = useState('');
+
+  // Subscribe to real-time progress updates
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // Fetch current active progress
+    const fetchActiveProgress = async () => {
+      const { data, error } = await supabase
+        .from('ai_generation_progress')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('progress_percentage', 0)
+        .lt('progress_percentage', 100)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (data && !error) {
+        setGenerationProgress(data);
+        setStep('creating');
+        
+        // Fetch the associated proposal data
+        if (data.proposal_id) {
+          const { data: proposalData } = await supabase
+            .from('ai_course_proposals')
+            .select('proposal_data')
+            .eq('id', data.proposal_id)
+            .single();
+          
+          if (proposalData) {
+            setProposal(proposalData.proposal_data);
+            setProposalId(data.proposal_id);
+          }
+        }
+      }
+    };
+
+    fetchActiveProgress();
+
+    // Subscribe to real-time changes
+    const subscription = supabase
+      .channel('ai_progress_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'ai_generation_progress',
+          filter: `user_id=eq.${user.id}`
+        },
+        async (payload) => {
+          if (payload.new.progress_percentage < 100) {
+            setGenerationProgress(payload.new);
+            setStep('creating');
+            
+            // Fetch proposal data if needed
+            if (payload.new.proposal_id && !proposal) {
+              const { data: proposalData } = await supabase
+                .from('ai_course_proposals')
+                .select('proposal_data')
+                .eq('id', payload.new.proposal_id)
+                .single();
+              
+              if (proposalData) {
+                setProposal(proposalData.proposal_data);
+                setProposalId(payload.new.proposal_id);
+              }
+            }
+          } else {
+            setGenerationProgress(null);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [user?.id, proposal]);
+
+  // Fetch past proposals
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const fetchPastProposals = async () => {
+      const { data, error } = await supabase
+        .from('ai_course_proposals')
+        .select(`
+          *,
+          ai_generation_progress!left (
+            progress_percentage,
+            current_step,
+            updated_at
+          )
+        `)
+        .eq('creator_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (!error && data) {
+        setPastProposals(data);
+      }
+    };
+
+    fetchPastProposals();
+  }, [user?.id]);
 
   const handleInputChange = (field: string, value: string) => {
     setCourseData(prev => ({
@@ -120,10 +224,8 @@ const CreatorCourseCreateWithAI = () => {
       setFeatureName(featureName);
       
       if (hasEnoughTokens(cost)) {
-        // User has enough tokens, proceed directly
         callback();
       } else {
-        // Show token dialog
         setPendingAction(() => callback);
         setShowTokenDialog(true);
       }
@@ -158,7 +260,6 @@ Difficulty Level: ${courseData.difficulty}
 
 Please generate a detailed course proposal with modules, lessons, and learning outcomes.`;
 
-      // Use the safe deductTokens function
       const tokenResult = await deductTokens('course_proposal', `course_proposal_${Date.now()}`);
       
       const { data, error } = await supabase.functions.invoke('generate-course', {
@@ -169,14 +270,23 @@ Please generate a detailed course proposal with modules, lessons, and learning o
         }
       });
 
-      if (error) {
-        console.error('Supabase function error:', error);
-        throw new Error(error.message || 'Failed to generate proposal');
-      }
+      if (error) throw new Error(error.message || 'Failed to generate proposal');
 
       if (data?.success) {
+        // Store proposal in ai_course_proposals table
+        const { data: proposalData, error: proposalError } = await supabase
+          .from('ai_course_proposals')
+          .insert({
+            creator_id: user.id,
+            proposal_data: data.proposal
+          })
+          .select()
+          .single();
+
+        if (proposalError) throw new Error('Failed to save proposal');
+
         setProposal(data.proposal);
-        setProposalId(data.proposal_id);
+        setProposalId(proposalData.id);
         setStep('proposal');
         toast.success(`Course proposal generated successfully! ${tokenResult?.wasFree ? '(Used free tokens)' : ''}`);
       } else {
@@ -210,27 +320,59 @@ Please generate a detailed course proposal with modules, lessons, and learning o
 
     setLoading(true);
     setStep('creating');
-    
-    // Reset progress
-    setCreationProgress({
-      percentage: 0,
-      step: 'Initializing Manager Agent...'
-    });
 
     try {
-      // Use the safe deductTokens function
+      // Create initial progress record
+      const { data: progressData, error: progressError } = await supabase
+        .from('ai_generation_progress')
+        .insert({
+          proposal_id: proposalId,
+          user_id: user.id,
+          progress_percentage: 0,
+          current_step: 'Initializing Manager Agent...',
+          agent_activity: {
+            manager: { status: 'active', message: 'Coordinating agents...' },
+            structure: { status: 'pending', message: 'Waiting...' },
+            content: { status: 'pending', message: 'Waiting...' },
+            quiz: { status: 'pending', message: 'Waiting...' },
+            transcript: { status: 'pending', message: 'Waiting...' },
+            exam: { status: 'pending', message: 'Waiting...' }
+          }
+        })
+        .select()
+        .single();
+
+      if (progressError) throw new Error('Failed to initialize progress tracking');
+
       const tokenResult = await deductTokens('full_course', `full_course_${proposalId}`);
       
       const { data, error } = await supabase.functions.invoke('generate-course', {
         body: {
           creator_id: user.id,
           action: 'generate_full_course',
-          proposal_id: proposalId
+          proposal_id: proposalId,
+          progress_id: progressData.id
         }
       });
 
       if (error) {
-        console.error('Supabase function error:', error);
+        // Update progress to error state
+        await supabase
+          .from('ai_generation_progress')
+          .update({
+            progress_percentage: 0,
+            current_step: 'Failed',
+            agent_activity: {
+              manager: { status: 'error', message: 'Generation failed' },
+              structure: { status: 'error', message: 'Failed' },
+              content: { status: 'error', message: 'Failed' },
+              quiz: { status: 'error', message: 'Failed' },
+              transcript: { status: 'error', message: 'Failed' },
+              exam: { status: 'error', message: 'Failed' }
+            }
+          })
+          .eq('id', progressData.id);
+        
         throw new Error(error.message || 'Failed to create course');
       }
 
@@ -270,6 +412,10 @@ Please generate a detailed course proposal with modules, lessons, and learning o
     checkTokensAndProceed('full_course', createFullCourse);
   };
 
+  const checkProposalExpiry = (expiresAt: string) => {
+    return new Date(expiresAt) > new Date();
+  };
+
   const features = [
     {
       icon: <Zap className="h-5 w-5" />,
@@ -283,8 +429,8 @@ Please generate a detailed course proposal with modules, lessons, and learning o
     },
     {
       icon: <Clock className="h-5 w-5" />,
-      title: "Optimized Process",
-      description: "Faster generation with improved reliability"
+      title: "Real-time Progress",
+      description: "Live updates from database with detailed tracking"
     },
     {
       icon: <Users className="h-5 w-5" />,
@@ -293,32 +439,33 @@ Please generate a detailed course proposal with modules, lessons, and learning o
     }
   ];
 
-  // Orange-purple gradient utility
+  // Gradient utilities
   const gradientClass = "bg-gradient-to-r from-orange-500 to-purple-600";
   const gradientTextClass = "bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent";
   const gradientHoverClass = "hover:from-orange-600 hover:to-purple-700";
+  const greenGradientClass = "bg-gradient-to-r from-green-500 to-emerald-600";
 
-  // Progress steps for course creation
-  const progressSteps = [
-    { percentage: 10, step: 'Structure Generation', description: 'Creating course modules and lessons' },
-    { percentage: 30, step: 'Content Generation', description: 'Generating detailed lesson content' },
-    { percentage: 50, step: 'Quiz Creation', description: 'Creating 3 quizzes per module' },
-    { percentage: 70, step: 'Transcript Generation', description: 'Creating video transcripts' },
-    { percentage: 85, step: 'Final Exam', description: 'Creating 15 exam questions' },
-    { percentage: 95, step: 'Final Assembly', description: 'Combining all components' },
-    { percentage: 98, step: 'Database Save', description: 'Saving to database' },
-    { percentage: 100, step: 'Completed', description: 'Course ready!' }
-  ];
+  const getProgressStepColor = (percentage: number) => {
+    if (percentage < 30) return "from-orange-500 to-amber-500";
+    if (percentage < 70) return "from-purple-500 to-indigo-500";
+    return "from-green-500 to-emerald-500";
+  };
 
-  const getCurrentProgressStep = () => {
-    return progressSteps.find(step => step.percentage <= creationProgress.percentage) || progressSteps[0];
+  const getAgentStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return "bg-green-500 animate-pulse";
+      case 'completed': return "bg-green-500";
+      case 'processing': return "bg-orange-500 animate-pulse";
+      case 'error': return "bg-red-500";
+      default: return "bg-gray-300";
+    }
   };
 
   const availableTokens = getAvailableTokens();
 
   return (
     <CreatorLayout title="Create Course with AI">
-      <div className="max-w-4xl mx-auto space-y-8">
+      <div className="max-w-6xl mx-auto space-y-8">
         {/* Free Trial Banner */}
         <FreeTrialBanner />
 
@@ -338,7 +485,84 @@ Please generate a detailed course proposal with modules, lessons, and learning o
           </p>
         </div>
 
-        {/* Token Balance Display */}
+        {/* Active Progress Display */}
+        {generationProgress && (
+          <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm border-l-4 border-l-orange-500">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center text-xl">
+                <BarChart3 className="h-5 w-5 mr-2 text-orange-500" />
+                Active Course Generation
+              </CardTitle>
+              <CardDescription>
+                Real-time progress from our AI agents
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Progress Bar */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Progress</span>
+                  <span>{generationProgress.progress_percentage}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div 
+                    className={`bg-gradient-to-r h-3 rounded-full transition-all duration-500 ease-out ${getProgressStepColor(generationProgress.progress_percentage)}`}
+                    style={{ width: `${generationProgress.progress_percentage}%` }}
+                  ></div>
+                </div>
+              </div>
+
+              {/* Current Step */}
+              <div className="text-center p-4 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg border border-orange-200">
+                <div className="flex items-center justify-center space-x-2 mb-2">
+                  <Bot className="h-5 w-5 text-orange-500" />
+                  <h4 className="font-semibold text-gray-800">Current Step</h4>
+                </div>
+                <p className="text-lg font-medium text-gray-900">{generationProgress.current_step}</p>
+                <p className="text-sm text-gray-600 mt-1">Updated: {new Date(generationProgress.updated_at).toLocaleTimeString()}</p>
+              </div>
+
+              {/* Agent Activity from Database */}
+              {generationProgress.agent_activity && (
+                <div className="space-y-3">
+                  <h5 className="font-semibold text-gray-800 flex items-center">
+                    <Sparkles className="h-4 w-4 mr-2 text-purple-500" />
+                    AI Agent Activity
+                  </h5>
+                  <div className="space-y-2 text-sm">
+                    {Object.entries(generationProgress.agent_activity).map(([agent, data]: [string, any]) => (
+                      <div key={agent} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
+                        <div className="flex items-center space-x-2">
+                          <div className={`w-2 h-2 rounded-full ${getAgentStatusColor(data.status)}`}></div>
+                          <span className="capitalize font-medium">{agent} Agent</span>
+                        </div>
+                        <div className="text-right">
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            data.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            data.status === 'active' ? 'bg-orange-100 text-orange-800' :
+                            data.status === 'processing' ? 'bg-purple-100 text-purple-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {data.status}
+                          </span>
+                          <p className="text-xs text-gray-500 mt-1">{data.message}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="text-center pt-4">
+                <p className="text-sm text-gray-500">
+                  This usually takes 2-3 minutes. Progress is saved automatically.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Token Balance */}
         <Card className="bg-gradient-to-r from-orange-50 to-purple-50 border-orange-200">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -347,7 +571,6 @@ Please generate a detailed course proposal with modules, lessons, and learning o
                 <p className="text-sm text-gray-600">Tokens available for AI features</p>
               </div>
               <div className="text-right space-y-2">
-                {/* Free Tokens */}
                 {availableTokens.free > 0 && !tokenBalance?.has_used_free_trial && (
                   <div className="flex items-center justify-end space-x-2">
                     <Gift className="h-4 w-4 text-green-500" />
@@ -360,7 +583,6 @@ Please generate a detailed course proposal with modules, lessons, and learning o
                   </div>
                 )}
                 
-                {/* Paid Tokens */}
                 <div className="flex items-center justify-end space-x-2">
                   <Coins className="h-5 w-5 text-orange-600" />
                   <span className="text-xl font-bold text-orange-600">
@@ -371,7 +593,6 @@ Please generate a detailed course proposal with modules, lessons, and learning o
               </div>
             </div>
 
-            {/* Usage Information */}
             <div className="mt-4 grid grid-cols-2 gap-4 text-sm text-gray-600">
               <div>
                 <div className="flex justify-between">
@@ -414,7 +635,7 @@ Please generate a detailed course proposal with modules, lessons, and learning o
         </div>
 
         {/* Step 1: Course Input */}
-        {step === 'input' && (
+        {step === 'input' && !generationProgress && (
           <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
             <CardHeader className="text-center pb-4">
               <CardTitle className={`text-2xl font-bold ${gradientTextClass}`}>
@@ -712,98 +933,79 @@ Please generate a detailed course proposal with modules, lessons, and learning o
           </Card>
         )}
 
-        {/* Step 4: Creating Course */}
-        {step === 'creating' && (
+        {/* Past Proposals Section */}
+        {pastProposals.length > 0 && (
           <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
-            <CardHeader className="text-center pb-4">
-              <CardTitle className={`text-2xl font-bold ${gradientTextClass}`}>
-                Creating Your Course with AI Agents
+            <CardHeader>
+              <CardTitle className="flex items-center text-xl">
+                <History className="h-5 w-5 mr-2 text-purple-500" />
+                Your Past AI Course Proposals
               </CardTitle>
-              <CardDescription className="text-lg">
-                Our Manager Agent is coordinating specialized AI agents to build your course
+              <CardDescription>
+                Previously generated course proposals and their status
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Progress Bar */}
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm text-gray-600">
-                  <span>Progress</span>
-                  <span>{creationProgress.percentage}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-3">
-                  <div 
-                    className="bg-gradient-to-r from-orange-500 to-purple-600 h-3 rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${creationProgress.percentage}%` }}
-                  ></div>
-                </div>
-              </div>
-
-              {/* Current Step */}
-              <div className="text-center p-4 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg border border-orange-200">
-                <div className="flex items-center justify-center space-x-2 mb-2">
-                  <Bot className="h-5 w-5 text-orange-500" />
-                  <h4 className="font-semibold text-gray-800">Current Step</h4>
-                </div>
-                <p className="text-lg font-medium text-gray-900">{getCurrentProgressStep().step}</p>
-                <p className="text-sm text-gray-600 mt-1">{getCurrentProgressStep().description}</p>
-              </div>
-
-              {/* Agent Activity */}
-              <div className="space-y-3">
-                <h5 className="font-semibold text-gray-800 flex items-center">
-                  <Sparkles className="h-4 w-4 mr-2 text-purple-500" />
-                  AI Agent Activity
-                </h5>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                      <span>Manager Agent</span>
+            <CardContent>
+              <div className="space-y-4">
+                {pastProposals.map((proposalItem) => {
+                  const proposalData = proposalItem.proposal_data;
+                  const isExpired = !checkProposalExpiry(proposalItem.expires_at);
+                  const progress = proposalItem.ai_generation_progress?.[0];
+                  
+                  return (
+                    <div key={proposalItem.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-orange-300 transition-colors">
+                      <div className="flex items-center space-x-4">
+                        <div className={`w-12 h-12 rounded-full ${isExpired ? 'bg-gray-400' : gradientClass} flex items-center justify-center text-white`}>
+                          <BookOpen className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-gray-900">{proposalData.course_title}</h4>
+                          <p className="text-sm text-gray-600 line-clamp-1">{proposalData.course_summary}</p>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                              {proposalData.difficulty_level}
+                            </Badge>
+                            <div className="flex items-center text-xs text-gray-500">
+                              <Calendar className="h-3 w-3 mr-1" />
+                              {new Date(proposalItem.created_at).toLocaleDateString()}
+                            </div>
+                            {isExpired && (
+                              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                <AlertCircle className="h-3 w-3 mr-1" />
+                                Expired
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        {progress?.progress_percentage === 100 ? (
+                          <Badge className={greenGradientClass + " text-white border-0"}>
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Completed
+                          </Badge>
+                        ) : progress?.progress_percentage > 0 ? (
+                          <div className="text-right">
+                            <Badge className="bg-orange-100 text-orange-700 border-orange-200">
+                              In Progress
+                            </Badge>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {progress.progress_percentage}% complete
+                            </p>
+                          </div>
+                        ) : isExpired ? (
+                          <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-200">
+                            Expired
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                            Proposal Ready
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                    <span className="text-xs text-gray-500">Coordinating</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
-                      <span>Structure Agent</span>
-                    </div>
-                    <span className="text-xs text-gray-500">Completed</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
-                      <span>Content Agent</span>
-                    </div>
-                    <span className="text-xs text-gray-500">Completed</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                      <span>Quiz Agent</span>
-                    </div>
-                    <span className="text-xs text-gray-500">Active</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                      <span>Transcript Agent</span>
-                    </div>
-                    <span className="text-xs text-gray-500">Pending</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                      <span>Exam Agent</span>
-                    </div>
-                    <span className="text-xs text-gray-500">Pending</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-center pt-4">
-                <p className="text-sm text-gray-500">
-                  This usually takes 2-3 minutes. Please don't close this window.
-                </p>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
