@@ -162,6 +162,8 @@ import LencoPaymentSuccessPage from '@/pages/LencoPaymentSuccessPage';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import AdminRoute from '@/components/admin/AdminRoute';
 import OTPManager from '@/components/auth/OTPManager';
+import InstallPrompt from '@/components/pwa/InstallPrompt';
+import OfflineIndicator from '@/components/pwa/OfflineIndicator';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -354,6 +356,10 @@ function App() {
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>
                 <Toaster />
+                
+                {/* PWA Components */}
+                <InstallPrompt />
+                <OfflineIndicator />
                 
                 {/* Global OTP Verification Modal */}
                 <OTPManager />
