@@ -68,7 +68,7 @@ const PushNotificationSetup: React.FC = () => {
         applicationServerKey: urlBase64ToUint8Array(
           // This is a placeholder - you'll need to generate your own VAPID keys
           // Run: npx web-push generate-vapid-keys
-          'BEl62iUYgUivxIkv69yViEuiBIa-Ib37J8jQOjhE3PJnz-dZ0MJJhf7hXPmHKLYBIRXl_V_0PxSKMJC-5HYzSfk'
+          'BDx0agxfhemcb33xmWOT5Y96mVc71Ykd_3pn7VQ_HLe2_M95ECQ6Vrr2uWd09xMNhu8dNewCoR_Oj-9v2qZya9c'
         ) as BufferSource,
       });
 
