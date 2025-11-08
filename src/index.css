@@ -117,4 +117,12 @@
   .bg-light-purple {
     @apply bg-[#E9D5FF];
   }
+  
+  .gradient-orange-purple {
+    background: linear-gradient(135deg, hsl(24, 94%, 53%) 0%, hsl(252, 87%, 67%) 100%);
+  }
+  
+  .gradient-orange-purple-hover {
+    background: linear-gradient(135deg, hsl(24, 94%, 48%) 0%, hsl(252, 87%, 62%) 100%);
+  }
 }
