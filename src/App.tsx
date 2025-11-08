@@ -164,6 +164,7 @@ import AdminRoute from '@/components/admin/AdminRoute';
 import OTPManager from '@/components/auth/OTPManager';
 import InstallPrompt from '@/components/pwa/InstallPrompt';
 import OfflineIndicator from '@/components/pwa/OfflineIndicator';
+import PushNotificationSetup from '@/components/pwa/PushNotificationSetup';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -360,6 +361,7 @@ function App() {
                 {/* PWA Components */}
                 <InstallPrompt />
                 <OfflineIndicator />
+                <PushNotificationSetup />
                 
                 {/* Global OTP Verification Modal */}
                 <OTPManager />
