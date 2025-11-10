@@ -79,6 +79,7 @@ const CreatorCourseCreateWithAI = () => {
   } = useSafeTokens();
   
   const [loading, setLoading] = useState(false);
+  const [progressLoading, setProgressLoading] = useState(false);
   const [step, setStep] = useState<'input' | 'generating' | 'proposal' | 'creating'>('input');
   const [courseData, setCourseData] = useState({
     title: '',
@@ -108,7 +109,7 @@ const CreatorCourseCreateWithAI = () => {
       console.log('Creating progress record for proposal:', proposalId);
       
       const progressData = {
-        proposal_id: proposalId, // Now works with fixed foreign key
+        proposal_id: proposalId,
         user_id: user!.id,
         progress_percentage: 0,
         current_step: 'Initializing Manager Agent...',
@@ -186,13 +187,45 @@ const CreatorCourseCreateWithAI = () => {
 
     fetchActiveProgress();
 
-    // Subscribe to real-time changes
+    // Enhanced subscription to listen for both INSERT and UPDATE events
     const subscription = supabase
       .channel('ai_progress_updates')
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT', // NEW: Listen for new records
+          schema: 'public',
+          table: 'ai_generation_progress',
+          filter: `user_id=eq.${user.id}`
+        },
+        async (payload) => {
+          console.log('📊 NEW progress record created:', payload);
+          
+          if (payload.new.progress_percentage < 100) {
+            setGenerationProgress(payload.new);
+            setCurrentProgressId(payload.new.id);
+            setStep('creating');
+            
+            // Fetch proposal data if we have a proposal_id but no proposal loaded
+            if (payload.new.proposal_id && !proposal) {
+              const { data: proposalData } = await supabase
+                .from('ai_course_proposals')
+                .select('proposal_data')
+                .eq('id', payload.new.proposal_id)
+                .single();
+              
+              if (proposalData) {
+                setProposal(proposalData.proposal_data);
+                setProposalId(payload.new.proposal_id);
+              }
+            }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Existing update logic
           schema: 'public',
           table: 'ai_generation_progress',
           filter: `user_id=eq.${user.id}`
@@ -382,8 +415,9 @@ Please generate a detailed course proposal with modules, lessons, and learning o
       return;
     }
 
+    setProgressLoading(true);
     setLoading(true);
-    setStep('creating');
+    setStep('creating'); // Set step immediately to show progress UI
 
     try {
       // Create progress record FIRST with proposal_id
@@ -391,6 +425,18 @@ Please generate a detailed course proposal with modules, lessons, and learning o
       const progressId = await createProgressRecord(proposalId);
       setCurrentProgressId(progressId);
       console.log('Progress record created with ID:', progressId);
+
+      // IMMEDIATELY FETCH THE NEW PROGRESS RECORD to display it
+      const { data: newProgress, error: fetchError } = await supabase
+        .from('ai_generation_progress')
+        .select('*')
+        .eq('id', progressId)
+        .single();
+      
+      if (newProgress && !fetchError) {
+        setGenerationProgress(newProgress);
+        console.log('Immediately set progress data:', newProgress);
+      }
 
       const tokenResult = await deductTokens('full_course', `full_course_${proposalId}`);
       
@@ -457,6 +503,7 @@ Please generate a detailed course proposal with modules, lessons, and learning o
       setGenerationProgress(null);
       setCurrentProgressId(null);
     } finally {
+      setProgressLoading(false);
       setLoading(false);
     }
   };
@@ -551,6 +598,65 @@ Please generate a detailed course proposal with modules, lessons, and learning o
             Let our AI Manager Agent create a complete, production-ready course for you
           </p>
         </div>
+
+        {/* Starting Progress Display - Shows immediately when creating */}
+        {(step === 'creating' && !generationProgress) && (
+          <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm border-l-4 border-l-orange-500">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center text-xl">
+                <BarChart3 className="h-5 w-5 mr-2 text-orange-500" />
+                Starting Course Creation...
+                {currentProgressId && (
+                  <Badge variant="outline" className="ml-2 text-xs">
+                    ID: {currentProgressId.slice(0, 8)}...
+                  </Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Initializing AI agents and setting up your course structure
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Progress Bar */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Progress</span>
+                  <span>0%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div 
+                    className="bg-gradient-to-r from-orange-500 to-amber-500 h-3 rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `0%` }}
+                  ></div>
+                </div>
+              </div>
+
+              {/* Current Step */}
+              <div className="text-center p-4 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg border border-orange-200">
+                <div className="flex items-center justify-center space-x-2 mb-2">
+                  <Bot className="h-5 w-5 text-orange-500" />
+                  <h4 className="font-semibold text-gray-800">Current Step</h4>
+                </div>
+                <p className="text-lg font-medium text-gray-900">Initializing AI Manager Agent...</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  Setting up course creation pipeline
+                </p>
+              </div>
+
+              {/* Loading Animation */}
+              <div className="text-center pt-4">
+                <div className="flex justify-center space-x-2 mb-4">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                </div>
+                <p className="text-sm text-gray-500">
+                  This usually takes 2-3 minutes. Progress will update automatically.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Active Progress Display */}
         {generationProgress && (
@@ -828,7 +934,7 @@ Please generate a detailed course proposal with modules, lessons, and learning o
         )}
 
         {/* Step 3: Proposal Review */}
-        {step === 'proposal' && proposal && (
+        {step === 'proposal' && proposal && !generationProgress && (
           <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
             <CardHeader className="text-center pb-4">
               <CardTitle className={`text-2xl font-bold ${gradientTextClass}`}>
@@ -993,10 +1099,10 @@ Please generate a detailed course proposal with modules, lessons, and learning o
                 </Button>
                 <Button
                   onClick={handleCreateFullCourse}
-                  disabled={loading}
+                  disabled={loading || progressLoading}
                   className={`flex-1 ${gradientClass} text-white font-semibold py-3 rounded-lg ${gradientHoverClass} transition-all duration-200 shadow-lg hover:shadow-xl`}
                 >
-                  {loading ? (
+                  {(loading || progressLoading) ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                       Creating Course...
