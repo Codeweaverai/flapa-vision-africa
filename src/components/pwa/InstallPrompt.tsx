@@ -10,10 +10,16 @@ const InstallPrompt: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    // Show prompt only if installable and not already installed
-    if (isInstallable && !isInstalled) {
+    // Check if already dismissed in this session
+    const dismissed = sessionStorage.getItem('pwa-install-dismissed');
+    
+    // Show prompt only if installable, not already installed, and not dismissed
+    if (isInstallable && !isInstalled && !dismissed) {
       // Small delay for better UX
-      const timer = setTimeout(() => setIsVisible(true), 2000);
+      const timer = setTimeout(() => {
+        console.log('Showing PWA install prompt');
+        setIsVisible(true);
+      }, 1000);
       return () => clearTimeout(timer);
     }
   }, [isInstallable, isInstalled]);

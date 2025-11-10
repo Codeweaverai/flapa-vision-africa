@@ -17,6 +17,10 @@ const PushNotificationSetup: React.FC = () => {
     // Check if push notifications are supported
     const supported = 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
     setIsSupported(supported);
+    
+    console.log('Push notification support:', supported);
+    console.log('Current user:', user ? 'logged in' : 'not logged in');
+    console.log('Notification permission:', Notification.permission);
 
     if (supported && user) {
       checkSubscriptionStatus();
@@ -24,8 +28,13 @@ const PushNotificationSetup: React.FC = () => {
       // Show prompt if not subscribed and permission not denied
       if (Notification.permission === 'default') {
         const dismissed = sessionStorage.getItem('push-notification-dismissed');
+        console.log('Notification dismissed?', dismissed);
         if (!dismissed) {
-          setTimeout(() => setIsVisible(true), 5000);
+          // Shorter delay for better UX
+          setTimeout(() => {
+            console.log('Showing push notification prompt');
+            setIsVisible(true);
+          }, 2000);
         }
       }
     }
