@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, MapPin, Users, ArrowRight, Star, ChevronLeft, ChevronRight, Play } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Calendar, Clock, MapPin, Users, ArrowRight, Star, ChevronLeft, ChevronRight, DollarSign } from 'lucide-react';
 import { Event, fetchEvents } from '@/services/eventService';
 import { format, parseISO, isAfter } from 'date-fns';
 import PriceDisplay from '@/components/currency/PriceDisplay';
@@ -16,6 +17,15 @@ interface EventWithReviews extends Event {
     total_reviews: number;
   };
   total_attendees?: number;
+  creator_name?: string;
+  creator_avatar?: string;
+  event_tickets?: Array<{
+    id: string;
+    name: string;
+    price: number;
+    quantity_available: number;
+    quantity_sold: number;
+  }>;
 }
 
 const EventsSection = () => {
@@ -31,10 +41,10 @@ const EventsSection = () => {
     try {
       const eventsData = await fetchEvents();
       
-      // Fetch reviews and bookings for all events
+      // Fetch reviews, bookings, and creator profiles for all events
       const eventsWithDetails = await Promise.all(
         eventsData.map(async (event) => {
-          const [reviewsResult, bookingsResult] = await Promise.allSettled([
+          const [reviewsResult, bookingsResult, profilesResult] = await Promise.allSettled([
             // Fetch reviews
             supabase
               .from('event_reviews')
@@ -44,18 +54,34 @@ const EventsSection = () => {
             supabase
               .from('event_bookings')
               .select('id')
-              .eq('event_id', event.id)
+              .eq('event_id', event.id),
+            // Fetch creator profile
+            supabase
+              .from('profiles')
+              .select('username, full_name, avatar_url')
+              .eq('id', event.creator_id)
+              .single()
           ]);
 
           const reviews = reviewsResult.status === 'fulfilled' && !reviewsResult.value.error ? 
             reviewsResult.value.data : [];
           const bookings = bookingsResult.status === 'fulfilled' && !bookingsResult.value.error ? 
             bookingsResult.value.data : [];
+          const profile = profilesResult.status === 'fulfilled' && !profilesResult.value.error ? 
+            profilesResult.value.data : null;
+
+          // Fetch tickets
+          const { data: tickets } = await supabase
+            .from('event_tickets')
+            .select('id, name, price, quantity_available, quantity_sold, event_id')
+            .eq('event_id', event.id);
 
           const totalReviews = reviews?.length || 0;
           const avgRating = totalReviews > 0 
             ? reviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews 
             : 0;
+
+          const is_free = !tickets || tickets.length === 0 || Math.min(...tickets.map(t => t.price)) === 0;
 
           return {
             ...event,
@@ -63,7 +89,11 @@ const EventsSection = () => {
               avg_rating: avgRating,
               total_reviews: totalReviews
             },
-            total_attendees: bookings.length
+            total_attendees: bookings.length,
+            creator_name: profile?.full_name || profile?.username || 'Unknown Creator',
+            creator_avatar: profile?.avatar_url || null,
+            event_tickets: tickets || [],
+            is_free
           };
         })
       );
@@ -71,7 +101,7 @@ const EventsSection = () => {
       // Filter for upcoming events only
       const upcomingEvents = eventsWithDetails
         .filter(event => isAfter(parseISO(event.start_time), new Date()))
-        .slice(0, 15); // Show 15 events for horizontal scrolling
+        .slice(0, 12); // Show 12 events for horizontal scrolling
       
       setEvents(upcomingEvents);
     } catch (error) {
@@ -102,33 +132,48 @@ const EventsSection = () => {
     }
   };
 
+  const getMinPrice = (tickets: EventWithReviews['event_tickets']) => {
+    if (!tickets || tickets.length === 0) return 0;
+    return Math.min(...tickets.map(t => t.price));
+  };
+
+  const getTotalCapacity = (tickets: EventWithReviews['event_tickets']) => {
+    if (!tickets || tickets.length === 0) return 0;
+    return tickets.reduce((sum, ticket) => sum + ticket.quantity_available, 0);
+  };
+
+  const getSoldTickets = (tickets: EventWithReviews['event_tickets']) => {
+    if (!tickets || tickets.length === 0) return 0;
+    return tickets.reduce((sum, ticket) => sum + ticket.quantity_sold, 0);
+  };
+
   const renderStarRating = (rating: number) => {
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 >= 0.5;
     const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
 
     return (
-      <div className="flex items-center gap-0.5">
+      <div className="flex items-center gap-1">
         {[...Array(fullStars)].map((_, i) => (
-          <Star key={`full-${i}`} className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+          <Star key={`full-${i}`} className="h-4 w-4 fill-yellow-400 text-yellow-400 drop-shadow-sm" />
         ))}
         {hasHalfStar && (
           <div className="relative">
-            <Star className="h-3 w-3 text-gray-300" />
+            <Star className="h-4 w-4 text-gray-300" />
             <div className="absolute top-0 left-0 w-1/2 overflow-hidden">
-              <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
             </div>
           </div>
         )}
         {[...Array(emptyStars)].map((_, i) => (
-          <Star key={`empty-${i}`} className="h-3 w-3 text-gray-300" />
+          <Star key={`empty-${i}`} className="h-4 w-4 text-gray-300" />
         ))}
-        <span className="text-xs text-gray-600 ml-1">({rating.toFixed(1)})</span>
+        <span className="text-sm text-gray-600 ml-1 font-medium">({rating.toFixed(1)})</span>
       </div>
     );
   };
 
-  // Upcoming Badge with Green Pulse Animation
+  // Upcoming Badge with Green Pulse Animation (same as ExploreEvents)
   const UpcomingBadge = () => (
     <Badge className="bg-gradient-to-r from-green-500 to-emerald-600 text-white border-0 shadow-lg animate-pulse">
       Upcoming
@@ -156,9 +201,9 @@ const EventsSection = () => {
           </div>
 
           <div className="flex space-x-6 pb-6">
-            {[...Array(5)].map((_, index) => (
+            {[...Array(4)].map((_, index) => (
               <div key={index} className="flex-none w-80 animate-pulse">
-                <div className="bg-white rounded-2xl shadow-lg overflow-hidden h-[420px]">
+                <div className="bg-white rounded-2xl shadow-lg overflow-hidden h-[480px]">
                   <div className="bg-gray-300 h-56"></div>
                   <div className="p-5 space-y-3">
                     <div className="h-4 bg-gray-300 rounded"></div>
@@ -240,131 +285,138 @@ const EventsSection = () => {
                   key={`${event.id}-${index}`} 
                   className="flex-none w-80 snap-start"
                 >
-                  <Card className="group hover:shadow-2xl transition-all duration-500 bg-white/90 backdrop-blur-sm border-purple-100 hover:border-purple-300 overflow-hidden h-[420px] flex flex-col">
-                    {/* Event Thumbnail with Icon */}
-                    <div className="relative h-56 overflow-hidden bg-gradient-to-br from-purple-400 to-orange-400">
-                      {event.image_url ? (
-                        <img 
-                          src={event.image_url} 
-                          alt={event.title}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-purple-400 to-orange-400 flex items-center justify-center">
-                          <Calendar className="h-14 w-14 text-white opacity-90" />
-                        </div>
-                      )}
-                      
-                      {/* Animated Orange Calendar Icon - Always Visible */}
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="bg-orange-500/90 rounded-full p-4 shadow-lg animate-pulse-slow">
-                          <Calendar className="h-6 w-6 text-white" />
-                        </div>
-                      </div>
-
-                      {/* Hover Overlay */}
-                      <Link 
-                        to={`/events/${event.id}`}
-                        className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-all duration-300"
-                      >
-                        <div className="bg-white rounded-full p-4 transform scale-110 group-hover:scale-100 transition-transform duration-300 shadow-xl">
-                          <Calendar className="h-7 w-7 text-orange-600" />
-                        </div>
-                      </Link>
-
-                      {/* Upcoming Badge with Green Pulse Animation */}
-                      <div className="absolute top-3 left-3 z-10">
-                        <UpcomingBadge />
-                      </div>
-
-                      {/* Wishlist Button */}
-                      <div className="absolute top-3 right-3 z-20">
-                        <WishlistButton 
-                          itemId={event.id}
-                          itemType="event"
-                          variant="ghost"
-                          size="icon"
-                          className="bg-white/90 hover:bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
-                        />
-                      </div>
-
-                      {/* Event Type Badge */}
-                      <div className="absolute top-12 left-3">
-                        <Badge className="bg-white/95 text-purple-800 border-purple-200 text-xs font-medium backdrop-blur-sm">
-                          {event.event_type?.charAt(0).toUpperCase() + event.event_type?.slice(1) || 'Event'}
-                        </Badge>
-                      </div>
-
-                      {/* Price/Free Badge */}
-                      <div className="absolute bottom-3 right-3">
-                        {event.is_free ? (
-                          <Badge className="bg-green-500 text-white border-0 text-xs font-bold shadow-lg">
-                            Free
-                          </Badge>
+                  <Card className="group overflow-hidden hover:shadow-2xl transition-all duration-500 bg-white/90 backdrop-blur-sm border-0 shadow-xl hover:scale-[1.02]">
+                    <div className="relative">
+                      {/* Event Image */}
+                      <div className="relative h-56 overflow-hidden cursor-pointer">
+                        {event.image_url ? (
+                          <img
+                            src={event.image_url}
+                            alt={event.title}
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                          />
                         ) : (
-                          <Badge className="bg-blue-500 text-white border-0 text-xs font-bold shadow-lg">
-                            <PriceDisplay amount={event.price} originalCurrency="USD" />
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Event Content */}
-                    <div className="flex-1 p-5 flex flex-col">
-                      <CardHeader className="p-0 pb-3">
-                        <CardTitle className="text-base font-bold group-hover:text-purple-600 transition-colors duration-300 line-clamp-2 leading-tight">
-                          {event.title}
-                        </CardTitle>
-                        <CardDescription className="line-clamp-2 text-sm mt-2 text-gray-600 leading-relaxed">
-                          {event.description}
-                        </CardDescription>
-                      </CardHeader>
-                      
-                      <CardContent className="p-0 mt-auto space-y-3">
-                        {/* Event Reviews */}
-                        {event.reviews && event.reviews.total_reviews > 0 && (
-                          <div className="flex items-center justify-between text-sm">
-                            <div className="flex items-center text-gray-700 font-medium">
-                              <Star className="h-4 w-4 mr-1 fill-yellow-400 text-yellow-400" />
-                              <span>{event.reviews.avg_rating?.toFixed(1) || 0}</span>
-                              <span className="ml-1 text-gray-500">({event.reviews.total_reviews || 0})</span>
-                            </div>
-                            <div className="flex items-center text-gray-700 font-medium">
-                              <Users className="h-4 w-4 mr-2 text-blue-500" />
-                              <span>{event.total_attendees || 0} attending</span>
+                          <div className="w-full h-full bg-gradient-to-br from-orange-200 via-purple-200 to-pink-300 flex items-center justify-center group-hover:from-orange-300 group-hover:to-purple-300 transition-all duration-500">
+                            {/* Animated Event Icon - Always Visible */}
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="bg-gradient-to-r from-orange-500 to-purple-600 rounded-full p-4 shadow-lg animate-pulse-slow">
+                                <Calendar className="h-8 w-8 text-white" />
+                              </div>
                             </div>
                           </div>
                         )}
+                        
+                        {/* Gradient Overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                        
+                        {/* Status and Type Badges */}
+                        <div className="absolute top-4 left-4 right-4 flex justify-between">
+                          <UpcomingBadge />
+                          <Badge className="bg-white/90 text-gray-700 border-white/50 backdrop-blur-sm font-medium">
+                            {event.event_type}
+                          </Badge>
+                        </div>
 
-                        {/* Event Date and Time */}
-                        <div className="flex items-center justify-between text-sm">
-                          <div className="flex items-center text-gray-600 font-medium">
-                            <Calendar className="h-4 w-4 mr-2 text-purple-500" />
+                        {/* Event Date Overlay */}
+                        <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm rounded-xl px-3 py-2 shadow-lg border border-white/30">
+                          <div className="text-sm font-bold text-gray-900">
                             {format(parseISO(event.start_time), 'MMM d, yyyy')}
                           </div>
-                          <div className="flex items-center text-gray-600 font-medium">
-                            <Clock className="h-4 w-4 mr-2 text-orange-500" />
-                            {format(parseISO(event.start_time), 'h:mm a')}
-                          </div>
                         </div>
 
-                        {/* Location */}
-                        <div className="flex items-center justify-between text-sm">
-                          <div className="flex items-center text-gray-700 font-medium">
-                            <MapPin className="h-4 w-4 mr-2 text-red-500" />
-                            <span className="truncate max-w-[180px]">
-                              {event.online_meeting_link ? 'Online Event' : (event.location || 'Location TBA')}
-                            </span>
-                          </div>
+                        {/* Wishlist Button - Moved to Bottom Right */}
+                        <div className="absolute bottom-4 right-4 z-20">
+                          <WishlistButton 
+                            itemId={event.id}
+                            itemType="event"
+                            variant="ghost"
+                            size="icon"
+                            iconOnly
+                            className="bg-white/90 hover:bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-all hover:scale-110 border-0 hover:text-red-500"
+                          />
                         </div>
-                        
-                        {/* View Event Button */}
-                        <Link to={`/events/${event.id}`} className="block mt-3">
-                          <Button className="w-full bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600 text-white border-0 text-sm font-semibold py-2 h-10 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5">
-                            View Event Details
+                      </div>
+
+                      {/* Card Content */}
+                      <div className="cursor-pointer">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-xl font-bold text-gray-900 line-clamp-2 group-hover:text-orange-600 transition-colors duration-300">
+                            {event.title}
+                          </CardTitle>
+                          
+                          {/* Creator with Avatar */}
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <Avatar className="h-6 w-6 border border-orange-200">
+                              <AvatarImage 
+                                src={event.creator_avatar || undefined} 
+                                alt={event.creator_name}
+                              />
+                              <AvatarFallback className="bg-gradient-to-r from-orange-400 to-purple-500 text-white text-xs font-bold">
+                                {event.creator_name?.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium">by {event.creator_name}</span>
+                          </div>
+                        </CardHeader>
+
+                        <CardContent className="space-y-4">
+                          {/* Event Reviews */}
+                          {event.reviews && event.reviews.total_reviews > 0 && (
+                            <div className="flex items-center justify-between">
+                              {renderStarRating(event.reviews.avg_rating)}
+                              <span className="text-xs text-gray-500 font-medium">
+                                {event.reviews.total_reviews} review{event.reviews.total_reviews !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Event Details */}
+                          {event.location && (
+                            <div className="flex items-center text-sm text-gray-600">
+                              <MapPin className="h-4 w-4 mr-2 text-orange-500 flex-shrink-0" />
+                              <span className="truncate font-medium">{event.location}</span>
+                            </div>
+                          )}
+                          
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Users className="h-4 w-4 mr-2 text-orange-500 flex-shrink-0" />
+                            <span className="font-medium">{getSoldTickets(event.event_tickets)}/{getTotalCapacity(event.event_tickets)} registered</span>
+                          </div>
+
+                          {/* Event Time */}
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Clock className="h-4 w-4 mr-2 text-orange-500 flex-shrink-0" />
+                            <span className="font-medium">{format(parseISO(event.start_time), 'h:mm a')}</span>
+                          </div>
+                        </CardContent>
+
+                        <CardContent className="flex justify-between items-center pt-4 border-t border-gray-100">
+                          <div className="flex items-center">
+                            <DollarSign className="h-5 w-5 mr-1 text-orange-500" />
+                            <span className="font-bold text-xl text-gray-900">
+                              {event.is_free ? (
+                                <span className="bg-gradient-to-r from-green-500 to-emerald-600 bg-clip-text text-transparent">
+                                  Free
+                                </span>
+                              ) : (
+                                <PriceDisplay amount={getMinPrice(event.event_tickets)} originalCurrency="USD" />
+                              )}
+                            </span>
+                            {!event.is_free && event.event_tickets && event.event_tickets.length > 1 && (
+                              <span className="text-sm text-gray-500 ml-1 font-medium">+</span>
+                            )}
+                          </div>
+                          <Button 
+                            size="sm" 
+                            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 font-semibold"
+                            asChild
+                          >
+                            <Link to={`/events/${event.id}`}>
+                              View Details
+                            </Link>
                           </Button>
-                        </Link>
-                      </CardContent>
+                        </CardContent>
+                      </div>
                     </div>
                   </Card>
                 </div>
