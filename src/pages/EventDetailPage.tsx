@@ -11,6 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import EventReviewsTab from '@/components/event/EventReviewsTab';
+import FreeEventRegistration from '@/components/event/FreeEventRegistration'; // Import the new component
 import { 
   Calendar, 
   MapPin, 
@@ -436,6 +437,12 @@ const EventDetailPage = () => {
       default:
         return `🎤 Speaking on: ${speakingTopic}`;
     }
+  };
+
+  const handleRegistrationSuccess = () => {
+    // Refresh event data to update attendee count and registration status
+    loadEventData();
+    setIsRegistered(true);
   };
 
   // Use the PulseLoading component
@@ -935,23 +942,15 @@ const EventDetailPage = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Ticket className="h-5 w-5" />
-                    Event Tickets
+                    {event.is_free ? 'Event Registration' : 'Event Tickets'}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {isRegistered ? (
-                    <div className="text-center py-6">
-                      <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                      <p className="text-green-800 font-medium mb-4">You're registered for this event!</p>
-                      <Button 
-                        asChild
-                        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                      >
-                        <Link to="/my-events">
-                          View Event Ticket
-                        </Link>
-                      </Button>
-                    </div>
+                  {event.is_free ? (
+                    <FreeEventRegistration 
+                      event={event}
+                      onRegistrationSuccess={handleRegistrationSuccess}
+                    />
                   ) : availableTickets.length === 0 ? (
                     <div className="text-center py-6">
                       <Info className="h-12 w-12 text-gray-400 mx-auto mb-4" />
