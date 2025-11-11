@@ -260,7 +260,7 @@ const FreeEventRegistration: React.FC<FreeEventRegistrationProps> = ({
             asChild
             className="w-full bg-green-600 hover:bg-green-700 text-white"
           >
-            <a href="/my-tickets">
+            <a href="/my-events">
               <Ticket className="h-4 w-4 mr-2" />
               View My Ticket
             </a>
