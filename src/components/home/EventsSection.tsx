@@ -128,6 +128,13 @@ const EventsSection = () => {
     );
   };
 
+  // Upcoming Badge with Green Pulse Animation
+  const UpcomingBadge = () => (
+    <Badge className="bg-gradient-to-r from-green-500 to-emerald-600 text-white border-0 shadow-lg animate-pulse">
+      Upcoming
+    </Badge>
+  );
+
   if (loading) {
     return (
       <section className="py-16 bg-gradient-to-br from-purple-50 to-orange-50">
@@ -265,6 +272,11 @@ const EventsSection = () => {
                         </div>
                       </Link>
 
+                      {/* Upcoming Badge with Green Pulse Animation */}
+                      <div className="absolute top-3 left-3 z-10">
+                        <UpcomingBadge />
+                      </div>
+
                       {/* Wishlist Button */}
                       <div className="absolute top-3 right-3 z-20">
                         <WishlistButton 
@@ -277,7 +289,7 @@ const EventsSection = () => {
                       </div>
 
                       {/* Event Type Badge */}
-                      <div className="absolute top-3 left-3">
+                      <div className="absolute top-12 left-3">
                         <Badge className="bg-white/95 text-purple-800 border-purple-200 text-xs font-medium backdrop-blur-sm">
                           {event.event_type?.charAt(0).toUpperCase() + event.event_type?.slice(1) || 'Event'}
                         </Badge>
