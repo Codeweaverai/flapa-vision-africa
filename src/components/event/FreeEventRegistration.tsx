@@ -249,16 +249,16 @@ const FreeEventRegistration: React.FC<FreeEventRegistrationProps> = ({
 
   if (isRegistered) {
     return (
-      <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-6 text-center">
-        <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
-        <h3 className="font-semibold text-green-800 mb-2">You're Registered!</h3>
-        <p className="text-green-600 text-sm mb-4">
+      <div className="bg-gradient-to-r from-orange-50 to-purple-50 border border-orange-200 rounded-lg p-6 text-center">
+        <CheckCircle className="h-12 w-12 text-orange-500 mx-auto mb-3" />
+        <h3 className="font-semibold text-orange-800 mb-2">You're Registered!</h3>
+        <p className="text-orange-700 text-sm mb-4">
           Your free ticket has been generated and is ready to use.
         </p>
         <div className="space-y-2">
           <Button 
             asChild
-            className="w-full bg-green-600 hover:bg-green-700 text-white"
+            className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
           >
             <a href="/my-events">
               <Ticket className="h-4 w-4 mr-2" />
@@ -267,7 +267,7 @@ const FreeEventRegistration: React.FC<FreeEventRegistrationProps> = ({
           </Button>
           <Button 
             variant="outline"
-            className="w-full border-green-300 text-green-700 hover:bg-green-50"
+            className="w-full border-orange-300 text-orange-700 hover:bg-orange-50"
             onClick={addToGoogleCalendar}
           >
             <Calendar className="h-4 w-4 mr-2" />
@@ -290,7 +290,7 @@ const FreeEventRegistration: React.FC<FreeEventRegistrationProps> = ({
       <Button
         onClick={handleFreeRegistration}
         disabled={isLoading}
-        className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold py-3 text-lg shadow-lg hover:shadow-xl transition-all duration-200"
+        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-semibold py-3 text-lg shadow-lg hover:shadow-xl transition-all duration-200"
         size="lg"
       >
         {isLoading ? (
