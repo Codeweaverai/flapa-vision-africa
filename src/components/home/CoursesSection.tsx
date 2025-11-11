@@ -266,17 +266,39 @@ const CoursesSection = () => {
                       {/* Course Thumbnail */}
                       <div className="relative h-56 overflow-hidden cursor-pointer">
                         {course.thumbnail_url ? (
-                          <img
-                            src={course.thumbnail_url}
-                            alt={course.title}
-                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                          />
+                          <>
+                            <img
+                              src={course.thumbnail_url}
+                              alt={course.title}
+                              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                            />
+                            {/* Orange-Purple Gradient Video Icon with Pulse Animation - Always Visible on Images */}
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="relative">
+                                {/* Outer Pulse Ring */}
+                                <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full animate-ping opacity-20"></div>
+                                {/* Middle Pulse Ring */}
+                                <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full animate-pulse opacity-30"></div>
+                                {/* Main Icon Container */}
+                                <div className="relative bg-gradient-to-r from-orange-500 to-purple-600 rounded-full p-4 shadow-2xl animate-pulse-slow transform hover:scale-110 transition-transform duration-300">
+                                  <Play className="h-8 w-8 text-white fill-current" />
+                                </div>
+                              </div>
+                            </div>
+                          </>
                         ) : (
                           <div className="w-full h-full bg-gradient-to-br from-orange-200 via-purple-200 to-pink-300 flex items-center justify-center group-hover:from-orange-300 group-hover:to-purple-300 transition-all duration-500">
-                            {/* Animated Video Icon with Orange-Purple Gradient */}
+                            {/* Animated Video Icon with Orange-Purple Gradient for Placeholder */}
                             <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="bg-gradient-to-r from-orange-500 to-purple-600 rounded-full p-4 shadow-lg animate-pulse-slow">
-                                <Play className="h-8 w-8 text-white fill-current" />
+                              <div className="relative">
+                                {/* Outer Pulse Ring */}
+                                <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full animate-ping opacity-20"></div>
+                                {/* Middle Pulse Ring */}
+                                <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full animate-pulse opacity-30"></div>
+                                {/* Main Icon Container */}
+                                <div className="relative bg-gradient-to-r from-orange-500 to-purple-600 rounded-full p-4 shadow-2xl animate-pulse-slow transform hover:scale-110 transition-transform duration-300">
+                                  <Play className="h-8 w-8 text-white fill-current" />
+                                </div>
                               </div>
                             </div>
                           </div>
