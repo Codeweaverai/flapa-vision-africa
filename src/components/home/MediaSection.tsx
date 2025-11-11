@@ -107,40 +107,52 @@ const MediaSection = () => {
   const getPostTypeColor = (type: string) => {
     switch (type) {
       case 'video':
-        return 'bg-gradient-to-br from-red-500/10 to-pink-600/10 border-red-200';
+        return 'bg-gradient-to-br from-orange-500/10 to-red-500/10 border-orange-200';
       case 'podcast':
-        return 'bg-gradient-to-br from-green-500/10 to-teal-600/10 border-green-200';
+        return 'bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-200';
       default:
-        return 'bg-gradient-to-br from-blue-500/10 to-indigo-600/10 border-blue-200';
+        return 'bg-gradient-to-br from-amber-500/10 to-orange-500/10 border-amber-200';
     }
   };
 
   const getPostTypeGradient = (type: string) => {
     switch (type) {
       case 'video':
-        return 'from-red-500 to-pink-600';
+        return 'from-orange-500 to-red-500';
       case 'podcast':
-        return 'from-green-500 to-teal-600';
+        return 'from-purple-500 to-pink-500';
       default:
-        return 'from-blue-500 to-indigo-600';
+        return 'from-amber-500 to-orange-500';
+    }
+  };
+
+  const getPostTypeLight = (type: string) => {
+    switch (type) {
+      case 'video':
+        return 'bg-orange-100/80 text-orange-700';
+      case 'podcast':
+        return 'bg-purple-100/80 text-purple-700';
+      default:
+        return 'bg-amber-100/80 text-amber-700';
     }
   };
 
   return (
-    <section className="py-20 bg-gradient-to-br from-slate-50 via-white to-slate-100/50 relative overflow-hidden">
+    <section className="py-20 bg-gradient-to-br from-orange-50/50 via-purple-50/50 to-pink-50/50 relative overflow-hidden">
       {/* Background Elements */}
-      <div className="absolute inset-0 bg-grid-slate-200/50 [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]" />
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-gradient-to-r from-orange-400/20 to-purple-600/20 rounded-full blur-3xl opacity-30" />
+      <div className="absolute inset-0 bg-grid-orange-200/30 [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-gradient-to-r from-orange-400/30 to-purple-600/30 rounded-full blur-3xl opacity-40" />
+      <div className="absolute bottom-0 right-0 w-80 h-80 bg-gradient-to-r from-purple-400/20 to-pink-500/20 rounded-full blur-3xl opacity-30" />
       
       <div className="container mx-auto px-4 relative">
         {/* Header */}
         <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 backdrop-blur-sm border border-slate-200/60 shadow-sm mb-6">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 backdrop-blur-sm border border-orange-200/60 shadow-sm mb-6">
             <div className="w-2 h-2 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full animate-pulse" />
-            <span className="text-sm font-medium text-slate-700">Latest Insights</span>
+            <span className="text-sm font-medium text-orange-700">Latest Insights</span>
           </div>
           
-          <h2 className="text-5xl font-bold mb-6 bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+          <h2 className="text-5xl font-bold mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
             Stay Informed & Inspired
           </h2>
           
@@ -155,12 +167,12 @@ const MediaSection = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[...Array(3)].map((_, i) => (
               <div key={i} className="group">
-                <div className="h-64 bg-slate-200 rounded-2xl mb-4 animate-pulse" />
+                <div className="h-64 bg-gradient-to-br from-orange-100 to-purple-100 rounded-2xl mb-4 animate-pulse" />
                 <div className="space-y-3">
-                  <Skeleton className="h-4 w-20 rounded-full" />
-                  <Skeleton className="h-6 w-full rounded" />
-                  <Skeleton className="h-4 w-3/4 rounded" />
-                  <Skeleton className="h-10 w-full rounded-xl mt-4" />
+                  <Skeleton className="h-4 w-20 rounded-full bg-orange-200" />
+                  <Skeleton className="h-6 w-full rounded bg-orange-200" />
+                  <Skeleton className="h-4 w-3/4 rounded bg-orange-200" />
+                  <Skeleton className="h-10 w-full rounded-xl mt-4 bg-gradient-to-r from-orange-200 to-purple-200" />
                 </div>
               </div>
             ))}
@@ -175,7 +187,7 @@ const MediaSection = () => {
               >
                 {/* Card */}
                 <Card className={`
-                  relative overflow-hidden border-0 bg-white/80 backdrop-blur-sm 
+                  relative overflow-hidden border-0 bg-white/90 backdrop-blur-sm 
                   shadow-sm hover:shadow-2xl transition-all duration-500 
                   group-hover:scale-[1.02] h-full flex flex-col
                   ${getPostTypeColor(post.post_type)}
@@ -204,7 +216,7 @@ const MediaSection = () => {
                     {(post.post_type === 'video' || post.post_type === 'podcast') && (
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
                         <div className="w-14 h-14 bg-white/90 rounded-full flex items-center justify-center transform scale-90 group-hover:scale-100 transition-transform duration-300">
-                          <Play className="h-6 w-6 text-slate-800 fill-current ml-1" />
+                          <Play className="h-6 w-6 text-orange-600 fill-current ml-1" />
                         </div>
                       </div>
                     )}
@@ -228,7 +240,7 @@ const MediaSection = () => {
                       <div className="absolute top-4 right-4">
                         <Badge 
                           variant="secondary" 
-                          className="backdrop-blur-sm bg-white/90 border-white/40 text-slate-700 font-medium shadow-sm"
+                          className={`backdrop-blur-sm bg-white/90 border-orange-200 text-orange-700 font-medium shadow-sm ${getPostTypeLight(post.post_type)}`}
                         >
                           {post.category}
                         </Badge>
@@ -246,7 +258,7 @@ const MediaSection = () => {
                   
                   {/* Content Section */}
                   <CardHeader className="pb-4 flex-1">
-                    <CardTitle className="text-xl font-bold text-slate-800 line-clamp-2 leading-tight group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-slate-800 group-hover:to-slate-600 group-hover:bg-clip-text transition-all duration-300 mb-3">
+                    <CardTitle className="text-xl font-bold text-slate-800 line-clamp-2 leading-tight group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-orange-600 group-hover:to-purple-600 group-hover:bg-clip-text transition-all duration-300 mb-3">
                       {post.title}
                     </CardTitle>
                     
@@ -261,8 +273,8 @@ const MediaSection = () => {
                     {/* Meta information */}
                     <div className="flex items-center justify-between text-sm text-slate-500 mb-4">
                       <div className="flex items-center gap-2">
-                        <div className="p-1.5 rounded-lg bg-slate-100/80">
-                          <Calendar className="h-3.5 w-3.5 text-slate-600" />
+                        <div className="p-1.5 rounded-lg bg-gradient-to-r from-orange-100 to-purple-100">
+                          <Calendar className="h-3.5 w-3.5 text-orange-600" />
                         </div>
                         <span className="font-medium">
                           {new Date(post.published_at).toLocaleDateString('en-US', { 
@@ -273,8 +285,8 @@ const MediaSection = () => {
                         </span>
                       </div>
                       
-                      <div className="flex items-center gap-1 text-slate-400">
-                        <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                      <div className="flex items-center gap-1 text-orange-500">
+                        <Star className="h-3.5 w-3.5 fill-orange-400 text-orange-400" />
                         <span className="text-xs font-medium">Premium</span>
                       </div>
                     </div>
@@ -284,7 +296,8 @@ const MediaSection = () => {
                       asChild 
                       className={`
                         w-full rounded-xl h-11 font-semibold text-sm 
-                        bg-gradient-to-r ${getPostTypeGradient(post.post_type)}
+                        bg-gradient-to-r from-orange-500 to-purple-600
+                        hover:from-orange-600 hover:to-purple-700
                         hover:shadow-lg transform hover:scale-[1.02] 
                         transition-all duration-300 border-0 text-white
                         group/btn
@@ -311,9 +324,9 @@ const MediaSection = () => {
               asChild 
               size="lg" 
               variant="outline"
-              className="rounded-2xl px-8 py-6 text-base font-semibold border-2 border-slate-200 bg-white/80 backdrop-blur-sm hover:bg-white hover:border-slate-300 hover:shadow-lg transition-all duration-300 group/cta"
+              className="rounded-2xl px-8 py-6 text-base font-semibold border-2 border-orange-200 bg-white/80 backdrop-blur-sm hover:bg-white hover:border-orange-300 hover:shadow-lg transition-all duration-300 group/cta text-orange-700"
             >
-              <Link to="/media" className="flex items-center gap-3 text-slate-700">
+              <Link to="/media" className="flex items-center gap-3">
                 <span>Explore All Content</span>
                 <ArrowRight className="h-5 w-5 group-hover/cta:translate-x-1 transition-transform duration-200" />
               </Link>
