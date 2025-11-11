@@ -13,6 +13,7 @@ import CreatorsSection from '@/components/home/CreatorsSection';
 import TrendingNowSection from '@/components/home/TrendingNowSection';
 import LocalContentSection from '@/components/home/LocalContentSection';
 import MobileAppSection from '@/components/home/MobileAppSection';
+import MobileAppSection from '@/components/home/LiveEventsSection';
 
 const Index = () => {
   return (
@@ -28,6 +29,7 @@ const Index = () => {
       <AboutSection />
       <CreatorsSection />
       <MobileAppSection />
+      <LiveEventsSection/>
       <CallToAction />
     </Layout>
   );
