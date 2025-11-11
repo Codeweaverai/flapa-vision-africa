@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, Clock, Users, Star, Play, BookOpen, Calendar, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { TrendingUp, Clock, Users, Star, Play, BookOpen, Calendar, MapPin, ChevronLeft, ChevronRight, DollarSign } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import PriceDisplay from '@/components/currency/PriceDisplay';
@@ -18,9 +19,12 @@ interface Course {
   price: number;
   is_free: boolean;
   thumbnail_url?: string;
+  creator_id: string;
   average_rating?: number;
   total_reviews?: number;
   total_students?: number;
+  creator_name?: string;
+  creator_avatar?: string;
 }
 
 interface Event {
@@ -35,6 +39,16 @@ interface Event {
   price?: number;
   is_free: boolean;
   total_attendees?: number;
+  creator_id: string;
+  creator_name?: string;
+  creator_avatar?: string;
+  event_tickets?: Array<{
+    id: string;
+    name: string;
+    price: number;
+    quantity_available: number;
+    quantity_sold: number;
+  }>;
 }
 
 const TrendingNowSection = () => {
@@ -45,35 +59,64 @@ const TrendingNowSection = () => {
   useEffect(() => {
     const fetchTrendingContent = async () => {
       try {
-        // Fetch top-rated courses with most enrollments
+        // Fetch courses with creator profiles
         const { data: coursesData, error: coursesError } = await supabase
           .from('courses')
-          .select(`
-            *,
-            course_reviews (rating),
-            course_enrollments (id)
-          `)
+          .select('*')
           .eq('is_published', true)
           .order('created_at', { ascending: false });
 
         if (coursesError) throw coursesError;
 
-        // Fetch popular events
+        // Fetch events
         const { data: eventsData, error: eventsError } = await supabase
           .from('events')
-          .select(`
-            *,
-            event_bookings (id)
-          `)
+          .select('*')
           .gte('start_time', new Date().toISOString())
           .order('start_time', { ascending: true });
 
         if (eventsError) throw eventsError;
 
-        // Process courses with stats and sort by popularity
+        // Get creator IDs for both courses and events
+        const courseCreatorIds = [...new Set(coursesData?.map(course => course.creator_id).filter(Boolean) || [])];
+        const eventCreatorIds = [...new Set(eventsData?.map(event => event.creator_id).filter(Boolean) || [])];
+        const allCreatorIds = [...new Set([...courseCreatorIds, ...eventCreatorIds])];
+
+        // Fetch creator profiles
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, username, full_name, avatar_url')
+          .in('id', allCreatorIds);
+
+        // Fetch additional data for courses
+        const courseIds = coursesData?.map(course => course.id) || [];
+        const { data: courseReviews } = await supabase
+          .from('course_reviews')
+          .select('course_id, rating')
+          .in('course_id', courseIds);
+
+        const { data: courseEnrollments } = await supabase
+          .from('course_enrollments')
+          .select('course_id')
+          .in('course_id', courseIds);
+
+        // Fetch additional data for events
+        const eventIds = eventsData?.map(event => event.id) || [];
+        const { data: eventBookings } = await supabase
+          .from('event_bookings')
+          .select('event_id')
+          .in('event_id', eventIds);
+
+        const { data: eventTickets } = await supabase
+          .from('event_tickets')
+          .select('id, name, price, quantity_available, quantity_sold, event_id')
+          .in('event_id', eventIds);
+
+        // Process courses with stats
         const processedCourses = (coursesData || []).map(course => {
-          const reviews = course.course_reviews || [];
-          const enrollments = course.course_enrollments || [];
+          const reviews = courseReviews?.filter(review => review.course_id === course.id) || [];
+          const enrollments = courseEnrollments?.filter(enrollment => enrollment.course_id === course.id) || [];
+          const creatorProfile = profilesData?.find(profile => profile.id === course.creator_id);
           
           const averageRating = reviews.length > 0 
             ? reviews.reduce((sum: number, review: any) => sum + review.rating, 0) / reviews.length 
@@ -85,20 +128,33 @@ const TrendingNowSection = () => {
             average_rating: Math.round(averageRating * 10) / 10,
             total_reviews: reviews.length,
             total_students: enrollments.length,
-            popularity_score: (averageRating * reviews.length) + (enrollments.length * 2),
-            course_reviews: undefined,
-            course_enrollments: undefined
+            creator_name: creatorProfile?.full_name || creatorProfile?.username || 'Unknown Creator',
+            creator_avatar: creatorProfile?.avatar_url || null,
+            popularity_score: (averageRating * reviews.length) + (enrollments.length * 2)
           };
         }).sort((a, b) => b.popularity_score - a.popularity_score);
 
         // Process events with stats
-        const processedEvents = (eventsData || []).map(event => ({
-          ...event,
-          type: 'event',
-          total_attendees: (event.event_bookings || []).length,
-          popularity_score: (event.event_bookings || []).length * 3,
-          event_bookings: undefined
-        })).sort((a, b) => b.popularity_score - a.popularity_score);
+        const processedEvents = (eventsData || []).map(event => {
+          const bookings = eventBookings?.filter(booking => booking.event_id === event.id) || [];
+          const tickets = eventTickets?.filter(ticket => ticket.event_id === event.id) || [];
+          const creatorProfile = profilesData?.find(profile => profile.id === event.creator_id);
+          
+          const is_free = tickets.length === 0 || Math.min(...tickets.map(t => t.price)) === 0;
+          const minPrice = tickets.length > 0 ? Math.min(...tickets.map(t => t.price)) : 0;
+
+          return {
+            ...event,
+            type: 'event',
+            total_attendees: bookings.length,
+            creator_name: creatorProfile?.full_name || creatorProfile?.username || 'Unknown Creator',
+            creator_avatar: creatorProfile?.avatar_url || null,
+            event_tickets: tickets,
+            is_free,
+            price: minPrice,
+            popularity_score: bookings.length * 3
+          };
+        }).sort((a, b) => b.popularity_score - a.popularity_score);
 
         // Combine and get top trending items
         const combined = [
@@ -129,8 +185,7 @@ const TrendingNowSection = () => {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
-      day: 'numeric',
-      year: 'numeric'
+      day: 'numeric'
     });
   };
 
@@ -139,6 +194,16 @@ const TrendingNowSection = () => {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const getTotalCapacity = (tickets: any[]) => {
+    if (!tickets || tickets.length === 0) return 0;
+    return tickets.reduce((sum, ticket) => sum + ticket.quantity_available, 0);
+  };
+
+  const getSoldTickets = (tickets: any[]) => {
+    if (!tickets || tickets.length === 0) return 0;
+    return tickets.reduce((sum, ticket) => sum + ticket.quantity_sold, 0);
   };
 
   const scrollLeft = () => {
@@ -159,11 +224,36 @@ const TrendingNowSection = () => {
     }
   };
 
+  const renderStarRating = (rating: number) => {
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
+    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+
+    return (
+      <div className="flex items-center gap-1">
+        {[...Array(fullStars)].map((_, i) => (
+          <Star key={`full-${i}`} className="h-4 w-4 fill-yellow-400 text-yellow-400 drop-shadow-sm" />
+        ))}
+        {hasHalfStar && (
+          <div className="relative">
+            <Star className="h-4 w-4 text-gray-300" />
+            <div className="absolute top-0 left-0 w-1/2 overflow-hidden">
+              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+            </div>
+          </div>
+        )}
+        {[...Array(emptyStars)].map((_, i) => (
+          <Star key={`empty-${i}`} className="h-4 w-4 text-gray-300" />
+        ))}
+        <span className="text-sm text-gray-600 ml-1 font-medium">({rating.toFixed(1)})</span>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <section className="py-16 bg-gradient-to-br from-orange-50 to-purple-50">
         <div className="container mx-auto px-4">
-          {/* Header with Navigation Arrows Skeleton */}
           <div className="flex items-end justify-between mb-12">
             <div className="text-center md:text-left">
               <div className="flex items-center justify-center md:justify-start gap-2 mb-4">
@@ -185,7 +275,7 @@ const TrendingNowSection = () => {
           <div className="flex space-x-6 pb-6">
             {[...Array(4)].map((_, index) => (
               <div key={index} className="flex-none w-80 animate-pulse">
-                <div className="bg-white rounded-2xl shadow-lg overflow-hidden h-[420px]">
+                <div className="bg-white rounded-2xl shadow-lg overflow-hidden h-[480px]">
                   <div className="bg-gray-300 h-56"></div>
                   <div className="p-5 space-y-3">
                     <div className="h-4 bg-gray-300 rounded"></div>
@@ -244,203 +334,248 @@ const TrendingNowSection = () => {
         </div>
 
         {/* Horizontal Scrolling Container */}
-        <div className="relative">
-          <div 
-            ref={scrollContainerRef}
-            className="flex overflow-x-auto scrollbar-hide space-x-6 pb-6 snap-x snap-mandatory"
-            style={{
-              scrollbarWidth: 'none',
-              msOverflowStyle: 'none'
-            }}
-          >
-            {duplicatedContent.map((item, index) => (
-              <div 
-                key={`${item.id}-${index}`} 
-                className="flex-none w-80 snap-start"
-              >
-                <Card className="group hover:shadow-2xl transition-all duration-500 bg-white/90 backdrop-blur-sm border-purple-100 hover:border-purple-300 overflow-hidden h-[420px] flex flex-col">
-                  {/* Content Thumbnail with Icon */}
-                  <div className="relative h-56 overflow-hidden bg-gradient-to-br from-purple-400 to-orange-400">
-                    {(item.type === 'course' ? item.thumbnail_url : item.image_url) ? (
-                      <img 
-                        src={item.type === 'course' ? item.thumbnail_url : item.image_url} 
-                        alt={item.title}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-purple-400 to-orange-400 flex items-center justify-center">
-                        {item.type === 'course' ? (
-                          <BookOpen className="h-14 w-14 text-white opacity-90" />
+        {trendingContent.length === 0 ? (
+          <div className="text-center py-20 bg-white/60 backdrop-blur-sm rounded-2xl border border-white/30 shadow-xl">
+            <div className="relative inline-block mb-6">
+              <div className="absolute -inset-4 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full blur-xl opacity-10"></div>
+              <TrendingUp className="h-20 w-20 text-gray-400 mx-auto relative" />
+            </div>
+            <h3 className="text-3xl font-bold text-gray-900 mb-3">No Trending Content</h3>
+            <p className="text-gray-600 max-w-md mx-auto text-lg">
+              Check back soon for trending courses and events.
+            </p>
+          </div>
+        ) : (
+          <div className="relative">
+            <div 
+              ref={scrollContainerRef}
+              className="flex overflow-x-auto scrollbar-hide space-x-6 pb-6 snap-x snap-mandatory"
+              style={{
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none'
+              }}
+            >
+              {duplicatedContent.map((item, index) => (
+                <div 
+                  key={`${item.id}-${index}`} 
+                  className="flex-none w-80 snap-start"
+                >
+                  <Card className="group overflow-hidden hover:shadow-2xl transition-all duration-500 bg-white/90 backdrop-blur-sm border-0 shadow-xl hover:scale-[1.02]">
+                    <div className="relative">
+                      {/* Content Thumbnail */}
+                      <div className="relative h-56 overflow-hidden cursor-pointer">
+                        {(item.type === 'course' ? item.thumbnail_url : item.image_url) ? (
+                          <>
+                            <img
+                              src={item.type === 'course' ? item.thumbnail_url : item.image_url}
+                              alt={item.title}
+                              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                            />
+                            {/* Orange-Purple Gradient Icon with Pulse Animation */}
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="relative">
+                                {/* Outer Pulse Ring */}
+                                <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full animate-ping opacity-20"></div>
+                                {/* Middle Pulse Ring */}
+                                <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full animate-pulse opacity-30"></div>
+                                {/* Main Icon Container */}
+                                <div className="relative bg-gradient-to-r from-orange-500 to-purple-600 rounded-full p-4 shadow-2xl animate-pulse-slow transform hover:scale-110 transition-transform duration-300">
+                                  {item.type === 'course' ? (
+                                    <Play className="h-8 w-8 text-white fill-current" />
+                                  ) : (
+                                    <Calendar className="h-8 w-8 text-white" />
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </>
                         ) : (
-                          <Calendar className="h-14 w-14 text-white opacity-90" />
+                          <div className="w-full h-full bg-gradient-to-br from-orange-200 via-purple-200 to-pink-300 flex items-center justify-center group-hover:from-orange-300 group-hover:to-purple-300 transition-all duration-500">
+                            {/* Animated Icon with Orange-Purple Gradient */}
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="relative">
+                                {/* Outer Pulse Ring */}
+                                <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full animate-ping opacity-20"></div>
+                                {/* Middle Pulse Ring */}
+                                <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full animate-pulse opacity-30"></div>
+                                {/* Main Icon Container */}
+                                <div className="relative bg-gradient-to-r from-orange-500 to-purple-600 rounded-full p-4 shadow-2xl animate-pulse-slow transform hover:scale-110 transition-transform duration-300">
+                                  {item.type === 'course' ? (
+                                    <Play className="h-8 w-8 text-white fill-current" />
+                                  ) : (
+                                    <Calendar className="h-8 w-8 text-white" />
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         )}
-                      </div>
-                    )}
-                    
-                    {/* Animated Orange Icon - Always Visible */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="bg-orange-500/90 rounded-full p-4 shadow-lg animate-pulse-slow">
-                        {item.type === 'course' ? (
-                          <Play className="h-6 w-6 text-white fill-current" />
-                        ) : (
-                          <Calendar className="h-6 w-6 text-white" />
-                        )}
-                      </div>
-                    </div>
+                        
+                        {/* Gradient Overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                        
+                        {/* Type and Trending Badges */}
+                        <div className="absolute top-4 left-4 right-4 flex justify-between">
+                          <Badge className="bg-gradient-to-r from-green-500 to-emerald-600 text-white border-0 shadow-lg font-medium">
+                            <TrendingUp className="h-3 w-3 mr-1" />
+                            #{index + 1}
+                          </Badge>
+                          <Badge className="bg-white/90 text-gray-700 border-white/50 backdrop-blur-sm font-medium">
+                            {item.type === 'course' ? item.category : item.event_type}
+                          </Badge>
+                        </div>
 
-                    {/* Hover Overlay */}
-                    <Link 
-                      to={item.type === 'course' ? `/learning/course-detail/${item.id}` : `/event-detail/${item.id}`}
-                      className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-all duration-300"
-                    >
-                      <div className="bg-white rounded-full p-4 transform scale-110 group-hover:scale-100 transition-transform duration-300 shadow-xl">
-                        {item.type === 'course' ? (
-                          <Play className="h-7 w-7 text-orange-600 fill-current" />
-                        ) : (
-                          <Calendar className="h-7 w-7 text-orange-600" />
-                        )}
-                      </div>
-                    </Link>
-
-                    {/* Wishlist Button for courses */}
-                    {item.type === 'course' && (
-                      <div className="absolute top-3 right-3 z-20">
-                        <WishlistButton 
-                          itemId={item.id}
-                          itemType="course"
-                          variant="ghost"
-                          size="icon"
-                          className="bg-white/90 hover:bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
-                        />
-                      </div>
-                    )}
-
-                    {/* Type Badge */}
-                    <div className="absolute top-3 left-3">
-                      <Badge className="bg-white/95 text-purple-800 border-purple-200 text-xs font-medium backdrop-blur-sm">
-                        {item.type === 'course' ? 'COURSE' : 'EVENT'}
-                      </Badge>
-                    </div>
-
-                    {/* Trending Badge */}
-                    <div className="absolute bottom-3 right-3">
-                      <Badge className="bg-gradient-to-r from-green-500 to-emerald-600 text-white border-0 text-xs font-bold shadow-lg">
-                        <TrendingUp className="h-3 w-3 mr-1" />
-                        #{index + 1}
-                      </Badge>
-                    </div>
-
-                    {/* Price/Free Badge */}
-                    <div className="absolute bottom-3 left-3">
-                      {item.is_free ? (
-                        <Badge className="bg-green-500 text-white border-0 text-xs font-bold shadow-lg">
-                          Free
-                        </Badge>
-                      ) : (
-                        <Badge className="bg-blue-500 text-white border-0 text-xs font-bold shadow-lg">
-                          <PriceDisplay amount={item.price} originalCurrency="USD" />
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Content Details */}
-                  <div className="flex-1 p-5 flex flex-col">
-                    <CardHeader className="p-0 pb-3">
-                      <CardTitle className="text-base font-bold group-hover:text-purple-600 transition-colors duration-300 line-clamp-2 leading-tight">
-                        {item.title}
-                      </CardTitle>
-                      <CardDescription className="line-clamp-2 text-sm mt-2 text-gray-600 leading-relaxed">
-                        {item.type === 'course' ? item.summary : item.description}
-                      </CardDescription>
-                    </CardHeader>
-                    
-                    <CardContent className="p-0 mt-auto space-y-3">
-                      {/* Course Specific Details */}
-                      {item.type === 'course' ? (
-                        <>
-                          {/* Duration and Difficulty */}
-                          <div className="flex items-center justify-between text-sm">
-                            <div className="flex items-center text-gray-600 font-medium">
-                              <Clock className="h-4 w-4 mr-2 text-purple-500" />
-                              {formatDuration(item.duration_minutes)}
-                            </div>
-                            <Badge variant="outline" className="border-orange-300 text-orange-600 bg-orange-50 text-xs font-semibold">
-                              {item.difficulty_level}
-                            </Badge>
+                        {/* Content Specific Overlay */}
+                        <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm rounded-xl px-3 py-2 shadow-lg border border-white/30">
+                          <div className="flex items-center gap-2 text-sm font-bold text-gray-900">
+                            {item.type === 'course' ? (
+                              <>
+                                <Clock className="h-4 w-4 text-orange-500" />
+                                {formatDuration(item.duration_minutes)}
+                              </>
+                            ) : (
+                              <>
+                                <Calendar className="h-4 w-4 text-orange-500" />
+                                {formatDate(item.start_time)}
+                              </>
+                            )}
                           </div>
+                        </div>
 
-                          {/* Reviews and Students */}
-                          <div className="flex items-center justify-between text-sm">
-                            <div className="flex items-center text-gray-700 font-medium">
-                              <Star className="h-4 w-4 mr-1 fill-yellow-400 text-yellow-400" />
-                              <span>{item.average_rating?.toFixed(1) || 0}</span>
-                              <span className="ml-1 text-gray-500">({item.total_reviews || 0})</span>
-                            </div>
-                            <div className="flex items-center text-gray-700 font-medium">
-                              <Users className="h-4 w-4 mr-2 text-blue-500" />
-                              <span>{item.total_students || 0}</span>
-                            </div>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          {/* Event Date and Time */}
-                          <div className="flex items-center justify-between text-sm">
-                            <div className="flex items-center text-gray-600 font-medium">
-                              <Calendar className="h-4 w-4 mr-2 text-purple-500" />
-                              {formatDate(item.start_time)}
-                            </div>
-                            <div className="flex items-center text-gray-600 font-medium">
-                              <Clock className="h-4 w-4 mr-1 text-orange-500" />
-                              {formatTime(item.start_time)}
-                            </div>
-                          </div>
+                        {/* Wishlist Button */}
+                        <div className="absolute bottom-4 right-4 z-20">
+                          <WishlistButton 
+                            itemId={item.id}
+                            itemType={item.type}
+                            variant="ghost"
+                            size="icon"
+                            iconOnly
+                            className="bg-white/90 hover:bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-all hover:scale-110 border-0 hover:text-red-500"
+                          />
+                        </div>
+                      </div>
 
-                          {/* Location and Attendees */}
-                          <div className="flex items-center justify-between text-sm">
-                            <div className="flex items-center text-gray-700 font-medium">
-                              <MapPin className="h-4 w-4 mr-2 text-blue-500" />
-                              <span className="truncate max-w-[120px]">{item.location || 'Online'}</span>
-                            </div>
-                            <div className="flex items-center text-gray-700 font-medium">
-                              <Users className="h-4 w-4 mr-2 text-green-500" />
-                              <span>{item.total_attendees || 0}</span>
-                            </div>
+                      {/* Card Content */}
+                      <div className="cursor-pointer">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-xl font-bold text-gray-900 line-clamp-2 group-hover:text-orange-600 transition-colors duration-300">
+                            {item.title}
+                          </CardTitle>
+                          
+                          {/* Creator with Avatar */}
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <Avatar className="h-6 w-6 border border-orange-200">
+                              <AvatarImage 
+                                src={item.creator_avatar || undefined} 
+                                alt={item.creator_name}
+                              />
+                              <AvatarFallback className="bg-gradient-to-r from-orange-400 to-purple-500 text-white text-xs font-bold">
+                                {item.creator_name?.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium">by {item.creator_name}</span>
                           </div>
-                        </>
-                      )}
-                      
-                      {/* View Button with Video Icon for Courses */}
-                      <Link 
-                        to={item.type === 'course' ? `/learning/course-detail/${item.id}` : `/event-detail/${item.id}`} 
-                        className="block mt-3"
-                      >
-                        <Button className="w-full bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600 text-white border-0 text-sm font-semibold py-2 h-10 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
+                        </CardHeader>
+
+                        <CardContent className="space-y-4">
+                          {/* Content Summary */}
+                          <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">
+                            {item.type === 'course' ? item.summary : item.description}
+                          </p>
+
+                          {/* Content Specific Details */}
                           {item.type === 'course' ? (
                             <>
-                              <Play className="h-4 w-4 text-white fill-current" />
-                              View Course
+                              {/* Course Reviews */}
+                              {item.total_reviews && item.total_reviews > 0 && (
+                                <div className="flex items-center justify-between">
+                                  {renderStarRating(item.average_rating || 0)}
+                                  <span className="text-xs text-gray-500 font-medium">
+                                    {item.total_reviews} review{item.total_reviews !== 1 ? 's' : ''}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Students Count */}
+                              <div className="flex items-center text-sm text-gray-600">
+                                <Users className="h-4 w-4 mr-2 text-orange-500 flex-shrink-0" />
+                                <span className="font-medium">{item.total_students || 0} students enrolled</span>
+                              </div>
                             </>
                           ) : (
-                            'View Event'
+                            <>
+                              {/* Event Time */}
+                              <div className="flex items-center text-sm text-gray-600">
+                                <Clock className="h-4 w-4 mr-2 text-orange-500 flex-shrink-0" />
+                                <span className="font-medium">{formatTime(item.start_time)}</span>
+                              </div>
+
+                              {/* Event Location and Attendees */}
+                              <div className="flex items-center justify-between text-sm">
+                                <div className="flex items-center text-gray-600">
+                                  <MapPin className="h-4 w-4 mr-2 text-orange-500 flex-shrink-0" />
+                                  <span className="truncate font-medium">{item.location}</span>
+                                </div>
+                                <div className="flex items-center text-gray-600">
+                                  <Users className="h-4 w-4 mr-2 text-orange-500 flex-shrink-0" />
+                                  <span className="font-medium">{getSoldTickets(item.event_tickets)}/{getTotalCapacity(item.event_tickets)}</span>
+                                </div>
+                              </div>
+                            </>
                           )}
-                        </Button>
-                      </Link>
-                    </CardContent>
-                  </div>
-                </Card>
-              </div>
-            ))}
+                        </CardContent>
+
+                        <CardContent className="flex justify-between items-center pt-4 border-t border-gray-100">
+                          <div className="flex items-center">
+                            <DollarSign className="h-5 w-5 mr-1 text-orange-500" />
+                            <span className="font-bold text-xl text-gray-900">
+                              {item.is_free ? (
+                                <span className="bg-gradient-to-r from-green-500 to-emerald-600 bg-clip-text text-transparent">
+                                  Free
+                                </span>
+                              ) : (
+                                <PriceDisplay amount={item.price} originalCurrency="USD" />
+                              )}
+                            </span>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 font-semibold"
+                            asChild
+                          >
+                            <Link to={item.type === 'course' ? `/learning/course-detail/${item.id}` : `/events/${item.id}`}>
+                              {item.type === 'course' ? (
+                                <>
+                                  <Play className="h-4 w-4 mr-1 text-white fill-current" />
+                                  Enroll Now
+                                </>
+                              ) : (
+                                'View Event'
+                              )}
+                            </Link>
+                          </Button>
+                        </CardContent>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-        
-        <div className="text-center mt-8">
-          <Link to="/trending">
-            <Button size="lg" className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 rounded-xl px-8">
+        )}
+
+        {/* CTA Section */}
+        <div className="text-center mt-12">
+          <Button 
+            asChild 
+            size="lg" 
+            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 rounded-xl px-8"
+          >
+            <Link to="/trending" className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
               View All Trending
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
       </div>
 
