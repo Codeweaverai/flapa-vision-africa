@@ -35,46 +35,68 @@ const CoursesSection = () => {
   useEffect(() => {
     const fetchCourses = async () => {
       try {
-        const { data, error } = await supabase
+        // First, fetch courses without the complex join
+        const { data: coursesData, error: coursesError } = await supabase
           .from('courses')
-          .select(`
-            *,
-            course_reviews (rating),
-            course_enrollments (id),
-            profiles:creator_id (username, full_name, avatar_url)
-          `)
+          .select('*')
           .eq('is_published', true)
           .order('created_at', { ascending: false })
           .limit(50);
 
-        if (error) throw error;
+        if (coursesError) throw coursesError;
 
-        // Calculate ratings and student counts
-        const coursesWithStats = (data || []).map(course => {
-          const reviews = course.course_reviews || [];
-          const enrollments = course.course_enrollments || [];
-          const profile = course.profiles || {};
-          
-          const averageRating = reviews.length > 0 
-            ? reviews.reduce((sum: number, review: any) => sum + review.rating, 0) / reviews.length 
+        if (!coursesData || coursesData.length === 0) {
+          setCourses([]);
+          setLoading(false);
+          return;
+        }
+
+        // Fetch additional data separately
+        const courseIds = coursesData.map(course => course.id);
+        const creatorIds = [...new Set(coursesData.map(course => course.creator_id).filter(Boolean))];
+
+        // Fetch reviews
+        const { data: reviewsData } = await supabase
+          .from('course_reviews')
+          .select('course_id, rating')
+          .in('course_id', courseIds);
+
+        // Fetch enrollments
+        const { data: enrollmentsData } = await supabase
+          .from('course_enrollments')
+          .select('course_id')
+          .in('course_id', courseIds);
+
+        // Fetch creator profiles
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, username, full_name, avatar_url')
+          .in('id', creatorIds);
+
+        // Combine all data
+        const coursesWithStats = coursesData.map(course => {
+          const courseReviews = reviewsData?.filter(review => review.course_id === course.id) || [];
+          const courseEnrollments = enrollmentsData?.filter(enrollment => enrollment.course_id === course.id) || [];
+          const creatorProfile = profilesData?.find(profile => profile.id === course.creator_id);
+
+          const averageRating = courseReviews.length > 0 
+            ? courseReviews.reduce((sum, review) => sum + review.rating, 0) / courseReviews.length 
             : 0;
 
           return {
             ...course,
             average_rating: Math.round(averageRating * 10) / 10,
-            total_reviews: reviews.length,
-            total_students: enrollments.length,
-            creator_name: profile.full_name || profile.username || 'Unknown Creator',
-            creator_avatar: profile.avatar_url || null,
-            course_reviews: undefined,
-            course_enrollments: undefined,
-            profiles: undefined
+            total_reviews: courseReviews.length,
+            total_students: courseEnrollments.length,
+            creator_name: creatorProfile?.full_name || creatorProfile?.username || 'Unknown Creator',
+            creator_avatar: creatorProfile?.avatar_url || null
           };
         });
 
         setCourses(coursesWithStats);
       } catch (error) {
         console.error('Error fetching courses:', error);
+        setCourses([]);
       } finally {
         setLoading(false);
       }
