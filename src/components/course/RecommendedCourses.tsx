@@ -359,12 +359,13 @@ const RecommendedCourses = ({ currentCourseId, category }: RecommendedCoursesPro
                     {/* Card Content */}
                     <div className="cursor-pointer">
                       <CardHeader className="pb-3">
-                        <CardTitle className="text-xl font-bold text-gray-900 line-clamp-2 group-hover:text-orange-600 transition-colors duration-300">
+                        {/* Course Title - Truncated to only one line */}
+                        <CardTitle className="text-xl font-bold text-gray-900 line-clamp-1 group-hover:text-orange-600 transition-colors duration-300 leading-tight">
                           {course.title}
                         </CardTitle>
                         
                         {/* Creator with Avatar */}
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-2 text-sm text-gray-600 mt-2">
                           <Avatar className="h-6 w-6 border border-orange-200">
                             <AvatarImage 
                               src={course.creator_avatar || undefined} 
