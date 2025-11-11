@@ -13,7 +13,7 @@ import CreatorsSection from '@/components/home/CreatorsSection';
 import TrendingNowSection from '@/components/home/TrendingNowSection';
 import LocalContentSection from '@/components/home/LocalContentSection';
 import MobileAppSection from '@/components/home/MobileAppSection';
-import MobileAppSection from '@/components/home/LiveEventsSection';
+import LiveEventsSection from '@/components/home/LiveEventsSection';
 
 const Index = () => {
   return (
