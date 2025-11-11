@@ -12,6 +12,7 @@ import BrowseCategoriesSection from '@/components/home/BrowseCategoriesSection';
 import CreatorsSection from '@/components/home/CreatorsSection';
 import TrendingNowSection from '@/components/home/TrendingNowSection';
 import LocalContentSection from '@/components/home/LocalContentSection';
+import LocalContentSection from '@/components/home/LiveEventsSection';
 
 const HomePage = () => {
   return (
@@ -27,6 +28,7 @@ const HomePage = () => {
       <EventsSection />
       <AboutSection />
       <CreatorsSection />
+      <LiveEventsSection/>
       <CallToAction />
     </Layout>
   );
