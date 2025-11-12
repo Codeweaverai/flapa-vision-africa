@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Bot, Sparkles, BookOpen, Clock, Users, Zap, CheckCircle, ArrowRight, Play, Star, FileText, Target, GraduationCap, Coins, Gift, History, Calendar, BarChart3, AlertCircle } from 'lucide-react';
+import { Bot, Sparkles, BookOpen, Clock, Users, Zap, CheckCircle, ArrowRight, Play, Star, FileText, Target, GraduationCap, Coins, Gift, History, Calendar, BarChart3, AlertCircle, ChevronRight, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
@@ -96,6 +96,7 @@ const CreatorCourseCreateWithAI = () => {
   const [generationProgress, setGenerationProgress] = useState<any>(null);
   const [pastProposals, setPastProposals] = useState<any[]>([]);
   const [currentProgressId, setCurrentProgressId] = useState<string | null>(null);
+  const [showAllProposals, setShowAllProposals] = useState(false);
   
   // Token usage states
   const [showTokenDialog, setShowTokenDialog] = useState(false);
@@ -143,7 +144,7 @@ const CreatorCourseCreateWithAI = () => {
     }
   };
 
-  // Subscribe to real-time progress updates
+  // Enhanced real-time progress tracking
   useEffect(() => {
     if (!user?.id) return;
 
@@ -154,8 +155,6 @@ const CreatorCourseCreateWithAI = () => {
           .from('ai_generation_progress')
           .select('*')
           .eq('user_id', user.id)
-          .gte('progress_percentage', 0)
-          .lt('progress_percentage', 100)
           .order('created_at', { ascending: false })
           .limit(1)
           .single();
@@ -164,10 +163,18 @@ const CreatorCourseCreateWithAI = () => {
           console.log('Found active progress:', data);
           setGenerationProgress(data);
           setCurrentProgressId(data.id);
-          setStep('creating');
           
-          // Fetch the associated proposal data using the proposal_id
-          if (data.proposal_id) {
+          // Set step based on progress percentage
+          if (data.progress_percentage === 100) {
+            setStep('proposal');
+            toast.success('Course created successfully!');
+            setTimeout(() => navigate('/creator/courses'), 2000);
+          } else if (data.progress_percentage > 0) {
+            setStep('creating');
+          }
+          
+          // Fetch associated proposal data
+          if (data.proposal_id && !proposal) {
             const { data: proposalData } = await supabase
               .from('ai_course_proposals')
               .select('proposal_data')
@@ -181,99 +188,87 @@ const CreatorCourseCreateWithAI = () => {
           }
         }
       } catch (error) {
-        console.log('No active progress found or error:', error);
+        console.log('No active progress found:', error);
       }
     };
 
     fetchActiveProgress();
 
-    // Enhanced subscription to listen for both INSERT and UPDATE events
+    // Enhanced real-time subscription with better event handling
     const subscription = supabase
       .channel('ai_progress_updates')
       .on(
         'postgres_changes',
         {
-          event: 'INSERT', // NEW: Listen for new records
+          event: 'INSERT',
           schema: 'public',
           table: 'ai_generation_progress',
           filter: `user_id=eq.${user.id}`
         },
         async (payload) => {
           console.log('📊 NEW progress record created:', payload);
-          
-          if (payload.new.progress_percentage < 100) {
-            setGenerationProgress(payload.new);
-            setCurrentProgressId(payload.new.id);
-            setStep('creating');
-            
-            // Fetch proposal data if we have a proposal_id but no proposal loaded
-            if (payload.new.proposal_id && !proposal) {
-              const { data: proposalData } = await supabase
-                .from('ai_course_proposals')
-                .select('proposal_data')
-                .eq('id', payload.new.proposal_id)
-                .single();
-              
-              if (proposalData) {
-                setProposal(proposalData.proposal_data);
-                setProposalId(payload.new.proposal_id);
-              }
-            }
-          }
+          handleProgressUpdate(payload.new);
         }
       )
       .on(
         'postgres_changes',
         {
-          event: '*', // Existing update logic
+          event: 'UPDATE', // SPECIFICALLY listen for UPDATE events
           schema: 'public',
           table: 'ai_generation_progress',
           filter: `user_id=eq.${user.id}`
         },
         async (payload) => {
-          console.log('📊 Real-time progress update:', payload);
-          
-          if (payload.new.progress_percentage < 100) {
-            setGenerationProgress(payload.new);
-            setCurrentProgressId(payload.new.id);
-            setStep('creating');
-            
-            // Fetch proposal data if we have a proposal_id but no proposal loaded
-            if (payload.new.proposal_id && !proposal) {
-              const { data: proposalData } = await supabase
-                .from('ai_course_proposals')
-                .select('proposal_data')
-                .eq('id', payload.new.proposal_id)
-                .single();
-              
-              if (proposalData) {
-                setProposal(proposalData.proposal_data);
-                setProposalId(payload.new.proposal_id);
-              }
-            }
-          } else if (payload.new.progress_percentage === 100) {
-            // Course generation completed
-            console.log('Course generation completed!');
-            setGenerationProgress(null);
-            setCurrentProgressId(null);
-            toast.success('Course created successfully!');
-            
-            // Navigate to courses page after a short delay
-            setTimeout(() => {
-              navigate('/creator/courses');
-            }, 2000);
-          } else {
-            setGenerationProgress(null);
-            setCurrentProgressId(null);
-          }
+          console.log('📊 PROGRESS UPDATE:', payload);
+          handleProgressUpdate(payload.new);
         }
       )
       .subscribe();
 
+    // Helper function to handle progress updates
+    const handleProgressUpdate = async (progressData: any) => {
+      if (progressData.progress_percentage < 100) {
+        setGenerationProgress(progressData);
+        setCurrentProgressId(progressData.id);
+        setStep('creating');
+        
+        // Fetch proposal data if we have a proposal_id but no proposal loaded
+        if (progressData.proposal_id && !proposal) {
+          const { data: proposalData } = await supabase
+            .from('ai_course_proposals')
+            .select('proposal_data')
+            .eq('id', progressData.proposal_id)
+            .single();
+          
+          if (proposalData) {
+            setProposal(proposalData.proposal_data);
+            setProposalId(progressData.proposal_id);
+          }
+        }
+      } else if (progressData.progress_percentage === 100) {
+        // Course generation completed
+        console.log('✅ Course generation completed!');
+        setGenerationProgress(null);
+        setCurrentProgressId(null);
+        setStep('proposal');
+        toast.success('Course created successfully!');
+        
+        // Refresh tokens and navigate
+        await refetchTokens();
+        setTimeout(() => {
+          navigate('/creator/courses');
+        }, 2000);
+      } else {
+        // Handle error or invalid state
+        setGenerationProgress(null);
+        setCurrentProgressId(null);
+      }
+    };
+
     return () => {
       subscription.unsubscribe();
     };
-  }, [user?.id, proposal, navigate]);
+  }, [user?.id, proposal, navigate, refetchTokens]);
 
   // Fetch past proposals with their progress
   useEffect(() => {
@@ -294,7 +289,7 @@ const CreatorCourseCreateWithAI = () => {
         `)
         .eq('creator_id', user.id)
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(showAllProposals ? 50 : 10);
 
       if (!error && data) {
         setPastProposals(data);
@@ -302,13 +297,27 @@ const CreatorCourseCreateWithAI = () => {
     };
 
     fetchPastProposals();
-  }, [user?.id]);
+  }, [user?.id, showAllProposals]);
 
   const handleInputChange = (field: string, value: string) => {
     setCourseData(prev => ({
       ...prev,
       [field]: value
     }));
+  };
+
+  // Load proposal data into form for reuse
+  const loadProposalIntoForm = (proposalData: any) => {
+    setCourseData({
+      title: proposalData.course_title || '',
+      description: proposalData.course_description || '',
+      targetAudience: proposalData.target_audience || '',
+      learningGoals: proposalData.learning_outcomes?.join(', ') || '',
+      duration: `${Math.ceil(proposalData.duration_minutes / 60)} hours` || '',
+      difficulty: proposalData.difficulty_level?.toLowerCase() || 'beginner'
+    });
+    setStep('input');
+    toast.success('Proposal loaded! Review and generate a new course.');
   };
 
   const checkTokensAndProceed = async (action: 'proposal' | 'full_course', callback: () => void) => {
@@ -417,7 +426,7 @@ Please generate a detailed course proposal with modules, lessons, and learning o
 
     setProgressLoading(true);
     setLoading(true);
-    setStep('creating'); // Set step immediately to show progress UI
+    setStep('creating');
 
     try {
       // Create progress record FIRST with proposal_id
@@ -425,6 +434,9 @@ Please generate a detailed course proposal with modules, lessons, and learning o
       const progressId = await createProgressRecord(proposalId);
       setCurrentProgressId(progressId);
       console.log('Progress record created with ID:', progressId);
+
+      // Wait a moment for the progress record to be available
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // IMMEDIATELY FETCH THE NEW PROGRESS RECORD to display it
       const { data: newProgress, error: fetchError } = await supabase
@@ -436,6 +448,8 @@ Please generate a detailed course proposal with modules, lessons, and learning o
       if (newProgress && !fetchError) {
         setGenerationProgress(newProgress);
         console.log('Immediately set progress data:', newProgress);
+      } else {
+        console.warn('Could not fetch progress immediately:', fetchError);
       }
 
       const tokenResult = await deductTokens('full_course', `full_course_${proposalId}`);
@@ -484,20 +498,25 @@ Please generate a detailed course proposal with modules, lessons, and learning o
     } catch (error: any) {
       console.error('Error creating course:', error);
       
+      // Enhanced error handling with specific messages
+      let errorMessage = error.message || 'Failed to create course. Please try again.';
+      
       if (error.message?.includes('Insufficient tokens')) {
-        toast.error('Insufficient tokens to create full course');
+        errorMessage = 'Insufficient tokens to create full course';
         await refetchTokens();
         setStep('proposal');
       } else if (error.message?.includes('Stored proposal not found')) {
-        toast.error('The course proposal expired. Please generate a new proposal.');
+        errorMessage = 'The course proposal expired. Please generate a new proposal.';
         setStep('input');
       } else if (error.message?.includes('timeout')) {
-        toast.error('Course generation is taking longer than expected. Please try again.');
+        errorMessage = 'Course generation is taking longer than expected. Please try again.';
         setStep('proposal');
-      } else {
-        toast.error(error.message || 'Failed to create course. Please try again.');
+      } else if (error.message?.includes('already in progress')) {
+        errorMessage = 'Course generation is already in progress. Please wait for it to complete.';
         setStep('proposal');
       }
+      
+      toast.error(errorMessage);
       
       // Reset progress on error
       setGenerationProgress(null);
@@ -508,16 +527,37 @@ Please generate a detailed course proposal with modules, lessons, and learning o
     }
   };
 
+  // Add a manual refresh button for progress
+  const refreshProgress = async () => {
+    if (!currentProgressId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('ai_generation_progress')
+        .select('*')
+        .eq('id', currentProgressId)
+        .single();
+      
+      if (!error && data) {
+        setGenerationProgress(data);
+        console.log('Manually refreshed progress:', data);
+        
+        if (data.progress_percentage === 100) {
+          toast.success('Course completed!');
+          setTimeout(() => navigate('/creator/courses'), 2000);
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing progress:', error);
+    }
+  };
+
   const handleGenerateProposal = () => {
     checkTokensAndProceed('proposal', generateProposal);
   };
 
   const handleCreateFullCourse = () => {
     checkTokensAndProceed('full_course', createFullCourse);
-  };
-
-  const checkProposalExpiry = (expiresAt: string) => {
-    return new Date(expiresAt) > new Date();
   };
 
   const features = [
@@ -548,6 +588,7 @@ Please generate a detailed course proposal with modules, lessons, and learning o
   const gradientTextClass = "bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent";
   const gradientHoverClass = "hover:from-orange-600 hover:to-purple-700";
   const greenGradientClass = "bg-gradient-to-r from-green-500 to-emerald-600";
+  const orangePurpleGradient = "bg-gradient-to-r from-orange-500 to-purple-600";
 
   const getProgressStepColor = (percentage: number) => {
     if (percentage < 30) return "from-orange-500 to-amber-500";
@@ -576,6 +617,9 @@ Please generate a detailed course proposal with modules, lessons, and learning o
   };
 
   const availableTokens = getAvailableTokens();
+
+  // Display proposals (last 5 initially, more when expanded)
+  const displayedProposals = showAllProposals ? pastProposals : pastProposals.slice(0, 5);
 
   return (
     <CreatorLayout title="Create Course with AI">
@@ -662,15 +706,26 @@ Please generate a detailed course proposal with modules, lessons, and learning o
         {generationProgress && (
           <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm border-l-4 border-l-orange-500">
             <CardHeader className="pb-4">
-              <CardTitle className="flex items-center text-xl">
-                <BarChart3 className="h-5 w-5 mr-2 text-orange-500" />
-                Active Course Generation
-                {currentProgressId && (
-                  <Badge variant="outline" className="ml-2 text-xs">
-                    ID: {currentProgressId.slice(0, 8)}...
-                  </Badge>
-                )}
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center text-xl">
+                  <BarChart3 className="h-5 w-5 mr-2 text-orange-500" />
+                  Active Course Generation
+                  {currentProgressId && (
+                    <Badge variant="outline" className="ml-2 text-xs">
+                      ID: {currentProgressId.slice(0, 8)}...
+                    </Badge>
+                  )}
+                </CardTitle>
+                <Button
+                  onClick={refreshProgress}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center space-x-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  <span>Refresh</span>
+                </Button>
+              </div>
               <CardDescription>
                 Real-time progress from our AI agents - Updates automatically
               </CardDescription>
@@ -1120,33 +1175,51 @@ Please generate a detailed course proposal with modules, lessons, and learning o
           </Card>
         )}
 
-        {/* Past Proposals Section */}
+        {/* Past Proposals Section with Modern Design */}
         {pastProposals.length > 0 && (
           <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
             <CardHeader>
-              <CardTitle className="flex items-center text-xl">
-                <History className="h-5 w-5 mr-2 text-purple-500" />
-                Your Past AI Course Proposals
-              </CardTitle>
-              <CardDescription>
-                Previously generated course proposals and their status
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center text-xl">
+                    <History className="h-5 w-5 mr-2 text-purple-500" />
+                    Your AI Course Proposals
+                  </CardTitle>
+                  <CardDescription>
+                    Click any proposal to reuse it. Proposals never expire.
+                  </CardDescription>
+                </div>
+                {pastProposals.length > 5 && (
+                  <Button
+                    onClick={() => setShowAllProposals(!showAllProposals)}
+                    className={`${orangePurpleGradient} text-white hover:from-orange-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl`}
+                  >
+                    {showAllProposals ? 'Show Less' : 'View More'}
+                    <ChevronRight className={`h-4 w-4 ml-2 transition-transform ${showAllProposals ? 'rotate-90' : ''}`} />
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {pastProposals.map((proposalItem) => {
+                {displayedProposals.map((proposalItem) => {
                   const proposalData = proposalItem.proposal_data;
-                  const isExpired = !checkProposalExpiry(proposalItem.expires_at);
                   const progress = proposalItem.ai_generation_progress?.[0];
                   
                   return (
-                    <div key={proposalItem.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-orange-300 transition-colors">
+                    <div 
+                      key={proposalItem.id} 
+                      className="flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg border border-orange-200 hover:border-orange-400 transition-all duration-300 cursor-pointer hover:shadow-md group"
+                      onClick={() => loadProposalIntoForm(proposalData)}
+                    >
                       <div className="flex items-center space-x-4">
-                        <div className={`w-12 h-12 rounded-full ${isExpired ? 'bg-gray-400' : gradientClass} flex items-center justify-center text-white`}>
+                        <div className={`w-12 h-12 rounded-full ${gradientClass} flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300`}>
                           <BookOpen className="h-6 w-6" />
                         </div>
                         <div>
-                          <h4 className="font-semibold text-gray-900">{proposalData.course_title}</h4>
+                          <h4 className="font-semibold text-gray-900 group-hover:text-orange-700 transition-colors">
+                            {proposalData.course_title}
+                          </h4>
                           <p className="text-sm text-gray-600 line-clamp-1">{proposalData.course_summary}</p>
                           <div className="flex items-center space-x-2 mt-1">
                             <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
@@ -1156,12 +1229,10 @@ Please generate a detailed course proposal with modules, lessons, and learning o
                               <Calendar className="h-3 w-3 mr-1" />
                               {new Date(proposalItem.created_at).toLocaleDateString()}
                             </div>
-                            {isExpired && (
-                              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                                <AlertCircle className="h-3 w-3 mr-1" />
-                                Expired
-                              </Badge>
-                            )}
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Reusable
+                            </Badge>
                           </div>
                         </div>
                       </div>
@@ -1180,13 +1251,9 @@ Please generate a detailed course proposal with modules, lessons, and learning o
                               {progress.progress_percentage}% complete
                             </p>
                           </div>
-                        ) : isExpired ? (
-                          <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-200">
-                            Expired
-                          </Badge>
                         ) : (
-                          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                            Proposal Ready
+                          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 group-hover:bg-purple-100 transition-colors">
+                            Click to Reuse
                           </Badge>
                         )}
                       </div>
@@ -1194,6 +1261,29 @@ Please generate a detailed course proposal with modules, lessons, and learning o
                   );
                 })}
               </div>
+              
+              {/* Show More/Less Button at bottom for better UX */}
+              {pastProposals.length > 5 && (
+                <div className="mt-6 text-center">
+                  <Button
+                    onClick={() => setShowAllProposals(!showAllProposals)}
+                    variant="outline"
+                    className={`border-2 ${orangePurpleGradient} border-transparent bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 hover:text-white transition-all duration-200 shadow-lg hover:shadow-xl`}
+                  >
+                    {showAllProposals ? (
+                      <>
+                        Show Less
+                        <ChevronRight className="h-4 w-4 ml-2 rotate-90" />
+                      </>
+                    ) : (
+                      <>
+                        View More Proposals
+                        <ChevronRight className="h-4 w-4 ml-2" />
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
