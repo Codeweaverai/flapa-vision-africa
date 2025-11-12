@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Bot, Sparkles, BookOpen, Clock, Users, Zap, CheckCircle, ArrowRight, Play, Star, FileText, Target, GraduationCap, Coins, Gift, History, Calendar, BarChart3, AlertCircle, ChevronRight, RefreshCw } from 'lucide-react';
+import { Bot, Sparkles, BookOpen, Clock, Users, Zap, CheckCircle, ArrowRight, Play, Star, FileText, Target, GraduationCap, Coins, Gift, History, Calendar, BarChart3, AlertCircle, ChevronRight, RefreshCw, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
@@ -97,6 +97,7 @@ const CreatorCourseCreateWithAI = () => {
   const [pastProposals, setPastProposals] = useState<any[]>([]);
   const [currentProgressId, setCurrentProgressId] = useState<string | null>(null);
   const [showAllProposals, setShowAllProposals] = useState(false);
+  const [functionError, setFunctionError] = useState<string | null>(null);
   
   // Token usage states
   const [showTokenDialog, setShowTokenDialog] = useState(false);
@@ -171,6 +172,9 @@ const CreatorCourseCreateWithAI = () => {
             setTimeout(() => navigate('/creator/courses'), 2000);
           } else if (data.progress_percentage > 0) {
             setStep('creating');
+          } else if (data.current_step?.includes('Failed')) {
+            setStep('creating');
+            setFunctionError(data.current_step);
           }
           
           // Fetch associated proposal data
@@ -232,6 +236,14 @@ const CreatorCourseCreateWithAI = () => {
         setCurrentProgressId(progressData.id);
         setStep('creating');
         
+        // Check for errors
+        if (progressData.current_step?.includes('Failed') || progressData.current_step?.includes('error')) {
+          setFunctionError(progressData.current_step);
+          toast.error('Course generation failed. Please try again.');
+        } else {
+          setFunctionError(null);
+        }
+        
         // Fetch proposal data if we have a proposal_id but no proposal loaded
         if (progressData.proposal_id && !proposal) {
           const { data: proposalData } = await supabase
@@ -251,6 +263,7 @@ const CreatorCourseCreateWithAI = () => {
         setGenerationProgress(null);
         setCurrentProgressId(null);
         setStep('proposal');
+        setFunctionError(null);
         toast.success('Course created successfully!');
         
         // Refresh tokens and navigate
@@ -262,6 +275,7 @@ const CreatorCourseCreateWithAI = () => {
         // Handle error or invalid state
         setGenerationProgress(null);
         setCurrentProgressId(null);
+        setFunctionError(null);
       }
     };
 
@@ -354,6 +368,7 @@ const CreatorCourseCreateWithAI = () => {
 
     setLoading(true);
     setStep('generating');
+    setFunctionError(null);
 
     try {
       const prompt = `Create a comprehensive course about: ${courseData.title}
@@ -368,6 +383,7 @@ Please generate a detailed course proposal with modules, lessons, and learning o
 
       const tokenResult = await deductTokens('course_proposal', `course_proposal_${Date.now()}`);
       
+      console.log('Calling generate-course function for proposal...');
       const { data, error } = await supabase.functions.invoke('generate-course', {
         body: {
           user_prompt: prompt,
@@ -376,7 +392,10 @@ Please generate a detailed course proposal with modules, lessons, and learning o
         }
       });
 
-      if (error) throw new Error(error.message || 'Failed to generate proposal');
+      if (error) {
+        console.error('Function call error:', error);
+        throw new Error(error.message || 'Failed to generate proposal');
+      }
 
       if (data?.success) {
         // Store proposal in ai_course_proposals table
@@ -401,13 +420,20 @@ Please generate a detailed course proposal with modules, lessons, and learning o
     } catch (error: any) {
       console.error('Error generating proposal:', error);
       
+      let errorMessage = error.message || 'Failed to generate course proposal';
+      
       if (error.message?.includes('Insufficient tokens')) {
-        toast.error('Insufficient tokens to generate course proposal');
+        errorMessage = 'Insufficient tokens to generate course proposal';
         await refetchTokens();
-      } else {
-        toast.error(error.message || 'Failed to generate course proposal');
+      } else if (error.message?.includes('Edge Function')) {
+        errorMessage = 'AI service temporarily unavailable. Please try again.';
+      } else if (error.message?.includes('timeout')) {
+        errorMessage = 'Request timed out. Please try again.';
       }
+      
+      toast.error(errorMessage);
       setStep('input');
+      setFunctionError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -427,6 +453,7 @@ Please generate a detailed course proposal with modules, lessons, and learning o
     setProgressLoading(true);
     setLoading(true);
     setStep('creating');
+    setFunctionError(null);
 
     try {
       // Create progress record FIRST with proposal_id
@@ -436,7 +463,7 @@ Please generate a detailed course proposal with modules, lessons, and learning o
       console.log('Progress record created with ID:', progressId);
 
       // Wait a moment for the progress record to be available
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // IMMEDIATELY FETCH THE NEW PROGRESS RECORD to display it
       const { data: newProgress, error: fetchError } = await supabase
@@ -461,18 +488,20 @@ Please generate a detailed course proposal with modules, lessons, and learning o
           creator_id: user.id,
           action: 'generate_full_course',
           proposal_id: proposalId,
-          progress_id: progressId
+          progress_id: progressId,
+          use_gpt4: true // Force GPT-4 usage
         }
       });
 
       if (error) {
         console.error('Function call error:', error);
+        
         // Update progress to error state if function call fails immediately
         await supabase
           .from('ai_generation_progress')
           .update({
             progress_percentage: 0,
-            current_step: 'Failed - Function call error',
+            current_step: 'Failed - Function call error: ' + error.message,
             agent_activity: {
               manager: { status: 'error', message: 'Function call failed: ' + error.message },
               structure: { status: 'error', message: 'Failed' },
@@ -514,9 +543,13 @@ Please generate a detailed course proposal with modules, lessons, and learning o
       } else if (error.message?.includes('already in progress')) {
         errorMessage = 'Course generation is already in progress. Please wait for it to complete.';
         setStep('proposal');
+      } else if (error.message?.includes('Edge Function')) {
+        errorMessage = 'AI service temporarily unavailable. Please try again in a moment.';
+        setStep('proposal');
       }
       
       toast.error(errorMessage);
+      setFunctionError(errorMessage);
       
       // Reset progress on error
       setGenerationProgress(null);
@@ -545,11 +578,24 @@ Please generate a detailed course proposal with modules, lessons, and learning o
         if (data.progress_percentage === 100) {
           toast.success('Course completed!');
           setTimeout(() => navigate('/creator/courses'), 2000);
+        } else if (data.current_step?.includes('Failed')) {
+          setFunctionError(data.current_step);
         }
       }
     } catch (error) {
       console.error('Error refreshing progress:', error);
     }
+  };
+
+  // Retry failed course generation
+  const retryCourseGeneration = async () => {
+    if (!proposalId) {
+      toast.error('No proposal found to retry');
+      return;
+    }
+    
+    setFunctionError(null);
+    await createFullCourse();
   };
 
   const handleGenerateProposal = () => {
@@ -589,6 +635,7 @@ Please generate a detailed course proposal with modules, lessons, and learning o
   const gradientHoverClass = "hover:from-orange-600 hover:to-purple-700";
   const greenGradientClass = "bg-gradient-to-r from-green-500 to-emerald-600";
   const orangePurpleGradient = "bg-gradient-to-r from-orange-500 to-purple-600";
+  const redGradientClass = "bg-gradient-to-r from-red-500 to-orange-600";
 
   const getProgressStepColor = (percentage: number) => {
     if (percentage < 30) return "from-orange-500 to-amber-500";
@@ -643,8 +690,48 @@ Please generate a detailed course proposal with modules, lessons, and learning o
           </p>
         </div>
 
+        {/* Error Display */}
+        {functionError && (
+          <Card className="border-0 shadow-xl bg-red-50 border-l-4 border-l-red-500">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center text-xl text-red-700">
+                <AlertTriangle className="h-5 w-5 mr-2" />
+                Course Generation Failed
+              </CardTitle>
+              <CardDescription className="text-red-600">
+                There was an error during course creation
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-white rounded-lg p-4 border border-red-200">
+                <p className="text-red-700 font-medium">Error Details:</p>
+                <p className="text-red-600 text-sm mt-1">{functionError}</p>
+              </div>
+              <div className="flex space-x-4">
+                <Button
+                  onClick={retryCourseGeneration}
+                  className={`${gradientClass} text-white hover:from-orange-600 hover:to-purple-700`}
+                  disabled={loading}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  {loading ? 'Retrying...' : 'Retry Course Generation'}
+                </Button>
+                <Button
+                  onClick={() => {
+                    setFunctionError(null);
+                    setStep('proposal');
+                  }}
+                  variant="outline"
+                >
+                  Back to Proposal
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Starting Progress Display - Shows immediately when creating */}
-        {(step === 'creating' && !generationProgress) && (
+        {(step === 'creating' && !generationProgress && !functionError) && (
           <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm border-l-4 border-l-orange-500">
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center text-xl">
@@ -703,7 +790,7 @@ Please generate a detailed course proposal with modules, lessons, and learning o
         )}
 
         {/* Active Progress Display */}
-        {generationProgress && (
+        {generationProgress && !functionError && (
           <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm border-l-4 border-l-orange-500">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
@@ -877,7 +964,7 @@ Please generate a detailed course proposal with modules, lessons, and learning o
         </div>
 
         {/* Step 1: Course Input */}
-        {step === 'input' && !generationProgress && (
+        {step === 'input' && !generationProgress && !functionError && (
           <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
             <CardHeader className="text-center pb-4">
               <CardTitle className={`text-2xl font-bold ${gradientTextClass}`}>
@@ -973,7 +1060,7 @@ Please generate a detailed course proposal with modules, lessons, and learning o
         )}
 
         {/* Step 2: Generating */}
-        {step === 'generating' && (
+        {step === 'generating' && !functionError && (
           <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm text-center">
             <CardContent className="pt-12 pb-12">
               <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto mb-6"></div>
@@ -989,7 +1076,7 @@ Please generate a detailed course proposal with modules, lessons, and learning o
         )}
 
         {/* Step 3: Proposal Review */}
-        {step === 'proposal' && proposal && !generationProgress && (
+        {step === 'proposal' && proposal && !generationProgress && !functionError && (
           <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
             <CardHeader className="text-center pb-4">
               <CardTitle className={`text-2xl font-bold ${gradientTextClass}`}>
