@@ -24,18 +24,53 @@ interface MediaPost {
   author_id?: string;
 }
 
+interface RecommendedPost {
+  id: string;
+  title: string;
+  summary?: string;
+  category?: string;
+  post_type: string;
+  image_url?: string;
+  duration_minutes?: number;
+  published_at: string;
+}
+
 const MediaPostDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const [post, setPost] = useState<MediaPost | null>(null);
+  const [recommendedPosts, setRecommendedPosts] = useState<RecommendedPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
 
+  // Content processing function
+  const processContent = (content: string) => {
+    if (!content) return '';
+    
+    let processed = content
+      // Replace double line breaks with paragraph tags
+      .replace(/\n\s*\n/g, '</p><p class="mb-6 text-lg leading-8 text-gray-700">')
+      // Replace single line breaks with <br>
+      .replace(/\n/g, '<br>')
+      // Ensure we have proper paragraph tags
+      .replace(/<p>/g, '<p class="mb-6 text-lg leading-8 text-gray-700">')
+      // Handle existing paragraphs without classes
+      .replace(/<p([^>]*)>/g, '<p$1 class="mb-6 text-lg leading-8 text-gray-700">');
+    
+    // Wrap in paragraph if no HTML tags present
+    if (!processed.includes('<p>') && !processed.includes('<div>')) {
+      processed = `<p class="mb-6 text-lg leading-8 text-gray-700">${processed}</p>`;
+    }
+    
+    return processed;
+  };
+
   useEffect(() => {
-    const fetchPost = async () => {
+    const fetchPostAndRecommendations = async () => {
       if (!id) return;
 
       try {
-        const { data, error } = await supabase
+        // Fetch the main post
+        const { data: postData, error: postError } = await supabase
           .from('media_posts')
           .select(`
             id,
@@ -54,9 +89,32 @@ const MediaPostDetailPage = () => {
           .eq('is_published', true)
           .single();
 
-        if (error) throw error;
+        if (postError) throw postError;
 
-        setPost(data);
+        setPost(postData);
+
+        // Fetch recommended posts (excluding current post)
+        const { data: recommendedData, error: recommendedError } = await supabase
+          .from('media_posts')
+          .select(`
+            id,
+            title,
+            summary,
+            category,
+            post_type,
+            image_url,
+            duration_minutes,
+            published_at
+          `)
+          .eq('is_published', true)
+          .neq('id', id)
+          .order('published_at', { ascending: false })
+          .limit(3);
+
+        if (recommendedError) throw recommendedError;
+
+        setRecommendedPosts(recommendedData || []);
+
       } catch (error) {
         console.error('Error fetching media post:', error);
         toast.error('Failed to load media post');
@@ -65,7 +123,7 @@ const MediaPostDetailPage = () => {
       }
     };
 
-    fetchPost();
+    fetchPostAndRecommendations();
   }, [id]);
 
   const shareOnFacebook = () => {
@@ -86,6 +144,50 @@ const MediaPostDetailPage = () => {
   const copyToClipboard = () => {
     navigator.clipboard.writeText(window.location.href);
     toast.success('Link copied to clipboard!');
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const getPostIcon = (postType?: string) => {
+    const type = postType || post?.post_type;
+    switch (type) {
+      case 'video':
+        return <Play className="h-4 w-4" />;
+      case 'podcast':
+        return <Headphones className="h-4 w-4" />;
+      default:
+        return <BookOpen className="h-4 w-4" />;
+    }
+  };
+
+  const getTypeColor = (postType?: string) => {
+    const type = postType || post?.post_type;
+    switch (type) {
+      case 'video':
+        return 'from-orange-500 to-purple-600';
+      case 'podcast':
+        return 'from-orange-500 to-purple-600';
+      default:
+        return 'from-orange-500 to-purple-600';
+    }
+  };
+
+  const isVideoContent = (mediaUrl?: string) => {
+    if (!mediaUrl) return false;
+    return ReactPlayer.canPlay(mediaUrl) && (
+      mediaUrl.includes('youtube') || 
+      mediaUrl.includes('vimeo') || 
+      mediaUrl.includes('.mp4') || 
+      mediaUrl.includes('.webm') || 
+      mediaUrl.includes('.mov') ||
+      post?.post_type === 'video'
+    );
   };
 
   if (loading) {
@@ -145,48 +247,6 @@ const MediaPostDetailPage = () => {
       </Layout>
     );
   }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
-  const getPostIcon = () => {
-    switch (post.post_type) {
-      case 'video':
-        return <Play className="h-5 w-5" />;
-      case 'podcast':
-        return <Headphones className="h-5 w-5" />;
-      default:
-        return <BookOpen className="h-5 w-5" />;
-    }
-  };
-
-  const getTypeColor = () => {
-    switch (post.post_type) {
-      case 'video':
-        return 'from-orange-500 to-purple-600';
-      case 'podcast':
-        return 'from-orange-500 to-purple-600';
-      default:
-        return 'from-orange-500 to-purple-600';
-    }
-  };
-
-  const isVideoContent = (mediaUrl?: string) => {
-    if (!mediaUrl) return false;
-    return ReactPlayer.canPlay(mediaUrl) && (
-      mediaUrl.includes('youtube') || 
-      mediaUrl.includes('vimeo') || 
-      mediaUrl.includes('.mp4') || 
-      mediaUrl.includes('.webm') || 
-      mediaUrl.includes('.mov') ||
-      post.post_type === 'video'
-    );
-  };
 
   return (
     <Layout>
@@ -329,15 +389,12 @@ const MediaPostDetailPage = () => {
                       </div>
                     )}
 
-                    {/* Content */}
+                    {/* Content with processed paragraphs */}
                     <div className="prose prose-lg max-w-none">
                       <div 
-                        className="text-gray-700 leading-relaxed tracking-wide space-y-6"
+                        className="text-gray-700 leading-relaxed tracking-wide"
                         dangerouslySetInnerHTML={{ 
-                          __html: post.content.replace(
-                            /<p>/g, 
-                            '<p class="mb-6 text-lg leading-8 text-gray-700">'
-                          ) 
+                          __html: processContent(post.content)
                         }} 
                       />
                     </div>
@@ -372,6 +429,88 @@ const MediaPostDetailPage = () => {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Recommended Posts Section */}
+                {recommendedPosts.length > 0 && (
+                  <div className="mt-12">
+                    <div className="flex items-center justify-between mb-8">
+                      <h2 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                        Recommended for You
+                      </h2>
+                      <Button 
+                        asChild 
+                        variant="outline"
+                        className="border-orange-200 text-orange-600 hover:bg-orange-50"
+                      >
+                        <Link to="/media">
+                          View All
+                        </Link>
+                      </Button>
+                    </div>
+                    
+                    <div className="grid md:grid-cols-3 gap-6">
+                      {recommendedPosts.map((recommendedPost) => (
+                        <Card 
+                          key={recommendedPost.id} 
+                          className="bg-white border border-gray-200 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl overflow-hidden group"
+                        >
+                          <Link to={`/media/${recommendedPost.id}`}>
+                            <div className="relative h-48 overflow-hidden">
+                              {recommendedPost.image_url ? (
+                                <img
+                                  src={recommendedPost.image_url}
+                                  alt={recommendedPost.title}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                />
+                              ) : (
+                                <div className={`w-full h-full bg-gradient-to-br ${getTypeColor(recommendedPost.post_type)} flex items-center justify-center`}>
+                                  <div className="text-white/80 text-4xl">
+                                    {getPostIcon(recommendedPost.post_type)}
+                                  </div>
+                                </div>
+                              )}
+                              <div className="absolute top-3 left-3">
+                                <Badge className={`bg-gradient-to-r ${getTypeColor(recommendedPost.post_type)} text-white border-0 font-semibold text-xs px-2 py-1`}>
+                                  {getPostIcon(recommendedPost.post_type)}
+                                </Badge>
+                              </div>
+                            </div>
+                            
+                            <CardContent className="p-4">
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between text-xs text-gray-500">
+                                  <span>{formatDate(recommendedPost.published_at)}</span>
+                                  {recommendedPost.duration_minutes && (
+                                    <span className="flex items-center gap-1">
+                                      <Clock className="h-3 w-3" />
+                                      {recommendedPost.duration_minutes} min
+                                    </span>
+                                  )}
+                                </div>
+                                
+                                <h3 className="font-semibold text-gray-800 line-clamp-2 group-hover:text-orange-600 transition-colors">
+                                  {recommendedPost.title}
+                                </h3>
+                                
+                                {recommendedPost.summary && (
+                                  <p className="text-sm text-gray-600 line-clamp-2">
+                                    {recommendedPost.summary}
+                                  </p>
+                                )}
+                                
+                                {recommendedPost.category && (
+                                  <Badge variant="outline" className="text-xs border-gray-200">
+                                    {recommendedPost.category}
+                                  </Badge>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Link>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Sidebar */}
