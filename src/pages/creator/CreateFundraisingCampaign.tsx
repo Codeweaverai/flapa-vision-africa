@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Upload, DollarSign, Calendar } from 'lucide-react';
+import { ArrowLeft, Upload, DollarSign, Calendar, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
@@ -28,6 +28,7 @@ const CreateFundraisingCampaign: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [formData, setFormData] = useState<CampaignFormData>({
     title: '',
     description: '',
@@ -51,23 +52,114 @@ const CreateFundraisingCampaign: React.FC = () => {
     'business'
   ];
 
-  const handleInputChange = (field: keyof CampaignFormData, value: string | number) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+  // Image upload configuration
+  const BUCKET_NAME = 'fundraising_assets';
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+  const ALLOWED_MIME_TYPES = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp',
+    'image/gif'
+  ];
+
+  const validateFile = (file: File): { valid: boolean; error?: string } => {
+    // Check file size
+    if (file.size > MAX_FILE_SIZE) {
+      return { valid: false, error: 'File size must be less than 5MB' };
+    }
+
+    // Check file type
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      return { valid: false, error: 'File must be an image (JPEG, PNG, WebP, GIF)' };
+    }
+
+    return { valid: true };
   };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !user) return;
 
-    // In a real implementation, you would upload to Supabase Storage
-    // For now, we'll use a placeholder
-    toast.info('Image upload functionality coming soon!');
+    // Validate file
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      toast.error(validation.error);
+      return;
+    }
+
+    setUploadingImage(true);
+
+    try {
+      // Generate unique file path
+      const fileExt = file.name.split('.').pop();
+      const fileName = `temp-${user.id}-${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+      const filePath = `campaigns/${fileName}`;
+
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from(BUCKET_NAME)
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) {
+        console.error('Upload error:', error);
+        toast.error('Failed to upload image: ' + error.message);
+        return;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from(BUCKET_NAME)
+        .getPublicUrl(filePath);
+
+      setFormData(prev => ({
+        ...prev,
+        cover_image_url: publicUrl
+      }));
+      
+      toast.success('Image uploaded successfully!');
+    } catch (error) {
+      console.error('Upload failed:', error);
+      toast.error('Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+      // Clear the file input
+      event.target.value = '';
+    }
+  };
+
+  const handleRemoveImage = async () => {
+    if (formData.cover_image_url) {
+      try {
+        // Extract file path from URL for deletion
+        const urlObj = new URL(formData.cover_image_url);
+        const pathParts = urlObj.pathname.split('/');
+        const bucketIndex = pathParts.indexOf(BUCKET_NAME);
+        
+        if (bucketIndex !== -1) {
+          const filePath = pathParts.slice(bucketIndex + 1).join('/');
+          await supabase.storage
+            .from(BUCKET_NAME)
+            .remove([filePath]);
+        }
+      } catch (error) {
+        console.error('Error deleting image:', error);
+      }
+    }
+
     setFormData(prev => ({
       ...prev,
-      cover_image_url: URL.createObjectURL(file)
+      cover_image_url: ''
+    }));
+  };
+
+  const handleInputChange = (field: keyof CampaignFormData, value: string | number) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
     }));
   };
 
@@ -269,24 +361,43 @@ const CreateFundraisingCampaign: React.FC = () => {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
                       {formData.cover_image_url ? (
-                        <div className="space-y-2">
-                          <img 
-                            src={formData.cover_image_url} 
-                            alt="Cover preview" 
-                            className="w-full h-32 object-cover rounded-lg"
-                          />
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => handleInputChange('cover_image_url', '')}
-                          >
-                            Change Image
-                          </Button>
+                        <div className="space-y-3">
+                          <div className="relative">
+                            <img 
+                              src={formData.cover_image_url} 
+                              alt="Cover preview" 
+                              className="w-full h-32 object-cover rounded-lg"
+                            />
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              className="absolute -top-2 -right-2 h-6 w-6 p-0 rounded-full"
+                              onClick={handleRemoveImage}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <div className="flex gap-2">
+                            <Label htmlFor="cover-image" className="cursor-pointer flex-1">
+                              <Button variant="outline" size="sm" className="w-full" asChild>
+                                <span>Change Image</span>
+                              </Button>
+                              <Input
+                                id="cover-image"
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleImageUpload}
+                                disabled={uploadingImage}
+                              />
+                            </Label>
+                          </div>
                         </div>
                       ) : (
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           <Upload className="h-8 w-8 text-gray-400 mx-auto" />
                           <div>
                             <Label htmlFor="cover-image" className="cursor-pointer">
@@ -299,9 +410,18 @@ const CreateFundraisingCampaign: React.FC = () => {
                               accept="image/*"
                               className="hidden"
                               onChange={handleImageUpload}
+                              disabled={uploadingImage}
                             />
                           </div>
-                          <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                          <p className="text-xs text-gray-500">
+                            PNG, JPG, WebP, GIF up to 5MB
+                          </p>
+                          {uploadingImage && (
+                            <div className="flex items-center justify-center gap-2 text-sm text-blue-600">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                              Uploading...
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
