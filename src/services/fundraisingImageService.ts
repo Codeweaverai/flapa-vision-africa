@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabaseClient';
-import { toast } from 'sonner';
 
 export interface UploadResult {
   success: boolean;
@@ -85,12 +84,10 @@ export class FundraisingImageService {
 
   static async deleteCampaignImage(imagePath: string): Promise<{ success: boolean; error?: string }> {
     try {
-      // Extract the path after 'campaigns/'
-      const pathWithoutPrefix = imagePath.replace('campaigns/', '');
-      
+      // Use the exact path from the upload
       const { error } = await supabase.storage
         .from(this.BUCKET_NAME)
-        .remove([pathWithoutPrefix]);
+        .remove([imagePath]);
 
       if (error) {
         console.error('Delete error:', error);
@@ -101,29 +98,6 @@ export class FundraisingImageService {
     } catch (error) {
       console.error('Delete failed:', error);
       return { success: false, error: 'Failed to delete image' };
-    }
-  }
-
-  static async updateCampaignImage(
-    oldImagePath: string | null,
-    newFile: File,
-    campaignId: string,
-    userId: string
-  ): Promise<UploadResult> {
-    try {
-      // Delete old image if it exists
-      if (oldImagePath) {
-        await this.deleteCampaignImage(oldImagePath);
-      }
-
-      // Upload new image
-      return await this.uploadCampaignImage(newFile, campaignId, userId);
-    } catch (error) {
-      console.error('Update failed:', error);
-      return { 
-        success: false, 
-        error: 'Failed to update image' 
-      };
     }
   }
 
@@ -141,6 +115,41 @@ export class FundraisingImageService {
       return null;
     } catch {
       return null;
+    }
+  }
+}
+
+export class FundraisingStorageCleanup {
+  static async cleanupCampaignImages(campaignId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      // List all files in the campaign folder
+      const { data: files, error } = await supabase.storage
+        .from('fundraising_assets')
+        .list(`campaigns/${campaignId}`);
+
+      if (error) {
+        console.error('Error listing files:', error);
+        return { success: false, error: error.message };
+      }
+
+      if (files && files.length > 0) {
+        // Delete all files in the campaign folder
+        const filePaths = files.map(file => `campaigns/${campaignId}/${file.name}`);
+        
+        const { error: deleteError } = await supabase.storage
+          .from('fundraising_assets')
+          .remove(filePaths);
+
+        if (deleteError) {
+          console.error('Error deleting files:', deleteError);
+          return { success: false, error: deleteError.message };
+        }
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Cleanup failed:', error);
+      return { success: false, error: 'Failed to cleanup campaign images' };
     }
   }
 }
