@@ -233,7 +233,8 @@ const PublicFundraisingCampaign: React.FC = () => {
         <div className="container mx-auto px-4 py-8">
           {/* Back Button */}
           <Button variant="ghost" size="sm" asChild className="mb-6">
-            <Link to={`/creator/${campaign.profiles.id}`}>
+            {/* ✅ UPDATED ROUTE: Correct creator profile route */}
+            <Link to={`/creator/profile/${campaign.profiles.id}`}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Creator Profile
             </Link>
@@ -375,7 +376,8 @@ const PublicFundraisingCampaign: React.FC = () => {
                     </p>
                   )}
                   <Button variant="outline" className="w-full mt-4" asChild>
-                    <Link to={`/creator/${campaign.profiles.id}`}>
+                    {/* ✅ UPDATED ROUTE: Correct creator profile route */}
+                    <Link to={`/creator/profile/${campaign.profiles.id}`}>
                       View Profile
                     </Link>
                   </Button>
