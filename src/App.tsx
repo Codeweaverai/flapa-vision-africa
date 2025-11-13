@@ -80,6 +80,8 @@ import CreatorEventCreateWithAI from '@/pages/creator/CreatorEventCreateWithAI';
 import TokenTopUpPage from '@/pages/creator/TokenTopUpPage';
 import TokenTopUpSuccess from '@/pages/creator/TokenTopUpSuccess';
 import CoursePreviewPage from '@/pages/creator/CoursePreviewPage';
+import CreatorFundraising  from '@/pages/creator/CreatorFundraising ';
+
 
 // Import workplace pages
 import AcceptInvitePage from '@/pages/AcceptInvitePage';
@@ -280,6 +282,7 @@ function App() {
                   <Route path="/creator/tokens" element={<ProtectedRoute><TokenTopUpPage /></ProtectedRoute>} />
                   <Route path="/creator/tokens/success" element={<ProtectedRoute><TokenTopUpSuccess /></ProtectedRoute>} />
                   <Route path="/creator/courses/:id/preview" element={<ProtectedRoute><CoursePreviewPage /></ProtectedRoute>} />
+                  <Route path="/creator/fundraising" element={<ProtectedRoute><CreatorFundraising  /></ProtectedRoute>} />
 
       
                   {/* Community Routes */}
