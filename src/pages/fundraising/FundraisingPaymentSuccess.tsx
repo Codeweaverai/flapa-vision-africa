@@ -12,9 +12,9 @@ import { useAuth } from '@/contexts/AuthContext';
 interface Contribution {
   id: string;
   amount: number;
-  currency: string; // ✅ ADDED CURRENCY FIELD
-  transaction_fee: number; // ✅ ADDED TRANSACTION FEE
-  net_amount: number; // ✅ ADDED NET AMOUNT
+  currency: string;
+  transaction_fee: number;
+  net_amount: number;
   status: string;
   is_anonymous: boolean;
   message_to_creator: string;
@@ -66,10 +66,8 @@ const FundraisingPaymentSuccess = () => {
 
   useEffect(() => {
     const checkPaymentStatus = async () => {
-      // First try to get deposit_id from URL parameters
       let targetDepositId = depositId;
 
-      // If no deposit_id in URL, try localStorage as fallback
       if (!targetDepositId) {
         const lastPayment = localStorage.getItem('lastFundraisingPayment');
         if (lastPayment) {
@@ -105,7 +103,6 @@ const FundraisingPaymentSuccess = () => {
             case 'completed':
               setPaymentStatus('completed');
               toast.success('Payment completed! Thank you for your contribution.');
-              // Clear localStorage on successful payment
               localStorage.removeItem('lastFundraisingPayment');
               break;
             case 'pending':
@@ -115,7 +112,6 @@ const FundraisingPaymentSuccess = () => {
             case 'failed':
               setPaymentStatus('failed');
               toast.error('Payment failed. Please try again.');
-              // Clear localStorage on failed payment
               localStorage.removeItem('lastFundraisingPayment');
               break;
             default:
@@ -162,15 +158,14 @@ const FundraisingPaymentSuccess = () => {
       } catch (error) {
         console.error('Polling error:', error);
       }
-    }, 5000); // Check every 5 seconds
+    }, 5000);
 
-    // Stop polling after 5 minutes
     setTimeout(() => {
       clearInterval(pollInterval);
       if (paymentStatus === 'pending') {
         toast.info('Payment is taking longer than expected. Your contribution will be processed automatically when payment completes.');
       }
-    }, 300000); // 5 minutes
+    }, 300000);
   };
 
   const getStatusConfig = () => {
@@ -216,7 +211,8 @@ const FundraisingPaymentSuccess = () => {
 
   const handleViewCampaign = () => {
     if (contribution?.fundraising_campaigns?.id) {
-      navigate(`/campaign/${contribution.fundraising_campaigns.id}`);
+      // ✅ UPDATED ROUTE: Changed from /campaign/ to /fundraising/
+      navigate(`/fundraising/${contribution.fundraising_campaigns.id}`);
     } else {
       navigate('/campaigns');
     }
@@ -243,7 +239,6 @@ const FundraisingPaymentSuccess = () => {
       <Layout>
         <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
           <div className="max-w-2xl mx-auto px-4 w-full">
-            {/* Status Card */}
             <Card className={`border-2 ${statusConfig.borderColor} ${statusConfig.bgColor} shadow-xl`}>
               <CardContent className="pt-8">
                 <div className="text-center space-y-6">
@@ -266,7 +261,6 @@ const FundraisingPaymentSuccess = () => {
                     </div>
                   )}
 
-                  {/* Contribution Details */}
                   {(contribution || depositId) && (
                     <div className="bg-white rounded-lg p-6 border border-gray-200 space-y-4">
                       <h3 className="font-semibold text-gray-900">Contribution Details</h3>
@@ -281,7 +275,6 @@ const FundraisingPaymentSuccess = () => {
                         <div>
                           <span className="text-gray-600">Amount:</span>
                           <p className="font-semibold">
-                            {/* ✅ REMOVED PriceDisplay - use direct formatting */}
                             {contribution ? formatCurrency(contribution.amount, contribution.currency) : 'Loading...'}
                           </p>
                         </div>
@@ -310,7 +303,6 @@ const FundraisingPaymentSuccess = () => {
               </CardContent>
             </Card>
 
-            {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center mt-6">
               {paymentStatus === 'pending' && (
                 <Button
@@ -340,7 +332,6 @@ const FundraisingPaymentSuccess = () => {
               </Button>
             </div>
 
-            {/* Help Text */}
             {paymentStatus === 'pending' && (
               <Card className="bg-blue-50 border-blue-200 mt-6">
                 <CardContent className="pt-6">
@@ -365,7 +356,6 @@ const FundraisingPaymentSuccess = () => {
     );
   }
 
-  // Show success page only when payment is completed
   return (
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
@@ -389,7 +379,6 @@ const FundraisingPaymentSuccess = () => {
               <CardContent className="space-y-8">
                 {contribution && (
                   <>
-                    {/* Campaign Info */}
                     <div className="bg-gradient-to-r from-orange-100 to-purple-100 p-6 rounded-xl border border-orange-200">
                       <h3 className="text-lg font-semibold mb-3 text-gray-800">
                         You're supporting
@@ -398,7 +387,6 @@ const FundraisingPaymentSuccess = () => {
                         {contribution.fundraising_campaigns.title}
                       </h2>
                       
-                      {/* Progress Update */}
                       <div className="mt-4 p-4 bg-white rounded-lg border border-purple-200">
                         <div className="flex items-center justify-between text-sm text-gray-700 mb-2">
                           <span>Campaign Progress</span>
@@ -422,7 +410,6 @@ const FundraisingPaymentSuccess = () => {
                         </div>
                         <div className="flex justify-between text-xs text-gray-600 mt-1">
                           <span>
-                            {/* ✅ REMOVED PriceDisplay - use direct formatting */}
                             {formatCurrency(contribution.fundraising_campaigns.current_amount, contribution.fundraising_campaigns.currency)} raised
                           </span>
                           <span>
@@ -432,13 +419,11 @@ const FundraisingPaymentSuccess = () => {
                       </div>
                     </div>
                     
-                    {/* Contribution Details */}
                     <div className="bg-green-50 p-6 rounded-xl border border-green-200">
                       <div className="flex items-center justify-center space-x-3 text-green-800">
                         <Check className="w-6 h-6 text-green-600" />
                         <span className="font-semibold text-lg">
                           Your contribution of {' '}
-                          {/* ✅ REMOVED PriceDisplay - use direct formatting */}
                           {formatCurrency(contribution.amount, contribution.currency)}{' '}
                           has been confirmed!
                         </span>
@@ -446,11 +431,9 @@ const FundraisingPaymentSuccess = () => {
                       <div className="text-sm text-green-700 mt-2 space-y-1">
                         <p>Contribution ID: {contribution.id}</p>
                         <p>Date: {formatDate(contribution.created_at)}</p>
-                        {/* ✅ ADDED Transaction Fee Display */}
                         {contribution.transaction_fee > 0 && (
                           <p>Transaction Fee: {formatCurrency(contribution.transaction_fee, contribution.currency)}</p>
                         )}
-                        {/* ✅ ADDED Net Amount Display */}
                         {contribution.net_amount > 0 && (
                           <p>Net to Campaign: {formatCurrency(contribution.net_amount, contribution.currency)}</p>
                         )}
@@ -460,7 +443,6 @@ const FundraisingPaymentSuccess = () => {
                       </div>
                     </div>
 
-                    {/* Reward Information */}
                     {contribution.campaign_rewards && (
                       <div className="bg-orange-50 p-6 rounded-xl border border-orange-200">
                         <h3 className="font-semibold text-orange-800 mb-3">
@@ -481,7 +463,6 @@ const FundraisingPaymentSuccess = () => {
                       </div>
                     )}
 
-                    {/* Message to Creator */}
                     {contribution.message_to_creator && (
                       <div className="bg-purple-50 p-6 rounded-xl border border-purple-200">
                         <h3 className="font-semibold text-purple-800 mb-2">
@@ -495,7 +476,6 @@ const FundraisingPaymentSuccess = () => {
                   </>
                 )}
 
-                {/* Benefits List */}
                 <div className="space-y-4 text-sm text-gray-700">
                   <div className="flex items-center justify-center space-x-3 p-3 bg-orange-50 rounded-lg">
                     <Check className="w-5 h-5 text-green-500" />
@@ -513,7 +493,6 @@ const FundraisingPaymentSuccess = () => {
                   )}
                 </div>
 
-                {/* Action Buttons */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
                   <Button 
                     onClick={handleViewCampaign}
@@ -529,7 +508,8 @@ const FundraisingPaymentSuccess = () => {
                     variant="outline"
                     className="w-full border-orange-300 text-orange-600 hover:bg-orange-50 font-semibold py-3"
                   >
-                    <Link to="/campaigns">
+                    {/* ✅ UPDATED ROUTE: Changed from /campaigns to /fundraising */}
+                    <Link to="/fundraising">
                       <Users className="w-5 h-5 mr-2" />
                       Explore More Campaigns
                     </Link>
