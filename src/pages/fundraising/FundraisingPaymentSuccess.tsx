@@ -8,11 +8,13 @@ import { Check, ArrowRight, Heart, Users, Calendar, Home, Loader2, AlertCircle, 
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import PriceDisplay from '@/components/currency/PriceDisplay';
 
 interface Contribution {
   id: string;
   amount: number;
+  currency: string; // ✅ ADDED CURRENCY FIELD
+  transaction_fee: number; // ✅ ADDED TRANSACTION FEE
+  net_amount: number; // ✅ ADDED NET AMOUNT
   status: string;
   is_anonymous: boolean;
   message_to_creator: string;
@@ -38,6 +40,16 @@ interface Contribution {
     avatar_url: string;
   };
 }
+
+// Helper function to format currency display
+const formatCurrency = (amount: number, currency: string) => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+};
 
 const FundraisingPaymentSuccess = () => {
   const navigate = useNavigate();
@@ -269,10 +281,8 @@ const FundraisingPaymentSuccess = () => {
                         <div>
                           <span className="text-gray-600">Amount:</span>
                           <p className="font-semibold">
-                            <PriceDisplay 
-                              amount={contribution?.amount || 0} 
-                              originalCurrency={contribution?.fundraising_campaigns?.currency || 'USD'} 
-                            />
+                            {/* ✅ REMOVED PriceDisplay - use direct formatting */}
+                            {contribution ? formatCurrency(contribution.amount, contribution.currency) : 'Loading...'}
                           </p>
                         </div>
                         <div>
@@ -412,16 +422,11 @@ const FundraisingPaymentSuccess = () => {
                         </div>
                         <div className="flex justify-between text-xs text-gray-600 mt-1">
                           <span>
-                            <PriceDisplay 
-                              amount={contribution.fundraising_campaigns.current_amount} 
-                              originalCurrency={contribution.fundraising_campaigns.currency} 
-                            /> raised
+                            {/* ✅ REMOVED PriceDisplay - use direct formatting */}
+                            {formatCurrency(contribution.fundraising_campaigns.current_amount, contribution.fundraising_campaigns.currency)} raised
                           </span>
                           <span>
-                            Goal: <PriceDisplay 
-                              amount={contribution.fundraising_campaigns.goal_amount} 
-                              originalCurrency={contribution.fundraising_campaigns.currency} 
-                            />
+                            Goal: {formatCurrency(contribution.fundraising_campaigns.goal_amount, contribution.fundraising_campaigns.currency)}
                           </span>
                         </div>
                       </div>
@@ -433,16 +438,22 @@ const FundraisingPaymentSuccess = () => {
                         <Check className="w-6 h-6 text-green-600" />
                         <span className="font-semibold text-lg">
                           Your contribution of {' '}
-                          <PriceDisplay 
-                            amount={contribution.amount} 
-                            originalCurrency={contribution.fundraising_campaigns.currency} 
-                          />{' '}
+                          {/* ✅ REMOVED PriceDisplay - use direct formatting */}
+                          {formatCurrency(contribution.amount, contribution.currency)}{' '}
                           has been confirmed!
                         </span>
                       </div>
                       <div className="text-sm text-green-700 mt-2 space-y-1">
                         <p>Contribution ID: {contribution.id}</p>
                         <p>Date: {formatDate(contribution.created_at)}</p>
+                        {/* ✅ ADDED Transaction Fee Display */}
+                        {contribution.transaction_fee > 0 && (
+                          <p>Transaction Fee: {formatCurrency(contribution.transaction_fee, contribution.currency)}</p>
+                        )}
+                        {/* ✅ ADDED Net Amount Display */}
+                        {contribution.net_amount > 0 && (
+                          <p>Net to Campaign: {formatCurrency(contribution.net_amount, contribution.currency)}</p>
+                        )}
                         {contribution.is_anonymous && (
                           <p className="font-semibold">✓ Anonymous Contribution</p>
                         )}
