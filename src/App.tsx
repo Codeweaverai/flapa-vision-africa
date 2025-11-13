@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -80,8 +79,13 @@ import CreatorEventCreateWithAI from '@/pages/creator/CreatorEventCreateWithAI';
 import TokenTopUpPage from '@/pages/creator/TokenTopUpPage';
 import TokenTopUpSuccess from '@/pages/creator/TokenTopUpSuccess';
 import CoursePreviewPage from '@/pages/creator/CoursePreviewPage';
-import CreatorFundraising  from '@/pages/creator/CreatorFundraising ';
 
+// Import fundraising pages
+import CreatorFundraising from '@/pages/creator/CreatorFundraising';
+import CreateFundraisingCampaign from '@/pages/creator/CreateFundraisingCampaign';
+import EditFundraisingCampaign from '@/pages/creator/EditFundraisingCampaign';
+import FundraisingCampaignDetails from '@/pages/creator/FundraisingCampaignDetails';
+import PublicFundraisingCampaign from '@/pages/fundraising/PublicFundraisingCampaign';
 
 // Import workplace pages
 import AcceptInvitePage from '@/pages/AcceptInvitePage';
@@ -276,15 +280,20 @@ function App() {
                   <Route path="/creator/analytics" element={<ProtectedRoute><CreatorAnalytics /></ProtectedRoute>} />
                   <Route path="/creator/payments" element={<ProtectedRoute><CreatorPayments /></ProtectedRoute>} />
                   <Route path="/creator/promo-codes" element={<ProtectedRoute><CreatorPromoCodes /></ProtectedRoute>} />
-                   <Route path="/creator/settings" element={<ProtectedRoute><CreatorSettings /></ProtectedRoute>} />
+                  <Route path="/creator/settings" element={<ProtectedRoute><CreatorSettings /></ProtectedRoute>} />
                   <Route path="/creator/attendees" element={<ProtectedRoute><CreatorAttendeeManagement /></ProtectedRoute>} />
-                 <Route path="/creator/activities" element={<ProtectedRoute><CreatorRecentActivities /></ProtectedRoute>} />
+                  <Route path="/creator/activities" element={<ProtectedRoute><CreatorRecentActivities /></ProtectedRoute>} />
                   <Route path="/creator/tokens" element={<ProtectedRoute><TokenTopUpPage /></ProtectedRoute>} />
                   <Route path="/creator/tokens/success" element={<ProtectedRoute><TokenTopUpSuccess /></ProtectedRoute>} />
                   <Route path="/creator/courses/:id/preview" element={<ProtectedRoute><CoursePreviewPage /></ProtectedRoute>} />
-                  <Route path="/creator/fundraising" element={<ProtectedRoute><CreatorFundraising  /></ProtectedRoute>} />
 
-      
+                  {/* Fundraising Routes */}
+                  <Route path="/creator/fundraising" element={<ProtectedRoute><CreatorFundraising /></ProtectedRoute>} />
+                  <Route path="/creator/fundraising/create" element={<ProtectedRoute><CreateFundraisingCampaign /></ProtectedRoute>} />
+                  <Route path="/creator/fundraising/:campaignId" element={<ProtectedRoute><FundraisingCampaignDetails /></ProtectedRoute>} />
+                  <Route path="/creator/fundraising/:campaignId/edit" element={<ProtectedRoute><EditFundraisingCampaign /></ProtectedRoute>} />
+                  <Route path="/fundraising/:campaignId" element={<PublicFundraisingCampaign />} />
+
                   {/* Community Routes */}
                   <Route path="/community" element={<ProtectedRoute><CommunityPage /></ProtectedRoute>} />
                   <Route path="/community/chat" element={<ProtectedRoute><CommunityChatPage /></ProtectedRoute>} />
