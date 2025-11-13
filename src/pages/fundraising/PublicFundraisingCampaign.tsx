@@ -16,7 +16,8 @@ import {
   Facebook,
   Twitter,
   Linkedin,
-  Link2
+  Link2,
+  Instagram
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { supabase } from '@/lib/supabaseClient';
@@ -26,14 +27,45 @@ import PriceDisplay from '@/components/currency/PriceDisplay';
 import { Link } from 'react-router-dom';
 import FundraisingMobileMoneyDialog from '@/components/fundraising/FundraisingMobileMoneyDialog';
 
-// Social Media Icons - Using Lucide React icons
-const SocialIcons = {
-  whatsapp: MessageCircle,
-  facebook: Facebook,
-  twitter: Twitter,
-  linkedin: Linkedin,
-  link: Link2
-};
+// Social Media Icons with brand colors
+const SocialPlatforms = [
+  {
+    platform: 'whatsapp',
+    Icon: MessageCircle,
+    color: 'text-white bg-[#25D366] hover:bg-[#25D366]/90',
+    label: 'WhatsApp'
+  },
+  {
+    platform: 'facebook',
+    Icon: Facebook,
+    color: 'text-white bg-[#1877F2] hover:bg-[#1877F2]/90',
+    label: 'Facebook'
+  },
+  {
+    platform: 'twitter',
+    Icon: Twitter,
+    color: 'text-white bg-[#1DA1F2] hover:bg-[#1DA1F2]/90',
+    label: 'X'
+  },
+  {
+    platform: 'instagram',
+    Icon: Instagram,
+    color: 'text-white bg-gradient-to-r from-[#405DE6] via-[#E1306C] to-[#FFDC80] hover:opacity-90',
+    label: 'Instagram'
+  },
+  {
+    platform: 'linkedin',
+    Icon: Linkedin,
+    color: 'text-white bg-[#0A66C2] hover:bg-[#0A66C2]/90',
+    label: 'LinkedIn'
+  },
+  {
+    platform: 'link',
+    Icon: Link2,
+    color: 'text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300',
+    label: 'Copy Link'
+  }
+];
 
 interface Campaign {
   id: string;
@@ -145,6 +177,7 @@ const PublicFundraisingCampaign: React.FC = () => {
       whatsapp: `https://wa.me/?text=${title}%20${shareUrl}`,
       facebook: `https://www.facebook.com/sharer/sharer.php?u=${shareUrl}&quote=${title}`,
       twitter: `https://twitter.com/intent/tweet?text=${title}&url=${shareUrl}`,
+      instagram: `https://www.instagram.com/?url=${shareUrl}`,
       linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${shareUrl}&summary=${text}`,
     };
 
@@ -386,17 +419,17 @@ const PublicFundraisingCampaign: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-3 gap-3">
-                    {Object.entries(SocialIcons).map(([platform, Icon]) => (
+                    {SocialPlatforms.map(({ platform, Icon, color, label }) => (
                       <Button
                         key={platform}
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        className="h-12 flex flex-col gap-1"
+                        className={`h-14 flex flex-col gap-1 transition-all duration-200 ${color} rounded-lg`}
                         onClick={() => handleSocialShare(platform)}
                       >
-                        <Icon className="h-4 w-4" />
-                        <span className="text-xs capitalize">
-                          {platform === 'link' ? 'Copy Link' : platform}
+                        <Icon className="h-6 w-6" />
+                        <span className="text-xs font-medium">
+                          {label}
                         </span>
                       </Button>
                     ))}
