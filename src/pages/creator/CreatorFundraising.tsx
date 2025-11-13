@@ -10,7 +10,6 @@ import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import PriceDisplay from '@/components/currency/PriceDisplay';
-import { FundraisingImageService, FundraisingStorageCleanup } from '@/services/fundraisingImageService';
 import {
   DropdownMenu,
   DropdownMenuContent,
