@@ -97,6 +97,11 @@ const CreatorLayout = ({ children, title }: CreatorLayoutProps) => {
       icon: <Calendar className="h-5 w-5" />
     },
     {
+      label: 'Creator Fundraising',
+      href: '/creator/fundraising',
+      icon: <DollarSign className="h-5 w-5" />
+    },
+    {
       label: 'Creator Settings',
       href: '/creator/settings',
       icon: <Settings className="h-5 w-5" />
