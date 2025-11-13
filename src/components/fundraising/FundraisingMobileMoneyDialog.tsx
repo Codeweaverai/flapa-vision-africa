@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -66,6 +67,7 @@ const FundraisingMobileMoneyDialog: React.FC<FundraisingMobileMoneyDialogProps> 
   onClose,
   campaign
 }) => {
+  const navigate = useNavigate();
   const [selectedCountry, setSelectedCountry] = useState<PawapayCountryCode>('Zambia');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [customAmount, setCustomAmount] = useState('');
@@ -214,8 +216,7 @@ const FundraisingMobileMoneyDialog: React.FC<FundraisingMobileMoneyDialogProps> 
           campaign_id: campaign.id,
           reward_id: selectedReward || null,
           is_anonymous: isAnonymous,
-          message_to_creator: message || null,
-          return_url: `${window.location.origin}/campaign/${campaign.id}?payment=success`
+          message_to_creator: message || null
         }
       });
 
@@ -228,13 +229,31 @@ const FundraisingMobileMoneyDialog: React.FC<FundraisingMobileMoneyDialogProps> 
         return;
       }
 
-      if (data?.redirectUrl) {
-        console.log('Redirecting to PawaPay:', data.redirectUrl);
-        window.location.href = data.redirectUrl;
+      if (data?.success) {
+        // Store payment info for the success page
+        const paymentInfo = {
+          depositId: data.depositId,
+          contributionId: data.contributionId,
+          campaignId: campaign.id,
+          amount: finalAmount,
+          currency: finalCurrency,
+          campaignTitle: campaign.title
+        };
+
+        localStorage.setItem('lastFundraisingPayment', JSON.stringify(paymentInfo));
+
+        // Show success message and close dialog
+        toast.success('Payment initiated! Please check your mobile device to complete the payment.');
+        onClose();
+        
+        // Redirect to success page to monitor payment status
+        setTimeout(() => {
+          navigate(`/fundraising/payment-success?deposit_id=${data.depositId}`);
+        }, 1000);
       } else {
-        console.error('No redirect URL in response:', data);
-        setError('No redirect URL returned from payment provider');
-        toast.error('Failed to get payment link from provider');
+        console.error('No success response from payment function:', data);
+        setError('Failed to initiate payment. Please try again.');
+        toast.error('Failed to initiate payment. Please try again.');
       }
     } catch (error) {
       console.error('Error initiating PawaPay payment:', error);
@@ -500,6 +519,32 @@ const FundraisingMobileMoneyDialog: React.FC<FundraisingMobileMoneyDialogProps> 
               </div>
             </div>
 
+            {/* Payment Flow Explanation */}
+            <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+              <h4 className="font-semibold text-sm text-blue-900 mb-2 flex items-center gap-2">
+                <Smartphone className="h-4 w-4 text-blue-600" />
+                How Mobile Money Payment Works
+              </h4>
+              <div className="space-y-2 text-xs text-blue-800">
+                <div className="flex items-start gap-2">
+                  <div className="w-4 h-4 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs mt-0.5 flex-shrink-0">1</div>
+                  <span>You'll be redirected to a payment status page</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="w-4 h-4 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs mt-0.5 flex-shrink-0">2</div>
+                  <span>Check your mobile device for a payment prompt</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="w-4 h-4 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs mt-0.5 flex-shrink-0">3</div>
+                  <span>Complete the payment on your mobile device</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="w-4 h-4 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs mt-0.5 flex-shrink-0">4</div>
+                  <span>The status page will update automatically when payment is complete</span>
+                </div>
+              </div>
+            </div>
+
             {/* Action Buttons */}
             <div className="space-y-4 pt-4 border-t border-gray-200">
               <div className="flex gap-3">
@@ -536,8 +581,7 @@ const FundraisingMobileMoneyDialog: React.FC<FundraisingMobileMoneyDialogProps> 
                   <Lock className="h-3 w-3 text-green-600" />
                   <span className="font-medium">Secure Payment</span>
                 </div>
-                You will be redirected to complete the payment on your mobile device.
-                Please ensure you have sufficient balance in your mobile money account.
+                You will complete the payment on your mobile device. The payment status will be monitored automatically.
               </div>
             </div>
           </div>
