@@ -5,7 +5,19 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, Users, DollarSign, Calendar, Share2, ArrowLeft } from 'lucide-react';
+import { 
+  Heart, 
+  Users, 
+  DollarSign, 
+  Calendar, 
+  Share2, 
+  ArrowLeft,
+  MessageCircle,
+  Facebook,
+  Twitter,
+  Linkedin,
+  Link2
+} from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
@@ -13,6 +25,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { Link } from 'react-router-dom';
 import FundraisingMobileMoneyDialog from '@/components/fundraising/FundraisingMobileMoneyDialog';
+
+// Social Media Icons - Using Lucide React icons
+const SocialIcons = {
+  whatsapp: MessageCircle,
+  facebook: Facebook,
+  twitter: Twitter,
+  linkedin: Linkedin,
+  link: Link2
+};
 
 interface Campaign {
   id: string;
@@ -111,6 +132,29 @@ const PublicFundraisingCampaign: React.FC = () => {
       navigator.clipboard.writeText(shareUrl);
       toast.success('Campaign link copied to clipboard!');
     }
+  };
+
+  const handleSocialShare = (platform: string) => {
+    if (!campaign) return;
+
+    const shareUrl = window.location.href;
+    const title = encodeURIComponent(campaign.title);
+    const text = encodeURIComponent(campaign.description.substring(0, 200));
+    
+    const shareUrls = {
+      whatsapp: `https://wa.me/?text=${title}%20${shareUrl}`,
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${shareUrl}&quote=${title}`,
+      twitter: `https://twitter.com/intent/tweet?text=${title}&url=${shareUrl}`,
+      linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${shareUrl}&summary=${text}`,
+    };
+
+    if (platform === 'link') {
+      navigator.clipboard.writeText(shareUrl);
+      toast.success('Campaign link copied to clipboard!');
+      return;
+    }
+
+    window.open(shareUrls[platform as keyof typeof shareUrls], '_blank', 'width=600,height=400');
   };
 
   if (loading) {
@@ -248,10 +292,10 @@ const PublicFundraisingCampaign: React.FC = () => {
               {/* Campaign Story */}
               <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
                 <CardHeader>
-                  <CardTitle>About This Campaign</CardTitle>
+                  <CardTitle className="text-xl font-semibold text-gray-900">About This Campaign</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-700 leading-relaxed text-lg whitespace-pre-line">
+                  <p className="text-gray-700 leading-relaxed text-base whitespace-pre-line">
                     {campaign.description}
                   </p>
                 </CardContent>
@@ -261,10 +305,10 @@ const PublicFundraisingCampaign: React.FC = () => {
               {campaign.use_of_funds && (
                 <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
                   <CardHeader>
-                    <CardTitle>Use of Funds</CardTitle>
+                    <CardTitle className="text-xl font-semibold text-gray-900">Use of Funds</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-gray-700 leading-relaxed text-lg">
+                    <p className="text-gray-700 leading-relaxed text-base">
                       {campaign.use_of_funds}
                     </p>
                   </CardContent>
@@ -277,7 +321,7 @@ const PublicFundraisingCampaign: React.FC = () => {
               {/* Creator Info */}
               <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
                 <CardHeader>
-                  <CardTitle>About the Creator</CardTitle>
+                  <CardTitle className="text-lg font-semibold">About the Creator</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center gap-4 mb-4">
@@ -308,7 +352,7 @@ const PublicFundraisingCampaign: React.FC = () => {
               {/* Campaign Details */}
               <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
                 <CardHeader>
-                  <CardTitle>Campaign Details</CardTitle>
+                  <CardTitle className="text-lg font-semibold">Campaign Details</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm">
                   <div className="flex items-center gap-2">
@@ -332,19 +376,48 @@ const PublicFundraisingCampaign: React.FC = () => {
                 </CardContent>
               </Card>
 
-              {/* Support Button */}
+              {/* Social Share */}
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold">Share This Campaign</CardTitle>
+                  <CardDescription className="text-sm">
+                    Help spread the word about this campaign
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-3">
+                    {Object.entries(SocialIcons).map(([platform, Icon]) => (
+                      <Button
+                        key={platform}
+                        variant="outline"
+                        size="sm"
+                        className="h-12 flex flex-col gap-1"
+                        onClick={() => handleSocialShare(platform)}
+                      >
+                        <Icon className="h-4 w-4" />
+                        <span className="text-xs capitalize">
+                          {platform === 'link' ? 'Copy Link' : platform}
+                        </span>
+                      </Button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Support Card */}
               <Card className="bg-gradient-to-r from-orange-500 to-purple-600 border-0 shadow-xl">
                 <CardContent className="p-6 text-center text-white">
                   <Heart className="h-8 w-8 mx-auto mb-3" />
                   <h3 className="font-semibold text-lg mb-2">Ready to Support?</h3>
-                  <p className="text-white/90 text-sm mb-4">
-                    Help bring this project to life by making a contribution.
+                  <p className="text-white/90 text-sm mb-4 leading-relaxed">
+                    Help bring this project to life by making a contribution. Every donation brings us closer to our goal.
                   </p>
                   <Button 
                     onClick={handleSupportClick}
                     size="lg"
-                    className="w-full bg-white text-orange-600 hover:bg-white/90"
+                    className="w-full bg-white text-orange-600 hover:bg-white/90 font-semibold"
                   >
+                    <Heart className="h-4 w-4 mr-2" />
                     Support Now
                   </Button>
                 </CardContent>
