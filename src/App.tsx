@@ -32,6 +32,7 @@ import MyEventsPage from '@/pages/MyEventsPage';
 import WishlistPage from '@/pages/WishlistPage';
 import GiftCardsPage from '@/pages/GiftCardsPage';
 import GiftRedeemPage from '@/pages/GiftRedeemPage';
+import FundraisingPaymentSuccess from '@/pages/fundraising/FundraisingPaymentSuccess';
 
 // Import account pages
 import AccountPage from '@/pages/AccountPage';
@@ -164,6 +165,7 @@ import NotFoundPage from '@/pages/NotFoundPage';
 import CardSuccessPage from '@/pages/CardSuccessPage';
 import LencoPaymentSuccessPage from '@/pages/LencoPaymentSuccessPage';
 
+
 // Import components
 import ProtectedRoute from '@/components/ProtectedRoute';
 import AdminRoute from '@/components/admin/AdminRoute';
@@ -236,7 +238,8 @@ function App() {
                   <Route path="/payment-success" element={<ProtectedRoute><PaymentSuccessPage /></ProtectedRoute>} />
                   <Route path="/card-success" element={<ProtectedRoute><CardSuccessPage /></ProtectedRoute>} />
                   <Route path="/lenco-payment-success" element={<ProtectedRoute><LencoPaymentSuccessPage /></ProtectedRoute>} />
-                  
+                  <Route path="/fundraising/payment-success" element={<ProtectedRoute><FundraisingPaymentSuccess /></ProtectedRoute>} />
+
                   <Route path="/payment-cancel" element={<ProtectedRoute><PaymentCancelPage /></ProtectedRoute>} />
                   <Route path="/my-orders" element={<ProtectedRoute><MyOrdersPage /></ProtectedRoute>} />
                   <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
