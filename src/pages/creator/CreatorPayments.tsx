@@ -208,7 +208,8 @@ const CreatorPayments: React.FC = () => {
     total_earnings: 0,
     total_platform_fees: 0,
     course_revenue: 0,
-    event_revenue: 0
+    event_revenue: 0,
+    fundraising_revenue: 0 // ✅ ADDED FUNDRAISING REVENUE
   });
 
   // Pagination states
@@ -509,6 +510,8 @@ const CreatorPayments: React.FC = () => {
         return 'Course Purchase';
       case 'event_ticket':
         return 'Event Registration';
+      case 'fundraising_contribution': // ✅ ADDED FUNDRAISING
+        return 'Campaign Contribution';
       case 'consultation':
         return 'Consultation Booking';
       default:
@@ -702,7 +705,9 @@ const CreatorPayments: React.FC = () => {
   const renderTransactionCard = (transaction: any) => {
     const gradientClass = transaction.item_type === 'course' 
       ? 'bg-gradient-to-br from-orange-500 to-purple-600'
-      : 'bg-gradient-to-br from-purple-500 to-orange-600';
+      : transaction.item_type === 'event_ticket'
+      ? 'bg-gradient-to-br from-purple-500 to-orange-600'
+      : 'bg-gradient-to-br from-blue-500 to-blue-600'; // ✅ ADDED FUNDRAISING GRADIENT
     
     return (
       <Card key={transaction.id} className={`mb-3 ${gradientClass} text-white shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 w-full`}>
@@ -1020,8 +1025,8 @@ const CreatorPayments: React.FC = () => {
             </Card>
           </div>
 
-          {/* Revenue Breakdown */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 w-full">
+          {/* Revenue Breakdown - UPDATED WITH FUNDRAISING */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 w-full">
             <Card className="bg-gradient-to-br from-orange-500 to-orange-400 shadow-lg border-0 w-full">
               <CardHeader>
                 <CardTitle className="text-white text-lg sm:text-xl">Course Revenue</CardTitle>
@@ -1046,6 +1051,21 @@ const CreatorPayments: React.FC = () => {
               <CardContent>
                 <div className="text-2xl sm:text-3xl font-bold text-white">
                   <PriceDisplay amount={earnings.event_revenue} originalCurrency="USD" />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* ✅ ADDED: Fundraising Revenue Card */}
+            <Card className="bg-gradient-to-br from-blue-500 to-blue-400 shadow-lg border-0 w-full">
+              <CardHeader>
+                <CardTitle className="text-white text-lg sm:text-xl">Fundraising Revenue</CardTitle>
+                <CardDescription className="text-white/80 text-sm">
+                  Earnings from campaign contributions
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl sm:text-3xl font-bold text-white">
+                  <PriceDisplay amount={earnings.fundraising_revenue} originalCurrency="USD" />
                 </div>
               </CardContent>
             </Card>
