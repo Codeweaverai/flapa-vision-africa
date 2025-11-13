@@ -6,13 +6,14 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Upload, DollarSign, Calendar, Trash2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Upload, DollarSign, Calendar, Trash2, AlertTriangle, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import PriceDisplay from '@/components/currency/PriceDisplay';
+import { FundraisingImageService, FundraisingStorageCleanup } from '@/services/fundraisingImageService';
 
 interface CampaignFormData {
   title: string;
@@ -30,6 +31,7 @@ const EditFundraisingCampaign: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [campaign, setCampaign] = useState<any>(null);
   const [formData, setFormData] = useState<CampaignFormData>({
     title: '',
@@ -106,13 +108,50 @@ const EditFundraisingCampaign: React.FC = () => {
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !user || !campaignId) return;
 
-    // In a real implementation, you would upload to Supabase Storage
-    toast.info('Image upload functionality coming soon!');
+    setUploadingImage(true);
+
+    try {
+      const result = await FundraisingImageService.uploadCampaignImage(
+        file, 
+        campaignId, 
+        user.id
+      );
+
+      if (result.success && result.url) {
+        setFormData(prev => ({
+          ...prev,
+          cover_image_url: result.url!
+        }));
+        toast.success('Image uploaded successfully!');
+      } else {
+        toast.error(result.error || 'Failed to upload image');
+      }
+    } catch (error) {
+      console.error('Image upload error:', error);
+      toast.error('Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+      event.target.value = '';
+    }
+  };
+
+  const handleRemoveImage = async () => {
+    if (campaign?.cover_image_url) {
+      try {
+        const imagePath = FundraisingImageService.extractFilePathFromUrl(campaign.cover_image_url);
+        if (imagePath) {
+          await FundraisingImageService.deleteCampaignImage(imagePath);
+        }
+      } catch (error) {
+        console.error('Error deleting old image:', error);
+      }
+    }
+
     setFormData(prev => ({
       ...prev,
-      cover_image_url: URL.createObjectURL(file)
+      cover_image_url: ''
     }));
   };
 
@@ -174,6 +213,18 @@ const EditFundraisingCampaign: React.FC = () => {
     setLoading(true);
 
     try {
+      // Clean up campaign images first
+      if (campaign.cover_image_url) {
+        const imagePath = FundraisingImageService.extractFilePathFromUrl(campaign.cover_image_url);
+        if (imagePath) {
+          await FundraisingImageService.deleteCampaignImage(imagePath);
+        }
+      }
+
+      // Clean up all campaign images from storage
+      await FundraisingStorageCleanup.cleanupCampaignImages(campaignId);
+
+      // Delete the campaign from database
       const { error } = await supabase
         .from('fundraising_campaigns')
         .delete()
@@ -383,24 +434,43 @@ const EditFundraisingCampaign: React.FC = () => {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
                       {formData.cover_image_url ? (
-                        <div className="space-y-2">
-                          <img 
-                            src={formData.cover_image_url} 
-                            alt="Cover preview" 
-                            className="w-full h-32 object-cover rounded-lg"
-                          />
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => handleInputChange('cover_image_url', '')}
-                          >
-                            Change Image
-                          </Button>
+                        <div className="space-y-3">
+                          <div className="relative">
+                            <img 
+                              src={formData.cover_image_url} 
+                              alt="Cover preview" 
+                              className="w-full h-32 object-cover rounded-lg"
+                            />
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              className="absolute -top-2 -right-2 h-6 w-6 p-0 rounded-full"
+                              onClick={handleRemoveImage}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <div className="flex gap-2">
+                            <Label htmlFor="cover-image" className="cursor-pointer flex-1">
+                              <Button variant="outline" size="sm" className="w-full" asChild>
+                                <span>Change Image</span>
+                              </Button>
+                              <Input
+                                id="cover-image"
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleImageUpload}
+                                disabled={uploadingImage}
+                              />
+                            </Label>
+                          </div>
                         </div>
                       ) : (
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           <Upload className="h-8 w-8 text-gray-400 mx-auto" />
                           <div>
                             <Label htmlFor="cover-image" className="cursor-pointer">
@@ -413,9 +483,18 @@ const EditFundraisingCampaign: React.FC = () => {
                               accept="image/*"
                               className="hidden"
                               onChange={handleImageUpload}
+                              disabled={uploadingImage}
                             />
                           </div>
-                          <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                          <p className="text-xs text-gray-500">
+                            PNG, JPG, WebP, GIF up to 5MB
+                          </p>
+                          {uploadingImage && (
+                            <div className="flex items-center justify-center gap-2 text-sm text-blue-600">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                              Uploading...
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
