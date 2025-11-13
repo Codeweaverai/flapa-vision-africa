@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { Link } from 'react-router-dom';
+import FundraisingMobileMoneyDialog from '@/components/fundraising/FundraisingMobileMoneyDialog';
 
 interface Campaign {
   id: string;
@@ -41,6 +42,7 @@ const PublicFundraisingCampaign: React.FC = () => {
   const { user } = useAuth();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
 
   useEffect(() => {
     if (campaignId) {
@@ -87,7 +89,7 @@ const PublicFundraisingCampaign: React.FC = () => {
       toast.error('Please log in to support this campaign');
       return;
     }
-    toast.info('Support functionality coming soon!');
+    setShowPaymentDialog(true);
   };
 
   const handleShareCampaign = async () => {
@@ -350,6 +352,22 @@ const PublicFundraisingCampaign: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Mobile Money Payment Dialog */}
+        {campaign && (
+          <FundraisingMobileMoneyDialog
+            isOpen={showPaymentDialog}
+            onClose={() => setShowPaymentDialog(false)}
+            campaign={{
+              id: campaign.id,
+              title: campaign.title,
+              goal_amount: campaign.goal_amount,
+              current_amount: campaign.current_amount,
+              currency: campaign.currency,
+              creator_id: campaign.profiles.id
+            }}
+          />
+        )}
       </div>
     </Layout>
   );
