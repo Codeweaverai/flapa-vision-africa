@@ -443,7 +443,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
       }
     }
 
-    // Fetch fundraising contributions with campaign data
+    // ✅ FIXED: Fetch fundraising contributions WITHOUT profiles.email (since it doesn't exist)
     let fundraisingContributions: any[] = [];
     if (campaignIds.length > 0) {
       const { data: contributions, error: contributionsError } = await supabase
@@ -459,9 +459,9 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
           ),
           profiles!campaign_contributions_supporter_id_fkey(
             id,
-            email,
             username,
             full_name
+            // ✅ REMOVED: email (since it doesn't exist in profiles table)
           )
         `)
         .eq('status', 'completed')
@@ -527,11 +527,16 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
           payoutEligibleDate = item.created_at;
         }
 
+        // ✅ FIXED: Use placeholder email since profiles table doesn't have email
+        const customerName = item.is_anonymous 
+          ? 'Anonymous Supporter' 
+          : (item.profiles?.username || item.profiles?.full_name || 'Unknown Supporter');
+
         creatorTransactions.push({
           id: item.id,
           order_id: item.id,
-          customer_email: item.profiles?.email || 'Anonymous',
-          customer_name: item.is_anonymous ? 'Anonymous Supporter' : (item.profiles?.username || item.profiles?.full_name || 'Unknown Supporter'),
+          customer_email: 'campaign@supporter.com', // ✅ PLACEHOLDER EMAIL
+          customer_name: customerName,
           item_type: 'fundraising_contribution',
           item_name: `Campaign: ${item.fundraising_campaigns?.title}`,
           item_id: item.campaign_id,
