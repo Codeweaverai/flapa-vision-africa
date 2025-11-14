@@ -167,7 +167,7 @@ const EditFundraisingCampaign: React.FC = () => {
           title: formData.title,
           description: formData.description,
           goal_amount: formData.goal_amount,
-          category: formCategory,
+          category: formData.category,
           end_date: formData.end_date || null,
           use_of_funds: formData.use_of_funds,
           cover_image_url: formData.cover_image_url,
