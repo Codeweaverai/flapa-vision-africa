@@ -6,9 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, Upload, DollarSign, Calendar, Trash2, AlertTriangle, Image, Save, Eye, Users, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Upload, DollarSign, Calendar, Trash2, Save, Image, Eye } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
@@ -27,11 +25,6 @@ interface CampaignFormData {
   status: string;
 }
 
-interface CampaignStats {
-  total_raised: number;
-  contributions_count: number;
-}
-
 const EditFundraisingCampaign: React.FC = () => {
   const { campaignId } = useParams<{ campaignId: string }>();
   const { user } = useAuth();
@@ -39,7 +32,6 @@ const EditFundraisingCampaign: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [campaign, setCampaign] = useState<any>(null);
-  const [campaignStats, setCampaignStats] = useState<CampaignStats>({ total_raised: 0, contributions_count: 0 });
   const [formData, setFormData] = useState<CampaignFormData>({
     title: '',
     description: '',
@@ -67,7 +59,6 @@ const EditFundraisingCampaign: React.FC = () => {
   useEffect(() => {
     if (campaignId) {
       loadCampaign();
-      loadCampaignStats();
     }
   }, [campaignId]);
 
@@ -107,29 +98,6 @@ const EditFundraisingCampaign: React.FC = () => {
     }
   };
 
-  const loadCampaignStats = async () => {
-    if (!campaignId) return;
-
-    try {
-      const { data: contributions, error } = await supabase
-        .from('campaign_contributions')
-        .select('amount, currency, status')
-        .eq('campaign_id', campaignId)
-        .eq('status', 'completed');
-
-      if (error) throw error;
-
-      const totalRaised = contributions?.reduce((sum, contribution) => sum + Number(contribution.amount || 0), 0) || 0;
-      
-      setCampaignStats({
-        total_raised: totalRaised,
-        contributions_count: contributions?.length || 0
-      });
-    } catch (error) {
-      console.error('Error loading campaign stats:', error);
-    }
-  };
-
   const handleInputChange = (field: keyof CampaignFormData, value: string | number) => {
     setFormData(prev => ({
       ...prev,
@@ -147,7 +115,7 @@ const EditFundraisingCampaign: React.FC = () => {
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) { // 10MB limit
+    if (file.size > 10 * 1024 * 1024) {
       toast.error('Image size must be less than 10MB');
       return;
     }
@@ -160,7 +128,7 @@ const EditFundraisingCampaign: React.FC = () => {
       const fileName = `${campaignId}/${Math.random().toString(36).substring(2)}.${fileExt}`;
       
       // Upload to Supabase Storage
-      const { error: uploadError, data } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('fundraising_assets')
         .upload(fileName, file);
 
@@ -199,7 +167,7 @@ const EditFundraisingCampaign: React.FC = () => {
           title: formData.title,
           description: formData.description,
           goal_amount: formData.goal_amount,
-          category: formData.category,
+          category: formCategory,
           end_date: formData.end_date || null,
           use_of_funds: formData.use_of_funds,
           cover_image_url: formData.cover_image_url,
@@ -225,7 +193,14 @@ const EditFundraisingCampaign: React.FC = () => {
     if (!user || !campaignId) return;
 
     // Check if campaign has contributions
-    if (campaignStats.contributions_count > 0) {
+    const { data: contributions } = await supabase
+      .from('campaign_contributions')
+      .select('id')
+      .eq('campaign_id', campaignId)
+      .eq('status', 'completed')
+      .limit(1);
+
+    if (contributions && contributions.length > 0) {
       toast.error('Cannot delete campaign with completed contributions');
       return;
     }
@@ -275,8 +250,6 @@ const EditFundraisingCampaign: React.FC = () => {
     );
   };
 
-  const progress = campaignStats.total_raised / (formData.goal_amount || 1) * 100;
-
   if (!campaign) {
     return (
       <CreatorLayout>
@@ -292,7 +265,7 @@ const EditFundraisingCampaign: React.FC = () => {
   return (
     <CreatorLayout>
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-orange-100">
-        <div className="p-4 lg:p-6 max-w-7xl mx-auto">
+        <div className="p-4 lg:p-6 max-w-4xl mx-auto">
           {/* Header */}
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
             <div className="flex items-center gap-3">
@@ -311,84 +284,81 @@ const EditFundraisingCampaign: React.FC = () => {
                 </p>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="sm"
-                asChild
-                className="border-slate-300 hover:bg-white/80"
-              >
-                <Link to={`/fundraising/${campaignId}`} target="_blank">
-                  <Eye className="h-4 w-4 mr-2" />
-                  View Public
-                </Link>
-              </Button>
-            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              asChild
+              className="border-slate-300 hover:bg-white/80"
+            >
+              <Link to={`/fundraising/${campaignId}`} target="_blank">
+                <Eye className="h-4 w-4 mr-2" />
+                View Public
+              </Link>
+            </Button>
           </div>
 
-          {/* Horizontal Layout */}
-          <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-            {/* Main Content - 3 columns */}
-            <div className="xl:col-span-3 space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Campaign Details */}
-                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-slate-900">
-                      <TrendingUp className="h-5 w-5 text-orange-600" />
-                      Campaign Details
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="title" className="text-sm font-medium text-slate-700">Campaign Title *</Label>
-                      <Input
-                        id="title"
-                        placeholder="e.g., Build My Podcast Studio"
-                        value={formData.title}
-                        onChange={(e) => handleInputChange('title', e.target.value)}
-                        className="bg-white/50 border-slate-200"
-                        required
-                      />
-                    </div>
+          {/* Single Column Layout */}
+          <div className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Campaign Details */}
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+                <CardHeader>
+                  <CardTitle className="text-slate-900">Campaign Information</CardTitle>
+                  <CardDescription>
+                    Basic details about your fundraising campaign
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="title" className="text-sm font-medium text-slate-700">Campaign Title *</Label>
+                    <Input
+                      id="title"
+                      placeholder="e.g., Build My Podcast Studio"
+                      value={formData.title}
+                      onChange={(e) => handleInputChange('title', e.target.value)}
+                      className="bg-white/50 border-slate-200"
+                      required
+                    />
+                  </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="description" className="text-sm font-medium text-slate-700">Description *</Label>
-                      <Textarea
-                        id="description"
-                        placeholder="Tell your story and explain why you're raising funds..."
-                        rows={4}
-                        value={formData.description}
-                        onChange={(e) => handleInputChange('description', e.target.value)}
-                        className="bg-white/50 border-slate-200 resize-none"
-                        required
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="description" className="text-sm font-medium text-slate-700">Description *</Label>
+                    <Textarea
+                      id="description"
+                      placeholder="Tell your story and explain why you're raising funds..."
+                      rows={4}
+                      value={formData.description}
+                      onChange={(e) => handleInputChange('description', e.target.value)}
+                      className="bg-white/50 border-slate-200 resize-none"
+                      required
+                    />
+                  </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="use_of_funds" className="text-sm font-medium text-slate-700">Use of Funds *</Label>
-                      <Textarea
-                        id="use_of_funds"
-                        placeholder="Explain exactly how the funds will be used..."
-                        rows={3}
-                        value={formData.use_of_funds}
-                        onChange={(e) => handleInputChange('use_of_funds', e.target.value)}
-                        className="bg-white/50 border-slate-200 resize-none"
-                        required
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
+                  <div className="space-y-2">
+                    <Label htmlFor="use_of_funds" className="text-sm font-medium text-slate-700">Use of Funds *</Label>
+                    <Textarea
+                      id="use_of_funds"
+                      placeholder="Explain exactly how the funds will be used..."
+                      rows={3}
+                      value={formData.use_of_funds}
+                      onChange={(e) => handleInputChange('use_of_funds', e.target.value)}
+                      className="bg-white/50 border-slate-200 resize-none"
+                      required
+                    />
+                  </div>
+                </CardContent>
+              </Card>
 
-                {/* Funding & Settings */}
-                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-slate-900">
-                      <DollarSign className="h-5 w-5 text-emerald-600" />
-                      Funding & Settings
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
+              {/* Funding Goal & Settings */}
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+                <CardHeader>
+                  <CardTitle className="text-slate-900">Funding & Settings</CardTitle>
+                  <CardDescription>
+                    Set your funding goal and campaign preferences
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="goal_amount" className="text-sm font-medium text-slate-700">Goal Amount (USD) *</Label>
                       <div className="relative">
@@ -405,44 +375,38 @@ const EditFundraisingCampaign: React.FC = () => {
                           required
                         />
                       </div>
-                      {campaignStats.total_raised > 0 && (
-                        <p className="text-sm text-amber-600 flex items-center gap-1 mt-1">
-                          <AlertTriangle className="h-4 w-4" />
-                          Campaign has raised <PriceDisplay amount={campaignStats.total_raised} originalCurrency="USD" showOriginal={false} />
-                        </p>
-                      )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="category" className="text-sm font-medium text-slate-700">Category *</Label>
-                        <Select value={formData.category} onValueChange={(value) => handleInputChange('category', value)}>
-                          <SelectTrigger className="bg-white/50 border-slate-200">
-                            <SelectValue placeholder="Select category" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categories.map(category => (
-                              <SelectItem key={category} value={category}>
-                                {category.charAt(0).toUpperCase() + category.slice(1)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="category" className="text-sm font-medium text-slate-700">Category *</Label>
+                      <Select value={formData.category} onValueChange={(value) => handleInputChange('category', value)}>
+                        <SelectTrigger className="bg-white/50 border-slate-200">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map(category => (
+                            <SelectItem key={category} value={category}>
+                              {category.charAt(0).toUpperCase() + category.slice(1)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="status" className="text-sm font-medium text-slate-700">Status</Label>
-                        <Select value={formData.status} onValueChange={(value) => handleInputChange('status', value)}>
-                          <SelectTrigger className="bg-white/50 border-slate-200">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="draft">Draft</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="status" className="text-sm font-medium text-slate-700">Status</Label>
+                      <Select value={formData.status} onValueChange={(value) => handleInputChange('status', value)}>
+                        <SelectTrigger className="bg-white/50 border-slate-200">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="draft">Draft</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div className="space-y-2">
@@ -459,17 +423,14 @@ const EditFundraisingCampaign: React.FC = () => {
                         />
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-              {/* Cover Image Upload */}
+              {/* Cover Image */}
               <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-slate-900">
-                    <Image className="h-5 w-5 text-purple-600" />
-                    Cover Image
-                  </CardTitle>
+                  <CardTitle className="text-slate-900">Cover Image</CardTitle>
                   <CardDescription>
                     Upload a compelling image for your campaign (Max 10MB)
                   </CardDescription>
@@ -512,7 +473,7 @@ const EditFundraisingCampaign: React.FC = () => {
                       <Label htmlFor="cover-image" className="cursor-pointer">
                         <div className="space-y-3">
                           <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto">
-                            <Upload className="h-8 w-8 text-slate-400" />
+                            <Image className="h-8 w-8 text-slate-400" />
                           </div>
                           <div>
                             <span className="text-blue-600 hover:text-blue-700 font-medium">Click to upload</span>
@@ -539,68 +500,19 @@ const EditFundraisingCampaign: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
-            </div>
-
-            {/* Sidebar - 1 column */}
-            <div className="space-y-6">
-              {/* Campaign Stats */}
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="text-slate-900">Campaign Stats</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-600">Progress</span>
-                      <span className="font-medium">{Math.round(progress)}%</span>
-                    </div>
-                    <Progress value={progress} className="h-2 bg-slate-200" />
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4 text-center">
-                    <div className="p-3 bg-slate-50 rounded-lg">
-                      <div className="text-lg font-bold text-slate-900">
-                        <PriceDisplay amount={campaignStats.total_raised} originalCurrency="USD" showOriginal={false} />
-                      </div>
-                      <div className="text-xs text-slate-600">Raised</div>
-                    </div>
-                    <div className="p-3 bg-slate-50 rounded-lg">
-                      <div className="text-lg font-bold text-slate-900">
-                        <PriceDisplay amount={formData.goal_amount} originalCurrency="USD" showOriginal={false} />
-                      </div>
-                      <div className="text-xs text-slate-600">Goal</div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center py-2 border-t border-slate-200">
-                    <span className="text-sm text-slate-600">Supporters</span>
-                    <span className="text-sm font-medium text-slate-900 flex items-center gap-1">
-                      <Users className="h-4 w-4" />
-                      {campaignStats.contributions_count}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-t border-slate-200">
-                    <span className="text-sm text-slate-600">Created</span>
-                    <span className="text-sm font-medium text-slate-900">
-                      {new Date(campaign.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
 
               {/* Actions */}
               <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
-                <CardContent className="p-6 space-y-3">
+                <CardContent className="p-6 space-y-4">
                   <Button 
                     type="submit" 
-                    onClick={handleSubmit}
                     className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white transition-all duration-300"
                     disabled={!isFormValid() || loading || uploading}
                   >
                     {loading ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Updating...
+                        Updating Campaign...
                       </>
                     ) : (
                       <>
@@ -615,20 +527,14 @@ const EditFundraisingCampaign: React.FC = () => {
                     variant="outline" 
                     className="w-full text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 transition-all duration-300"
                     onClick={handleDeleteCampaign}
-                    disabled={loading || uploading || campaignStats.contributions_count > 0}
+                    disabled={loading || uploading}
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Delete Campaign
                   </Button>
-
-                  {campaignStats.contributions_count > 0 && (
-                    <div className="text-xs text-amber-600 text-center p-2 bg-amber-50 rounded-lg border border-amber-200">
-                      Cannot delete campaign with contributions
-                    </div>
-                  )}
                 </CardContent>
               </Card>
-            </div>
+            </form>
           </div>
         </div>
       </div>
