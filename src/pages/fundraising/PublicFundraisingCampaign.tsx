@@ -17,7 +17,10 @@ import {
   Twitter,
   Linkedin,
   Link2,
-  Instagram
+  Instagram,
+  Target,
+  TrendingUp,
+  Zap
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { supabase } from '@/lib/supabaseClient';
@@ -26,6 +29,46 @@ import { useAuth } from '@/contexts/AuthContext';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { Link } from 'react-router-dom';
 import FundraisingMobileMoneyDialog from '@/components/fundraising/FundraisingMobileMoneyDialog';
+
+// Currency conversion rates (static - same as other pages)
+const exchangeRates: { [key: string]: number } = {
+  USD: 1,
+  EUR: 0.85,
+  GBP: 0.73,
+  ZMW: 0.044,
+  NGN: 0.0012,
+  GHS: 0.082,
+  KES: 0.0078,
+  UGX: 0.00027,
+  TZS: 0.00043,
+  RWF: 0.0010,
+  XOF: 0.0016,
+  XAF: 0.0016,
+  CDF: 0.00049,
+  MZN: 0.015,
+  MWK: 0.0009,
+  LSL: 0.054,
+  SLL: 0.000048
+};
+
+// Currency conversion function
+const convertCurrency = async (
+  amount: number,
+  fromCurrency: string,
+  toCurrency: string
+): Promise<number> => {
+  if (fromCurrency === toCurrency) {
+    return amount;
+  }
+
+  const fromRate = exchangeRates[fromCurrency] || 1;
+  const toRate = exchangeRates[toCurrency] || 1;
+  
+  const usdAmount = amount * fromRate;
+  const targetAmount = usdAmount / toRate;
+  
+  return Number(targetAmount.toFixed(2));
+};
 
 // Social Media Icons with brand colors
 const SocialPlatforms = [
@@ -62,7 +105,7 @@ const SocialPlatforms = [
   {
     platform: 'link',
     Icon: Link2,
-    color: 'text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300',
+    color: 'text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300',
     label: 'Copy Link'
   }
 ];
@@ -72,7 +115,6 @@ interface Campaign {
   title: string;
   description: string;
   goal_amount: number;
-  current_amount: number;
   currency: string;
   category: string;
   status: string;
@@ -90,10 +132,25 @@ interface Campaign {
   };
 }
 
+interface CampaignContribution {
+  id: string;
+  amount: number;
+  currency: string;
+  net_amount: number;
+  transaction_fee: number;
+  status: string;
+}
+
+interface CampaignStats {
+  total_raised: number;
+  contributions_count: number;
+}
+
 const PublicFundraisingCampaign: React.FC = () => {
   const { campaignId } = useParams<{ campaignId: string }>();
   const { user } = useAuth();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
+  const [campaignStats, setCampaignStats] = useState<CampaignStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
 
@@ -103,9 +160,39 @@ const PublicFundraisingCampaign: React.FC = () => {
     }
   }, [campaignId]);
 
+  const calculateCampaignStats = async (contributions: CampaignContribution[], campaign: Campaign): Promise<CampaignStats> => {
+    const completedContributions = contributions.filter(c => c.status === 'completed');
+    const campaignBaseCurrency = campaign.currency || 'USD';
+    
+    let totalRaised = 0;
+
+    for (const contribution of completedContributions) {
+      const contributionCurrency = contribution.currency || 'USD';
+      const originalAmount = Number(contribution.amount || 0);
+
+      let amountInBaseCurrency = originalAmount;
+
+      if (contributionCurrency !== campaignBaseCurrency) {
+        try {
+          amountInBaseCurrency = await convertCurrency(originalAmount, contributionCurrency, campaignBaseCurrency);
+        } catch (error) {
+          console.warn(`Currency conversion failed for contribution:`, error);
+          amountInBaseCurrency = originalAmount;
+        }
+      }
+
+      totalRaised += amountInBaseCurrency;
+    }
+
+    return {
+      total_raised: totalRaised,
+      contributions_count: completedContributions.length
+    };
+  };
+
   const loadCampaign = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: campaignData, error: campaignError } = await supabase
         .from('fundraising_campaigns')
         .select(`
           *,
@@ -115,8 +202,22 @@ const PublicFundraisingCampaign: React.FC = () => {
         .eq('status', 'active')
         .single();
 
-      if (error) throw error;
-      setCampaign(data);
+      if (campaignError) throw campaignError;
+      setCampaign(campaignData);
+
+      // Load contributions to calculate current amount
+      const { data: contributionsData, error: contributionsError } = await supabase
+        .from('campaign_contributions')
+        .select('*')
+        .eq('campaign_id', campaignId)
+        .eq('status', 'completed');
+
+      if (contributionsError) throw contributionsError;
+
+      if (campaignData && contributionsData) {
+        const stats = await calculateCampaignStats(contributionsData, campaignData);
+        setCampaignStats(stats);
+      }
     } catch (error) {
       console.error('Error loading campaign:', error);
       toast.error('Campaign not found');
@@ -128,7 +229,7 @@ const PublicFundraisingCampaign: React.FC = () => {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
-      month: 'long',
+      month: 'short',
       day: 'numeric'
     });
   };
@@ -193,9 +294,9 @@ const PublicFundraisingCampaign: React.FC = () => {
   if (loading) {
     return (
       <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-orange-100">
           <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
           </div>
         </div>
       </Layout>
@@ -205,15 +306,15 @@ const PublicFundraisingCampaign: React.FC = () => {
   if (!campaign) {
     return (
       <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
-          <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-2xl max-w-md mx-auto">
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-orange-100 flex items-center justify-center">
+          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-2xl max-w-md mx-auto">
             <CardContent className="p-12 text-center">
               <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full flex items-center justify-center">
                 <Heart className="h-10 w-10 text-white" />
               </div>
-              <h3 className="text-xl font-semibold mb-2 text-gray-800">Campaign Not Found</h3>
-              <p className="text-gray-600 mb-6">This campaign doesn't exist or is no longer active.</p>
-              <Button asChild>
+              <h3 className="text-xl font-semibold mb-2 text-slate-800">Campaign Not Found</h3>
+              <p className="text-slate-600 mb-6">This campaign doesn't exist or is no longer active.</p>
+              <Button asChild className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
                 <Link to="/courses">
                   Browse Courses
                 </Link>
@@ -225,27 +326,29 @@ const PublicFundraisingCampaign: React.FC = () => {
     );
   }
 
-  const progress = calculateProgress(campaign.current_amount, campaign.goal_amount);
+  const currentAmount = campaignStats?.total_raised || 0;
+  const goalAmount = campaign.goal_amount || 1;
+  const progress = calculateProgress(currentAmount, goalAmount);
+  const campaignBaseCurrency = campaign.currency || 'USD';
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
-        <div className="container mx-auto px-4 py-8">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-orange-100">
+        <div className="container mx-auto px-4 py-6 max-w-7xl">
           {/* Back Button */}
-          <Button variant="ghost" size="sm" asChild className="mb-6">
-            {/* ✅ UPDATED ROUTE: Correct creator profile route */}
+          <Button variant="ghost" size="sm" asChild className="mb-6 hover:bg-white/80 transition-all duration-300">
             <Link to={`/creator/profile/${campaign.profiles.id}`}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Creator Profile
             </Link>
           </Button>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
               {/* Campaign Header */}
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl overflow-hidden">
-                <div className="relative h-80 bg-gradient-to-br from-orange-400 to-purple-400">
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl overflow-hidden">
+                <div className="relative h-64 bg-gradient-to-br from-orange-400 to-purple-400">
                   {campaign.cover_image_url ? (
                     <img 
                       src={campaign.cover_image_url} 
@@ -255,81 +358,97 @@ const PublicFundraisingCampaign: React.FC = () => {
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <div className="text-center text-white">
-                        <Heart className="w-20 h-20 mx-auto mb-4 opacity-80" />
-                        <p className="text-2xl font-semibold">{campaign.title}</p>
+                        <Heart className="w-16 h-16 mx-auto mb-4 opacity-80" />
+                        <p className="text-xl font-semibold">{campaign.title}</p>
                       </div>
                     </div>
                   )}
                 </div>
                 
-                <CardContent className="p-8">
-                  <div className="flex items-start justify-between mb-6">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between mb-4">
                     <div>
-                      <h1 className="text-3xl font-bold text-gray-900 mb-2">{campaign.title}</h1>
-                      <div className="flex items-center gap-4">
-                        <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0">
+                      <h1 className="text-2xl font-bold text-slate-900 mb-2">{campaign.title}</h1>
+                      <div className="flex items-center gap-3">
+                        <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 text-xs">
                           {campaign.category}
                         </Badge>
-                        <span className="text-sm text-gray-600">
+                        <span className="text-sm text-slate-600">
                           Created {formatDate(campaign.created_at)}
                         </span>
                       </div>
                     </div>
-                    <Button variant="outline" onClick={handleShareCampaign}>
+                    <Button variant="outline" size="sm" onClick={handleShareCampaign} className="border-slate-300 hover:bg-white/80">
                       <Share2 className="h-4 w-4 mr-2" />
                       Share
                     </Button>
                   </div>
 
                   {/* Progress Section */}
-                  <div className="bg-gradient-to-r from-orange-50 to-purple-50 rounded-2xl p-6 mb-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
+                  <div className="bg-gradient-to-r from-orange-50 to-purple-50 rounded-xl p-4 mb-4">
+                    <div className="grid grid-cols-3 gap-4 mb-3">
                       <div className="text-center">
-                        <div className="text-3xl font-bold text-gray-900">
-                          <PriceDisplay amount={campaign.current_amount} originalCurrency="USD" />
+                        <div className="text-xl font-bold text-slate-900 font-mono">
+                          <PriceDisplay 
+                            amount={currentAmount} 
+                            originalCurrency={campaignBaseCurrency}
+                            showOriginal={false}
+                          />
                         </div>
-                        <p className="text-sm text-gray-600">Raised</p>
+                        <p className="text-xs text-slate-600">Raised</p>
                       </div>
                       <div className="text-center">
-                        <div className="text-3xl font-bold text-gray-900">
-                          <PriceDisplay amount={campaign.goal_amount} originalCurrency="USD" />
+                        <div className="text-xl font-bold text-slate-900 font-mono">
+                          <PriceDisplay 
+                            amount={goalAmount} 
+                            originalCurrency={campaignBaseCurrency}
+                            showOriginal={false}
+                          />
                         </div>
-                        <p className="text-sm text-gray-600">Goal</p>
+                        <p className="text-xs text-slate-600">Goal</p>
                       </div>
                       <div className="text-center">
-                        <div className="text-3xl font-bold text-gray-900">
+                        <div className="text-xl font-bold text-slate-900 font-mono">
                           {Math.round(progress)}%
                         </div>
-                        <p className="text-sm text-gray-600">Funded</p>
+                        <p className="text-xs text-slate-600">Funded</p>
                       </div>
                     </div>
-                    <Progress value={progress} className="h-4 bg-white/50" />
-                    <div className="flex justify-between text-sm text-gray-600 mt-2">
+                    <Progress value={progress} className="h-2 bg-white/50" />
+                    <div className="flex justify-between text-xs text-slate-600 mt-2">
                       <span>{progress.toFixed(1)}% of goal reached</span>
                       <span>
                         {campaign.end_date && `Ends ${formatDate(campaign.end_date)}`}
                       </span>
                     </div>
+                    {campaignStats?.contributions_count && (
+                      <div className="text-xs text-slate-500 text-center mt-2">
+                        From {campaignStats.contributions_count} contributions
+                      </div>
+                    )}
                   </div>
 
                   <Button 
                     onClick={handleSupportClick}
                     size="lg"
-                    className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white text-lg py-6"
+                    className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white py-4 text-base transition-all duration-300"
                   >
-                    <Heart className="h-5 w-5 mr-2" />
+                    <Heart className="h-4 w-4 mr-2" />
                     Support This Campaign
                   </Button>
                 </CardContent>
               </Card>
 
               {/* Campaign Story */}
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
                 <CardHeader>
-                  <CardTitle className="text-xl font-semibold text-gray-900">About This Campaign</CardTitle>
+                  <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                    <Target className="h-5 w-5 text-orange-600" />
+                    About This Campaign
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-700 leading-relaxed text-base whitespace-pre-line">
+                  <p className="text-slate-700 leading-relaxed text-sm whitespace-pre-line">
                     {campaign.description}
                   </p>
                 </CardContent>
@@ -337,12 +456,15 @@ const PublicFundraisingCampaign: React.FC = () => {
 
               {/* Use of Funds */}
               {campaign.use_of_funds && (
-                <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
                   <CardHeader>
-                    <CardTitle className="text-xl font-semibold text-gray-900">Use of Funds</CardTitle>
+                    <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5 text-purple-600" />
+                      Use of Funds
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-gray-700 leading-relaxed text-base">
+                    <p className="text-slate-700 leading-relaxed text-sm">
                       {campaign.use_of_funds}
                     </p>
                   </CardContent>
@@ -353,30 +475,29 @@ const PublicFundraisingCampaign: React.FC = () => {
             {/* Sidebar */}
             <div className="space-y-6">
               {/* Creator Info */}
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
                 <CardHeader>
-                  <CardTitle className="text-lg font-semibold">About the Creator</CardTitle>
+                  <CardTitle className="text-base font-semibold">About the Creator</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center gap-4 mb-4">
-                    <Avatar className="w-16 h-16 border-2 border-orange-200">
+                  <div className="flex items-center gap-3 mb-3">
+                    <Avatar className="w-12 h-12 border-2 border-orange-200">
                       <AvatarImage src={campaign.profiles.avatar_url || ''} />
-                      <AvatarFallback className="bg-gradient-to-r from-orange-500 to-purple-600 text-white text-lg">
+                      <AvatarFallback className="bg-gradient-to-r from-orange-500 to-purple-600 text-white text-sm">
                         {campaign.profiles.full_name?.[0] || campaign.profiles.username?.[0] || 'U'}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <h3 className="font-semibold text-lg">{campaign.profiles.full_name || campaign.profiles.username}</h3>
-                      <p className="text-sm text-gray-600">Creator</p>
+                      <h3 className="font-semibold text-slate-900 text-sm">{campaign.profiles.full_name || campaign.profiles.username}</h3>
+                      <p className="text-xs text-slate-600">Creator</p>
                     </div>
                   </div>
                   {campaign.profiles.bio && (
-                    <p className="text-sm text-gray-700 leading-relaxed">
+                    <p className="text-xs text-slate-700 leading-relaxed mb-3">
                       {campaign.profiles.bio}
                     </p>
                   )}
-                  <Button variant="outline" className="w-full mt-4" asChild>
-                    {/* ✅ UPDATED ROUTE: Correct creator profile route */}
+                  <Button variant="outline" size="sm" className="w-full border-slate-300 hover:bg-white/80" asChild>
                     <Link to={`/creator/profile/${campaign.profiles.id}`}>
                       View Profile
                     </Link>
@@ -385,51 +506,61 @@ const PublicFundraisingCampaign: React.FC = () => {
               </Card>
 
               {/* Campaign Details */}
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
                 <CardHeader>
-                  <CardTitle className="text-lg font-semibold">Campaign Details</CardTitle>
+                  <CardTitle className="text-base font-semibold">Campaign Details</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3 text-sm">
+                <CardContent className="space-y-3 text-xs">
                   <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-purple-500" />
+                    <Calendar className="h-3.5 w-3.5 text-purple-500" />
                     <span>Started {formatDate(campaign.start_date)}</span>
                   </div>
                   {campaign.end_date && (
                     <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-orange-500" />
+                      <Calendar className="h-3.5 w-3.5 text-orange-500" />
                       <span>Ends {formatDate(campaign.end_date)}</span>
                     </div>
                   )}
                   <div className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 text-green-500" />
-                    <span>Goal: <PriceDisplay amount={campaign.goal_amount} originalCurrency="USD" /></span>
+                    <DollarSign className="h-3.5 w-3.5 text-emerald-500" />
+                    <span>
+                      Goal: <PriceDisplay 
+                        amount={goalAmount} 
+                        originalCurrency={campaignBaseCurrency}
+                        showOriginal={false}
+                      />
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-blue-500" />
+                    <Users className="h-3.5 w-3.5 text-blue-500" />
                     <span>Category: {campaign.category}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-3.5 w-3.5 text-amber-500" />
+                    <span>Currency: {campaignBaseCurrency}</span>
                   </div>
                 </CardContent>
               </Card>
 
               {/* Social Share */}
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
                 <CardHeader>
-                  <CardTitle className="text-lg font-semibold">Share This Campaign</CardTitle>
-                  <CardDescription className="text-sm">
+                  <CardTitle className="text-base font-semibold">Share This Campaign</CardTitle>
+                  <CardDescription className="text-xs">
                     Help spread the word about this campaign
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-3 gap-2">
                     {SocialPlatforms.map(({ platform, Icon, color, label }) => (
                       <Button
                         key={platform}
                         variant="ghost"
                         size="sm"
-                        className={`h-14 flex flex-col gap-1 transition-all duration-200 ${color} rounded-lg`}
+                        className={`h-12 flex flex-col gap-1 transition-all duration-200 ${color} rounded-lg text-xs`}
                         onClick={() => handleSocialShare(platform)}
                       >
-                        <Icon className="h-6 w-6" />
+                        <Icon className="h-4 w-4" />
                         <span className="text-xs font-medium">
                           {label}
                         </span>
@@ -441,18 +572,18 @@ const PublicFundraisingCampaign: React.FC = () => {
 
               {/* Support Card */}
               <Card className="bg-gradient-to-r from-orange-500 to-purple-600 border-0 shadow-xl">
-                <CardContent className="p-6 text-center text-white">
-                  <Heart className="h-8 w-8 mx-auto mb-3" />
-                  <h3 className="font-semibold text-lg mb-2">Ready to Support?</h3>
-                  <p className="text-white/90 text-sm mb-4 leading-relaxed">
-                    Help bring this project to life by making a contribution. Every donation brings us closer to our goal.
+                <CardContent className="p-4 text-center text-white">
+                  <Heart className="h-6 w-6 mx-auto mb-2" />
+                  <h3 className="font-semibold text-sm mb-1">Ready to Support?</h3>
+                  <p className="text-white/90 text-xs mb-3 leading-relaxed">
+                    Help bring this project to life by making a contribution.
                   </p>
                   <Button 
                     onClick={handleSupportClick}
-                    size="lg"
-                    className="w-full bg-white text-orange-600 hover:bg-white/90 font-semibold"
+                    size="sm"
+                    className="w-full bg-white text-orange-600 hover:bg-white/90 font-semibold text-xs"
                   >
-                    <Heart className="h-4 w-4 mr-2" />
+                    <Heart className="h-3 w-3 mr-1.5" />
                     Support Now
                   </Button>
                 </CardContent>
@@ -470,7 +601,7 @@ const PublicFundraisingCampaign: React.FC = () => {
               id: campaign.id,
               title: campaign.title,
               goal_amount: campaign.goal_amount,
-              current_amount: campaign.current_amount,
+              current_amount: currentAmount,
               currency: campaign.currency,
               creator_id: campaign.profiles.id
             }}
