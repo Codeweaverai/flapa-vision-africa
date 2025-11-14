@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import PriceDisplay from '@/components/currency/PriceDisplay';
+import { convertCurrency } from '@/services/currencyService';
 
 interface Campaign {
   id: string;
@@ -47,12 +48,13 @@ interface Contribution {
 }
 
 interface CampaignStats {
-  total_raised: number;
-  total_net_amount: number;
-  total_transaction_fees: number;
+  total_raised: number; // In campaign base currency (USD)
+  total_net_amount: number; // In campaign base currency (USD)
+  total_transaction_fees: number; // In campaign base currency (USD)
   contributions_count: number;
   payment_methods: { [key: string]: number };
   currencies: { [key: string]: number };
+  original_currency_totals: { [key: string]: number }; // Keep original amounts for display
 }
 
 const FundraisingCampaignDetails: React.FC = () => {
@@ -98,9 +100,9 @@ const FundraisingCampaignDetails: React.FC = () => {
       if (contributionsError) throw contributionsError;
       setContributions(contributionsData || []);
 
-      // Calculate campaign statistics
+      // Calculate campaign statistics with currency conversion
       if (contributionsData) {
-        const stats = calculateCampaignStats(contributionsData);
+        const stats = await calculateCampaignStats(contributionsData, campaignData);
         setCampaignStats(stats);
       }
     } catch (error) {
@@ -111,44 +113,68 @@ const FundraisingCampaignDetails: React.FC = () => {
     }
   };
 
-  const calculateCampaignStats = (contributions: Contribution[]): CampaignStats => {
+  const calculateCampaignStats = async (contributions: Contribution[], campaign: Campaign): Promise<CampaignStats> => {
     const completedContributions = contributions.filter(c => c.status === 'completed');
+    const campaignBaseCurrency = campaign.currency || 'USD';
     
-    const totalRaised = completedContributions.reduce((sum, contribution) => {
-      return sum + Number(contribution.amount || 0);
-    }, 0);
+    let totalRaisedUSD = 0;
+    let totalNetAmountUSD = 0;
+    let totalTransactionFeesUSD = 0;
+    
+    const paymentMethods: { [key: string]: number } = {};
+    const currencies: { [key: string]: number } = {};
+    const originalCurrencyTotals: { [key: string]: number } = {};
 
-    const totalNetAmount = completedContributions.reduce((sum, contribution) => {
-      return sum + Number(contribution.net_amount || contribution.amount || 0);
-    }, 0);
+    // Process each contribution with currency conversion
+    for (const contribution of completedContributions) {
+      const contributionCurrency = contribution.currency || 'USD';
+      const originalAmount = Number(contribution.amount || 0);
+      const originalNetAmount = Number(contribution.net_amount || contribution.amount || 0);
+      const originalTransactionFee = Number(contribution.transaction_fee || 0);
 
-    const totalTransactionFees = completedContributions.reduce((sum, contribution) => {
-      return sum + Number(contribution.transaction_fee || 0);
-    }, 0);
+      // Convert to campaign base currency (USD)
+      let amountInUSD = originalAmount;
+      let netAmountInUSD = originalNetAmount;
+      let feeInUSD = originalTransactionFee;
 
-    // Group by payment method
-    const paymentMethods = completedContributions.reduce((acc, contribution) => {
+      if (contributionCurrency !== campaignBaseCurrency) {
+        try {
+          amountInUSD = await convertCurrency(originalAmount, contributionCurrency, campaignBaseCurrency);
+          netAmountInUSD = await convertCurrency(originalNetAmount, contributionCurrency, campaignBaseCurrency);
+          feeInUSD = await convertCurrency(originalTransactionFee, contributionCurrency, campaignBaseCurrency);
+        } catch (error) {
+          console.warn(`Failed to convert currency for contribution ${contribution.id}:`, error);
+          // Fallback: use original amounts if conversion fails
+          amountInUSD = originalAmount;
+          netAmountInUSD = originalNetAmount;
+          feeInUSD = originalTransactionFee;
+        }
+      }
+
+      // Add to totals
+      totalRaisedUSD += amountInUSD;
+      totalNetAmountUSD += netAmountInUSD;
+      totalTransactionFeesUSD += feeInUSD;
+
+      // Track payment methods (in USD)
       const method = contribution.payment_method || 'unknown';
-      const amount = Number(contribution.amount || 0);
-      acc[method] = (acc[method] || 0) + amount;
-      return acc;
-    }, {} as { [key: string]: number });
+      paymentMethods[method] = (paymentMethods[method] || 0) + amountInUSD;
 
-    // Group by currency
-    const currencies = completedContributions.reduce((acc, contribution) => {
-      const currency = contribution.currency || 'USD';
-      const amount = Number(contribution.amount || 0);
-      acc[currency] = (acc[currency] || 0) + amount;
-      return acc;
-    }, {} as { [key: string]: number });
+      // Track currencies (original amounts for display)
+      currencies[contributionCurrency] = (currencies[contributionCurrency] || 0) + originalAmount;
+      
+      // Track original currency totals
+      originalCurrencyTotals[contributionCurrency] = (originalCurrencyTotals[contributionCurrency] || 0) + originalAmount;
+    }
 
     return {
-      total_raised: totalRaised,
-      total_net_amount: totalNetAmount,
-      total_transaction_fees: totalTransactionFees,
+      total_raised: totalRaisedUSD,
+      total_net_amount: totalNetAmountUSD,
+      total_transaction_fees: totalTransactionFeesUSD,
       contributions_count: completedContributions.length,
       payment_methods: paymentMethods,
-      currencies: currencies
+      currencies: currencies,
+      original_currency_totals: originalCurrencyTotals
     };
   };
 
@@ -267,6 +293,7 @@ const FundraisingCampaignDetails: React.FC = () => {
   const goalAmount = campaign.goal_amount || 1;
   const progress = calculateProgress(currentAmount, goalAmount);
   const transactionFees = campaignStats?.total_transaction_fees || 0;
+  const campaignBaseCurrency = campaign.currency || 'USD';
 
   return (
     <CreatorLayout>
@@ -334,7 +361,7 @@ const FundraisingCampaignDetails: React.FC = () => {
                       <div className="text-2xl font-bold text-gray-900">
                         <PriceDisplay 
                           amount={currentAmount} 
-                          originalCurrency={campaign.currency || 'USD'}
+                          originalCurrency={campaignBaseCurrency}
                           showOriginal={false}
                         />
                       </div>
@@ -344,7 +371,7 @@ const FundraisingCampaignDetails: React.FC = () => {
                       <div className="text-2xl font-bold text-gray-900">
                         <PriceDisplay 
                           amount={netAmount} 
-                          originalCurrency={campaign.currency || 'USD'}
+                          originalCurrency={campaignBaseCurrency}
                           showOriginal={false}
                         />
                       </div>
@@ -354,7 +381,7 @@ const FundraisingCampaignDetails: React.FC = () => {
                       <div className="text-2xl font-bold text-gray-900">
                         <PriceDisplay 
                           amount={transactionFees} 
-                          originalCurrency={campaign.currency || 'USD'}
+                          originalCurrency={campaignBaseCurrency}
                           showOriginal={false}
                         />
                       </div>
@@ -374,6 +401,9 @@ const FundraisingCampaignDetails: React.FC = () => {
                       {campaign.end_date && `Ends ${formatDate(campaign.end_date)}`}
                     </span>
                   </div>
+                  <div className="mt-2 text-xs text-gray-500 text-center">
+                    All amounts converted to {campaignBaseCurrency}
+                  </div>
                 </CardContent>
               </Card>
 
@@ -384,6 +414,9 @@ const FundraisingCampaignDetails: React.FC = () => {
                     <TrendingUp className="h-5 w-5 text-green-600" />
                     Financial Breakdown
                   </CardTitle>
+                  <CardDescription>
+                    All amounts converted to campaign base currency ({campaignBaseCurrency})
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -392,7 +425,7 @@ const FundraisingCampaignDetails: React.FC = () => {
                       <span className="font-bold text-lg">
                         <PriceDisplay 
                           amount={currentAmount} 
-                          originalCurrency={campaign.currency || 'USD'}
+                          originalCurrency={campaignBaseCurrency}
                           showOriginal={false}
                         />
                       </span>
@@ -403,7 +436,7 @@ const FundraisingCampaignDetails: React.FC = () => {
                       <span className="font-bold text-lg text-red-700">
                         -<PriceDisplay 
                           amount={transactionFees} 
-                          originalCurrency={campaign.currency || 'USD'}
+                          originalCurrency={campaignBaseCurrency}
                           showOriginal={false}
                         />
                       </span>
@@ -414,7 +447,7 @@ const FundraisingCampaignDetails: React.FC = () => {
                       <span className="font-bold text-lg text-green-800">
                         <PriceDisplay 
                           amount={netAmount} 
-                          originalCurrency={campaign.currency || 'USD'}
+                          originalCurrency={campaignBaseCurrency}
                           showOriginal={false}
                         />
                       </span>
@@ -424,7 +457,7 @@ const FundraisingCampaignDetails: React.FC = () => {
                   {/* Payment Methods */}
                   {campaignStats?.payment_methods && Object.keys(campaignStats.payment_methods).length > 0 && (
                     <div className="mt-6">
-                      <h4 className="font-semibold mb-3">Payment Methods</h4>
+                      <h4 className="font-semibold mb-3">Payment Methods ({campaignBaseCurrency})</h4>
                       <div className="flex flex-wrap gap-2">
                         {Object.entries(campaignStats.payment_methods).map(([method, amount]) => (
                           <Badge key={method} className={getPaymentMethodColor(method)}>
@@ -433,7 +466,7 @@ const FundraisingCampaignDetails: React.FC = () => {
                               {method.replace('_', ' ')}: 
                               <PriceDisplay 
                                 amount={amount} 
-                                originalCurrency={campaign.currency || 'USD'}
+                                originalCurrency={campaignBaseCurrency}
                                 showOriginal={false}
                                 className="ml-1"
                               />
@@ -444,12 +477,12 @@ const FundraisingCampaignDetails: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Currencies */}
-                  {campaignStats?.currencies && Object.keys(campaignStats.currencies).length > 0 && (
+                  {/* Original Currency Totals */}
+                  {campaignStats?.original_currency_totals && Object.keys(campaignStats.original_currency_totals).length > 0 && (
                     <div className="mt-4">
-                      <h4 className="font-semibold mb-3">Contributions by Currency</h4>
+                      <h4 className="font-semibold mb-3">Contributions in Original Currencies</h4>
                       <div className="flex flex-wrap gap-2">
-                        {Object.entries(campaignStats.currencies).map(([currency, amount]) => (
+                        {Object.entries(campaignStats.original_currency_totals).map(([currency, amount]) => (
                           <Badge key={currency} variant="outline" className="bg-white">
                             <span className="flex items-center gap-1">
                               {currency}: 
@@ -514,8 +547,18 @@ const FundraisingCampaignDetails: React.FC = () => {
                     <span className="font-medium capitalize">{campaign.category}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Currency:</span>
-                    <span className="font-medium">{campaign.currency || 'USD'}</span>
+                    <span className="text-gray-600">Base Currency:</span>
+                    <span className="font-medium">{campaignBaseCurrency}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Goal Amount:</span>
+                    <span className="font-medium">
+                      <PriceDisplay 
+                        amount={goalAmount} 
+                        originalCurrency={campaignBaseCurrency}
+                        showOriginal={false}
+                      />
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Started:</span>
@@ -570,11 +613,7 @@ const FundraisingCampaignDetails: React.FC = () => {
                               />
                             </span>
                             <span className="text-xs text-gray-500">
-                              Net: <PriceDisplay 
-                                amount={contribution.net_amount} 
-                                originalCurrency={contribution.currency || 'USD'}
-                                showOriginal={false}
-                              />
+                              {contribution.currency} → {campaignBaseCurrency}
                             </span>
                           </div>
                         </div>
