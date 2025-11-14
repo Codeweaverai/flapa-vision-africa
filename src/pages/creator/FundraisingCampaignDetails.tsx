@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, Eye, Edit, Users, DollarSign, Calendar, Share2 } from 'lucide-react';
+import { ArrowLeft, Eye, Edit, Users, DollarSign, Calendar, Share2, CreditCard, Smartphone, Building, TrendingUp } from 'lucide-react';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
@@ -30,14 +30,29 @@ interface Campaign {
 interface Contribution {
   id: string;
   amount: number;
+  currency: string;
+  net_amount: number;
+  transaction_fee: number;
+  payment_method: string;
+  payment_provider: string;
   supporter_id: string;
   is_anonymous: boolean;
   message_to_creator: string | null;
   created_at: string;
+  status: string;
   profiles: {
     full_name: string;
     avatar_url: string | null;
   };
+}
+
+interface CampaignStats {
+  total_raised: number;
+  total_net_amount: number;
+  total_transaction_fees: number;
+  contributions_count: number;
+  payment_methods: { [key: string]: number };
+  currencies: { [key: string]: number };
 }
 
 const FundraisingCampaignDetails: React.FC = () => {
@@ -45,6 +60,7 @@ const FundraisingCampaignDetails: React.FC = () => {
   const { user } = useAuth();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [contributions, setContributions] = useState<Contribution[]>([]);
+  const [campaignStats, setCampaignStats] = useState<CampaignStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -68,7 +84,7 @@ const FundraisingCampaignDetails: React.FC = () => {
       if (campaignError) throw campaignError;
       setCampaign(campaignData);
 
-      // Load contributions
+      // Load contributions with all financial data
       const { data: contributionsData, error: contributionsError } = await supabase
         .from('campaign_contributions')
         .select(`
@@ -81,12 +97,59 @@ const FundraisingCampaignDetails: React.FC = () => {
 
       if (contributionsError) throw contributionsError;
       setContributions(contributionsData || []);
+
+      // Calculate campaign statistics
+      if (contributionsData) {
+        const stats = calculateCampaignStats(contributionsData);
+        setCampaignStats(stats);
+      }
     } catch (error) {
       console.error('Error loading campaign data:', error);
       toast.error('Failed to load campaign details');
     } finally {
       setLoading(false);
     }
+  };
+
+  const calculateCampaignStats = (contributions: Contribution[]): CampaignStats => {
+    const completedContributions = contributions.filter(c => c.status === 'completed');
+    
+    const totalRaised = completedContributions.reduce((sum, contribution) => {
+      return sum + Number(contribution.amount || 0);
+    }, 0);
+
+    const totalNetAmount = completedContributions.reduce((sum, contribution) => {
+      return sum + Number(contribution.net_amount || contribution.amount || 0);
+    }, 0);
+
+    const totalTransactionFees = completedContributions.reduce((sum, contribution) => {
+      return sum + Number(contribution.transaction_fee || 0);
+    }, 0);
+
+    // Group by payment method
+    const paymentMethods = completedContributions.reduce((acc, contribution) => {
+      const method = contribution.payment_method || 'unknown';
+      const amount = Number(contribution.amount || 0);
+      acc[method] = (acc[method] || 0) + amount;
+      return acc;
+    }, {} as { [key: string]: number });
+
+    // Group by currency
+    const currencies = completedContributions.reduce((acc, contribution) => {
+      const currency = contribution.currency || 'USD';
+      const amount = Number(contribution.amount || 0);
+      acc[currency] = (acc[currency] || 0) + amount;
+      return acc;
+    }, {} as { [key: string]: number });
+
+    return {
+      total_raised: totalRaised,
+      total_net_amount: totalNetAmount,
+      total_transaction_fees: totalTransactionFees,
+      contributions_count: completedContributions.length,
+      payment_methods: paymentMethods,
+      currencies: currencies
+    };
   };
 
   const getStatusColor = (status: string) => {
@@ -106,6 +169,25 @@ const FundraisingCampaignDetails: React.FC = () => {
       case 'cancelled': return 'Cancelled';
       case 'draft': return 'Draft';
       default: return status;
+    }
+  };
+
+  const getPaymentMethodIcon = (method: string) => {
+    switch (method) {
+      case 'mobile_money': return <Smartphone className="h-3 w-3" />;
+      case 'card': return <CreditCard className="h-3 w-3" />;
+      case 'bank_transfer': return <Building className="h-3 w-3" />;
+      default: return <DollarSign className="h-3 w-3" />;
+    }
+  };
+
+  const getPaymentMethodColor = (method: string) => {
+    switch (method) {
+      case 'mobile_money': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'card': return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'bank_transfer': return 'bg-green-100 text-green-800 border-green-200';
+      case 'paypal': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -180,7 +262,11 @@ const FundraisingCampaignDetails: React.FC = () => {
     );
   }
 
-  const progress = calculateProgress(campaign.current_amount, campaign.goal_amount);
+  const currentAmount = campaignStats?.total_raised || campaign.current_amount || 0;
+  const netAmount = campaignStats?.total_net_amount || currentAmount;
+  const goalAmount = campaign.goal_amount || 1;
+  const progress = calculateProgress(currentAmount, goalAmount);
+  const transactionFees = campaignStats?.total_transaction_fees || 0;
 
   return (
     <CreatorLayout>
@@ -243,22 +329,40 @@ const FundraisingCampaignDetails: React.FC = () => {
                   )}
                 </div>
                 <CardContent className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                     <div className="text-center">
                       <div className="text-2xl font-bold text-gray-900">
-                        <PriceDisplay amount={campaign.current_amount} originalCurrency="USD" />
+                        <PriceDisplay 
+                          amount={currentAmount} 
+                          originalCurrency={campaign.currency || 'USD'}
+                          showOriginal={false}
+                        />
                       </div>
-                      <p className="text-sm text-gray-600">Raised</p>
+                      <p className="text-sm text-gray-600">Gross Raised</p>
                     </div>
                     <div className="text-center">
                       <div className="text-2xl font-bold text-gray-900">
-                        <PriceDisplay amount={campaign.goal_amount} originalCurrency="USD" />
+                        <PriceDisplay 
+                          amount={netAmount} 
+                          originalCurrency={campaign.currency || 'USD'}
+                          showOriginal={false}
+                        />
                       </div>
-                      <p className="text-sm text-gray-600">Goal</p>
+                      <p className="text-sm text-gray-600">Net Amount</p>
                     </div>
                     <div className="text-center">
                       <div className="text-2xl font-bold text-gray-900">
-                        {contributions.length}
+                        <PriceDisplay 
+                          amount={transactionFees} 
+                          originalCurrency={campaign.currency || 'USD'}
+                          showOriginal={false}
+                        />
+                      </div>
+                      <p className="text-sm text-gray-600">Fees</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-gray-900">
+                        {campaignStats?.contributions_count || 0}
                       </div>
                       <p className="text-sm text-gray-600">Supporters</p>
                     </div>
@@ -270,6 +374,97 @@ const FundraisingCampaignDetails: React.FC = () => {
                       {campaign.end_date && `Ends ${formatDate(campaign.end_date)}`}
                     </span>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Financial Breakdown */}
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-green-600" />
+                    Financial Breakdown
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                      <span className="font-medium">Gross Amount Raised:</span>
+                      <span className="font-bold text-lg">
+                        <PriceDisplay 
+                          amount={currentAmount} 
+                          originalCurrency={campaign.currency || 'USD'}
+                          showOriginal={false}
+                        />
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+                      <span className="font-medium text-red-700">Transaction Fees:</span>
+                      <span className="font-bold text-lg text-red-700">
+                        -<PriceDisplay 
+                          amount={transactionFees} 
+                          originalCurrency={campaign.currency || 'USD'}
+                          showOriginal={false}
+                        />
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg border-2 border-green-200">
+                      <span className="font-medium text-green-800">Your Net Amount:</span>
+                      <span className="font-bold text-lg text-green-800">
+                        <PriceDisplay 
+                          amount={netAmount} 
+                          originalCurrency={campaign.currency || 'USD'}
+                          showOriginal={false}
+                        />
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Payment Methods */}
+                  {campaignStats?.payment_methods && Object.keys(campaignStats.payment_methods).length > 0 && (
+                    <div className="mt-6">
+                      <h4 className="font-semibold mb-3">Payment Methods</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(campaignStats.payment_methods).map(([method, amount]) => (
+                          <Badge key={method} className={getPaymentMethodColor(method)}>
+                            <span className="flex items-center gap-1">
+                              {getPaymentMethodIcon(method)}
+                              {method.replace('_', ' ')}: 
+                              <PriceDisplay 
+                                amount={amount} 
+                                originalCurrency={campaign.currency || 'USD'}
+                                showOriginal={false}
+                                className="ml-1"
+                              />
+                            </span>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Currencies */}
+                  {campaignStats?.currencies && Object.keys(campaignStats.currencies).length > 0 && (
+                    <div className="mt-4">
+                      <h4 className="font-semibold mb-3">Contributions by Currency</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(campaignStats.currencies).map(([currency, amount]) => (
+                          <Badge key={currency} variant="outline" className="bg-white">
+                            <span className="flex items-center gap-1">
+                              {currency}: 
+                              <PriceDisplay 
+                                amount={amount} 
+                                originalCurrency={currency}
+                                showOriginal={false}
+                                className="ml-1"
+                              />
+                            </span>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -319,6 +514,10 @@ const FundraisingCampaignDetails: React.FC = () => {
                     <span className="font-medium capitalize">{campaign.category}</span>
                   </div>
                   <div className="flex justify-between">
+                    <span className="text-gray-600">Currency:</span>
+                    <span className="font-medium">{campaign.currency || 'USD'}</span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="text-gray-600">Started:</span>
                     <span className="font-medium">{formatDate(campaign.start_date)}</span>
                   </div>
@@ -353,13 +552,31 @@ const FundraisingCampaignDetails: React.FC = () => {
                             <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-medium">
                               {contribution.is_anonymous ? 'A' : contribution.profiles.full_name?.[0] || 'U'}
                             </div>
-                            <span className="text-sm">
-                              {contribution.is_anonymous ? 'Anonymous' : contribution.profiles.full_name}
+                            <div className="flex flex-col">
+                              <span className="text-sm">
+                                {contribution.is_anonymous ? 'Anonymous' : contribution.profiles.full_name}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                via {contribution.payment_method}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-sm font-medium block">
+                              <PriceDisplay 
+                                amount={contribution.amount} 
+                                originalCurrency={contribution.currency || 'USD'}
+                                showOriginal={false}
+                              />
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              Net: <PriceDisplay 
+                                amount={contribution.net_amount} 
+                                originalCurrency={contribution.currency || 'USD'}
+                                showOriginal={false}
+                              />
                             </span>
                           </div>
-                          <span className="text-sm font-medium">
-                            <PriceDisplay amount={contribution.amount} originalCurrency="USD" />
-                          </span>
                         </div>
                       ))}
                       {contributions.length > 5 && (
