@@ -6,7 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Upload, DollarSign, Calendar, Trash2, AlertTriangle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { ArrowLeft, Upload, DollarSign, Calendar, Trash2, AlertTriangle, Image, Save, Eye, Users, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
@@ -25,12 +27,19 @@ interface CampaignFormData {
   status: string;
 }
 
+interface CampaignStats {
+  total_raised: number;
+  contributions_count: number;
+}
+
 const EditFundraisingCampaign: React.FC = () => {
   const { campaignId } = useParams<{ campaignId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [campaign, setCampaign] = useState<any>(null);
+  const [campaignStats, setCampaignStats] = useState<CampaignStats>({ total_raised: 0, contributions_count: 0 });
   const [formData, setFormData] = useState<CampaignFormData>({
     title: '',
     description: '',
@@ -58,6 +67,7 @@ const EditFundraisingCampaign: React.FC = () => {
   useEffect(() => {
     if (campaignId) {
       loadCampaign();
+      loadCampaignStats();
     }
   }, [campaignId]);
 
@@ -97,6 +107,29 @@ const EditFundraisingCampaign: React.FC = () => {
     }
   };
 
+  const loadCampaignStats = async () => {
+    if (!campaignId) return;
+
+    try {
+      const { data: contributions, error } = await supabase
+        .from('campaign_contributions')
+        .select('amount, currency, status')
+        .eq('campaign_id', campaignId)
+        .eq('status', 'completed');
+
+      if (error) throw error;
+
+      const totalRaised = contributions?.reduce((sum, contribution) => sum + Number(contribution.amount || 0), 0) || 0;
+      
+      setCampaignStats({
+        total_raised: totalRaised,
+        contributions_count: contributions?.length || 0
+      });
+    } catch (error) {
+      console.error('Error loading campaign stats:', error);
+    }
+  };
+
   const handleInputChange = (field: keyof CampaignFormData, value: string | number) => {
     setFormData(prev => ({
       ...prev,
@@ -106,14 +139,51 @@ const EditFundraisingCampaign: React.FC = () => {
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !user || !campaignId) return;
 
-    // In a real implementation, you would upload to Supabase Storage
-    toast.info('Image upload functionality coming soon!');
-    setFormData(prev => ({
-      ...prev,
-      cover_image_url: URL.createObjectURL(file)
-    }));
+    // Validate file type and size
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) { // 10MB limit
+      toast.error('Image size must be less than 10MB');
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      // Generate unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${campaignId}/${Math.random().toString(36).substring(2)}.${fileExt}`;
+      
+      // Upload to Supabase Storage
+      const { error: uploadError, data } = await supabase.storage
+        .from('fundraising_assets')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('fundraising_assets')
+        .getPublicUrl(fileName);
+
+      // Update form data with new image URL
+      setFormData(prev => ({
+        ...prev,
+        cover_image_url: publicUrl
+      }));
+
+      toast.success('Image uploaded successfully!');
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast.error('Failed to upload image');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -155,14 +225,7 @@ const EditFundraisingCampaign: React.FC = () => {
     if (!user || !campaignId) return;
 
     // Check if campaign has contributions
-    const { data: contributions } = await supabase
-      .from('campaign_contributions')
-      .select('id')
-      .eq('campaign_id', campaignId)
-      .eq('status', 'completed')
-      .limit(1);
-
-    if (contributions && contributions.length > 0) {
+    if (campaignStats.contributions_count > 0) {
       toast.error('Cannot delete campaign with completed contributions');
       return;
     }
@@ -174,6 +237,16 @@ const EditFundraisingCampaign: React.FC = () => {
     setLoading(true);
 
     try {
+      // Delete cover image from storage if exists
+      if (campaign.cover_image_url) {
+        const imagePath = campaign.cover_image_url.split('/').pop();
+        if (imagePath) {
+          await supabase.storage
+            .from('fundraising_assets')
+            .remove([`${campaignId}/${imagePath}`]);
+        }
+      }
+
       const { error } = await supabase
         .from('fundraising_campaigns')
         .delete()
@@ -202,12 +275,14 @@ const EditFundraisingCampaign: React.FC = () => {
     );
   };
 
+  const progress = campaignStats.total_raised / (formData.goal_amount || 1) * 100;
+
   if (!campaign) {
     return (
       <CreatorLayout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-orange-100">
           <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
           </div>
         </div>
       </CreatorLayout>
@@ -216,111 +291,113 @@ const EditFundraisingCampaign: React.FC = () => {
 
   return (
     <CreatorLayout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
-        <div className="p-6 max-w-4xl mx-auto">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-orange-100">
+        <div className="p-4 lg:p-6 max-w-7xl mx-auto">
           {/* Header */}
-          <div className="flex items-center gap-4 mb-6">
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/creator/fundraising">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Campaigns
-              </Link>
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold">Edit Campaign</h1>
-              <p className="text-muted-foreground">
-                Update your campaign details and settings
-              </p>
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="sm" asChild className="hover:bg-white/80 transition-all duration-300">
+                <Link to="/creator/fundraising">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back
+                </Link>
+              </Button>
+              <div>
+                <h1 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                  Edit Campaign
+                </h1>
+                <p className="text-slate-600 mt-1">
+                  Update your campaign details and settings
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                asChild
+                className="border-slate-300 hover:bg-white/80"
+              >
+                <Link to={`/fundraising/${campaignId}`} target="_blank">
+                  <Eye className="h-4 w-4 mr-2" />
+                  View Public
+                </Link>
+              </Button>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Main Form */}
-              <div className="lg:col-span-2 space-y-6">
-                {/* Campaign Status */}
-                <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-                  <CardHeader>
-                    <CardTitle>Campaign Status</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Select value={formData.status} onValueChange={(value) => handleInputChange('status', value)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="draft">Draft</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </CardContent>
-                </Card>
-
+          {/* Horizontal Layout */}
+          <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+            {/* Main Content - 3 columns */}
+            <div className="xl:col-span-3 space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Campaign Details */}
-                <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
                   <CardHeader>
-                    <CardTitle>Campaign Details</CardTitle>
-                    <CardDescription>
-                      Basic information about your fundraising campaign
-                    </CardDescription>
+                    <CardTitle className="flex items-center gap-2 text-slate-900">
+                      <TrendingUp className="h-5 w-5 text-orange-600" />
+                      Campaign Details
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="title">Campaign Title *</Label>
+                      <Label htmlFor="title" className="text-sm font-medium text-slate-700">Campaign Title *</Label>
                       <Input
                         id="title"
                         placeholder="e.g., Build My Podcast Studio"
                         value={formData.title}
                         onChange={(e) => handleInputChange('title', e.target.value)}
+                        className="bg-white/50 border-slate-200"
                         required
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="description">Description *</Label>
+                      <Label htmlFor="description" className="text-sm font-medium text-slate-700">Description *</Label>
                       <Textarea
                         id="description"
                         placeholder="Tell your story and explain why you're raising funds..."
-                        rows={5}
+                        rows={4}
                         value={formData.description}
                         onChange={(e) => handleInputChange('description', e.target.value)}
+                        className="bg-white/50 border-slate-200 resize-none"
                         required
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="use_of_funds">Use of Funds *</Label>
+                      <Label htmlFor="use_of_funds" className="text-sm font-medium text-slate-700">Use of Funds *</Label>
                       <Textarea
                         id="use_of_funds"
                         placeholder="Explain exactly how the funds will be used..."
                         rows={3}
                         value={formData.use_of_funds}
                         onChange={(e) => handleInputChange('use_of_funds', e.target.value)}
+                        className="bg-white/50 border-slate-200 resize-none"
                         required
                       />
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Funding Goal */}
-                <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+                {/* Funding & Settings */}
+                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
                   <CardHeader>
-                    <CardTitle>Funding Goal</CardTitle>
-                    <CardDescription>
-                      Set your target amount and campaign duration
-                    </CardDescription>
+                    <CardTitle className="flex items-center gap-2 text-slate-900">
+                      <DollarSign className="h-5 w-5 text-emerald-600" />
+                      Funding & Settings
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="goal_amount">Goal Amount (USD) *</Label>
+                      <Label htmlFor="goal_amount" className="text-sm font-medium text-slate-700">Goal Amount (USD) *</Label>
                       <div className="relative">
-                        <DollarSign className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
+                        <DollarSign className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
                         <Input
                           id="goal_amount"
                           type="number"
                           placeholder="0.00"
-                          className="pl-10"
+                          className="pl-10 bg-white/50 border-slate-200"
                           min="1"
                           step="0.01"
                           value={formData.goal_amount || ''}
@@ -328,19 +405,19 @@ const EditFundraisingCampaign: React.FC = () => {
                           required
                         />
                       </div>
-                      {campaign.current_amount > 0 && (
-                        <p className="text-sm text-yellow-600 flex items-center gap-1">
+                      {campaignStats.total_raised > 0 && (
+                        <p className="text-sm text-amber-600 flex items-center gap-1 mt-1">
                           <AlertTriangle className="h-4 w-4" />
-                          Campaign has already raised <PriceDisplay amount={campaign.current_amount} originalCurrency="USD" />
+                          Campaign has raised <PriceDisplay amount={campaignStats.total_raised} originalCurrency="USD" showOriginal={false} />
                         </p>
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="category">Category *</Label>
+                        <Label htmlFor="category" className="text-sm font-medium text-slate-700">Category *</Label>
                         <Select value={formData.category} onValueChange={(value) => handleInputChange('category', value)}>
-                          <SelectTrigger>
+                          <SelectTrigger className="bg-white/50 border-slate-200">
                             <SelectValue placeholder="Select category" />
                           </SelectTrigger>
                           <SelectContent>
@@ -354,146 +431,205 @@ const EditFundraisingCampaign: React.FC = () => {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="end_date">End Date (Optional)</Label>
-                        <div className="relative">
-                          <Calendar className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
-                          <Input
-                            id="end_date"
-                            type="date"
-                            className="pl-10"
-                            min={new Date().toISOString().split('T')[0]}
-                            value={formData.end_date}
-                            onChange={(e) => handleInputChange('end_date', e.target.value)}
-                          />
-                        </div>
+                        <Label htmlFor="status" className="text-sm font-medium text-slate-700">Status</Label>
+                        <Select value={formData.status} onValueChange={(value) => handleInputChange('status', value)}>
+                          <SelectTrigger className="bg-white/50 border-slate-200">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="draft">Draft</SelectItem>
+                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="end_date" className="text-sm font-medium text-slate-700">End Date (Optional)</Label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
+                        <Input
+                          id="end_date"
+                          type="date"
+                          className="pl-10 bg-white/50 border-slate-200"
+                          min={new Date().toISOString().split('T')[0]}
+                          value={formData.end_date}
+                          onChange={(e) => handleInputChange('end_date', e.target.value)}
+                        />
                       </div>
                     </div>
                   </CardContent>
                 </Card>
               </div>
 
-              {/* Sidebar */}
-              <div className="space-y-6">
-                {/* Cover Image */}
-                <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-                  <CardHeader>
-                    <CardTitle>Cover Image</CardTitle>
-                    <CardDescription>
-                      Add a compelling image for your campaign
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                      {formData.cover_image_url ? (
-                        <div className="space-y-2">
-                          <img 
-                            src={formData.cover_image_url} 
-                            alt="Cover preview" 
-                            className="w-full h-32 object-cover rounded-lg"
-                          />
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => handleInputChange('cover_image_url', '')}
-                          >
-                            Change Image
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <Upload className="h-8 w-8 text-gray-400 mx-auto" />
-                          <div>
-                            <Label htmlFor="cover-image" className="cursor-pointer">
-                              <span className="text-blue-600 hover:text-blue-700">Upload an image</span>
-                              <span className="text-gray-600"> or drag and drop</span>
-                            </Label>
+              {/* Cover Image Upload */}
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-slate-900">
+                    <Image className="h-5 w-5 text-purple-600" />
+                    Cover Image
+                  </CardTitle>
+                  <CardDescription>
+                    Upload a compelling image for your campaign (Max 10MB)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-slate-400 transition-colors duration-300">
+                    {formData.cover_image_url ? (
+                      <div className="space-y-4">
+                        <img 
+                          src={formData.cover_image_url} 
+                          alt="Cover preview" 
+                          className="w-full h-48 object-cover rounded-lg shadow-sm"
+                        />
+                        <div className="flex gap-2 justify-center">
+                          <Label htmlFor="cover-image-change" className="cursor-pointer">
+                            <Button variant="outline" size="sm" className="border-slate-300">
+                              <Upload className="h-4 w-4 mr-2" />
+                              Change Image
+                            </Button>
                             <Input
-                              id="cover-image"
+                              id="cover-image-change"
                               type="file"
                               accept="image/*"
                               className="hidden"
                               onChange={handleImageUpload}
+                              disabled={uploading}
                             />
-                          </div>
-                          <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                          </Label>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handleInputChange('cover_image_url', '')}
+                            className="border-red-200 text-red-600 hover:bg-red-50"
+                          >
+                            Remove
+                          </Button>
                         </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Campaign Stats */}
-                <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-                  <CardHeader>
-                    <CardTitle>Campaign Stats</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Raised:</span>
-                      <span className="font-medium">
-                        <PriceDisplay amount={campaign.current_amount} originalCurrency="USD" />
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Goal:</span>
-                      <span className="font-medium">
-                        <PriceDisplay amount={campaign.goal_amount} originalCurrency="USD" />
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Progress:</span>
-                      <span className="font-medium">
-                        {Math.round((campaign.current_amount / campaign.goal_amount) * 100)}%
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Created:</span>
-                      <span className="font-medium">
-                        {new Date(campaign.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Action Buttons */}
-                <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-                  <CardContent className="p-6 space-y-3">
-                    <Button 
-                      type="submit" 
-                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
-                      disabled={!isFormValid() || loading}
-                    >
-                      {loading ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Updating Campaign...
-                        </>
-                      ) : (
-                        'Update Campaign'
-                      )}
-                    </Button>
-
-                    <Button 
-                      type="button"
-                      variant="outline" 
-                      className="w-full text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-                      onClick={handleDeleteCampaign}
-                      disabled={loading || campaign.current_amount > 0}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete Campaign
-                    </Button>
-
-                    {campaign.current_amount > 0 && (
-                      <p className="text-xs text-red-600 text-center">
-                        Cannot delete campaign with contributions
-                      </p>
+                      </div>
+                    ) : (
+                      <Label htmlFor="cover-image" className="cursor-pointer">
+                        <div className="space-y-3">
+                          <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto">
+                            <Upload className="h-8 w-8 text-slate-400" />
+                          </div>
+                          <div>
+                            <span className="text-blue-600 hover:text-blue-700 font-medium">Click to upload</span>
+                            <span className="text-slate-600"> or drag and drop</span>
+                          </div>
+                          <p className="text-sm text-slate-500">PNG, JPG, GIF up to 10MB</p>
+                        </div>
+                        <Input
+                          id="cover-image"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleImageUpload}
+                          disabled={uploading}
+                        />
+                      </Label>
                     )}
-                  </CardContent>
-                </Card>
-              </div>
+                    {uploading && (
+                      <div className="mt-4 flex items-center justify-center gap-2 text-slate-600">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                        Uploading image...
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          </form>
+
+            {/* Sidebar - 1 column */}
+            <div className="space-y-6">
+              {/* Campaign Stats */}
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+                <CardHeader>
+                  <CardTitle className="text-slate-900">Campaign Stats</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-600">Progress</span>
+                      <span className="font-medium">{Math.round(progress)}%</span>
+                    </div>
+                    <Progress value={progress} className="h-2 bg-slate-200" />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4 text-center">
+                    <div className="p-3 bg-slate-50 rounded-lg">
+                      <div className="text-lg font-bold text-slate-900">
+                        <PriceDisplay amount={campaignStats.total_raised} originalCurrency="USD" showOriginal={false} />
+                      </div>
+                      <div className="text-xs text-slate-600">Raised</div>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-lg">
+                      <div className="text-lg font-bold text-slate-900">
+                        <PriceDisplay amount={formData.goal_amount} originalCurrency="USD" showOriginal={false} />
+                      </div>
+                      <div className="text-xs text-slate-600">Goal</div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center py-2 border-t border-slate-200">
+                    <span className="text-sm text-slate-600">Supporters</span>
+                    <span className="text-sm font-medium text-slate-900 flex items-center gap-1">
+                      <Users className="h-4 w-4" />
+                      {campaignStats.contributions_count}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-t border-slate-200">
+                    <span className="text-sm text-slate-600">Created</span>
+                    <span className="text-sm font-medium text-slate-900">
+                      {new Date(campaign.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Actions */}
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+                <CardContent className="p-6 space-y-3">
+                  <Button 
+                    type="submit" 
+                    onClick={handleSubmit}
+                    className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white transition-all duration-300"
+                    disabled={!isFormValid() || loading || uploading}
+                  >
+                    {loading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Updating...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Update Campaign
+                      </>
+                    )}
+                  </Button>
+
+                  <Button 
+                    type="button"
+                    variant="outline" 
+                    className="w-full text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 transition-all duration-300"
+                    onClick={handleDeleteCampaign}
+                    disabled={loading || uploading || campaignStats.contributions_count > 0}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Campaign
+                  </Button>
+
+                  {campaignStats.contributions_count > 0 && (
+                    <div className="text-xs text-amber-600 text-center p-2 bg-amber-50 rounded-lg border border-amber-200">
+                      Cannot delete campaign with contributions
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </div>
       </div>
     </CreatorLayout>
