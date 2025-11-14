@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, Eye, Edit, Users, DollarSign, Calendar, Share2, CreditCard, Smartphone, Building, TrendingUp, Target, Zap } from 'lucide-react';
+import { ArrowLeft, Eye, Edit, Users, DollarSign, Calendar, Share2, CreditCard, Smartphone, Building, TrendingUp, Target, Zap, Download, Filter } from 'lucide-react';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
@@ -16,7 +16,7 @@ const exchangeRates: { [key: string]: number } = {
   USD: 1,
   EUR: 0.85,
   GBP: 0.73,
-  ZMW: 0.044, // 1 ZMW = 0.044 USD
+  ZMW: 0.044,
   NGN: 0.0012,
   GHS: 0.082,
   KES: 0.0078,
@@ -45,7 +45,6 @@ const convertCurrency = async (
   const fromRate = exchangeRates[fromCurrency] || 1;
   const toRate = exchangeRates[toCurrency] || 1;
   
-  // Convert through USD as base
   const usdAmount = amount * fromRate;
   const targetAmount = usdAmount / toRate;
   
@@ -84,6 +83,7 @@ interface Contribution {
   profiles: {
     full_name: string;
     avatar_url: string | null;
+    username: string;
   };
 }
 
@@ -104,6 +104,7 @@ const FundraisingCampaignDetails: React.FC = () => {
   const [contributions, setContributions] = useState<Contribution[]>([]);
   const [campaignStats, setCampaignStats] = useState<CampaignStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [transactionFilter, setTransactionFilter] = useState('all');
 
   useEffect(() => {
     if (campaignId) {
@@ -129,10 +130,9 @@ const FundraisingCampaignDetails: React.FC = () => {
         .from('campaign_contributions')
         .select(`
           *,
-          profiles (full_name, avatar_url)
+          profiles (full_name, avatar_url, username)
         `)
         .eq('campaign_id', campaignId)
-        .eq('status', 'completed')
         .order('created_at', { ascending: false });
 
       if (contributionsError) throw contributionsError;
@@ -225,10 +225,10 @@ const FundraisingCampaignDetails: React.FC = () => {
 
   const getPaymentMethodIcon = (method: string) => {
     switch (method) {
-      case 'mobile_money': return <Smartphone className="h-3 w-3" />;
-      case 'card': return <CreditCard className="h-3 w-3" />;
-      case 'bank_transfer': return <Building className="h-3 w-3" />;
-      default: return <DollarSign className="h-3 w-3" />;
+      case 'mobile_money': return <Smartphone className="h-4 w-4" />;
+      case 'card': return <CreditCard className="h-4 w-4" />;
+      case 'bank_transfer': return <Building className="h-4 w-4" />;
+      default: return <DollarSign className="h-4 w-4" />;
     }
   };
 
@@ -242,11 +242,31 @@ const FundraisingCampaignDetails: React.FC = () => {
     }
   };
 
+  const getStatusBadgeColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      case 'pending': return 'bg-amber-100 text-amber-800 border-amber-200';
+      case 'failed': return 'bg-rose-100 text-rose-800 border-rose-200';
+      case 'refunded': return 'bg-slate-100 text-slate-800 border-slate-200';
+      default: return 'bg-slate-100 text-slate-800 border-slate-200';
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
+    });
+  };
+
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     });
   };
 
@@ -273,6 +293,11 @@ const FundraisingCampaignDetails: React.FC = () => {
       toast.success('Campaign link copied to clipboard!');
     }
   };
+
+  const filteredContributions = contributions.filter(contribution => {
+    if (transactionFilter === 'all') return true;
+    return contribution.status === transactionFilter;
+  });
 
   if (loading) {
     return (
@@ -321,10 +346,10 @@ const FundraisingCampaignDetails: React.FC = () => {
   return (
     <CreatorLayout>
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-orange-100">
-        <div className="p-6 max-w-7xl mx-auto">
-          {/* Modern Header */}
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-8">
-            <div className="flex items-center gap-4">
+        <div className="p-4 lg:p-6 max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+            <div className="flex items-center gap-3">
               <Button variant="ghost" size="sm" asChild className="hover:bg-white/80 transition-all duration-300">
                 <Link to="/creator/fundraising">
                   <ArrowLeft className="h-4 w-4 mr-2" />
@@ -332,10 +357,10 @@ const FundraisingCampaignDetails: React.FC = () => {
                 </Link>
               </Button>
               <div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                <h1 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
                   {campaign.title}
                 </h1>
-                <div className="flex items-center gap-3 mt-2">
+                <div className="flex items-center gap-2 mt-1">
                   <Badge className={`${getStatusColor(campaign.status)} font-medium`}>
                     {getStatusText(campaign.status)}
                   </Badge>
@@ -345,285 +370,324 @@ const FundraisingCampaignDetails: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <Button 
                 variant="outline" 
+                size="sm"
                 onClick={handleShareCampaign}
                 className="border-slate-300 hover:bg-white/80 transition-all duration-300"
               >
-                <Share2 className="h-4 w-4 mr-2" />
-                Share
+                <Share2 className="h-4 w-4" />
               </Button>
               <Button 
                 asChild
+                size="sm"
                 className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 transition-all duration-300"
               >
                 <Link to={`/creator/fundraising/${campaign.id}/edit`}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Campaign
+                  <Edit className="h-4 w-4" />
                 </Link>
               </Button>
             </div>
           </div>
 
-          {/* Horizontal Layout */}
-          <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-            {/* Main Content - 3 columns */}
-            <div className="xl:col-span-3 space-y-6">
-              {/* Hero Section with Progress */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Campaign Cover */}
-                <Card className="lg:col-span-2 bg-white/80 backdrop-blur-sm border-0 shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-500">
-                  <div className="relative h-64 bg-gradient-to-br from-orange-400 to-purple-500">
-                    {campaign.cover_image_url ? (
-                      <img 
-                        src={campaign.cover_image_url} 
-                        alt={campaign.title}
-                        className="w-full h-full object-cover"
+          {/* Horizontal Stats Grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-6">
+            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+              <CardContent className="p-4 lg:p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs lg:text-sm font-medium text-slate-600">Gross Raised</p>
+                    <p className="text-lg lg:text-2xl font-bold text-slate-900">
+                      <PriceDisplay 
+                        amount={currentAmount} 
+                        originalCurrency={campaignBaseCurrency}
+                        showOriginal={false}
                       />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <div className="text-center text-white">
-                          <Target className="w-16 h-16 mx-auto mb-2 opacity-90" />
-                          <p className="text-lg font-semibold">Campaign Image</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-
-                {/* Progress Stats */}
-                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl p-6">
-                  <div className="space-y-6">
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-slate-900 mb-2">
-                        <PriceDisplay 
-                          amount={currentAmount} 
-                          originalCurrency={campaignBaseCurrency}
-                          showOriginal={false}
-                        />
-                      </div>
-                      <Progress value={progress} className="h-2 bg-slate-200" />
-                      <div className="flex justify-between text-sm text-slate-600 mt-2">
-                        <span>{Math.round(progress)}% funded</span>
-                        <span>
-                          <PriceDisplay 
-                            amount={goalAmount} 
-                            originalCurrency={campaignBaseCurrency}
-                            showOriginal={false}
-                          />
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="text-center p-3 bg-slate-50 rounded-lg">
-                        <Users className="h-6 w-6 text-blue-600 mx-auto mb-2" />
-                        <div className="text-lg font-bold text-slate-900">{campaignStats?.contributions_count || 0}</div>
-                        <div className="text-xs text-slate-600">Supporters</div>
-                      </div>
-                      <div className="text-center p-3 bg-slate-50 rounded-lg">
-                        <Zap className="h-6 w-6 text-orange-600 mx-auto mb-2" />
-                        <div className="text-lg font-bold text-slate-900">
-                          <PriceDisplay 
-                            amount={netAmount} 
-                            originalCurrency={campaignBaseCurrency}
-                            showOriginal={false}
-                          />
-                        </div>
-                        <div className="text-xs text-slate-600">Net Amount</div>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-
-              {/* Financial Overview Cards - Horizontal */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-0 shadow-lg">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-blue-800">Gross Raised</p>
-                        <p className="text-2xl font-bold text-blue-900">
-                          <PriceDisplay 
-                            amount={currentAmount} 
-                            originalCurrency={campaignBaseCurrency}
-                            showOriginal={false}
-                          />
-                        </p>
-                      </div>
-                      <TrendingUp className="h-8 w-8 text-blue-600" />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-0 shadow-lg">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-emerald-800">Net Amount</p>
-                        <p className="text-2xl font-bold text-emerald-900">
-                          <PriceDisplay 
-                            amount={netAmount} 
-                            originalCurrency={campaignBaseCurrency}
-                            showOriginal={false}
-                          />
-                        </p>
-                      </div>
-                      <DollarSign className="h-8 w-8 text-emerald-600" />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-rose-50 to-rose-100 border-0 shadow-lg">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-rose-800">Fees</p>
-                        <p className="text-2xl font-bold text-rose-900">
-                          <PriceDisplay 
-                            amount={transactionFees} 
-                            originalCurrency={campaignBaseCurrency}
-                            showOriginal={false}
-                          />
-                        </p>
-                      </div>
-                      <CreditCard className="h-8 w-8 text-rose-600" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Content Sections */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-slate-900">
-                      <TrendingUp className="h-5 w-5 text-orange-600" />
-                      Campaign Story
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-slate-700 leading-relaxed whitespace-pre-line">
-                      {campaign.description}
                     </p>
-                  </CardContent>
-                </Card>
+                  </div>
+                  <TrendingUp className="h-6 w-6 lg:h-8 lg:w-8 text-orange-600" />
+                </div>
+              </CardContent>
+            </Card>
 
-                {campaign.use_of_funds && (
-                  <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-slate-900">
-                        <Target className="h-5 w-5 text-purple-600" />
-                        Use of Funds
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-slate-700 leading-relaxed">
-                        {campaign.use_of_funds}
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
+            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+              <CardContent className="p-4 lg:p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs lg:text-sm font-medium text-slate-600">Net Amount</p>
+                    <p className="text-lg lg:text-2xl font-bold text-slate-900">
+                      <PriceDisplay 
+                        amount={netAmount} 
+                        originalCurrency={campaignBaseCurrency}
+                        showOriginal={false}
+                      />
+                    </p>
+                  </div>
+                  <DollarSign className="h-6 w-6 lg:h-8 lg:w-8 text-emerald-600" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+              <CardContent className="p-4 lg:p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs lg:text-sm font-medium text-slate-600">Transaction Fees</p>
+                    <p className="text-lg lg:text-2xl font-bold text-slate-900">
+                      <PriceDisplay 
+                        amount={transactionFees} 
+                        originalCurrency={campaignBaseCurrency}
+                        showOriginal={false}
+                      />
+                    </p>
+                  </div>
+                  <CreditCard className="h-6 w-6 lg:h-8 lg:w-8 text-rose-600" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+              <CardContent className="p-4 lg:p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs lg:text-sm font-medium text-slate-600">Supporters</p>
+                    <p className="text-lg lg:text-2xl font-bold text-slate-900">
+                      {campaignStats?.contributions_count || 0}
+                    </p>
+                  </div>
+                  <Users className="h-6 w-6 lg:h-8 lg:w-8 text-blue-600" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Progress Section */}
+          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl mb-6">
+            <CardContent className="p-6">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex justify-between text-sm text-slate-600 mb-2">
+                    <span>Campaign Progress</span>
+                    <span>{Math.round(progress)}% funded</span>
+                  </div>
+                  <Progress value={progress} className="h-3 bg-slate-200" />
+                  <div className="flex justify-between text-sm text-slate-600 mt-2">
+                    <span>
+                      <PriceDisplay 
+                        amount={currentAmount} 
+                        originalCurrency={campaignBaseCurrency}
+                        showOriginal={false}
+                      /> raised
+                    </span>
+                    <span>
+                      Goal: <PriceDisplay 
+                        amount={goalAmount} 
+                        originalCurrency={campaignBaseCurrency}
+                        showOriginal={false}
+                      />
+                    </span>
+                  </div>
+                </div>
+                <Button asChild className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
+                  <Link to={`/fundraising/${campaign.id}`} target="_blank">
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Public Page
+                  </Link>
+                </Button>
               </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* Sidebar - 1 column */}
-            <div className="space-y-6">
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="text-slate-900">Campaign Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between items-center py-2 border-b border-slate-200">
-                    <span className="text-sm text-slate-600">Status</span>
-                    <Badge className={getStatusColor(campaign.status)}>
-                      {getStatusText(campaign.status)}
-                    </Badge>
+          {/* Campaign Content */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            {/* Campaign Story */}
+            <Card className="lg:col-span-2 bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-slate-900">
+                  <Target className="h-5 w-5 text-orange-600" />
+                  Campaign Story
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-slate-700 leading-relaxed whitespace-pre-line">
+                  {campaign.description}
+                </p>
+                {campaign.use_of_funds && (
+                  <div className="mt-6">
+                    <h4 className="font-semibold text-slate-900 mb-3">Use of Funds</h4>
+                    <p className="text-slate-700 leading-relaxed">
+                      {campaign.use_of_funds}
+                    </p>
                   </div>
-                  <div className="flex justify-between items-center py-2 border-b border-slate-200">
-                    <span className="text-sm text-slate-600">Category</span>
-                    <span className="text-sm font-medium text-slate-900 capitalize">{campaign.category}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b border-slate-200">
-                    <span className="text-sm text-slate-600">Currency</span>
-                    <span className="text-sm font-medium text-slate-900">{campaignBaseCurrency}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b border-slate-200">
-                    <span className="text-sm text-slate-600">Started</span>
-                    <span className="text-sm font-medium text-slate-900">{formatDate(campaign.start_date)}</span>
-                  </div>
-                  {campaign.end_date && (
-                    <div className="flex justify-between items-center py-2">
-                      <span className="text-sm text-slate-600">Ends</span>
-                      <span className="text-sm font-medium text-slate-900">{formatDate(campaign.end_date)}</span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                )}
+              </CardContent>
+            </Card>
 
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="text-slate-900">Recent Supporters</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {contributions.length === 0 ? (
-                    <div className="text-center py-8 text-slate-500">
-                      <Users className="h-12 w-12 mx-auto mb-3 text-slate-400" />
-                      <p className="text-sm">No supporters yet</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {contributions.slice(0, 5).map((contribution) => (
-                        <div key={contribution.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                          <div className="flex items-center gap-3">
+            {/* Campaign Details */}
+            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+              <CardHeader>
+                <CardTitle className="text-slate-900">Campaign Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between items-center py-2 border-b border-slate-200">
+                  <span className="text-sm text-slate-600">Status</span>
+                  <Badge className={getStatusColor(campaign.status)}>
+                    {getStatusText(campaign.status)}
+                  </Badge>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-200">
+                  <span className="text-sm text-slate-600">Category</span>
+                  <span className="text-sm font-medium text-slate-900 capitalize">{campaign.category}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-200">
+                  <span className="text-sm text-slate-600">Currency</span>
+                  <span className="text-sm font-medium text-slate-900">{campaignBaseCurrency}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-200">
+                  <span className="text-sm text-slate-600">Started</span>
+                  <span className="text-sm font-medium text-slate-900">{formatDate(campaign.start_date)}</span>
+                </div>
+                {campaign.end_date && (
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-sm text-slate-600">Ends</span>
+                    <span className="text-sm font-medium text-slate-900">{formatDate(campaign.end_date)}</span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Transaction History */}
+          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+            <CardHeader>
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div>
+                  <CardTitle className="text-slate-900">Transaction History</CardTitle>
+                  <CardDescription>
+                    All contributions and payments for this campaign
+                  </CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
+                    {['all', 'completed', 'pending', 'failed'].map((filter) => (
+                      <Button
+                        key={filter}
+                        variant={transactionFilter === filter ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setTransactionFilter(filter)}
+                        className={`text-xs capitalize ${
+                          transactionFilter === filter 
+                            ? 'bg-white shadow-sm' 
+                            : 'hover:bg-white/50'
+                        }`}
+                      >
+                        {filter}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button variant="outline" size="sm" className="border-slate-300">
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {filteredContributions.length === 0 ? (
+                <div className="text-center py-12 text-slate-500">
+                  <CreditCard className="h-12 w-12 mx-auto mb-3 text-slate-400" />
+                  <p className="text-sm">No transactions found</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {transactionFilter !== 'all' ? `No ${transactionFilter} transactions` : 'No contributions yet'}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredContributions.map((contribution) => (
+                    <Card key={contribution.id} className="border-0 shadow-sm hover:shadow-md transition-all duration-300">
+                      <CardContent className="p-4 lg:p-6">
+                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                          {/* Supporter Info */}
+                          <div className="flex items-center gap-3 flex-1">
                             <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
                               {contribution.is_anonymous ? 'A' : contribution.profiles.full_name?.[0] || 'U'}
                             </div>
-                            <div>
-                              <div className="text-sm font-medium text-slate-900">
-                                {contribution.is_anonymous ? 'Anonymous' : contribution.profiles.full_name}
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-medium text-slate-900">
+                                  {contribution.is_anonymous ? 'Anonymous Supporter' : contribution.profiles.full_name || 'Unknown User'}
+                                </span>
+                                <Badge className={getStatusBadgeColor(contribution.status)}>
+                                  {contribution.status}
+                                </Badge>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                                <span>{formatDateTime(contribution.created_at)}</span>
+                                <span>•</span>
+                                <span className="flex items-center gap-1">
+                                  {getPaymentMethodIcon(contribution.payment_method)}
+                                  {contribution.payment_method?.replace('_', ' ') || 'Unknown'}
+                                </span>
+                                <span>•</span>
+                                <span>{contribution.payment_provider}</span>
+                              </div>
+                              {contribution.message_to_creator && (
+                                <p className="text-sm text-slate-600 mt-2 italic">
+                                  "{contribution.message_to_creator}"
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Amount Info */}
+                          <div className="flex flex-col items-end gap-2">
+                            <div className="text-right">
+                              <div className="text-lg font-bold text-slate-900">
+                                <PriceDisplay 
+                                  amount={contribution.amount} 
+                                  originalCurrency={contribution.currency || 'USD'}
+                                  showOriginal={false}
+                                />
                               </div>
                               <div className="text-xs text-slate-500">
-                                {formatDate(contribution.created_at)}
+                                Gross Amount
                               </div>
                             </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm font-bold text-slate-900">
-                              <PriceDisplay 
-                                amount={contribution.amount} 
-                                originalCurrency={contribution.currency || 'USD'}
-                                showOriginal={false}
-                              />
+                            <div className="text-right">
+                              <div className="text-sm font-medium text-emerald-700">
+                                <PriceDisplay 
+                                  amount={contribution.net_amount} 
+                                  originalCurrency={contribution.currency || 'USD'}
+                                  showOriginal={false}
+                                />
+                              </div>
+                              <div className="text-xs text-slate-500">
+                                Net Amount
+                              </div>
                             </div>
-                            <div className="text-xs text-slate-500 capitalize">
-                              {contribution.payment_method}
-                            </div>
+                            {contribution.transaction_fee > 0 && (
+                              <div className="text-right">
+                                <div className="text-sm text-rose-700">
+                                  -<PriceDisplay 
+                                    amount={contribution.transaction_fee} 
+                                    originalCurrency={contribution.currency || 'USD'}
+                                    showOriginal={false}
+                                  />
+                                </div>
+                                <div className="text-xs text-slate-500">
+                                  Fees
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
-                <CardContent className="p-6">
-                  <Button 
-                    asChild 
-                    className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 transition-all duration-300"
-                  >
-                    <Link to={`/fundraising/${campaign.id}`} target="_blank">
-                      <Eye className="h-4 w-4 mr-2" />
-                      View Public Page
-                    </Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </CreatorLayout>
