@@ -4,10 +4,11 @@ import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Check, ArrowRight, Heart, Users, Calendar, Home, Loader2, AlertCircle, Clock, Sparkles } from 'lucide-react';
+import { Check, ArrowRight, Heart, Users, Calendar, Home, Loader2, AlertCircle, Clock, Sparkles, Target, TrendingUp } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 interface Contribution {
   id: string;
@@ -40,16 +41,6 @@ interface Contribution {
     avatar_url: string;
   };
 }
-
-// Helper function to format currency display
-const formatCurrency = (amount: number, currency: string) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
-};
 
 const FundraisingPaymentSuccess = () => {
   const navigate = useNavigate();
@@ -172,12 +163,12 @@ const FundraisingPaymentSuccess = () => {
     switch (paymentStatus) {
       case 'completed':
         return {
-          icon: <Check className="h-12 w-12 text-green-500" />,
+          icon: <Check className="h-12 w-12 text-emerald-500" />,
           title: "Contribution Successful!",
           description: "Thank you for supporting this campaign",
-          color: "text-green-600",
-          bgColor: "bg-green-50",
-          borderColor: "border-green-200"
+          color: "text-emerald-600",
+          bgColor: "bg-emerald-50",
+          borderColor: "border-emerald-200"
         };
       case 'pending':
         return {
@@ -190,12 +181,12 @@ const FundraisingPaymentSuccess = () => {
         };
       case 'failed':
         return {
-          icon: <AlertCircle className="h-12 w-12 text-red-500" />,
+          icon: <AlertCircle className="h-12 w-12 text-rose-500" />,
           title: "Payment Failed",
           description: "Your contribution could not be processed. Please try again.",
-          color: "text-red-600",
-          bgColor: "bg-red-50",
-          borderColor: "border-red-200"
+          color: "text-rose-600",
+          bgColor: "bg-rose-50",
+          borderColor: "border-rose-200"
         };
       default:
         return {
@@ -211,17 +202,16 @@ const FundraisingPaymentSuccess = () => {
 
   const handleViewCampaign = () => {
     if (contribution?.fundraising_campaigns?.id) {
-      // ✅ UPDATED ROUTE: Changed from /campaign/ to /fundraising/
       navigate(`/fundraising/${contribution.fundraising_campaigns.id}`);
     } else {
-      navigate('/campaigns');
+      navigate('/fundraising');
     }
   };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
-      month: 'long',
+      month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
@@ -237,9 +227,9 @@ const FundraisingPaymentSuccess = () => {
   if (paymentStatus !== 'completed') {
     return (
       <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-orange-100 flex items-center justify-center">
           <div className="max-w-2xl mx-auto px-4 w-full">
-            <Card className={`border-2 ${statusConfig.borderColor} ${statusConfig.bgColor} shadow-xl`}>
+            <Card className={`border-2 ${statusConfig.borderColor} ${statusConfig.bgColor} shadow-xl border-0`}>
               <CardContent className="pt-8">
                 <div className="text-center space-y-6">
                   <div className="flex justify-center">
@@ -247,10 +237,10 @@ const FundraisingPaymentSuccess = () => {
                   </div>
                   
                   <div className="space-y-2">
-                    <h1 className={`text-3xl font-bold ${statusConfig.color}`}>
+                    <h1 className={`text-2xl font-bold ${statusConfig.color}`}>
                       {statusConfig.title}
                     </h1>
-                    <p className="text-lg text-gray-600">
+                    <p className="text-slate-600 text-sm">
                       {statusConfig.description}
                     </p>
                   </div>
@@ -262,29 +252,35 @@ const FundraisingPaymentSuccess = () => {
                   )}
 
                   {(contribution || depositId) && (
-                    <div className="bg-white rounded-lg p-6 border border-gray-200 space-y-4">
-                      <h3 className="font-semibold text-gray-900">Contribution Details</h3>
+                    <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-slate-200 space-y-3">
+                      <h3 className="font-semibold text-slate-900 text-sm">Contribution Details</h3>
                       
-                      <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="grid grid-cols-2 gap-3 text-xs">
                         {contribution?.id && (
                           <div>
-                            <span className="text-gray-600">Contribution ID:</span>
+                            <span className="text-slate-600">Contribution ID:</span>
                             <p className="font-mono text-xs">{contribution.id}</p>
                           </div>
                         )}
                         <div>
-                          <span className="text-gray-600">Amount:</span>
-                          <p className="font-semibold">
-                            {contribution ? formatCurrency(contribution.amount, contribution.currency) : 'Loading...'}
+                          <span className="text-slate-600">Amount:</span>
+                          <p className="font-semibold text-slate-900">
+                            {contribution ? (
+                              <PriceDisplay 
+                                amount={contribution.amount} 
+                                originalCurrency={contribution.currency}
+                                showOriginal={false}
+                              />
+                            ) : 'Loading...'}
                           </p>
                         </div>
                         <div>
-                          <span className="text-gray-600">Status:</span>
+                          <span className="text-slate-600">Status:</span>
                           <Badge 
-                            variant={
-                              paymentStatus === 'completed' ? 'default' :
-                              paymentStatus === 'pending' ? 'secondary' :
-                              'destructive'
+                            className={
+                              paymentStatus === 'completed' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' :
+                              paymentStatus === 'pending' ? 'bg-orange-100 text-orange-800 border-orange-200' :
+                              'bg-rose-100 text-rose-800 border-rose-200'
                             }
                           >
                             {paymentStatus}
@@ -292,7 +288,7 @@ const FundraisingPaymentSuccess = () => {
                         </div>
                         {depositId && (
                           <div>
-                            <span className="text-gray-600">Reference:</span>
+                            <span className="text-slate-600">Reference:</span>
                             <p className="font-mono text-xs">{depositId}</p>
                           </div>
                         )}
@@ -303,21 +299,29 @@ const FundraisingPaymentSuccess = () => {
               </CardContent>
             </Card>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mt-6">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center mt-6">
               {paymentStatus === 'pending' && (
                 <Button
                   onClick={() => depositId && startPolling(depositId)}
                   disabled={loading}
                   variant="outline"
+                  className="border-slate-300 hover:bg-white/80"
                 >
-                  {loading ? 'Checking...' : 'Check Status Again'}
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Checking...
+                    </>
+                  ) : (
+                    'Check Status Again'
+                  )}
                 </Button>
               )}
 
               {paymentStatus === 'failed' && (
                 <Button
-                  onClick={() => navigate('/campaigns')}
-                  className="bg-gradient-to-r from-orange-500 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg"
+                  onClick={() => navigate('/fundraising')}
+                  className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white transition-all duration-300"
                 >
                   Try Again
                 </Button>
@@ -326,6 +330,7 @@ const FundraisingPaymentSuccess = () => {
               <Button
                 variant="ghost"
                 onClick={() => navigate('/')}
+                className="hover:bg-white/80"
               >
                 <Home className="h-4 w-4 mr-2" />
                 Back to Home
@@ -333,11 +338,11 @@ const FundraisingPaymentSuccess = () => {
             </div>
 
             {paymentStatus === 'pending' && (
-              <Card className="bg-blue-50 border-blue-200 mt-6">
+              <Card className="bg-blue-50 border-blue-200 mt-6 border-0">
                 <CardContent className="pt-6">
-                  <div className="text-center text-blue-800">
+                  <div className="text-center text-blue-800 text-sm">
                     <p className="font-semibold">Payment Processing</p>
-                    <p className="text-sm mt-1">
+                    <p className="mt-1">
                       Mobile money payments can take 30 seconds to process. 
                       This page will automatically update when your payment is complete.
                       {depositId && (
@@ -358,37 +363,38 @@ const FundraisingPaymentSuccess = () => {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
-        <div className="container mx-auto px-4 py-16">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-orange-100">
+        <div className="container mx-auto px-4 py-8 max-w-4xl">
           <div className="max-w-2xl mx-auto">
-            <Card className="text-center border-0 shadow-2xl bg-white/90 backdrop-blur-sm">
+            <Card className="text-center border-0 shadow-2xl bg-white/80 backdrop-blur-sm">
               <CardHeader className="pb-6">
-                <div className="mx-auto w-20 h-20 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full flex items-center justify-center mb-6">
-                  <Heart className="w-10 h-10 text-white" />
+                <div className="mx-auto w-16 h-16 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full flex items-center justify-center mb-4">
+                  <Heart className="w-8 h-8 text-white" />
                 </div>
-                <CardTitle className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                <CardTitle className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
                   Thank You for Your Support!
                 </CardTitle>
-                <div className="flex justify-center">
-                  <Sparkles className="w-6 h-6 text-orange-500" />
-                  <Sparkles className="w-6 h-6 text-purple-500" />
-                  <Sparkles className="w-6 h-6 text-orange-500" />
+                <div className="flex justify-center gap-1">
+                  <Sparkles className="w-5 h-5 text-orange-500" />
+                  <Sparkles className="w-5 h-5 text-purple-500" />
+                  <Sparkles className="w-5 h-5 text-orange-500" />
                 </div>
               </CardHeader>
               
-              <CardContent className="space-y-8">
+              <CardContent className="space-y-6">
                 {contribution && (
                   <>
-                    <div className="bg-gradient-to-r from-orange-100 to-purple-100 p-6 rounded-xl border border-orange-200">
-                      <h3 className="text-lg font-semibold mb-3 text-gray-800">
+                    <div className="bg-gradient-to-r from-orange-100 to-purple-100 p-4 rounded-xl border border-orange-200">
+                      <h3 className="text-base font-semibold mb-2 text-slate-800 flex items-center justify-center gap-2">
+                        <Target className="h-4 w-4 text-orange-600" />
                         You're supporting
                       </h3>
-                      <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                      <h2 className="text-xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
                         {contribution.fundraising_campaigns.title}
                       </h2>
                       
-                      <div className="mt-4 p-4 bg-white rounded-lg border border-purple-200">
-                        <div className="flex items-center justify-between text-sm text-gray-700 mb-2">
+                      <div className="mt-3 p-3 bg-white rounded-lg border border-purple-200">
+                        <div className="flex items-center justify-between text-xs text-slate-700 mb-2">
                           <span>Campaign Progress</span>
                           <span>
                             {calculateProgress(
@@ -397,9 +403,9 @@ const FundraisingPaymentSuccess = () => {
                             ).toFixed(1)}%
                           </span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="w-full bg-slate-200 rounded-full h-1.5">
                           <div 
-                            className="bg-gradient-to-r from-orange-500 to-purple-600 h-2 rounded-full" 
+                            className="bg-gradient-to-r from-orange-500 to-purple-600 h-1.5 rounded-full" 
                             style={{
                               width: `${calculateProgress(
                                 contribution.fundraising_campaigns.current_amount,
@@ -408,55 +414,78 @@ const FundraisingPaymentSuccess = () => {
                             }}
                           ></div>
                         </div>
-                        <div className="flex justify-between text-xs text-gray-600 mt-1">
+                        <div className="flex justify-between text-xs text-slate-600 mt-1">
                           <span>
-                            {formatCurrency(contribution.fundraising_campaigns.current_amount, contribution.fundraising_campaigns.currency)} raised
+                            <PriceDisplay 
+                              amount={contribution.fundraising_campaigns.current_amount} 
+                              originalCurrency={contribution.fundraising_campaigns.currency}
+                              showOriginal={false}
+                            /> raised
                           </span>
                           <span>
-                            Goal: {formatCurrency(contribution.fundraising_campaigns.goal_amount, contribution.fundraising_campaigns.currency)}
+                            Goal: <PriceDisplay 
+                              amount={contribution.fundraising_campaigns.goal_amount} 
+                              originalCurrency={contribution.fundraising_campaigns.currency}
+                              showOriginal={false}
+                            />
                           </span>
                         </div>
                       </div>
                     </div>
                     
-                    <div className="bg-green-50 p-6 rounded-xl border border-green-200">
-                      <div className="flex items-center justify-center space-x-3 text-green-800">
-                        <Check className="w-6 h-6 text-green-600" />
-                        <span className="font-semibold text-lg">
-                          Your contribution of {' '}
-                          {formatCurrency(contribution.amount, contribution.currency)}{' '}
-                          has been confirmed!
+                    <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200">
+                      <div className="flex items-center justify-center gap-2 text-emerald-800 mb-2">
+                        <Check className="w-5 h-5 text-emerald-600" />
+                        <span className="font-semibold text-base">
+                          Contribution Confirmed!
                         </span>
                       </div>
-                      <div className="text-sm text-green-700 mt-2 space-y-1">
-                        <p>Contribution ID: {contribution.id}</p>
-                        <p>Date: {formatDate(contribution.created_at)}</p>
-                        {contribution.transaction_fee > 0 && (
-                          <p>Transaction Fee: {formatCurrency(contribution.transaction_fee, contribution.currency)}</p>
-                        )}
-                        {contribution.net_amount > 0 && (
-                          <p>Net to Campaign: {formatCurrency(contribution.net_amount, contribution.currency)}</p>
-                        )}
-                        {contribution.is_anonymous && (
-                          <p className="font-semibold">✓ Anonymous Contribution</p>
-                        )}
+                      <div className="text-center">
+                        <div className="text-lg font-bold text-emerald-700 mb-1">
+                          <PriceDisplay 
+                            amount={contribution.amount} 
+                            originalCurrency={contribution.currency}
+                            showOriginal={false}
+                          />
+                        </div>
+                        <div className="text-xs text-emerald-700 space-y-0.5">
+                          <p>Contribution ID: {contribution.id}</p>
+                          <p>Date: {formatDate(contribution.created_at)}</p>
+                          {contribution.transaction_fee > 0 && (
+                            <p>Transaction Fee: <PriceDisplay 
+                              amount={contribution.transaction_fee} 
+                              originalCurrency={contribution.currency}
+                              showOriginal={false}
+                            /></p>
+                          )}
+                          {contribution.net_amount > 0 && (
+                            <p>Net to Campaign: <PriceDisplay 
+                              amount={contribution.net_amount} 
+                              originalCurrency={contribution.currency}
+                              showOriginal={false}
+                            /></p>
+                          )}
+                          {contribution.is_anonymous && (
+                            <p className="font-semibold">✓ Anonymous Contribution</p>
+                          )}
+                        </div>
                       </div>
                     </div>
 
                     {contribution.campaign_rewards && (
-                      <div className="bg-orange-50 p-6 rounded-xl border border-orange-200">
-                        <h3 className="font-semibold text-orange-800 mb-3">
+                      <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
+                        <h3 className="font-semibold text-orange-800 mb-2 text-sm flex items-center justify-center gap-1">
                           🎁 You've Unlocked a Reward!
                         </h3>
-                        <div className="text-left bg-white p-4 rounded-lg border border-orange-200">
-                          <h4 className="font-bold text-orange-600 text-lg">
+                        <div className="text-left bg-white p-3 rounded-lg border border-orange-200">
+                          <h4 className="font-bold text-orange-600 text-sm">
                             {contribution.campaign_rewards.title}
                           </h4>
-                          <p className="text-gray-700 mt-2">
+                          <p className="text-slate-700 mt-1 text-xs">
                             {contribution.campaign_rewards.description}
                           </p>
-                          <div className="flex items-center gap-2 mt-3 text-sm text-orange-600">
-                            <Calendar className="w-4 h-4" />
+                          <div className="flex items-center gap-1 mt-2 text-xs text-orange-600">
+                            <Calendar className="w-3.5 h-3.5" />
                             <span>You'll receive updates about your reward via email</span>
                           </div>
                         </div>
@@ -464,11 +493,11 @@ const FundraisingPaymentSuccess = () => {
                     )}
 
                     {contribution.message_to_creator && (
-                      <div className="bg-purple-50 p-6 rounded-xl border border-purple-200">
-                        <h3 className="font-semibold text-purple-800 mb-2">
+                      <div className="bg-purple-50 p-4 rounded-xl border border-purple-200">
+                        <h3 className="font-semibold text-purple-800 mb-2 text-sm flex items-center justify-center gap-1">
                           💌 Your Message to the Creator
                         </h3>
-                        <p className="text-gray-700 italic text-center">
+                        <p className="text-slate-700 italic text-center text-sm">
                           "{contribution.message_to_creator}"
                         </p>
                       </div>
@@ -476,48 +505,47 @@ const FundraisingPaymentSuccess = () => {
                   </>
                 )}
 
-                <div className="space-y-4 text-sm text-gray-700">
-                  <div className="flex items-center justify-center space-x-3 p-3 bg-orange-50 rounded-lg">
-                    <Check className="w-5 h-5 text-green-500" />
+                <div className="space-y-2 text-xs text-slate-700">
+                  <div className="flex items-center justify-center gap-2 p-2 bg-emerald-50 rounded-lg">
+                    <Check className="w-4 h-4 text-emerald-500" />
                     <span>You're now part of this campaign's supporter community</span>
                   </div>
-                  <div className="flex items-center justify-center space-x-3 p-3 bg-purple-50 rounded-lg">
-                    <Check className="w-5 h-5 text-green-500" />
+                  <div className="flex items-center justify-center gap-2 p-2 bg-purple-50 rounded-lg">
+                    <Check className="w-4 h-4 text-emerald-500" />
                     <span>You'll receive campaign updates and progress reports</span>
                   </div>
                   {contribution?.campaign_rewards && (
-                    <div className="flex items-center justify-center space-x-3 p-3 bg-orange-50 rounded-lg">
-                      <Check className="w-5 h-5 text-green-500" />
+                    <div className="flex items-center justify-center gap-2 p-2 bg-orange-50 rounded-lg">
+                      <Check className="w-4 h-4 text-emerald-500" />
                       <span>Your reward will be delivered as described by the creator</span>
                     </div>
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-4">
                   <Button 
                     onClick={handleViewCampaign}
-                    className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-semibold py-3"
+                    className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white transition-all duration-300 text-sm h-10"
                   >
-                    <Heart className="w-5 h-5 mr-2" />
+                    <Heart className="w-4 h-4 mr-1.5" />
                     View Campaign
-                    <ArrowRight className="w-4 h-4 ml-2" />
+                    <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
                   </Button>
 
                   <Button 
                     asChild
                     variant="outline"
-                    className="w-full border-orange-300 text-orange-600 hover:bg-orange-50 font-semibold py-3"
+                    className="w-full border-slate-300 text-slate-700 hover:bg-white/80 font-semibold text-sm h-10"
                   >
-                    {/* ✅ UPDATED ROUTE: Changed from /campaigns to /fundraising */}
                     <Link to="/fundraising">
-                      <Users className="w-5 h-5 mr-2" />
-                      Explore More Campaigns
+                      <Users className="w-4 h-4 mr-1.5" />
+                      Explore More
                     </Link>
                   </Button>
                 </div>
 
-                <div className="pt-4 border-t border-gray-200">
-                  <p className="text-sm text-gray-600">
+                <div className="pt-4 border-t border-slate-200">
+                  <p className="text-xs text-slate-600">
                     A confirmation email has been sent to {user?.email}
                   </p>
                 </div>
