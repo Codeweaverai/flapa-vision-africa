@@ -56,8 +56,7 @@ interface Campaign {
   title: string;
   description: string;
   goal_amount: number;
-  current_amount: number;
-  currency: string;
+  currency: string; // Removed current_amount
   category: string;
   status: string;
   start_date: string;
@@ -138,7 +137,7 @@ const FundraisingCampaignDetails: React.FC = () => {
       if (contributionsError) throw contributionsError;
       setContributions(contributionsData || []);
 
-      if (contributionsData) {
+      if (contributionsData && campaignData) {
         const stats = await calculateCampaignStats(contributionsData, campaignData);
         setCampaignStats(stats);
       }
@@ -336,8 +335,9 @@ const FundraisingCampaignDetails: React.FC = () => {
     );
   }
 
-  const currentAmount = campaignStats?.total_raised || campaign.current_amount || 0;
-  const netAmount = campaignStats?.total_net_amount || currentAmount;
+  // Now currentAmount is always calculated from contributions (no stored current_amount)
+  const currentAmount = campaignStats?.total_raised || 0;
+  const netAmount = campaignStats?.total_net_amount || 0;
   const goalAmount = campaign.goal_amount || 1;
   const progress = calculateProgress(currentAmount, goalAmount);
   const transactionFees = campaignStats?.total_transaction_fees || 0;
@@ -404,6 +404,9 @@ const FundraisingCampaignDetails: React.FC = () => {
                         originalCurrency={campaignBaseCurrency}
                         showOriginal={false}
                       />
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      From {campaignStats?.contributions_count || 0} contributions
                     </p>
                   </div>
                   <TrendingUp className="h-6 w-6 lg:h-8 lg:w-8 text-orange-600" />
@@ -488,6 +491,11 @@ const FundraisingCampaignDetails: React.FC = () => {
                       />
                     </span>
                   </div>
+                  {campaignStats?.contributions_count && (
+                    <div className="text-xs text-slate-500 mt-1">
+                      Calculated from {campaignStats.contributions_count} completed contributions
+                    </div>
+                  )}
                 </div>
                 <Button asChild className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
                   <Link to={`/fundraising/${campaign.id}`} target="_blank">
