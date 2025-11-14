@@ -443,7 +443,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
       }
     }
 
-    // ✅ FIXED: Fetch fundraising contributions WITHOUT profiles.email (since it doesn't exist)
+    // ✅ FIXED: Fetch fundraising contributions WITHOUT the comment that was causing the 400 error
     let fundraisingContributions: any[] = [];
     if (campaignIds.length > 0) {
       const { data: contributions, error: contributionsError } = await supabase
@@ -461,7 +461,6 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
             id,
             username,
             full_name
-            // ✅ REMOVED: email (since it doesn't exist in profiles table)
           )
         `)
         .eq('status', 'completed')
