@@ -443,7 +443,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
       }
     }
 
-    // ✅ FIXED: Fetch fundraising contributions WITHOUT comments in the query string
+    // ✅ FIXED: Fetch fundraising contributions WITHOUT profiles.email (since it doesn't exist)
     let fundraisingContributions: any[] = [];
     if (campaignIds.length > 0) {
       const { data: contributions, error: contributionsError } = await supabase
@@ -461,6 +461,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
             id,
             username,
             full_name
+            // ✅ REMOVED: email (since it doesn't exist in profiles table)
           )
         `)
         .eq('status', 'completed')
@@ -534,7 +535,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
         creatorTransactions.push({
           id: item.id,
           order_id: item.id,
-          customer_email: 'campaign@supporter.com', // Placeholder email
+          customer_email: 'campaign@supporter.com', // ✅ PLACEHOLDER EMAIL
           customer_name: customerName,
           item_type: 'fundraising_contribution',
           item_name: `Campaign: ${item.fundraising_campaigns?.title}`,
