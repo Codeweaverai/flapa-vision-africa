@@ -32,6 +32,8 @@ interface FundraisingCampaign {
   use_of_funds: string | null;
   contributions_count?: number;
   created_at: string;
+  total_raised?: number;
+  total_raised_currency?: string;
 }
 
 const CreatorFundraising: React.FC = () => {
@@ -51,22 +53,40 @@ const CreatorFundraising: React.FC = () => {
     try {
       setLoading(true);
       
-      // Fetch campaigns with contribution counts
+      // Fetch campaigns with contribution counts and currency data
       const { data: campaignsData, error } = await supabase
         .from('fundraising_campaigns')
         .select(`
           *,
-          campaign_contributions (id)
+          campaign_contributions (
+            id,
+            amount,
+            currency,
+            status
+          )
         `)
         .eq('creator_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      const campaignsWithStats = campaignsData?.map(campaign => ({
-        ...campaign,
-        contributions_count: campaign.campaign_contributions?.length || 0
-      })) || [];
+      const campaignsWithStats = campaignsData?.map(campaign => {
+        const contributions = campaign.campaign_contributions || [];
+        const completedContributions = contributions.filter(c => c.status === 'completed');
+        
+        // Calculate total raised across all currencies
+        const totalRaised = completedContributions.reduce((sum, contribution) => {
+          return sum + Number(contribution.amount || 0);
+        }, 0);
+
+        return {
+          ...campaign,
+          contributions_count: completedContributions.length,
+          total_raised: totalRaised,
+          // Use campaign's base currency for display
+          total_raised_currency: campaign.currency
+        };
+      }) || [];
 
       setCampaigns(campaignsWithStats);
     } catch (error) {
@@ -107,6 +127,13 @@ const CreatorFundraising: React.FC = () => {
 
   const calculateProgress = (current: number, goal: number) => {
     return Math.min((current / goal) * 100, 100);
+  };
+
+  // Calculate total raised across all campaigns
+  const calculateTotalRaised = () => {
+    return campaigns.reduce((total, campaign) => {
+      return total + (campaign.total_raised || campaign.current_amount || 0);
+    }, 0);
   };
 
   if (loading) {
@@ -183,8 +210,9 @@ const CreatorFundraising: React.FC = () => {
                     <p className="text-sm font-medium text-gray-600">Total Raised</p>
                     <p className="text-2xl font-bold text-gray-900">
                       <PriceDisplay 
-                        amount={campaigns.reduce((sum, campaign) => sum + campaign.current_amount, 0)} 
+                        amount={calculateTotalRaised()} 
                         originalCurrency="USD" 
+                        showOriginal={false}
                       />
                     </p>
                   </div>
@@ -234,113 +262,136 @@ const CreatorFundraising: React.FC = () => {
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {campaigns.map((campaign) => (
-                <Card key={campaign.id} className="group bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border-0 overflow-hidden">
-                  <div className="relative h-48 bg-gradient-to-br from-orange-400 to-purple-400 overflow-hidden">
-                    {campaign.cover_image_url ? (
-                      <img 
-                        src={campaign.cover_image_url} 
-                        alt={campaign.title}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Heart className="w-12 h-12 text-white/80" />
-                      </div>
-                    )}
-                    
-                    {/* Status Badge */}
-                    <div className="absolute top-3 left-3">
-                      <Badge className={getStatusColor(campaign.status)}>
-                        {getStatusText(campaign.status)}
-                      </Badge>
-                    </div>
-
-                    {/* Progress Overlay */}
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
-                      <div className="text-white">
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="font-semibold">
-                            <PriceDisplay amount={campaign.current_amount} originalCurrency="USD" />
-                          </span>
-                          <span>
-                            of <PriceDisplay amount={campaign.goal_amount} originalCurrency="USD" />
-                          </span>
-                        </div>
-                        <Progress 
-                          value={calculateProgress(campaign.current_amount, campaign.goal_amount)} 
-                          className="h-2 bg-white/20"
+              {campaigns.map((campaign) => {
+                const currentAmount = campaign.total_raised || campaign.current_amount || 0;
+                const goalAmount = campaign.goal_amount || 1;
+                const progress = calculateProgress(currentAmount, goalAmount);
+                
+                return (
+                  <Card key={campaign.id} className="group bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border-0 overflow-hidden">
+                    <div className="relative h-48 bg-gradient-to-br from-orange-400 to-purple-400 overflow-hidden">
+                      {campaign.cover_image_url ? (
+                        <img 
+                          src={campaign.cover_image_url} 
+                          alt={campaign.title}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                         />
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <CardContent className="p-5">
-                    <div className="flex items-start justify-between mb-3">
-                      <h3 className="font-bold text-lg line-clamp-2 group-hover:text-purple-600 transition-colors duration-300 flex-1 mr-2">
-                        {campaign.title}
-                      </h3>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link to={`/creator/fundraising/${campaign.id}/edit`}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link to={`/creator/fundraising/${campaign.id}`}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </Link>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2 leading-relaxed">
-                      {campaign.description}
-                    </p>
-                    
-                    {/* Campaign Details */}
-                    <div className="space-y-2 text-sm text-gray-600 mb-4">
-                      {campaign.use_of_funds && (
-                        <div className="flex items-start gap-2">
-                          <DollarSign className="h-4 w-4 text-orange-500 mt-0.5 flex-shrink-0" />
-                          <span className="line-clamp-2">{campaign.use_of_funds}</span>
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Heart className="w-12 h-12 text-white/80" />
                         </div>
                       )}
                       
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-blue-500" />
-                        <span>{campaign.contributions_count || 0} supporters</span>
+                      {/* Status Badge */}
+                      <div className="absolute top-3 left-3">
+                        <Badge className={getStatusColor(campaign.status)}>
+                          {getStatusText(campaign.status)}
+                        </Badge>
                       </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-purple-500" />
-                        <span>Started {formatDate(campaign.start_date)}</span>
+
+                      {/* Progress Overlay */}
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
+                        <div className="text-white">
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="font-semibold">
+                              <PriceDisplay 
+                                amount={currentAmount} 
+                                originalCurrency={campaign.currency || 'USD'}
+                                showOriginal={false}
+                              />
+                            </span>
+                            <span>
+                              of <PriceDisplay 
+                                amount={goalAmount} 
+                                originalCurrency={campaign.currency || 'USD'}
+                                showOriginal={false}
+                              />
+                            </span>
+                          </div>
+                          <Progress 
+                            value={progress} 
+                            className="h-2 bg-white/20"
+                          />
+                          <div className="text-xs text-white/80 mt-1">
+                            {progress.toFixed(1)}% funded
+                          </div>
+                        </div>
                       </div>
                     </div>
                     
-                    <div className="flex gap-2">
-                      <Button 
-                        asChild
-                        className="flex-1 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0"
-                      >
-                        <Link to={`/creator/fundraising/${campaign.id}`}>
-                          <Eye className="h-4 w-4 mr-2" />
-                          View
-                        </Link>
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    <CardContent className="p-5">
+                      <div className="flex items-start justify-between mb-3">
+                        <h3 className="font-bold text-lg line-clamp-2 group-hover:text-purple-600 transition-colors duration-300 flex-1 mr-2">
+                          {campaign.title}
+                        </h3>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link to={`/creator/fundraising/${campaign.id}/edit`}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <Link to={`/creator/fundraising/${campaign.id}`}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </Link>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      
+                      <p className="text-sm text-gray-600 mb-4 line-clamp-2 leading-relaxed">
+                        {campaign.description}
+                      </p>
+                      
+                      {/* Campaign Details */}
+                      <div className="space-y-2 text-sm text-gray-600 mb-4">
+                        {campaign.use_of_funds && (
+                          <div className="flex items-start gap-2">
+                            <DollarSign className="h-4 w-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                            <span className="line-clamp-2">{campaign.use_of_funds}</span>
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4 text-blue-500" />
+                          <span>{campaign.contributions_count || 0} supporters</span>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-purple-500" />
+                          <span>Started {formatDate(campaign.start_date)}</span>
+                        </div>
+
+                        {/* Currency Info */}
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="h-4 w-4 text-green-500" />
+                          <span>Base currency: {campaign.currency || 'USD'}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Button 
+                          asChild
+                          className="flex-1 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0"
+                        >
+                          <Link to={`/creator/fundraising/${campaign.id}`}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            View
+                          </Link>
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>
