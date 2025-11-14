@@ -513,9 +513,9 @@ const FundraisingPaymentSuccess = () => {
                     variant="outline"
                     className="w-full border-slate-300 text-slate-700 hover:bg-white/80 font-semibold text-sm h-10"
                   >
-                    <Link to="/fundraising">
+                    <Link to="/account">
                       <Users className="w-4 h-4 mr-1.5" />
-                      Explore More
+                      Proceed To Account
                     </Link>
                   </Button>
                 </div>
