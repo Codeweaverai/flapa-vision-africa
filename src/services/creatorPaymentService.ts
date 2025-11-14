@@ -13,7 +13,7 @@ export interface CreatorEarnings {
   total_platform_fees: number;
   course_revenue: number;
   event_revenue: number;
-  fundraising_revenue: number; // ✅ ADDED FUNDRAISING REVENUE
+  fundraising_revenue: number;
 }
 
 export interface CreatorPaymentTransaction extends CreatorTransaction {}
@@ -48,6 +48,87 @@ export async function fetchCreatorPaymentTransactions(creatorId: string, limit: 
     return result;
   } catch (error) {
     console.error('Error fetching creator payment transactions:', error);
+    throw error;
+  }
+}
+
+export async function fetchCreatorPayouts(creatorId: string, limit: number = 10, offset: number = 0): Promise<{ payouts: any[], total: number }> {
+  try {
+    // Get total count for pagination
+    const { count: totalCount, error: countError } = await supabase
+      .from('creator_payouts')
+      .select('*', { count: 'exact', head: true })
+      .eq('creator_id', creatorId);
+
+    if (countError) throw countError;
+
+    // FIXED: Separate the queries to avoid foreign key relationship issues
+    const { data: payoutsData, error: payoutsError } = await supabase
+      .from('creator_payouts')
+      .select('*')
+      .eq('creator_id', creatorId)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (payoutsError) throw payoutsError;
+
+    // Get profile information separately
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, username, full_name, avatar_url')
+      .eq('id', creatorId)
+      .single();
+
+    if (profileError) {
+      console.warn('Error fetching profile data:', profileError);
+    }
+
+    // Combine the data manually
+    const payoutsWithProfile = payoutsData?.map(payout => ({
+      ...payout,
+      profiles: profileData || null
+    })) || [];
+
+    return { 
+      payouts: payoutsWithProfile, 
+      total: totalCount || 0 
+    };
+  } catch (error) {
+    console.error('Error fetching creator payouts:', error);
+    throw error;
+  }
+}
+
+// Alternative method if you need to fetch fundraising transactions
+export async function fetchFundraisingTransactions(campaignIds: string[]) {
+  try {
+    // FIXED: Clean select parameter without comments
+    const { data, error } = await supabase
+      .from('campaign_contributions')
+      .select(`
+        *,
+        fundraising_campaigns!inner (
+          id,
+          title,
+          creator_id,
+          end_date,
+          status
+        ),
+        profiles!campaign_contributions_supporter_id_fkey (
+          id,
+          username,
+          full_name
+        )
+      `)
+      .eq('status', 'completed')
+      .in('campaign_id', campaignIds)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    
+    return data;
+  } catch (error) {
+    console.error('Error fetching fundraising transactions:', error);
     throw error;
   }
 }
@@ -213,43 +294,6 @@ export async function requestCreatorPayout(
       variant: "destructive"
     });
     return false;
-  }
-}
-
-export async function fetchCreatorPayouts(creatorId: string, limit: number = 10, offset: number = 0): Promise<{ payouts: any[], total: number }> {
-  try {
-    // Get total count for pagination
-    const { count: totalCount, error: countError } = await supabase
-      .from('creator_payouts')
-      .select('*', { count: 'exact', head: true })
-      .eq('creator_id', creatorId);
-
-    if (countError) throw countError;
-
-    // Get paginated payouts with detailed information
-    const { data, error } = await supabase
-      .from('creator_payouts')
-      .select(`
-        *,
-        profiles!creator_payouts_creator_id_fkey (
-          username,
-          full_name,
-          avatar_url
-        )
-      `)
-      .eq('creator_id', creatorId)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
-
-    if (error) throw error;
-    
-    return { 
-      payouts: data || [], 
-      total: totalCount || 0 
-    };
-  } catch (error) {
-    console.error('Error fetching creator payouts:', error);
-    throw error;
   }
 }
 
