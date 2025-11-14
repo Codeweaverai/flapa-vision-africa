@@ -218,10 +218,6 @@ const FundraisingPaymentSuccess = () => {
     });
   };
 
-  const calculateProgress = (current: number, goal: number) => {
-    return Math.min((current / goal) * 100, 100);
-  };
-
   const statusConfig = getStatusConfig();
 
   if (paymentStatus !== 'completed') {
@@ -394,41 +390,21 @@ const FundraisingPaymentSuccess = () => {
                       </h2>
                       
                       <div className="mt-3 p-3 bg-white rounded-lg border border-purple-200">
-                        <div className="flex items-center justify-between text-xs text-slate-700 mb-2">
-                          <span>Campaign Progress</span>
-                          <span>
-                            {calculateProgress(
-                              contribution.fundraising_campaigns.current_amount,
-                              contribution.fundraising_campaigns.goal_amount
-                            ).toFixed(1)}%
-                          </span>
-                        </div>
-                        <div className="w-full bg-slate-200 rounded-full h-1.5">
-                          <div 
-                            className="bg-gradient-to-r from-orange-500 to-purple-600 h-1.5 rounded-full" 
-                            style={{
-                              width: `${calculateProgress(
-                                contribution.fundraising_campaigns.current_amount,
-                                contribution.fundraising_campaigns.goal_amount
-                              )}%`
-                            }}
-                          ></div>
-                        </div>
-                        <div className="flex justify-between text-xs text-slate-600 mt-1">
-                          <span>
+                        <div className="text-center">
+                          <div className="flex items-center justify-center gap-1 mb-2">
+                            <TrendingUp className="w-4 h-4 text-purple-500" />
+                            <span className="text-sm font-semibold text-slate-700">Campaign Goal</span>
+                          </div>
+                          <div className="text-lg font-bold text-slate-900">
                             <PriceDisplay 
-                              amount={contribution.fundraising_campaigns.current_amount} 
-                              originalCurrency={contribution.fundraising_campaigns.currency}
-                              showOriginal={false}
-                            /> raised
-                          </span>
-                          <span>
-                            Goal: <PriceDisplay 
                               amount={contribution.fundraising_campaigns.goal_amount} 
                               originalCurrency={contribution.fundraising_campaigns.currency}
                               showOriginal={false}
                             />
-                          </span>
+                          </div>
+                          <p className="text-xs text-slate-600 mt-1">
+                            Help reach this goal by sharing the campaign
+                          </p>
                         </div>
                       </div>
                     </div>
