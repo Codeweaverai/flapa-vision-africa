@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Mail, Smartphone, CreditCard, Banknote } from 'lucide-react';
+import { Mail, Smartphone, CreditCard, Banknote, HeartHandshake } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const Footer = () => {
@@ -97,6 +97,15 @@ const Footer = () => {
               <li>
                 <Link to="/community" className="text-gray-300 hover:text-indigo-300 transition-colors">
                   Community
+                </Link>
+              </li>
+              <li>
+                <Link 
+                  to="/creator-fundraising" 
+                  className="flex items-center gap-2 text-gray-300 hover:text-indigo-300 transition-colors group"
+                >
+                  <HeartHandshake className="h-4 w-4 text-orange-400 group-hover:text-orange-300 transition-colors" />
+                  <span>Creator Fundraising</span>
                 </Link>
               </li>
             </ul>
