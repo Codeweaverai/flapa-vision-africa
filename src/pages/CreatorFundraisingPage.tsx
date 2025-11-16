@@ -185,7 +185,7 @@ const CreatorFundraisingPage = () => {
                   <Link to="/creator/dashboard">Start Fundraising</Link>
                 </Button>
                 <Button 
-                  variant="outline" 
+                  variant="secondary" 
                   size="lg" 
                   className="border-2 border-white text-white hover:bg-white/10 font-semibold px-8 py-4 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 text-lg backdrop-blur-sm"
                 >
@@ -432,10 +432,10 @@ const CreatorFundraisingPage = () => {
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Button asChild size="lg" variant="secondary" className="bg-white text-orange-600 hover:bg-gray-100 font-semibold px-8 py-4 rounded-xl shadow-2xl hover:shadow-3xl transform hover:scale-105 transition-all duration-300 text-lg">
-                    <Link to="/creator/dashboard">Start Your Campaign</Link>
+                    <Link to="/account">Start Your Campaign</Link>
                   </Button>
                   <Button 
-                    variant="outline" 
+                    variant="secondary" 
                     size="lg"
                     className="border-2 border-white text-white hover:bg-white/10 font-semibold px-8 py-4 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 text-lg backdrop-blur-sm"
                   >
