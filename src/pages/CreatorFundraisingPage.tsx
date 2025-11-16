@@ -22,7 +22,8 @@ import {
   Sparkles,
   Gift,
   TrendingUp as TrendingUpIcon,
-  Crown
+  Crown,
+  ArrowRight
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -64,7 +65,7 @@ const CreatorFundraisingPage = () => {
     {
       icon: <DollarSign className="h-6 w-6" />,
       title: "Low 5% Platform Fee",
-      description: "Only 5% transaction fee for platform maintenance and hosting"
+      description: "Small transaction fee for platform maintenance and hosting needs"
     },
     {
       icon: <Clock className="h-6 w-6" />,
@@ -110,32 +111,26 @@ const CreatorFundraisingPage = () => {
     }
   ];
 
-  const pricingTiers = [
+  const trustFactors = [
     {
-      name: "Standard",
-      fee: "5%",
-      description: "Perfect for individual creators and small projects",
-      features: [
-        "All essential fundraising tools",
-        "Real-time analytics dashboard",
-        "Secure payment processing",
-        "Basic campaign templates",
-        "Email support"
-      ]
+      icon: <Shield className="h-8 w-8" />,
+      title: "Secure & Reliable",
+      description: "Bank-level security for all transactions and creator funds"
     },
     {
-      name: "Pro",
-      fee: "3%",
-      description: "Ideal for established creators and larger campaigns",
-      features: [
-        "Everything in Standard",
-        "Advanced analytics & insights",
-        "Priority campaign promotion",
-        "Custom reward tiers",
-        "Dedicated support manager",
-        "Early access to new features"
-      ],
-      popular: true
+      icon: <Globe className="h-8 w-8" />,
+      title: "Global Support",
+      description: "Available to creators in 20+ African countries with local payment methods"
+    },
+    {
+      icon: <TrendingUpIcon className="h-8 w-8" />,
+      title: "Proven Success",
+      description: "95% campaign success rate with over $500K raised to date"
+    },
+    {
+      icon: <Users className="h-8 w-8" />,
+      title: "Growing Community",
+      description: "Join 50,000+ supporters and 2,000+ successful creators"
     }
   ];
 
@@ -268,10 +263,10 @@ const CreatorFundraisingPage = () => {
                 Creator-First Benefits
               </Badge>
               <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                Transparent & Fair Pricing
+                Simple & Transparent Pricing
               </h2>
               <p className="text-xl text-gray-700 max-w-3xl mx-auto">
-                We believe in fair compensation for creators. Our small fees ensure platform sustainability while you keep the majority of your funds.
+                We believe in fair compensation for creators. Our small 5% fee ensures platform sustainability while you keep the majority of your funds.
               </p>
             </div>
 
@@ -294,45 +289,69 @@ const CreatorFundraisingPage = () => {
               ))}
             </div>
 
-            {/* Pricing Tiers */}
-            <div className="mt-16 grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-              {pricingTiers.map((tier, index) => (
+            {/* Simple Pricing Card */}
+            <div className="mt-16 max-w-2xl mx-auto">
+              <Card className="bg-gradient-to-r from-orange-500 to-purple-600 border-0 shadow-3xl text-white overflow-hidden">
+                <CardContent className="p-8 text-center">
+                  <div className="flex items-center justify-center gap-3 mb-4">
+                    <DollarSign className="h-8 w-8 text-white/90" />
+                    <h3 className="text-2xl font-bold">Simple & Fair Pricing</h3>
+                  </div>
+                  <div className="text-5xl font-bold mb-2">5%</div>
+                  <p className="text-white/90 text-lg mb-6">Platform Fee</p>
+                  <div className="grid md:grid-cols-2 gap-4 mb-6">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold">95%</div>
+                      <p className="text-white/80">You Keep</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold">5%</div>
+                      <p className="text-white/80">Platform Fee</p>
+                    </div>
+                  </div>
+                  <p className="text-white/80 mb-6">
+                    No hidden fees. No surprises. Just a simple 5% transaction fee that covers platform maintenance, 
+                    secure payments, and ongoing development.
+                  </p>
+                  <Button 
+                    size="lg" 
+                    className="bg-white text-orange-600 hover:bg-gray-100 font-semibold px-8 py-3 rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+                  >
+                    Start Your Campaign
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </section>
+
+        {/* Trust & Security Section */}
+        <section className="py-20 bg-white/50 backdrop-blur-sm">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                Trusted by Creators
+              </h2>
+              <p className="text-xl text-gray-700 max-w-3xl mx-auto">
+                Join thousands of creators who trust SkillPulse to bring their creative visions to life
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {trustFactors.map((factor, index) => (
                 <Card 
                   key={index} 
-                  className={`bg-white/90 backdrop-blur-sm border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 group hover:-translate-y-2 relative overflow-hidden ${
-                    tier.popular ? 'ring-2 ring-orange-500 ring-opacity-50' : ''
-                  }`}
+                  className="bg-white/80 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300 group text-center"
                 >
-                  {tier.popular && (
-                    <div className="absolute top-0 right-0">
-                      <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 rounded-bl-lg rounded-tr-lg px-4 py-2">
-                        <TrendingUpIcon className="h-3 w-3 mr-1" />
-                        Most Popular
-                      </Badge>
+                  <CardHeader className="pb-4">
+                    <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-4 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300">
+                      {factor.icon}
                     </div>
-                  )}
-                  <CardHeader className="text-center pb-4 pt-8">
-                    <CardTitle className="text-2xl mb-2">{tier.name}</CardTitle>
-                    <div className="flex items-baseline justify-center gap-1 mb-4">
-                      <span className="text-4xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                        {tier.fee}
-                      </span>
-                      <span className="text-gray-600">platform fee</span>
-                    </div>
-                    <CardDescription className="text-gray-600">{tier.description}</CardDescription>
+                    <CardTitle className="text-lg mb-2">{factor.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <ul className="space-y-3">
-                      {tier.features.map((feature, featureIndex) => (
-                        <li key={featureIndex} className="flex items-center gap-3">
-                          <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
-                          <span className="text-gray-700 text-sm">{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <Button className="w-full mt-6 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300">
-                      Get Started
-                    </Button>
+                    <p className="text-gray-600 text-sm">{factor.description}</p>
                   </CardContent>
                 </Card>
               ))}
