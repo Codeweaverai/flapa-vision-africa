@@ -313,50 +313,56 @@ const CreatorFundraising: React.FC = () => {
             </Button>
           </div>
 
-          {/* Stats Overview */}
+          {/* Stats Overview - Vertical Layout */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+            {/* Total Campaigns */}
             <Card className="bg-gradient-to-br from-orange-500 to-orange-400 border-0 shadow-xl text-white">
-              <CardContent className="p-4 lg:p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs lg:text-sm font-medium text-white/90">Total Campaigns</p>
-                    <p className="text-xl lg:text-2xl font-bold font-mono">{campaigns.length}</p>
+              <CardContent className="p-4 lg:p-5 text-center">
+                <div className="flex flex-col items-center space-y-3">
+                  <div className="p-3 bg-white/20 rounded-full backdrop-blur-sm">
+                    <Target className="h-6 w-6 lg:h-7 lg:w-7" />
                   </div>
-                  <div className="p-2 lg:p-3 bg-white/20 rounded-full backdrop-blur-sm">
-                    <Target className="h-4 lg:h-6 w-4 lg:w-6" />
+                  <div>
+                    <p className="text-xs lg:text-sm font-medium text-white/90 mb-1">Total Campaigns</p>
+                    <p className="text-xl lg:text-2xl font-bold font-mono">{campaigns.length}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
+            {/* Active Campaigns */}
             <Card className="bg-gradient-to-br from-emerald-500 to-emerald-400 border-0 shadow-xl text-white">
-              <CardContent className="p-4 lg:p-6">
-                <div className="flex items-center justify-between">
+              <CardContent className="p-4 lg:p-5 text-center">
+                <div className="flex flex-col items-center space-y-3">
+                  <div className="p-3 bg-white/20 rounded-full backdrop-blur-sm">
+                    <Zap className="h-6 w-6 lg:h-7 lg:w-7" />
+                  </div>
                   <div>
-                    <p className="text-xs lg:text-sm font-medium text-white/90">Active Campaigns</p>
+                    <p className="text-xs lg:text-sm font-medium text-white/90 mb-1">Active Campaigns</p>
                     <p className="text-xl lg:text-2xl font-bold font-mono">
                       {campaigns.filter(c => c.status === 'active').length}
                     </p>
                   </div>
-                  <div className="p-2 lg:p-3 bg-white/20 rounded-full backdrop-blur-sm">
-                    <Zap className="h-4 lg:h-6 w-4 lg:w-6" />
-                  </div>
                 </div>
               </CardContent>
             </Card>
 
+            {/* Total Raised */}
             <Card className="bg-gradient-to-br from-purple-500 to-purple-400 border-0 shadow-xl text-white">
-              <CardContent className="p-4 lg:p-6">
-                <div className="flex items-center justify-between">
+              <CardContent className="p-4 lg:p-5 text-center">
+                <div className="flex flex-col items-center space-y-3">
+                  <div className="p-3 bg-white/20 rounded-full backdrop-blur-sm">
+                    <TrendingUp className="h-6 w-6 lg:h-7 lg:w-7" />
+                  </div>
                   <div>
-                    <p className="text-xs lg:text-sm font-medium text-white/90">Total Raised</p>
-                    <p className="text-xl lg:text-2xl font-bold font-mono">
+                    <p className="text-xs lg:text-sm font-medium text-white/90 mb-1">Total Raised</p>
+                    <div className="text-lg lg:text-xl font-bold font-mono">
                       <PriceDisplay 
                         amount={totalStats.totalRaised} 
                         originalCurrency="USD" 
                         showOriginal={false}
                       />
-                    </p>
+                    </div>
                     <p className="text-xs text-white/80 mt-1">
                       Net: <PriceDisplay 
                         amount={totalStats.totalNetAmount} 
@@ -365,27 +371,25 @@ const CreatorFundraising: React.FC = () => {
                       />
                     </p>
                   </div>
-                  <div className="p-2 lg:p-3 bg-white/20 rounded-full backdrop-blur-sm">
-                    <TrendingUp className="h-4 lg:h-6 w-4 lg:w-6" />
-                  </div>
                 </div>
               </CardContent>
             </Card>
 
+            {/* Supporters */}
             <Card className="bg-gradient-to-br from-blue-500 to-blue-400 border-0 shadow-xl text-white">
-              <CardContent className="p-4 lg:p-6">
-                <div className="flex items-center justify-between">
+              <CardContent className="p-4 lg:p-5 text-center">
+                <div className="flex flex-col items-center space-y-3">
+                  <div className="p-3 bg-white/20 rounded-full backdrop-blur-sm">
+                    <Users className="h-6 w-6 lg:h-7 lg:w-7" />
+                  </div>
                   <div>
-                    <p className="text-xs lg:text-sm font-medium text-white/90">Supporters</p>
+                    <p className="text-xs lg:text-sm font-medium text-white/90 mb-1">Supporters</p>
                     <p className="text-xl lg:text-2xl font-bold font-mono">
                       {totalStats.totalContributions}
                     </p>
                     <p className="text-xs text-white/80 mt-1">
                       Across all campaigns
                     </p>
-                  </div>
-                  <div className="p-2 lg:p-3 bg-white/20 rounded-full backdrop-blur-sm">
-                    <Users className="h-4 lg:h-6 w-4 lg:w-6" />
                   </div>
                 </div>
               </CardContent>
