@@ -33,6 +33,7 @@ import WishlistPage from '@/pages/WishlistPage';
 import GiftCardsPage from '@/pages/GiftCardsPage';
 import GiftRedeemPage from '@/pages/GiftRedeemPage';
 import FundraisingPaymentSuccess from '@/pages/fundraising/FundraisingPaymentSuccess';
+import CreatorFundraisingPage from '@/pages/CreatorFundraisingPage';
 
 // Import account pages
 import AccountPage from '@/pages/AccountPage';
@@ -262,6 +263,7 @@ function App() {
                   <Route path="/creators" element={<CreatorsPage />} />
                   <Route path="/creator/profile/:creatorId" element={<CreatorPublicProfile />} />
                   <Route path="/become-creator" element={<BecomeCreatorPage />} />
+                  <Route path="/creator-fundraising" element={<CreatorFundraisingPage />} />
 
                   {/* Protected Creator Routes */}
                   <Route path="/creator/dashboard" element={<ProtectedRoute><CreatorDashboard /></ProtectedRoute>} />
