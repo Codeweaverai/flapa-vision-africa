@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Heart, Users, DollarSign, Calendar, Eye, Edit, MoreVertical, CreditCard, Smartphone, Building, TrendingUp, Target, Zap } from 'lucide-react';
+import { Plus, Heart, Users, DollarSign, Calendar, Eye, Edit, MoreVertical, CreditCard, Smartphone, Building, TrendingUp, Target, Zap, Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
@@ -304,7 +304,7 @@ const CreatorFundraising: React.FC = () => {
             </div>
             <Button
               asChild
-              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white transition-all duration-300"
+              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white transition-all duration-300 shadow-lg hover:shadow-xl"
             >
               <Link to="/creator/fundraising/create">
                 <Plus className="h-4 w-4 mr-2" />
@@ -314,50 +314,50 @@ const CreatorFundraising: React.FC = () => {
           </div>
 
           {/* Stats Overview */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
-            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+            <Card className="bg-gradient-to-br from-orange-500 to-orange-400 border-0 shadow-xl text-white">
               <CardContent className="p-4 lg:p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs lg:text-sm font-medium text-slate-600">Total Campaigns</p>
-                    <p className="text-xl lg:text-2xl font-bold text-slate-900 font-mono">{campaigns.length}</p>
+                    <p className="text-xs lg:text-sm font-medium text-white/90">Total Campaigns</p>
+                    <p className="text-xl lg:text-2xl font-bold font-mono">{campaigns.length}</p>
                   </div>
-                  <div className="p-2 lg:p-3 bg-orange-100 rounded-full">
-                    <Target className="h-4 lg:h-6 w-4 lg:w-6 text-orange-600" />
+                  <div className="p-2 lg:p-3 bg-white/20 rounded-full backdrop-blur-sm">
+                    <Target className="h-4 lg:h-6 w-4 lg:w-6" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+            <Card className="bg-gradient-to-br from-emerald-500 to-emerald-400 border-0 shadow-xl text-white">
               <CardContent className="p-4 lg:p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs lg:text-sm font-medium text-slate-600">Active Campaigns</p>
-                    <p className="text-xl lg:text-2xl font-bold text-slate-900 font-mono">
+                    <p className="text-xs lg:text-sm font-medium text-white/90">Active Campaigns</p>
+                    <p className="text-xl lg:text-2xl font-bold font-mono">
                       {campaigns.filter(c => c.status === 'active').length}
                     </p>
                   </div>
-                  <div className="p-2 lg:p-3 bg-emerald-100 rounded-full">
-                    <Zap className="h-4 lg:h-6 w-4 lg:w-6 text-emerald-600" />
+                  <div className="p-2 lg:p-3 bg-white/20 rounded-full backdrop-blur-sm">
+                    <Zap className="h-4 lg:h-6 w-4 lg:w-6" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+            <Card className="bg-gradient-to-br from-purple-500 to-purple-400 border-0 shadow-xl text-white">
               <CardContent className="p-4 lg:p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs lg:text-sm font-medium text-slate-600">Total Raised</p>
-                    <p className="text-xl lg:text-2xl font-bold text-slate-900 font-mono">
+                    <p className="text-xs lg:text-sm font-medium text-white/90">Total Raised</p>
+                    <p className="text-xl lg:text-2xl font-bold font-mono">
                       <PriceDisplay 
                         amount={totalStats.totalRaised} 
                         originalCurrency="USD" 
                         showOriginal={false}
                       />
                     </p>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-white/80 mt-1">
                       Net: <PriceDisplay 
                         amount={totalStats.totalNetAmount} 
                         originalCurrency="USD" 
@@ -365,34 +365,34 @@ const CreatorFundraising: React.FC = () => {
                       />
                     </p>
                   </div>
-                  <div className="p-2 lg:p-3 bg-purple-100 rounded-full">
-                    <TrendingUp className="h-4 lg:h-6 w-4 lg:w-6 text-purple-600" />
+                  <div className="p-2 lg:p-3 bg-white/20 rounded-full backdrop-blur-sm">
+                    <TrendingUp className="h-4 lg:h-6 w-4 lg:w-6" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+            <Card className="bg-gradient-to-br from-blue-500 to-blue-400 border-0 shadow-xl text-white">
               <CardContent className="p-4 lg:p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs lg:text-sm font-medium text-slate-600">Supporters</p>
-                    <p className="text-xl lg:text-2xl font-bold text-slate-900 font-mono">
+                    <p className="text-xs lg:text-sm font-medium text-white/90">Supporters</p>
+                    <p className="text-xl lg:text-2xl font-bold font-mono">
                       {totalStats.totalContributions}
                     </p>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-white/80 mt-1">
                       Across all campaigns
                     </p>
                   </div>
-                  <div className="p-2 lg:p-3 bg-blue-100 rounded-full">
-                    <Users className="h-4 lg:h-6 w-4 lg:w-6 text-blue-600" />
+                  <div className="p-2 lg:p-3 bg-white/20 rounded-full backdrop-blur-sm">
+                    <Users className="h-4 lg:h-6 w-4 lg:w-6" />
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Campaigns Grid */}
+          {/* Campaigns Grid - 2 cards per row */}
           {campaigns.length === 0 ? (
             <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-2xl">
               <CardContent className="p-12 text-center">
@@ -403,7 +403,7 @@ const CreatorFundraising: React.FC = () => {
                 <p className="text-slate-600 mb-6">Start your first fundraising campaign to get support from your community.</p>
                 <Button
                   asChild
-                  className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white transition-all duration-300"
+                  className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white transition-all duration-300 shadow-lg hover:shadow-xl"
                 >
                   <Link to="/creator/fundraising/create">
                     <Plus className="h-4 w-4 mr-2" />
@@ -413,7 +413,7 @@ const CreatorFundraising: React.FC = () => {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
               {campaigns.map((campaign) => {
                 const currentAmount = campaign.total_raised;
                 const netAmount = campaign.total_net_amount;
@@ -423,8 +423,8 @@ const CreatorFundraising: React.FC = () => {
                 const campaignBaseCurrency = campaign.currency || 'USD';
                 
                 return (
-                  <Card key={campaign.id} className="group bg-white/80 backdrop-blur-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-1 border-0 overflow-hidden">
-                    <div className="relative h-40 bg-gradient-to-br from-orange-400 to-purple-400 overflow-hidden">
+                  <Card key={campaign.id} className="group bg-white/80 backdrop-blur-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border-0 overflow-hidden w-full">
+                    <div className="relative h-48 bg-gradient-to-br from-orange-400 to-purple-400 overflow-hidden">
                       {campaign.cover_image_url ? (
                         <img 
                           src={campaign.cover_image_url} 
@@ -433,21 +433,24 @@ const CreatorFundraising: React.FC = () => {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <Heart className="w-10 h-10 text-white/80" />
+                          <div className="text-center text-white">
+                            <Heart className="w-12 h-12 mx-auto mb-2 opacity-80" />
+                            <p className="text-sm font-medium">{campaign.title}</p>
+                          </div>
                         </div>
                       )}
                       
                       {/* Status Badge */}
-                      <div className="absolute top-3 left-3">
-                        <Badge className={`${getStatusColor(campaign.status)} text-xs font-medium`}>
+                      <div className="absolute top-4 left-4">
+                        <Badge className={`${getStatusColor(campaign.status)} text-xs font-medium shadow-lg`}>
                           {getStatusText(campaign.status)}
                         </Badge>
                       </div>
 
                       {/* Progress Overlay */}
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
                         <div className="text-white">
-                          <div className="flex justify-between text-xs mb-1">
+                          <div className="flex justify-between text-sm mb-2">
                             <span className="font-semibold">
                               <PriceDisplay 
                                 amount={currentAmount} 
@@ -465,37 +468,44 @@ const CreatorFundraising: React.FC = () => {
                           </div>
                           <Progress 
                             value={progress} 
-                            className="h-1.5 bg-white/20"
+                            className="h-2 bg-white/30"
                           />
-                          <div className="text-xs text-white/80 mt-1 flex justify-between">
+                          <div className="flex justify-between text-xs text-white/90 mt-2">
                             <span>{Math.round(progress)}% funded</span>
                             <span>{campaign.contributions_count} supporters</span>
                           </div>
                         </div>
                       </div>
+
+                      {/* Hover Sparkles Effect */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-orange-500/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                        <div className="absolute top-4 right-4">
+                          <Sparkles className="h-4 w-4 text-white animate-pulse" />
+                        </div>
+                      </div>
                     </div>
                     
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <h3 className="font-semibold text-slate-900 line-clamp-2 group-hover:text-purple-600 transition-colors duration-300 flex-1 mr-2 text-sm leading-tight">
+                    <CardContent className="p-5">
+                      <div className="flex items-start justify-between mb-4">
+                        <h3 className="font-bold text-slate-900 line-clamp-2 group-hover:text-purple-600 transition-colors duration-300 flex-1 mr-3 text-base leading-tight">
                           {campaign.title}
                         </h3>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                              <MoreVertical className="h-3.5 w-3.5" />
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-slate-100">
+                              <MoreVertical className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="text-xs">
+                          <DropdownMenuContent align="end" className="text-sm">
                             <DropdownMenuItem asChild>
-                              <Link to={`/creator/fundraising/${campaign.id}/edit`} className="text-xs">
-                                <Edit className="h-3.5 w-3.5 mr-2" />
+                              <Link to={`/creator/fundraising/${campaign.id}/edit`}>
+                                <Edit className="h-4 w-4 mr-2" />
                                 Edit
                               </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem asChild>
-                              <Link to={`/creator/fundraising/${campaign.id}`} className="text-xs">
-                                <Eye className="h-3.5 w-3.5 mr-2" />
+                              <Link to={`/creator/fundraising/${campaign.id}`}>
+                                <Eye className="h-4 w-4 mr-2" />
                                 View Details
                               </Link>
                             </DropdownMenuItem>
@@ -503,14 +513,14 @@ const CreatorFundraising: React.FC = () => {
                         </DropdownMenu>
                       </div>
                       
-                      <p className="text-xs text-slate-600 mb-3 line-clamp-2 leading-relaxed">
+                      <p className="text-sm text-slate-600 mb-4 line-clamp-2 leading-relaxed">
                         {campaign.description}
                       </p>
                       
                       {/* Financial Breakdown */}
-                      <div className="space-y-2 mb-3">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-slate-600">Gross:</span>
+                      <div className="space-y-3 mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-slate-700">Gross Amount:</span>
                           <span className="font-semibold text-slate-900">
                             <PriceDisplay 
                               amount={currentAmount} 
@@ -520,8 +530,8 @@ const CreatorFundraising: React.FC = () => {
                           </span>
                         </div>
                         
-                        <div className="flex justify-between text-xs">
-                          <span className="text-slate-600">Fees:</span>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-slate-700">Transaction Fees:</span>
                           <span className="text-rose-600 font-medium">
                             -<PriceDisplay 
                               amount={transactionFees} 
@@ -531,8 +541,8 @@ const CreatorFundraising: React.FC = () => {
                           </span>
                         </div>
                         
-                        <div className="flex justify-between text-xs border-t pt-2">
-                          <span className="text-slate-700 font-semibold">Net:</span>
+                        <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-200">
+                          <span className="text-slate-800 font-bold">Net Amount:</span>
                           <span className="font-bold text-emerald-600">
                             <PriceDisplay 
                               amount={netAmount} 
@@ -545,10 +555,11 @@ const CreatorFundraising: React.FC = () => {
                       
                       {/* Payment Methods */}
                       {campaign.payment_methods && Object.keys(campaign.payment_methods).length > 0 && (
-                        <div className="mb-3">
-                          <div className="flex flex-wrap gap-1">
+                        <div className="mb-4">
+                          <p className="text-xs text-slate-600 mb-2 font-medium">Payment Methods:</p>
+                          <div className="flex flex-wrap gap-2">
                             {Object.entries(campaign.payment_methods).slice(0, 3).map(([method]) => (
-                              <Badge key={method} variant="secondary" className={`${getPaymentMethodColor(method)} text-xs px-1.5 py-0`}>
+                              <Badge key={method} variant="secondary" className={`${getPaymentMethodColor(method)} text-xs px-2 py-1 shadow-sm`}>
                                 <span className="flex items-center gap-1">
                                   {getPaymentMethodIcon(method)}
                                   {method.replace('_', ' ')}
@@ -556,7 +567,7 @@ const CreatorFundraising: React.FC = () => {
                               </Badge>
                             ))}
                             {Object.keys(campaign.payment_methods).length > 3 && (
-                              <Badge variant="secondary" className="bg-slate-100 text-slate-700 text-xs px-1.5 py-0">
+                              <Badge variant="secondary" className="bg-slate-100 text-slate-700 text-xs px-2 py-1 shadow-sm">
                                 +{Object.keys(campaign.payment_methods).length - 3}
                               </Badge>
                             )}
@@ -565,21 +576,23 @@ const CreatorFundraising: React.FC = () => {
                       )}
                       
                       {/* Campaign Meta */}
-                      <div className="flex items-center justify-between text-xs text-slate-500">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          <span>{formatDate(campaign.start_date)}</span>
+                      <div className="flex items-center justify-between text-sm text-slate-600 mb-4">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-slate-500" />
+                          <span>Started {formatDate(campaign.start_date)}</span>
                         </div>
-                        <span className="font-mono text-xs">{campaignBaseCurrency}</span>
+                        <span className="font-mono text-sm bg-slate-100 px-2 py-1 rounded text-slate-700">
+                          {campaignBaseCurrency}
+                        </span>
                       </div>
                       
                       <Button 
                         asChild
-                        className="w-full mt-3 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 text-xs h-8 transition-all duration-300"
+                        className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 text-sm h-10 transition-all duration-300 shadow-lg hover:shadow-xl"
                       >
                         <Link to={`/creator/fundraising/${campaign.id}`}>
-                          <Eye className="h-3 w-3 mr-1.5" />
-                          View Details
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Campaign Details
                         </Link>
                       </Button>
                     </CardContent>
