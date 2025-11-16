@@ -185,12 +185,15 @@ const CreatorFundraisingPage = () => {
                   <Link to="/creator/dashboard">Start Fundraising</Link>
                 </Button>
                 <Button 
-                  variant="secondary" 
+                  asChild
+                  variant="outline" 
                   size="lg" 
                   className="border-2 border-white text-white hover:bg-white/10 font-semibold px-8 py-4 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 text-lg backdrop-blur-sm"
                 >
-                  <Sparkles className="h-5 w-5 mr-2" />
-                  See How It Works
+                  <Link to="/how-fundraising-works">
+                    <Sparkles className="h-5 w-5 mr-2" />
+                    See How It Works
+                  </Link>
                 </Button>
               </div>
 
@@ -314,11 +317,11 @@ const CreatorFundraisingPage = () => {
                     secure payments, and ongoing development.
                   </p>
                   <Button 
+                    asChild
                     size="lg" 
                     className="bg-white text-orange-600 hover:bg-gray-100 font-semibold px-8 py-3 rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
                   >
-                    Start Your Campaign
-                    <ArrowRight className="h-4 w-4 ml-2" />
+                    <Link to="/creator/dashboard">Start Your Campaign</Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -359,7 +362,7 @@ const CreatorFundraisingPage = () => {
           </div>
         </section>
 
-        {/* Enhanced How It Works Section */}
+        {/* Enhanced How It Works Section - INCREASED CARD HEIGHT */}
         <section className="py-20 bg-gradient-to-br from-orange-50/50 to-purple-50/50 relative">
           <div className="absolute inset-0">
             <div className="absolute top-1/3 left-10 w-20 h-20 bg-orange-200/20 rounded-full blur-2xl"></div>
@@ -380,23 +383,24 @@ const CreatorFundraisingPage = () => {
                 <div key={index} className="relative">
                   {/* Connecting lines */}
                   {index < steps.length - 1 && (
-                    <div className="hidden lg:block absolute top-12 left-1/2 w-full h-0.5 bg-gradient-to-r from-orange-500/30 to-purple-600/30 -z-10"></div>
+                    <div className="hidden lg:block absolute top-16 left-1/2 w-full h-0.5 bg-gradient-to-r from-orange-500/30 to-purple-600/30 -z-10"></div>
                   )}
-                  <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 group hover:-translate-y-2 text-center relative overflow-hidden">
+                  {/* Increased card height with min-h-[320px] */}
+                  <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 group hover:-translate-y-2 text-center relative overflow-hidden min-h-[320px] flex flex-col">
                     <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
                       <div className="bg-gradient-to-r from-orange-500 to-purple-600 text-white w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
                         {step.number}
                       </div>
                     </div>
-                    <CardHeader className="pt-8 pb-4">
-                      <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-3 rounded-full w-12 h-12 mx-auto mb-4 flex items-center justify-center text-white opacity-90">
+                    <CardHeader className="pt-12 pb-4 flex-shrink-0">
+                      <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-3 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center text-white opacity-90 group-hover:scale-110 transition-transform duration-300">
                         {step.icon}
                       </div>
                       <CardTitle className="text-lg group-hover:text-orange-600 transition-colors duration-300">
                         {step.title}
                       </CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="flex-grow flex items-center">
                       <p className="text-gray-600 group-hover:text-gray-700 transition-colors duration-300">
                         {step.description}
                       </p>
@@ -404,6 +408,22 @@ const CreatorFundraisingPage = () => {
                   </Card>
                 </div>
               ))}
+            </div>
+
+            {/* Additional CTA for detailed guide */}
+            <div className="text-center mt-12">
+              <Button 
+                asChild
+                variant="outline" 
+                size="lg"
+                className="border-2 border-orange-500 text-orange-600 hover:bg-orange-50 font-semibold px-8 py-3 rounded-xl"
+              >
+                <Link to="/how-fundraising-works" className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5" />
+                  View Detailed Guide
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
             </div>
           </div>
         </section>
@@ -432,15 +452,18 @@ const CreatorFundraisingPage = () => {
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Button asChild size="lg" variant="secondary" className="bg-white text-orange-600 hover:bg-gray-100 font-semibold px-8 py-4 rounded-xl shadow-2xl hover:shadow-3xl transform hover:scale-105 transition-all duration-300 text-lg">
-                    <Link to="/account">Start Your Campaign</Link>
+                    <Link to="/creator/dashboard">Start Your Campaign</Link>
                   </Button>
                   <Button 
-                    variant="secondary" 
+                    asChild
+                    variant="outline" 
                     size="lg"
                     className="border-2 border-white text-white hover:bg-white/10 font-semibold px-8 py-4 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 text-lg backdrop-blur-sm"
                   >
-                    <Sparkles className="h-5 w-5 mr-2" />
-                    Schedule Demo
+                    <Link to="/how-fundraising-works" className="flex items-center">
+                      <Sparkles className="h-5 w-5 mr-2" />
+                      See Detailed Guide
+                    </Link>
                   </Button>
                 </div>
                 <p className="text-white/70 mt-6 text-sm">
