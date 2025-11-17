@@ -46,11 +46,7 @@ const HowFundraisingWorksPage = () => {
         "Set a realistic funding goal that covers your needs",
         "Plan your campaign duration based on your audience size"
       ],
-      estimatedTime: "1-2 hours",
-      resources: [
-        { name: "Campaign Planning Template", icon: <FileText className="h-4 w-4" />, type: "template" },
-        { name: "Goal Setting Guide", icon: <Download className="h-4 w-4" />, type: "guide" }
-      ]
+      estimatedTime: "1-2 hours"
     },
     {
       number: "02",
@@ -70,11 +66,7 @@ const HowFundraisingWorksPage = () => {
         "Show your passion and expertise",
         "Include a compelling video (increases success by 30%)"
       ],
-      estimatedTime: "2-3 hours",
-      resources: [
-        { name: "Video Creation Guide", icon: <Video className="h-4 w-4" />, type: "guide" },
-        { name: "Image Optimization Tips", icon: <Download className="h-4 w-4" />, type: "tips" }
-      ]
+      estimatedTime: "2-3 hours"
     },
     {
       number: "03",
@@ -94,11 +86,7 @@ const HowFundraisingWorksPage = () => {
         "Create a high-tier option for super supporters",
         "Make rewards personal and meaningful"
       ],
-      estimatedTime: "1-2 hours",
-      resources: [
-        { name: "Reward Tier Examples", icon: <FileText className="h-4 w-4" />, type: "examples" },
-        { name: "Pricing Strategy Guide", icon: <Download className="h-4 w-4" />, type: "guide" }
-      ]
+      estimatedTime: "1-2 hours"
     },
     {
       number: "04",
@@ -118,11 +106,7 @@ const HowFundraisingWorksPage = () => {
         "Post regular updates to keep momentum",
         "Engage with every backer personally"
       ],
-      estimatedTime: "Ongoing during campaign",
-      resources: [
-        { name: "Social Media Templates", icon: <Share2 className="h-4 w-4" />, type: "templates" },
-        { name: "Email Outreach Scripts", icon: <FileText className="h-4 w-4" />, type: "scripts" }
-      ]
+      estimatedTime: "Ongoing during campaign"
     },
     {
       number: "05",
@@ -142,11 +126,7 @@ const HowFundraisingWorksPage = () => {
         "Create excitement around stretch goals",
         "Thank every backer personally when possible"
       ],
-      estimatedTime: "1-2 hours daily",
-      resources: [
-        { name: "Update Template Library", icon: <FileText className="h-4 w-4" />, type: "templates" },
-        { name: "Engagement Analytics", icon: <BarChart3 className="h-4 w-4" />, type: "analytics" }
-      ]
+      estimatedTime: "1-2 hours daily"
     },
     {
       number: "06",
@@ -166,11 +146,7 @@ const HowFundraisingWorksPage = () => {
         "Over-deliver on rewards when possible",
         "Keep backers informed about any delays"
       ],
-      estimatedTime: "Varies by project scale",
-      resources: [
-        { name: "Fulfillment Checklist", icon: <CheckCircle className="h-4 w-4" />, type: "checklist" },
-        { name: "Backer Communication Templates", icon: <FileText className="h-4 w-4" />, type: "templates" }
-      ]
+      estimatedTime: "Varies by project scale"
     }
   ];
 
@@ -308,24 +284,12 @@ const HowFundraisingWorksPage = () => {
                           </div>
                         </div>
                         
-                        <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
+                        <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
                           <Clock className="h-4 w-4" />
                           <span>Estimated time: {step.estimatedTime}</span>
                         </div>
 
-                        {/* Resources */}
-                        <div className="mb-6">
-                          <h4 className="font-semibold text-gray-700 mb-3">Resources</h4>
-                          <div className="space-y-2">
-                            {step.resources.map((resource, resIndex) => (
-                              <div key={resIndex} className="flex items-center gap-2 text-sm text-orange-600 hover:text-orange-700 cursor-pointer">
-                                {resource.icon}
-                                <span>{resource.name}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
+                        {/* Pro Tip Section */}
                         <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-4 rounded-lg text-white">
                           <div className="flex items-center gap-2 mb-2">
                             <Sparkles className="h-4 w-4" />
@@ -479,7 +443,7 @@ const HowFundraisingWorksPage = () => {
                 </Button>
                 <Button 
                   asChild
-                  variant="outline" 
+                  variant="secondary" 
                   size="lg"
                   className="border-2 border-white text-white hover:bg-white/10 font-semibold px-8 py-4 rounded-xl text-lg"
                 >
