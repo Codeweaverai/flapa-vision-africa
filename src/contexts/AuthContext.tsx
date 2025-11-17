@@ -23,58 +23,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [otpRequired, setOtpRequired] = useState(false);
   const [verificationType, setVerificationType] = useState<'login' | 'registration' | 'inactive' | null>(null);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-
-  // Check if user has verified OTP in the last 24 hours
-  const hasRecentOTPVerification = async (userId: string): Promise<boolean> => {
-    try {
-      const { data: recentVerification, error } = await supabase
-        .from('user_otp_verifications')
-        .select('verified_at')
-        .eq('user_id', userId)
-        .not('verified_at', 'is', null)
-        .gte('verified_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()) // Last 24 hours
-        .order('verified_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (error) {
-        if (error.code === 'PGRST116') { // No rows found
-          return false;
-        }
-        console.error('Error checking recent OTP verification:', error);
-        return false; // Default to requiring OTP on error
-      }
-
-      return !!recentVerification;
-    } catch (error) {
-      console.error('Error in hasRecentOTPVerification:', error);
-      return false; // Default to requiring OTP on error
-    }
-  };
-
-  // Check if user needs OTP based on various factors
-  const shouldRequireOTP = async (userId: string, event: string): Promise<{ required: boolean; type: 'login' | 'registration' | 'inactive' }> => {
-    // For signups, always require OTP regardless of recent verification
-    if (event === 'SIGNED_UP') {
-      return { required: true, type: 'registration' };
-    }
-
-    // For logins, check if they have recent verification
-    const hasRecentVerification = await hasRecentOTPVerification(userId);
-    
-    if (hasRecentVerification) {
-      console.log('User has OTP verification within 24 hours, skipping OTP');
-      return { required: false, type: 'login' };
-    }
-
-    // If no recent verification, require OTP for login
-    console.log('No recent OTP verification found, requiring OTP');
-    return { required: true, type: 'login' };
-  };
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   useEffect(() => {
     let mounted = true;
+    let initialSessionProcessed = false;
 
     const initializeAuth = async () => {
       try {
@@ -87,124 +40,77 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(initialSession);
         setUser(initialSession?.user ?? null);
         
-        // For initial session, check if OTP is needed
+        // Mark that we've processed the initial session
+        initialSessionProcessed = true;
+        
+        // For initial session, OTP should NOT be required
         if (initialSession?.user) {
-          const otpCheck = await shouldRequireOTP(initialSession.user.id, 'INITIAL_SESSION');
-          if (!otpCheck.required) {
-            console.log('Existing session with recent OTP verification, OTP not required');
-            setOtpRequired(false);
-            setVerificationType(null);
-          } else {
-            console.log('Existing session needs OTP verification');
-            setOtpRequired(true);
-            setVerificationType(otpCheck.type);
-          }
+          console.log('Existing session found from initial load, OTP not required');
+          setOtpRequired(false);
+          setVerificationType(null);
         }
         
         setLoading(false);
-        setIsInitialLoad(false);
+        setInitialLoadComplete(true);
         
       } catch (error) {
         console.error('Error initializing auth:', error);
         if (mounted) {
           setLoading(false);
-          setIsInitialLoad(false);
+          setInitialLoadComplete(true);
         }
       }
     };
 
     initializeAuth();
 
-    // Listen for auth changes AFTER initial load
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
         
         console.log('Auth state change:', event, session?.user?.id);
         
-        // Handle SIGNED_IN events that are NOT from initial load
-        if (event === 'SIGNED_IN' && session?.user && !isInitialLoad) {
-          console.log('New sign in detected, checking OTP requirement');
-          
-          const otpCheck = await shouldRequireOTP(session.user.id, 'SIGNED_IN');
-          
-          setSession(session);
-          setUser(session.user);
-          
-          if (otpCheck.required) {
-            setVerificationType(otpCheck.type);
+        // Update session and user regardless of event
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        // Handle different auth events
+        if (event === 'SIGNED_IN' && session?.user) {
+          // Check if this is from initial load or a new authentication
+          if (initialSessionProcessed && initialLoadComplete) {
+            // This is a NEW authentication (user just logged in)
+            console.log('NEW authentication detected, requiring OTP verification');
+            setVerificationType('login');
             setOtpRequired(true);
-            console.log('OTP required for', otpCheck.type);
           } else {
+            // This is from initial page load
+            console.log('Initial session from page load, OTP not required');
             setOtpRequired(false);
             setVerificationType(null);
-            console.log('OTP not required due to recent verification');
           }
         } 
-        // Handle initial sign in from page load
-        else if (event === 'SIGNED_IN' && session?.user && isInitialLoad) {
-          console.log('Initial sign in from page load');
-          
-          const otpCheck = await shouldRequireOTP(session.user.id, 'INITIAL_SESSION');
-          
-          setSession(session);
-          setUser(session.user);
-          
-          if (otpCheck.required) {
-            setVerificationType(otpCheck.type);
-            setOtpRequired(true);
-          } else {
-            setOtpRequired(false);
-            setVerificationType(null);
-          }
-        }
-        // Handle user signed up (new registration)
-        else if (event === 'SIGNED_IN' && session?.user) {
-          // For new registrations, check if it's a new user by looking at profile creation time
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('created_at')
-            .eq('id', session.user.id)
-            .single();
-
-          const isNewUser = profile && 
-            (new Date().getTime() - new Date(profile.created_at).getTime()) < 5 * 60 * 1000; // Within 5 minutes
-          
-          if (isNewUser) {
-            console.log('New user registration detected, requiring OTP');
-            setSession(session);
-            setUser(session.user);
-            setVerificationType('registration');
-            setOtpRequired(true);
-          } else {
-            const otpCheck = await shouldRequireOTP(session.user.id, 'SIGNED_IN');
-            setSession(session);
-            setUser(session.user);
-            setOtpRequired(otpCheck.required);
-            setVerificationType(otpCheck.required ? otpCheck.type : null);
-          }
-        }
         else if (event === 'SIGNED_OUT') {
           console.log('User signed out, clearing all states');
-          setSession(null);
-          setUser(null);
           setOtpRequired(false);
           setVerificationType(null);
         }
         else if (event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
-          console.log('Session updated, no OTP required');
-          setSession(session);
-          setUser(session?.user ?? null);
+          console.log('Session maintenance event, OTP not required');
           setOtpRequired(false);
           setVerificationType(null);
         }
         else {
-          // For other events, update session but don't require OTP
+          // For all other events, no OTP required
           console.log('Other auth event:', event, '- OTP not required');
-          setSession(session);
-          setUser(session?.user ?? null);
           setOtpRequired(false);
           setVerificationType(null);
+        }
+        
+        // Set loading to false if this is the initial session
+        if (!initialLoadComplete) {
+          setLoading(false);
+          setInitialLoadComplete(true);
         }
       }
     );
@@ -213,49 +119,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [isInitialLoad]);
+  }, []);
 
   const completeOTPVerification = async () => {
-    if (!user) {
-      throw new Error('No user to verify');
-    }
-
-    try {
-      // Create a new OTP verification record with current timestamp
-      const { error } = await supabase
-        .from('user_otp_verifications')
-        .insert({
-          user_id: user.id,
-          otp_code: '000000', // Placeholder since we're using serverless functions
-          verification_type: verificationType || 'login',
-          verified_at: new Date().toISOString(),
-          expires_at: new Date().toISOString(),
-          attempts: 1
-        });
-
-      if (error) {
-        console.error('Error creating OTP verification record:', error);
-        // Continue anyway - don't block the user
-      }
-
-      console.log('OTP verification completed for user:', user.id);
-      
-      // Clear OTP states
-      setOtpRequired(false);
-      setVerificationType(null);
-      
-    } catch (error) {
-      console.error('Failed to complete OTP verification:', error);
-      // Still clear the OTP requirement even if there's an error
-      setOtpRequired(false);
-      setVerificationType(null);
-    }
+    console.log('OTP verification completed');
+    setOtpRequired(false);
+    setVerificationType(null);
   };
 
   const signIn = async (email: string, password: string) => {
     console.log('Attempting sign in for:', email);
     
-    // Reset OTP state before sign in
     setOtpRequired(false);
     setVerificationType(null);
     
@@ -269,13 +143,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw error;
     }
     
-    console.log('Sign in successful - OTP requirement will be checked');
+    console.log('Sign in successful - OTP will be required');
   };
 
   const signUp = async (email: string, password: string, metadata?: { full_name?: string; username?: string }) => {
     console.log('Attempting sign up for:', email);
     
-    // Reset OTP state before sign up
     setOtpRequired(false);
     setVerificationType(null);
     
@@ -302,7 +175,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       console.log('Sign up successful, user:', data.user?.id);
-      console.log('OTP will be required for new registration');
+      console.log('OTP will be required for verification');
       
       return data;
       
