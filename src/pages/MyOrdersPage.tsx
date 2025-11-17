@@ -23,6 +23,46 @@ declare global {
   }
 }
 
+// Currency conversion rates (same as creator profile page)
+const exchangeRates: { [key: string]: number } = {
+  USD: 1,
+  EUR: 0.85,
+  GBP: 0.73,
+  ZMW: 0.044,
+  NGN: 0.0012,
+  GHS: 0.082,
+  KES: 0.0078,
+  UGX: 0.00027,
+  TZS: 0.00043,
+  RWF: 0.0010,
+  XOF: 0.0016,
+  XAF: 0.0016,
+  CDF: 0.00049,
+  MZN: 0.015,
+  MWK: 0.0009,
+  LSL: 0.054,
+  SLL: 0.000048
+};
+
+// Currency conversion function
+const convertCurrency = async (
+  amount: number,
+  fromCurrency: string,
+  toCurrency: string
+): Promise<number> => {
+  if (fromCurrency === toCurrency) {
+    return amount;
+  }
+
+  const fromRate = exchangeRates[fromCurrency] || 1;
+  const toRate = exchangeRates[toCurrency] || 1;
+  
+  const usdAmount = amount * fromRate;
+  const targetAmount = usdAmount / toRate;
+  
+  return Number(targetAmount.toFixed(2));
+};
+
 // Local interfaces and helpers
 interface GiftCard {
   id: string;
@@ -330,7 +370,7 @@ const styles = StyleSheet.create({
   },
 });
 
-// Professional Receipt PDF Component
+// Enhanced Professional Receipt PDF Component with Currency Conversion
 const ReceiptPDF: React.FC<{
   selectedOrder: Order;
   selectedType: 'event' | 'course' | 'gift';
@@ -339,7 +379,8 @@ const ReceiptPDF: React.FC<{
   processingFee: number;
   total: number;
   filteredItems: any[];
-}> = ({ selectedOrder, selectedType, subtotal, taxAmount, processingFee, total, filteredItems }) => {
+  targetCurrency?: CurrencyCode;
+}> = ({ selectedOrder, selectedType, subtotal, taxAmount, processingFee, total, filteredItems, targetCurrency }) => {
   
   const safeCurrency = (value: string | null | undefined): CurrencyCode => {
     if (!value) return 'USD';
@@ -364,12 +405,114 @@ const ReceiptPDF: React.FC<{
     return `${start}${middle}${end}`;
   };
 
-  // Use currencyService for proper currency formatting
+  // Enhanced currency formatting with conversion support
   const formatCurrencyForPDF = (amount: number, currency: CurrencyCode): string => {
-    return currencyService.formatCurrency(amount, currency);
+    try {
+      const formatter = new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currency,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      return formatter.format(amount);
+    } catch (error) {
+      return `${currency} ${amount.toFixed(2)}`;
+    }
   };
 
   const orderCurrency = safeCurrency(selectedOrder.currency);
+  const displayCurrency = targetCurrency || orderCurrency;
+
+  // Convert amounts to target currency
+  const convertAmounts = async () => {
+    if (orderCurrency === displayCurrency) {
+      return {
+        subtotal,
+        taxAmount,
+        processingFee,
+        total,
+        items: filteredItems.reduce((acc, item) => {
+          acc[item.id] = {
+            unitPrice: safeNumber(item.unit_price),
+            totalPrice: safeNumber(item.total_price)
+          };
+          return acc;
+        }, {} as { [key: string]: { unitPrice: number; totalPrice: number } })
+      };
+    }
+
+    try {
+      // Convert all amounts
+      const convertedSubtotal = await convertCurrency(subtotal, orderCurrency, displayCurrency);
+      const convertedTaxAmount = await convertCurrency(taxAmount, orderCurrency, displayCurrency);
+      const convertedProcessingFee = await convertCurrency(processingFee, orderCurrency, displayCurrency);
+      const convertedTotal = await convertCurrency(total, orderCurrency, displayCurrency);
+      
+      // Convert individual items
+      const convertedItems: { [key: string]: { unitPrice: number; totalPrice: number } } = {};
+      for (const item of filteredItems) {
+        const convertedUnitPrice = await convertCurrency(safeNumber(item.unit_price), orderCurrency, displayCurrency);
+        const convertedTotalPrice = await convertCurrency(safeNumber(item.total_price), orderCurrency, displayCurrency);
+        convertedItems[item.id] = {
+          unitPrice: convertedUnitPrice,
+          totalPrice: convertedTotalPrice
+        };
+      }
+
+      return {
+        subtotal: convertedSubtotal,
+        taxAmount: convertedTaxAmount,
+        processingFee: convertedProcessingFee,
+        total: convertedTotal,
+        items: convertedItems
+      };
+    } catch (error) {
+      console.error('Currency conversion failed:', error);
+      // Fallback to original amounts
+      return {
+        subtotal,
+        taxAmount,
+        processingFee,
+        total,
+        items: filteredItems.reduce((acc, item) => {
+          acc[item.id] = {
+            unitPrice: safeNumber(item.unit_price),
+            totalPrice: safeNumber(item.total_price)
+          };
+          return acc;
+        }, {} as { [key: string]: { unitPrice: number; totalPrice: number } })
+      };
+    }
+  };
+
+  const [convertedAmounts, setConvertedAmounts] = React.useState<{
+    subtotal: number;
+    taxAmount: number;
+    processingFee: number;
+    total: number;
+    items: { [key: string]: { unitPrice: number; totalPrice: number } };
+  } | null>(null);
+
+  React.useEffect(() => {
+    const loadConvertedAmounts = async () => {
+      const amounts = await convertAmounts();
+      setConvertedAmounts(amounts);
+    };
+    loadConvertedAmounts();
+  }, [subtotal, taxAmount, processingFee, total, filteredItems, orderCurrency, displayCurrency]);
+
+  // Show loading state while converting
+  if (!convertedAmounts) {
+    return (
+      <Document>
+        <Page size="A4" style={styles.page}>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <Text>Generating receipt with currency conversion...</Text>
+          </View>
+        </Page>
+      </Document>
+    );
+  }
 
   return (
     <Document>
@@ -426,6 +569,14 @@ const ReceiptPDF: React.FC<{
                 {selectedOrder.payment_method || 'Mobile Money'}
               </Text>
             </View>
+            {/* Currency Information */}
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>CURRENCY:</Text>
+              <Text style={styles.detailValue}>
+                {displayCurrency}
+                {orderCurrency !== displayCurrency && ` (converted from ${orderCurrency})`}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -440,10 +591,10 @@ const ReceiptPDF: React.FC<{
               <Text style={styles.headerText}>QTY</Text>
             </View>
             <View style={styles.colUnitPrice}>
-              <Text style={styles.headerText}>UNIT PRICE</Text>
+              <Text style={styles.headerText}>UNIT PRICE ({displayCurrency})</Text>
             </View>
             <View style={styles.colAmount}>
-              <Text style={styles.headerText}>AMOUNT</Text>
+              <Text style={styles.headerText}>AMOUNT ({displayCurrency})</Text>
             </View>
           </View>
 
@@ -466,10 +617,10 @@ const ReceiptPDF: React.FC<{
                 <Text>{item.quantity}</Text>
               </View>
               <View style={styles.colUnitPrice}>
-                <Text>{formatCurrencyForPDF(safeNumber(item.unit_price), orderCurrency)}</Text>
+                <Text>{formatCurrencyForPDF(convertedAmounts.items[item.id]?.unitPrice || 0, displayCurrency)}</Text>
               </View>
               <View style={styles.colAmount}>
-                <Text>{formatCurrencyForPDF(safeNumber(item.total_price), orderCurrency)}</Text>
+                <Text>{formatCurrencyForPDF(convertedAmounts.items[item.id]?.totalPrice || 0, displayCurrency)}</Text>
               </View>
             </View>
           ))}
@@ -490,7 +641,7 @@ const ReceiptPDF: React.FC<{
                 <View style={styles.giftCardRow}>
                   <Text>Amount:</Text>
                   <Text style={{ fontWeight: 'bold' }}>
-                    {formatCurrencyForPDF(safeNumber(gift.amount), safeCurrency(gift.currency))}
+                    {formatCurrencyForPDF(safeNumber(gift.amount), safeCurrency(gift.currency || orderCurrency))}
                   </Text>
                 </View>
                 <View style={styles.giftCardRow}>
@@ -519,20 +670,20 @@ const ReceiptPDF: React.FC<{
           <View style={styles.totalsGrid}>
             <View style={styles.totalRow}>
               <Text>Subtotal:</Text>
-              <Text>{formatCurrencyForPDF(subtotal, "USD")}</Text>
+              <Text>{formatCurrencyForPDF(convertedAmounts.subtotal, displayCurrency)}</Text>
             </View>
             <View style={styles.totalRow}>
               <Text>Tax (1.5%):</Text>
-              <Text>{formatCurrencyForPDF(taxAmount, "USD")}</Text>
+              <Text>{formatCurrencyForPDF(convertedAmounts.taxAmount, displayCurrency)}</Text>
             </View>
             <View style={styles.totalRow}>
               <Text>Processing Fee (2.9%):</Text>
-              <Text>{formatCurrencyForPDF(processingFee, "USD")}</Text>
+              <Text>{formatCurrencyForPDF(convertedAmounts.processingFee, displayCurrency)}</Text>
             </View>
             <View style={[styles.totalRow, styles.grandTotal]}>
               <Text style={{ fontWeight: 'bold' }}>TOTAL AMOUNT:</Text>
               <Text style={styles.grandTotalAmount}>
-                {formatCurrencyForPDF(total, orderCurrency)}
+                {formatCurrencyForPDF(convertedAmounts.total, displayCurrency)}
               </Text>
             </View>
           </View>
@@ -544,6 +695,7 @@ const ReceiptPDF: React.FC<{
           <View style={styles.footerNotes}>
             <Text>This is a computer-generated receipt and does not require a physical signature.</Text>
             <Text>Tax Registration Number: VAT-{selectedOrder.id.slice(0, 8).toUpperCase()}-SL</Text>
+            <Text>All amounts displayed in {displayCurrency}{orderCurrency !== displayCurrency ? ` (converted from ${orderCurrency})` : ''}.</Text>
             <Text>For questions about this receipt, please contact our support team at support@skillpulse.cloud</Text>
           </View>
         </View>
@@ -749,6 +901,7 @@ const MyOrdersPage = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedType, setSelectedType] = useState<'event' | 'course' | 'gift'>('event');
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode>('USD');
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -1014,6 +1167,7 @@ const MyOrdersPage = () => {
   const handleViewReceipt = (order: Order, type: 'event' | 'course' | 'gift') => {
     setSelectedOrder(order);
     setSelectedType(type);
+    setSelectedCurrency(safeCurrency(order.currency)); // Set to order currency by default
     setShowReceiptModal(true);
   };
 
@@ -1051,11 +1205,12 @@ const MyOrdersPage = () => {
           processingFee={processingFee}
           total={total}
           filteredItems={filteredItems}
+          targetCurrency={selectedCurrency}
         />
       ).toBlob();
       
-      downloadPDF(blob, `receipt-${selectedOrder.id.slice(0, 8)}.pdf`);
-      toast.success('Receipt downloaded successfully!');
+      downloadPDF(blob, `receipt-${selectedOrder.id.slice(0, 8)}-${selectedCurrency}.pdf`);
+      toast.success(`Receipt downloaded in ${selectedCurrency}!`);
     } catch (error) {
       console.error('Error generating PDF:', error);
       toast.error('Failed to generate receipt');
@@ -1444,30 +1599,45 @@ const MyOrdersPage = () => {
           </div>
         </Modal>
 
-        {/* Enhanced Receipt Modal */}
+        {/* Enhanced Receipt Modal with Currency Selection */}
         <Modal 
           isOpen={showReceiptModal}
           onClose={() => setShowReceiptModal(false)}
           title="Order Receipt"
           actions={
-            <Button 
-              onClick={handleDownloadPDF}
-              disabled={isGeneratingPDF}
-              size="sm"
-              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-            >
-              {isGeneratingPDF ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Receipt
-                </>
-              )}
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-3 w-full">
+              {/* Currency Selection */}
+              <select
+                value={selectedCurrency}
+                onChange={(e) => setSelectedCurrency(e.target.value as CurrencyCode)}
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {Object.keys(SUPPORTED_CURRENCIES).map((currency) => (
+                  <option key={currency} value={currency}>
+                    {currency} - {SUPPORTED_CURRENCIES[currency as CurrencyCode]}
+                  </option>
+                ))}
+              </select>
+              
+              <Button 
+                onClick={handleDownloadPDF}
+                disabled={isGeneratingPDF}
+                size="sm"
+                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 flex-1"
+              >
+                {isGeneratingPDF ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    Download in {selectedCurrency}
+                  </>
+                )}
+              </Button>
+            </div>
           }
         >
           {selectedOrder && (() => {
@@ -1476,6 +1646,18 @@ const MyOrdersPage = () => {
             
             return (
               <div className="space-y-4">
+                {/* Currency Info Banner */}
+                {orderCurrency !== selectedCurrency && (
+                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-blue-500 text-white">Currency Conversion</Badge>
+                      <span className="text-sm text-blue-700">
+                        Receipt will be generated in {selectedCurrency} (converted from {orderCurrency})
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg">
                   <h3 className="font-semibold text-lg mb-2">Receipt #{selectedOrder.id.slice(0, 8)} - {selectedType.toUpperCase()}</h3>
                   <div className="grid grid-cols-2 gap-4 text-sm">
@@ -1485,13 +1667,7 @@ const MyOrdersPage = () => {
                     </div>
                     <div>
                       <p><strong>Payment:</strong> {selectedOrder.payment_method}</p>
-                      <p>
-                        <strong>Total:</strong> <PriceDisplay 
-                          amount={computeTypeSubtotalsFull(selectedOrder)[selectedType]} 
-                          originalCurrency="USD"
-                          className="font-semibold"
-                        />
-                      </p>
+                      <p><strong>Original Currency:</strong> {orderCurrency}</p>
                     </div>
                   </div>
                 </div>
@@ -1546,13 +1722,13 @@ const MyOrdersPage = () => {
 
                 {/* Receipt Summary */}
                 <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg mt-4">
-                  <h4 className="font-semibold mb-3">Receipt Summary</h4>
+                  <h4 className="font-semibold mb-3">Receipt Summary ({orderCurrency})</h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>Subtotal:</span>
                       <PriceDisplay 
                         amount={subtotal} 
-                        originalCurrency="USD"
+                        originalCurrency={orderCurrency}
                         className="font-medium"
                       />
                     </div>
@@ -1560,7 +1736,7 @@ const MyOrdersPage = () => {
                       <span>Tax (1.5%):</span>
                       <PriceDisplay 
                         amount={taxAmount} 
-                        originalCurrency="USD"
+                        originalCurrency={orderCurrency}
                         className="font-medium"
                       />
                     </div>
@@ -1568,7 +1744,7 @@ const MyOrdersPage = () => {
                       <span>Processing Fee (2.9%):</span>
                       <PriceDisplay 
                         amount={processingFee} 
-                        originalCurrency="USD"
+                        originalCurrency={orderCurrency}
                         className="font-medium"
                       />
                     </div>
@@ -1585,7 +1761,7 @@ const MyOrdersPage = () => {
 
                 <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
                   <p className="text-sm text-blue-700 text-center">
-                    Click "Download Receipt" to get a professional PDF version of this receipt
+                    Select your preferred currency and click "Download Receipt" to get a professional PDF version
                   </p>
                 </div>
               </div>
