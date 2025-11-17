@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Navigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -95,7 +94,7 @@ const AuthPage = () => {
       await signIn(email, password);
       console.log('AuthPage: Sign in successful');
       setAuthSuccess(true);
-      // OTP check and redirection will be handled by useEffect
+      toast.success('Sign in successful! Please check your email for verification code.');
     } catch (error: any) {
       console.error('Sign in error:', error);
       setErrorMessage(error.message || 'Failed to sign in. Please check your credentials.');
@@ -144,7 +143,7 @@ const AuthPage = () => {
       await signUp(email, password, { full_name: fullName, username });
       console.log('AuthPage: Sign up successful');
       setAuthSuccess(true);
-      // OTP check and redirection will be handled by useEffect
+      toast.success('Account created! Please check your email for verification code.');
     } catch (error: any) {
       console.error('Sign up error:', error);
       setErrorMessage(error.message || 'Failed to sign up. Please try again.');
@@ -202,26 +201,26 @@ const AuthPage = () => {
       </div>
 
       {/* Right Side - Auth Form */}
-<div className="w-full lg:w-1/2 flex items-center justify-center p-8">
-  <div className="w-full max-w-md">
-    <div className="mb-8 text-center">
-      <Link to="/" className="inline-block mb-4 hover:opacity-90 transition-opacity">
-        <img 
-          src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/Screenshot_2025-08-05_155641-removebg-preview.png" 
-          alt="SkillPulse Logo"
-          className="h-[200px] mx-auto" // Adjust height (h-16) as needed to fit your design
-        />
-      </Link>
-      <h1 className="text-4xl font-bold mb-2 text-white drop-shadow-lg">
-        {isInvitationFlow ? 'Join Workplace' : ''}
-      </h1>
-      <p className="text-orange-100">
-        {isInvitationFlow 
-          ? 'Sign in to accept your workplace invitation' 
-          : 'Sign in to your account or create a new one'
-        }
-      </p>
-    </div>
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
+        <div className="w-full max-w-md">
+          <div className="mb-8 text-center">
+            <Link to="/" className="inline-block mb-4 hover:opacity-90 transition-opacity">
+              <img 
+                src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/Screenshot_2025-08-05_155641-removebg-preview.png" 
+                alt="SkillPulse Logo"
+                className="h-[200px] mx-auto"
+              />
+            </Link>
+            <h1 className="text-4xl font-bold mb-2 text-white drop-shadow-lg">
+              {isInvitationFlow ? 'Join Workplace' : 'Welcome to SkillPulse'}
+            </h1>
+            <p className="text-orange-100">
+              {isInvitationFlow 
+                ? 'Sign in to accept your workplace invitation' 
+                : 'Secure access with email verification for every login'
+              }
+            </p>
+          </div>
           
           <Card className="backdrop-blur-md bg-white/20 border-0 shadow-2xl rounded-2xl">
             <CardContent className="p-6">
@@ -321,15 +320,14 @@ const AuthPage = () => {
                         'Sign In'
                       )}
                     </Button>
-                    {/* 👇 Forgot password link below the button */}
-                  <div className="text-center">
-                 <Link
-                to="/forgot-password"
-              className="text-sm text-orange-100 hover:text-white underline"
-              >
-               Forgot your password?
-               </Link>
-              </div>
+                    <div className="text-center">
+                      <Link
+                        to="/forgot-password"
+                        className="text-sm text-orange-100 hover:text-white underline"
+                      >
+                        Forgot your password?
+                      </Link>
+                    </div>
                   </form>
                 </TabsContent>
                 
@@ -393,11 +391,11 @@ const AuthPage = () => {
                           onChange={(e) => setPassword(e.target.value)}
                           required
                           autoComplete="new-password"
-                          minLength={8}
+                          minLength={6}
                           className="pl-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
                         />
                       </div>
-                      <p className="text-xs text-orange-100">Password must be at least 8 characters</p>
+                      <p className="text-xs text-orange-100">Password must be at least 6 characters</p>
                     </div>
                     <Button 
                       type="submit" 
@@ -413,18 +411,15 @@ const AuthPage = () => {
                         'Create Account'
                       )}
                     </Button>
-                     {/* 👇 Forgot password link below the button */}
-                  <div className="text-center">
-                 <Link
-                to="/forgot-password"
-              className="text-sm text-orange-100 hover:text-white underline"
-              >
-               Forgot your password?
-               </Link>
-              </div>
                   </form>
                 </TabsContent>
               </Tabs>
+
+              <div className="mt-6 text-center">
+                <p className="text-sm text-orange-100">
+                  🔒 For security, email verification is required for every login
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>
