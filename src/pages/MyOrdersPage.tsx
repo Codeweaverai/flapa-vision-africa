@@ -1252,7 +1252,7 @@ const MyOrdersPage = () => {
                                   <p className="text-sm text-purple-700 font-semibold mb-4">
                                     Price: <PriceDisplay 
                                       amount={safeNumber(enrollment.course.price)} 
-                                      originalCurrency={courseCurrency}
+                                      originalCurrency="USD"
                                       className="inline"
                                     />
                                   </p>
