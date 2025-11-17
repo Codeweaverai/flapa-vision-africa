@@ -23,77 +23,95 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [otpRequired, setOtpRequired] = useState(false);
   const [verificationType, setVerificationType] = useState<'login' | 'registration' | 'inactive' | null>(null);
-  const [isNewAuthentication, setIsNewAuthentication] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    const getInitialSession = async () => {
-      const { data: { session: initialSession } } = await supabase.auth.getSession();
-      console.log('Initial session loaded:', initialSession?.user?.id);
-      setSession(initialSession);
-      setUser(initialSession?.user ?? null);
-      
-      // For existing sessions, OTP should NOT be required
-      if (initialSession?.user) {
-        console.log('Existing session found, OTP not required');
-        setOtpRequired(false);
-        setVerificationType(null);
-        setIsNewAuthentication(false);
-      }
-      
-      setLoading(false);
-    };
+    let mounted = true;
 
-    getInitialSession();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state change:', event, session?.user?.id);
-        setSession(session);
-        setUser(session?.user ?? null);
+    const initializeAuth = async () => {
+      try {
+        // Get initial session first
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
         
-        if (event === 'SIGNED_IN' && session?.user) {
-          console.log('User signed in, requiring OTP verification');
-          // This is a new authentication, require OTP
-          setIsNewAuthentication(true);
-          setVerificationType('login');
-          setOtpRequired(true);
-        } 
-        else if (event === 'USER_UPDATED' && session?.user) {
-          console.log('User updated, no OTP required');
-          // User updated (like email confirmation), no OTP required
+        if (!mounted) return;
+        
+        console.log('Initial session loaded:', initialSession?.user?.id);
+        setSession(initialSession);
+        setUser(initialSession?.user ?? null);
+        
+        // For initial session, OTP should NOT be required
+        if (initialSession?.user) {
+          console.log('Existing session found, OTP not required');
           setOtpRequired(false);
           setVerificationType(null);
-          setIsNewAuthentication(false);
-        }
-        else if (event === 'TOKEN_REFRESHED' && session?.user) {
-          console.log('Token refreshed, no OTP required');
-          // Token refresh, not a new authentication
-          setOtpRequired(false);
-          setVerificationType(null);
-          setIsNewAuthentication(false);
-        }
-        else if (event === 'SIGNED_OUT') {
-          console.log('User signed out, clearing all states');
-          setOtpRequired(false);
-          setVerificationType(null);
-          setIsNewAuthentication(false);
-        }
-        else {
-          // For any other events, don't require OTP
-          console.log('Other auth event:', event, '- OTP not required');
-          setOtpRequired(false);
-          setVerificationType(null);
-          setIsNewAuthentication(false);
         }
         
         setLoading(false);
+        setIsInitialLoad(false);
+        
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+        if (mounted) {
+          setLoading(false);
+          setIsInitialLoad(false);
+        }
+      }
+    };
+
+    initializeAuth();
+
+    // Listen for auth changes AFTER initial load
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!mounted) return;
+        
+        console.log('Auth state change:', event, session?.user?.id);
+        
+        // Only process SIGNED_IN events that are NOT from initial load
+        if (event === 'SIGNED_IN' && session?.user && !isInitialLoad) {
+          console.log('New sign in detected, requiring OTP verification');
+          setSession(session);
+          setUser(session.user);
+          setVerificationType('login');
+          setOtpRequired(true);
+        } 
+        else if (event === 'SIGNED_IN' && session?.user && isInitialLoad) {
+          console.log('Initial sign in from page load, OTP not required');
+          setSession(session);
+          setUser(session.user);
+          setOtpRequired(false);
+          setVerificationType(null);
+        }
+        else if (event === 'SIGNED_OUT') {
+          console.log('User signed out, clearing all states');
+          setSession(null);
+          setUser(null);
+          setOtpRequired(false);
+          setVerificationType(null);
+        }
+        else if (event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
+          console.log('Session updated, no OTP required');
+          setSession(session);
+          setUser(session?.user ?? null);
+          setOtpRequired(false);
+          setVerificationType(null);
+        }
+        else {
+          // For other events, update session but don't require OTP
+          console.log('Other auth event:', event, '- OTP not required');
+          setSession(session);
+          setUser(session?.user ?? null);
+          setOtpRequired(false);
+          setVerificationType(null);
+        }
       }
     );
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [isInitialLoad]);
 
   const completeOTPVerification = async () => {
     if (!user) {
@@ -119,24 +137,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Clear OTP states
       setOtpRequired(false);
       setVerificationType(null);
-      setIsNewAuthentication(false);
       
     } catch (error) {
       console.error('Failed to complete OTP verification:', error);
       // Still clear the OTP requirement even if there's an error
       setOtpRequired(false);
       setVerificationType(null);
-      setIsNewAuthentication(false);
     }
   };
 
   const signIn = async (email: string, password: string) => {
     console.log('Attempting sign in for:', email);
     
-    // Reset OTP state before sign in (it will be set to true by auth state change)
+    // Reset OTP state before sign in
     setOtpRequired(false);
     setVerificationType(null);
-    setIsNewAuthentication(false);
     
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -148,20 +163,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw error;
     }
     
-    console.log('Sign in successful - OTP will be required');
-    // The auth state change listener will set otpRequired to true
+    console.log('Sign in successful - OTP will be required by auth state change');
   };
 
   const signUp = async (email: string, password: string, metadata?: { full_name?: string; username?: string }) => {
     console.log('Attempting sign up for:', email);
     
-    // Reset OTP state before sign up (it will be set to true by auth state change)
+    // Reset OTP state before sign up
     setOtpRequired(false);
     setVerificationType(null);
-    setIsNewAuthentication(false);
     
     try {
-      // Create auth user - the trigger will automatically create the profile
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -186,7 +198,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Sign up successful, user:', data.user?.id);
       console.log('OTP will be required for verification');
       
-      // The auth state change listener will handle setting OTP requirement
       return data;
       
     } catch (error: any) {
@@ -199,7 +210,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('Signing out user');
     setOtpRequired(false);
     setVerificationType(null);
-    setIsNewAuthentication(false);
     
     const { error } = await supabase.auth.signOut();
     if (error) {
