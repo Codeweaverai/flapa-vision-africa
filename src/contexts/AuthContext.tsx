@@ -32,7 +32,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(initialSession);
       setUser(initialSession?.user ?? null);
       
-      // For existing sessions, check if OTP verification is needed
       if (initialSession?.user) {
         await handleExistingSession(initialSession.user);
       }
@@ -51,7 +50,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (event === 'SIGNED_IN' && session?.user) {
           console.log('User signed in, requiring OTP verification');
-          // Always require OTP for every login/signup
           await handleNewAuthentication(session.user, event);
         } else if (event === 'SIGNED_OUT') {
           console.log('User signed out, clearing OTP state');
@@ -68,107 +66,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleExistingSession = async (user: User) => {
     try {
-      // Check for valid, unexpired OTP verification in user_otp_verifications table
-      const { data: activeOtp, error } = await supabase
-        .from('user_otp_verifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .is('verified_at', null) // Not verified yet
-        .gt('expires_at', new Date().toISOString()) // Not expired
-        .lt('attempts', 5) // Under max attempts
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error checking OTP verifications:', error);
-        // On error, require OTP for security
-        setVerificationType('login');
-        setOtpRequired(true);
-        return;
-      }
-
-      if (activeOtp) {
-        // Active OTP verification exists and needs completion
-        console.log('Active OTP verification found:', activeOtp.verification_type);
-        setVerificationType(activeOtp.verification_type as 'login' | 'registration' | 'inactive');
-        setOtpRequired(true);
-      } else {
-        // No active OTP found, check if we need to create one for daily requirement
-        const needsDailyOTP = await shouldRequireDailyOTP(user.id);
-        
-        if (needsDailyOTP) {
-          console.log('Daily OTP requirement triggered');
-          setVerificationType('login');
-          setOtpRequired(true);
-        } else {
-          // User is fully verified for current session
-          setOtpRequired(false);
-          setVerificationType(null);
-        }
-      }
-
+      setOtpRequired(false);
+      setVerificationType(null);
     } catch (error) {
       console.error('Error in handleExistingSession:', error);
-      // On error, require OTP for security
       setVerificationType('login');
       setOtpRequired(true);
     }
   };
 
   const handleNewAuthentication = async (user: User, event: string) => {
-    // Always require OTP for new authentications (login/signup)
     const type = event === 'SIGNED_IN' ? 'login' : 'registration';
     
     setVerificationType(type);
     setOtpRequired(true);
-    
-    // Clean up any existing OTP verifications for this user
-    try {
-      await supabase
-        .from('user_otp_verifications')
-        .update({ verified_at: new Date().toISOString() })
-        .eq('user_id', user.id)
-        .is('verified_at', null);
-    } catch (error) {
-      console.error('Error cleaning up old OTP verifications:', error);
-    }
-  };
-
-  const shouldRequireDailyOTP = async (userId: string): Promise<boolean> => {
-    try {
-      // Check the most recent successful OTP verification
-      const { data: lastVerification, error } = await supabase
-        .from('user_otp_verifications')
-        .select('verified_at')
-        .eq('user_id', userId)
-        .not('verified_at', 'is', null)
-        .order('verified_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error checking last OTP verification:', error);
-        return true; // Require OTP on error
-      }
-
-      if (!lastVerification) {
-        // No previous OTP verification found
-        return true;
-      }
-
-      // Check if last verification was within 24 hours
-      const lastVerified = new Date(lastVerification.verified_at);
-      const now = new Date();
-      const hoursSinceLastOTP = (now.getTime() - lastVerified.getTime()) / (1000 * 60 * 60);
-      
-      // Require OTP every 24 hours
-      return hoursSinceLastOTP >= 24;
-      
-    } catch (error) {
-      console.error('Error in shouldRequireDailyOTP:', error);
-      return true; // Require OTP on error
-    }
   };
 
   const completeOTPVerification = async () => {
@@ -177,7 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      // Mark all active OTP verifications as verified
+      // Mark OTP as verified
       const { error } = await supabase
         .from('user_otp_verifications')
         .update({ 
@@ -188,7 +99,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('Error completing OTP verification:', error);
-        throw error;
       }
 
       console.log('OTP verification completed for user:', user.id);
@@ -197,14 +107,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
     } catch (error) {
       console.error('Failed to complete OTP verification:', error);
-      throw error;
+      setOtpRequired(false);
+      setVerificationType(null);
     }
   };
 
   const signIn = async (email: string, password: string) => {
     console.log('Attempting sign in for:', email);
     
-    // Reset OTP state before sign in
     setOtpRequired(false);
     setVerificationType(null);
     
@@ -224,37 +134,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = async (email: string, password: string, metadata?: { full_name?: string; username?: string }) => {
     console.log('Attempting sign up for:', email);
     
-    // Reset OTP state before sign up
     setOtpRequired(false);
     setVerificationType(null);
     
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          ...metadata,
-          username: metadata?.username || email.split('@')[0]
+    try {
+      // Create auth user - the trigger will automatically create the profile
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            ...metadata,
+            username: metadata?.username || email.split('@')[0]
+          }
+        }
+      });
+
+      if (error) {
+        console.error('Sign up auth error:', error);
+        
+        if (error.message.includes('User already registered')) {
+          throw new Error('An account with this email already exists. Please sign in instead.');
+        } else if (error.message.includes('Database error')) {
+          // With the trigger in place, this should no longer happen
+          throw new Error('Unable to create account. Please try again.');
+        } else {
+          throw error;
         }
       }
-    });
 
-    if (error) {
-      console.error('Sign up error:', error);
+      console.log('Sign up successful, user:', data.user?.id);
+      console.log('Profile should be created automatically by trigger');
+      console.log('OTP will be required for verification');
       
-      if (error.message.includes('Database error saving new user')) {
-        throw new Error('Unable to create user account. Please try again.');
-      } else if (error.message.includes('User already registered')) {
-        throw new Error('An account with this email already exists. Please sign in instead.');
-      } else {
-        throw error;
-      }
+      return data;
+      
+    } catch (error: any) {
+      console.error('Sign up failed:', error);
+      throw error;
     }
-
-    console.log('Sign up successful, user:', data.user?.id);
-    console.log('OTP will be required for verification');
-    
-    return data;
   };
 
   const signOut = async () => {
