@@ -186,7 +186,7 @@ const CreatorFundraisingPage = () => {
                 </Button>
                 <Button 
                   asChild
-                  variant="outline" 
+                  variant="secondary" 
                   size="lg" 
                   className="border-2 border-white text-white hover:bg-white/10 font-semibold px-8 py-4 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 text-lg backdrop-blur-sm"
                 >
@@ -456,7 +456,7 @@ const CreatorFundraisingPage = () => {
                   </Button>
                   <Button 
                     asChild
-                    variant="outline" 
+                    variant="secondary" 
                     size="lg"
                     className="border-2 border-white text-white hover:bg-white/10 font-semibold px-8 py-4 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 text-lg backdrop-blur-sm"
                   >
