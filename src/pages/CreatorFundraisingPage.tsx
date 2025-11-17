@@ -200,10 +200,10 @@ const CreatorFundraisingPage = () => {
               {/* Enhanced Stats */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-8 backdrop-blur-sm bg-white/10 rounded-2xl p-8 border border-white/20">
                 {[
-                  { number: "$500K+", label: "Total Raised" },
-                  { number: "95%", label: "Success Rate" },
-                  { number: "2K+", label: "Projects Funded" },
-                  { number: "50K+", label: "Supporters" }
+                  { number: "$10K+", label: "Total Raised" },
+                  { number: "85%", label: "Success Rate" },
+                  { number: "100+", label: "Projects Funded" },
+                  { number: "10K+", label: "Supporters" }
                 ].map((stat, index) => (
                   <div key={index} className="text-center">
                     <div className="text-3xl md:text-4xl font-bold text-white mb-2 drop-shadow-lg">
