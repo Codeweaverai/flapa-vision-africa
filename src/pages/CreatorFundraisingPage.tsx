@@ -86,25 +86,21 @@ const CreatorFundraisingPage = () => {
 
   const steps = [
     {
-      number: "01",
       title: "Create Your Campaign",
       description: "Set your funding goal, timeline, and compelling story with our easy-to-use campaign builder.",
       icon: <Target className="h-6 w-6" />
     },
     {
-      number: "02",
       title: "Customize Rewards",
       description: "Offer exclusive rewards like early access, personalized content, or special mentions to your backers.",
       icon: <Gift className="h-6 w-6" />
     },
     {
-      number: "03",
       title: "Share & Promote",
       description: "Leverage built-in sharing tools and our platform promotion to reach your audience.",
       icon: <Users className="h-6 w-6" />
     },
     {
-      number: "04",
       title: "Receive Funds & Deliver",
       description: "Get funded quickly and start delivering on your promises to supporters.",
       icon: <DollarSign className="h-6 w-6" />
@@ -362,7 +358,7 @@ const CreatorFundraisingPage = () => {
           </div>
         </section>
 
-        {/* Enhanced How It Works Section - INCREASED CARD HEIGHT */}
+        {/* Enhanced How It Works Section - UPDATED (Numbers Removed) */}
         <section className="py-20 bg-gradient-to-br from-orange-50/50 to-purple-50/50 relative">
           <div className="absolute inset-0">
             <div className="absolute top-1/3 left-10 w-20 h-20 bg-orange-200/20 rounded-full blur-2xl"></div>
@@ -387,13 +383,8 @@ const CreatorFundraisingPage = () => {
                   )}
                   {/* Increased card height with min-h-[320px] */}
                   <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 group hover:-translate-y-2 text-center relative overflow-hidden min-h-[320px] flex flex-col">
-                    <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
-                      <div className="bg-gradient-to-r from-orange-500 to-purple-600 text-white w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
-                        {step.number}
-                      </div>
-                    </div>
-                    <CardHeader className="pt-12 pb-4 flex-shrink-0">
-                      <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-3 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center text-white opacity-90 group-hover:scale-110 transition-transform duration-300">
+                    <CardHeader className="pt-8 pb-4 flex-shrink-0">
+                      <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-4 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center text-white opacity-90 group-hover:scale-110 transition-transform duration-300 shadow-lg">
                         {step.icon}
                       </div>
                       <CardTitle className="text-lg group-hover:text-orange-600 transition-colors duration-300">
