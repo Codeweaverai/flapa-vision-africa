@@ -15,7 +15,7 @@ import {
   CardDescription,
   CardContent
 } from '@/components/ui/card';
-import { Loader2, Mail, Lock, User } from 'lucide-react';
+import { Loader2, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/lib/supabaseClient';
 
@@ -29,6 +29,7 @@ const AuthPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [authSuccess, setAuthSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   const redirectParam = searchParams.get('redirect');
@@ -116,8 +117,9 @@ const AuthPage = () => {
       return;
     }
     
-    if (password.length < 6) {
-      setErrorMessage('Password must be at least 6 characters');
+    // Update password validation to 8 characters
+    if (password.length < 8) {
+      setErrorMessage('Password must be at least 8 characters');
       setIsSubmitting(false);
       return;
     }
@@ -176,6 +178,10 @@ const AuthPage = () => {
       setErrorMessage(error.message || 'Failed to sign in with Google.');
       setIsSubmitting(false);
     }
+  };
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
   };
 
   if (loading) {
@@ -297,13 +303,27 @@ const AuthPage = () => {
                         <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-200 h-5 w-5" />
                         <Input 
                           id="password" 
-                          type="password" 
+                          type={showPassword ? "text" : "password"}
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           required
                           autoComplete="current-password"
-                          className="pl-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
+                          minLength={8}
+                          className="pl-10 pr-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
                         />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={togglePasswordVisibility}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-4 w-4 text-orange-200" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-orange-200" />
+                          )}
+                        </Button>
                       </div>
                     </div>
                     <Button 
@@ -386,16 +406,29 @@ const AuthPage = () => {
                         <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-200 h-5 w-5" />
                         <Input 
                           id="passwordRegister" 
-                          type="password" 
+                          type={showPassword ? "text" : "password"}
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           required
                           autoComplete="new-password"
-                          minLength={6}
-                          className="pl-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
+                          minLength={8}
+                          className="pl-10 pr-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
                         />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={togglePasswordVisibility}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-4 w-4 text-orange-200" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-orange-200" />
+                          )}
+                        </Button>
                       </div>
-                      <p className="text-xs text-orange-100">Password must be at least 6 characters</p>
+                      <p className="text-xs text-orange-100">Password must be at least 8 characters</p>
                     </div>
                     <Button 
                       type="submit" 
