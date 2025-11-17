@@ -406,11 +406,12 @@ const ReceiptPDF: React.FC<{
   };
 
   // Enhanced currency formatting with conversion support
-  const formatCurrencyForPDF = (amount: number, currency: CurrencyCode): string => {
+  const formatCurrencyForPDF = (amount: number, currency: string): string => {
     try {
+      const currencyCode = safeCurrency(currency);
       const formatter = new Intl.NumberFormat('en-US', {
         style: 'currency',
-        currency: currency,
+        currency: currencyCode,
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       });
@@ -540,9 +541,9 @@ const ReceiptPDF: React.FC<{
           <View style={styles.detailSection}>
             <Text style={styles.sectionTitle}>BILL TO:</Text>
             <Text style={styles.customerName}>
-              {selectedOrder.user_name || selectedOrder.email}
+              {selectedOrder.user_name || selectedOrder.email || 'Customer'}
             </Text>
-            <Text>{selectedOrder.email}</Text>
+            <Text>{selectedOrder.email || 'No email provided'}</Text>
           </View>
           <View style={styles.detailSection}>
             <View style={styles.detailRow}>
@@ -560,7 +561,7 @@ const ReceiptPDF: React.FC<{
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>PAYMENT STATUS:</Text>
               <Text style={styles.detailValue}>
-                {selectedOrder.payment_status.toUpperCase()}
+                {(selectedOrder.payment_status || 'completed').toUpperCase()}
               </Text>
             </View>
             <View style={styles.detailRow}>
@@ -608,13 +609,13 @@ const ReceiptPDF: React.FC<{
               ]}
             >
               <View style={styles.colDescription}>
-                <Text style={styles.itemName}>{item.item_name}</Text>
+                <Text style={styles.itemName}>{item.item_name || 'Unnamed Item'}</Text>
                 <Text style={styles.itemType}>
-                  {item.item_type.replace('_', ' ').toUpperCase()}
+                  {(item.item_type || 'item').replace('_', ' ').toUpperCase()}
                 </Text>
               </View>
               <View style={styles.colQty}>
-                <Text>{item.quantity}</Text>
+                <Text>{item.quantity || 1}</Text>
               </View>
               <View style={styles.colUnitPrice}>
                 <Text>{formatCurrencyForPDF(convertedAmounts.items[item.id]?.unitPrice || 0, displayCurrency)}</Text>
@@ -773,6 +774,22 @@ const obfuscateGiftCode = (code: string): string => {
   const end = code.slice(-4);
   const middle = '*'.repeat(Math.max(0, code.length - 8));
   return `${start}${middle}${end}`;
+};
+
+// Helper function for currency formatting in the modal
+const formatCurrencyForModal = (amount: number, currency: string): string => {
+  try {
+    const safeCurrencyCode = safeCurrency(currency);
+    const formatter = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: safeCurrencyCode,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    return formatter.format(amount);
+  } catch (error) {
+    return `${currency} ${amount.toFixed(2)}`;
+  }
 };
 
 const computeTypeSubtotalsFull = (order: Order) => {
@@ -1280,7 +1297,7 @@ const MyOrdersPage = () => {
                           <div className="text-right">
                             <PriceDisplay 
                               amount={card.subtotal} 
-                              originalCurrency="USD"
+                              currency={orderCurrency}
                               className="text-2xl font-bold text-white"
                             />
                             {getStatusBadge(card.order.payment_status)}
@@ -1339,7 +1356,7 @@ const MyOrdersPage = () => {
                                         <p className="text-sm text-orange-700 font-semibold">
                                           Price: <PriceDisplay 
                                             amount={safeNumber(booking.event_ticket.price)} 
-                                            originalCurrency="USD"
+                                            currency={eventCurrency}
                                             className="inline"
                                           />
                                         </p>
@@ -1407,7 +1424,7 @@ const MyOrdersPage = () => {
                                   <p className="text-sm text-purple-700 font-semibold mb-4">
                                     Price: <PriceDisplay 
                                       amount={safeNumber(enrollment.course.price)} 
-                                      originalCurrency="USD"
+                                      currency={courseCurrency}
                                       className="inline"
                                     />
                                   </p>
@@ -1446,7 +1463,7 @@ const MyOrdersPage = () => {
                                     <div>
                                       <PriceDisplay 
                                         amount={safeNumber(gift.amount)} 
-                                        originalCurrency="USD"
+                                        currency={giftCurrency}
                                         className="text-xl font-semibold text-gray-900 mb-1"
                                       />
                                       <p className="font-mono text-sm text-gray-600">
@@ -1680,18 +1697,12 @@ const MyOrdersPage = () => {
                         <div>
                           <p className="font-medium">{item.item_name}</p>
                           <p className="text-sm text-gray-600">
-                            Qty: {item.quantity} × <PriceDisplay 
-                              amount={safeNumber(item.unit_price)} 
-                              originalCurrency="USD"
-                              className="inline"
-                            />
+                            Qty: {item.quantity} × {formatCurrencyForModal(safeNumber(item.unit_price), orderCurrency)}
                           </p>
                         </div>
-                        <PriceDisplay 
-                          amount={safeNumber(item.total_price)} 
-                          originalCurrency="USD"
-                          className="font-semibold"
-                        />
+                        <span className="font-semibold">
+                          {formatCurrencyForModal(safeNumber(item.total_price), orderCurrency)}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -1708,11 +1719,9 @@ const MyOrdersPage = () => {
                             <p className="text-sm text-gray-600">Recipient: {gift.recipient_name} ({gift.recipient_email})</p>
                             <p className="text-sm text-gray-600">Status: {gift.status.toUpperCase()}</p>
                             <p className="text-sm text-gray-600">Expires: {format(new Date(gift.expires_at), 'PPP')}</p>
-                            <PriceDisplay 
-                              amount={safeNumber(gift.amount)} 
-                              originalCurrency="USD"
-                              className="font-semibold"
-                            />
+                            <span className="font-semibold">
+                              {formatCurrencyForModal(safeNumber(gift.amount), giftCurrency)}
+                            </span>
                           </div>
                         )})}
                       </div>
@@ -1726,35 +1735,27 @@ const MyOrdersPage = () => {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>Subtotal:</span>
-                      <PriceDisplay 
-                        amount={subtotal} 
-                        originalCurrency={orderCurrency}
-                        className="font-medium"
-                      />
+                      <span className="font-medium">
+                        {formatCurrencyForModal(subtotal, orderCurrency)}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Tax (1.5%):</span>
-                      <PriceDisplay 
-                        amount={taxAmount} 
-                        originalCurrency={orderCurrency}
-                        className="font-medium"
-                      />
+                      <span className="font-medium">
+                        {formatCurrencyForModal(taxAmount, orderCurrency)}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Processing Fee (2.9%):</span>
-                      <PriceDisplay 
-                        amount={processingFee} 
-                        originalCurrency={orderCurrency}
-                        className="font-medium"
-                      />
+                      <span className="font-medium">
+                        {formatCurrencyForModal(processingFee, orderCurrency)}
+                      </span>
                     </div>
                     <div className="flex justify-between font-semibold border-t pt-2">
                       <span>Total:</span>
-                      <PriceDisplay 
-                        amount={total} 
-                        originalCurrency={orderCurrency}
-                        className="font-bold"
-                      />
+                      <span className="font-bold">
+                        {formatCurrencyForModal(total, orderCurrency)}
+                      </span>
                     </div>
                   </div>
                 </div>
