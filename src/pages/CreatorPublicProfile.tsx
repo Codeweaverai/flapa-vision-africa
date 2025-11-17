@@ -335,65 +335,45 @@ const CreatorPublicProfile: React.FC = () => {
       return;
     }
 
+    // Validate user IDs
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(user.id) || !uuidRegex.test(creatorId)) {
+      toast.error('Invalid user ID format');
+      return;
+    }
+
     try {
-      // Check if conversation already exists
-      const { data: existingConversation } = await supabase
-        .from('inbox_conversations')
-        .select('id')
-        .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-        .or(`user1_id.eq.${creatorId},user2_id.eq.${creatorId}`)
-        .single();
-
-      let conversationId;
-
-      if (existingConversation) {
-        conversationId = existingConversation.id;
-      } else {
-        // Create new conversation
-        const { data: newConversation, error: convError } = await supabase
-          .from('inbox_conversations')
-          .insert({
-            user1_id: user.id,
-            user2_id: creatorId,
-            last_message_at: new Date().toISOString()
-          })
-          .select()
-          .single();
-
-        if (convError) throw convError;
-        conversationId = newConversation.id;
-      }
-
-      // Send initial message
-      const { error: messageError } = await supabase
+      // Send direct message using inbox_messages table
+      const { data: newMessage, error: messageError } = await supabase
         .from('inbox_messages')
         .insert({
-          conversation_id: conversationId,
           sender_id: user.id,
           recipient_id: creatorId,
-          subject: `Message to ${creator.full_name}`,
+          subject: `Message from ${user.user_metadata?.full_name || user.email}`,
           content: `Hi ${creator.full_name}, I'd like to connect with you!`,
-          message_type: 'direct'
-        });
+          message_type: 'direct',
+          is_read: false
+        })
+        .select()
+        .single();
 
-      if (messageError) throw messageError;
+      if (messageError) {
+        console.error('Error sending message:', messageError);
+        throw new Error(`Failed to send message: ${messageError.message}`);
+      }
 
-      // Create notification
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: creatorId,
-          content: `You have a new message from ${user.user_metadata?.full_name || user.email}`,
-          type: 'message',
-          related_id: conversationId
-        });
+      if (!newMessage) {
+        throw new Error('Failed to send message: No data returned');
+      }
 
       toast.success('Message sent successfully!');
-      // Redirect to inbox or conversation
-      window.location.href = `/inbox?conversation=${conversationId}`;
+      
+      // Redirect to inbox
+      window.location.href = `/inbox`;
+
     } catch (error) {
       console.error('Error sending message:', error);
-      toast.error('Failed to send message');
+      toast.error(error.message || 'Failed to send message');
     }
   };
 
