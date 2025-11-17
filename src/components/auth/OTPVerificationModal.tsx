@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -112,6 +111,17 @@ const OTPVerificationModal = ({
     }
   };
 
+  const getTitle = () => {
+    switch (verificationType) {
+      case 'registration':
+        return 'Verify Your Email';
+      case 'inactive':
+        return 'Security Verification';
+      default:
+        return 'Verify Your Identity';
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
       <DialogContent className="sm:max-w-md">
@@ -120,7 +130,7 @@ const OTPVerificationModal = ({
             <Mail className="h-8 w-8 text-white" />
           </div>
           <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
-            Verify Your Email
+            {getTitle()}
           </DialogTitle>
           <DialogDescription className="text-base">
             {getVerificationMessage()}
