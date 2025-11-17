@@ -1184,7 +1184,7 @@ const MyOrdersPage = () => {
                                         <p className="text-sm text-orange-700 font-semibold">
                                           Price: <PriceDisplay 
                                             amount={safeNumber(booking.event_ticket.price)} 
-                                            originalCurrency={eventCurrency}
+                                            originalCurrency="USD"
                                             className="inline"
                                           />
                                         </p>
