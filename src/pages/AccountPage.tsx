@@ -18,6 +18,12 @@ import CurrencySwitcher from '@/components/currency/CurrencySwitcher';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { SUPPORTED_CURRENCIES, CurrencyCode } from '@/constants/currencies';
 
+declare global {
+  interface Window {
+    PusherPushNotifications: any;
+  }
+}
+
 interface ProfileData {
   id: string;
   username: string;
@@ -31,6 +37,8 @@ interface ProfileData {
   push_interests?: string[];
   push_last_subscribed?: string;
   push_last_unsubscribed?: string;
+  beams_authenticated?: boolean;
+  beams_authenticated_at?: string;
 }
 
 interface UserStats {
@@ -157,7 +165,9 @@ const AccountPage = () => {
     push_notifications_enabled: false,
     push_interests: ['hello'],
     push_last_subscribed: undefined,
-    push_last_unsubscribed: undefined
+    push_last_unsubscribed: undefined,
+    beams_authenticated: false,
+    beams_authenticated_at: undefined
   });
   const [languagePreference, setLanguagePreference] = useState<LanguagePreference>({
     user_id: '',
@@ -207,7 +217,9 @@ const AccountPage = () => {
             push_notifications_enabled: data.push_notifications_enabled || false,
             push_interests: data.push_interests || ['hello'],
             push_last_subscribed: data.push_last_subscribed,
-            push_last_unsubscribed: data.push_last_unsubscribed
+            push_last_unsubscribed: data.push_last_unsubscribed,
+            beams_authenticated: data.beams_authenticated || false,
+            beams_authenticated_at: data.beams_authenticated_at
           });
 
           // Fetch user stats (courses enrolled and events booked)
@@ -220,8 +232,6 @@ const AccountPage = () => {
 
           // Fetch user preferences
           await fetchUserPreferences(data.id);
-
-          // Pusher Beams is now handled by the global PusherBeamsInitializer in App.tsx
         }
       } catch (error) {
         console.error('Error:', error);
@@ -429,8 +439,8 @@ const AccountPage = () => {
         return;
       }
 
-      // Request permission if subscribing
       if (action === 'subscribe') {
+        // Request browser permission first
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') {
           toast.error('Permission denied', {
@@ -439,21 +449,35 @@ const AccountPage = () => {
           return;
         }
 
-        // SUBSCRIBE TO PUSHER BEAMS (Frontend)
+        // SECURE AUTHENTICATION FLOW
         if (window.PusherPushNotifications) {
           const beamsClient = new window.PusherPushNotifications.Client({
             instanceId: '572e383b-e0d2-4eff-86ac-d066550451e0',
           });
+
+          // Step 1: Get Beams token from your deployed function
+          const { data: tokenData, error: tokenError } = await supabase.functions.invoke('beams-generate-token');
           
+          if (tokenError || !tokenData?.token) {
+            console.error('Error getting Beams token:', tokenError);
+            throw new Error('Failed to authenticate with notification service');
+          }
+
+          // Step 2: Authenticate with Pusher Beams using the token
+          await beamsClient.setUserId(user.id, tokenData.token);
+          
+          // Step 3: Start Beams and subscribe to interests
           await beamsClient.start();
           await beamsClient.addDeviceInterest('hello');
           await beamsClient.addDeviceInterest(`user_${user.id}`);
-          console.log('✅ Successfully subscribed to Pusher Beams');
+          
+          console.log('✅ Successfully authenticated and subscribed to Pusher Beams');
         } else {
           console.error('Pusher Beams SDK not available');
+          throw new Error('Notification service not available');
         }
       } else {
-        // UNSUBSCRIBE FROM PUSHER BEAMS (Frontend)
+        // UNSUBSCRIBE FLOW
         if (window.PusherPushNotifications) {
           const beamsClient = new window.PusherPushNotifications.Client({
             instanceId: '572e383b-e0d2-4eff-86ac-d066550451e0',
@@ -478,19 +502,21 @@ const AccountPage = () => {
         throw new Error(error.message || 'Failed to update notification settings');
       }
 
-      // Update local state
+      // Update local state with beams authentication status
       setProfile(prev => ({
         ...prev,
         push_notifications_enabled: action === 'subscribe',
         push_last_subscribed: action === 'subscribe' ? new Date().toISOString() : prev.push_last_subscribed,
         push_last_unsubscribed: action === 'unsubscribe' ? new Date().toISOString() : prev.push_last_unsubscribed,
-        push_interests: action === 'subscribe' ? ['hello', `user_${user.id}`] : prev.push_interests
+        push_interests: action === 'subscribe' ? ['hello', `user_${user.id}`] : prev.push_interests,
+        beams_authenticated: action === 'subscribe',
+        beams_authenticated_at: action === 'subscribe' ? new Date().toISOString() : prev.beams_authenticated_at
       }));
 
       // Show success message
       if (action === 'subscribe') {
         toast.success('Push notifications enabled!', {
-          description: 'You will now receive browser notifications for important updates.'
+          description: 'You will now receive secure, personalized notifications.'
         });
       } else {
         toast.success('Push notifications disabled', {
@@ -498,9 +524,20 @@ const AccountPage = () => {
         });
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error toggling push notifications:', error);
-      toast.error('Failed to update notification settings');
+      
+      if (error.message.includes('permission') || error.message.includes('Permission')) {
+        toast.error('Permission required', {
+          description: 'Please allow notifications in your browser settings.'
+        });
+      } else if (error.message.includes('auth') || error.message.includes('token')) {
+        toast.error('Authentication failed', {
+          description: 'Unable to authenticate with notification service. Please try again.'
+        });
+      } else {
+        toast.error('Failed to update notification settings');
+      }
     } finally {
       setNotificationLoading(false);
     }
@@ -729,6 +766,17 @@ const AccountPage = () => {
                   
                   <div className="flex items-center justify-between p-3 bg-white/50 rounded-lg shadow-sm">
                     <div className="flex items-center">
+                      <Bell className="h-4 w-4 mr-2 text-purple-500" />
+                      <span className="text-sm font-medium">Notifications</span>
+                    </div>
+                    <Badge variant={profile.push_notifications_enabled ? "default" : "secondary"}
+                      className={profile.push_notifications_enabled ? "bg-green-500 text-white" : "bg-gray-500 text-white"}>
+                      {profile.push_notifications_enabled ? 'Enabled' : 'Disabled'}
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-3 bg-white/50 rounded-lg shadow-sm">
+                    <div className="flex items-center">
                       <Clock className="h-4 w-4 mr-2 text-purple-500" />
                       <span className="text-sm font-medium">Member Since</span>
                     </div>
@@ -926,10 +974,15 @@ const AccountPage = () => {
                             </div>
                           </div>
                           <div>
-                            <h4 className="font-semibold text-gray-800">Browser Notifications</h4>
+                            <h4 className="font-semibold text-gray-800">Secure Browser Notifications</h4>
                             <p className="text-sm text-gray-600">
-                              Receive updates about courses, events, and messages
+                              Receive authenticated updates about courses, events, and messages
                             </p>
+                            {profile.beams_authenticated && profile.beams_authenticated_at && (
+                              <p className="text-xs text-green-600 mt-1">
+                                Authenticated since {new Date(profile.beams_authenticated_at).toLocaleDateString()}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <Button
@@ -953,8 +1006,8 @@ const AccountPage = () => {
                       </div>
                       <p className="text-xs text-gray-500">
                         {profile.push_notifications_enabled 
-                          ? 'You will receive browser notifications for important updates'
-                          : 'Enable to get notified about new courses, events, and messages'
+                          ? 'You will receive secure, authenticated browser notifications'
+                          : 'Enable to get authenticated notifications about new courses, events, and messages'
                         }
                       </p>
                     </div>
@@ -982,13 +1035,21 @@ const AccountPage = () => {
                           <div className="font-medium text-gray-800 flex items-center gap-2 mt-1">
                             <Bell className={`h-4 w-4 ${profile.push_notifications_enabled ? 'text-green-500' : 'text-gray-400'}`} />
                             <span>{profile.push_notifications_enabled ? 'Enabled' : 'Disabled'}</span>
-                            {profile.push_last_subscribed && (
-                              <span className="text-xs text-gray-500 ml-2">
-                                since {new Date(profile.push_last_subscribed).toLocaleDateString()}
-                              </span>
+                            {profile.beams_authenticated && (
+                              <Badge variant="outline" className="ml-2 text-xs bg-green-50 text-green-700 border-green-200">
+                                Authenticated
+                              </Badge>
                             )}
                           </div>
                         </div>
+                        {profile.push_last_subscribed && (
+                          <div className="md:col-span-2">
+                            <span className="text-gray-600">Last Enabled:</span>
+                            <div className="font-medium text-gray-800">
+                              {new Date(profile.push_last_subscribed).toLocaleDateString()}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </CardContent>
