@@ -438,17 +438,35 @@ const AccountPage = () => {
         }
       }
 
-      // Only update the tracking in the database
+      // Update the profile first to track the preference
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          push_notifications_enabled: action === 'subscribe',
+          push_last_subscribed: action === 'subscribe' ? new Date().toISOString() : null,
+          push_last_unsubscribed: action === 'unsubscribe' ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (profileError) throw profileError;
+
+      // Call the push subscription function with proper userId
       const { data, error } = await supabase.functions.invoke('subscribe-push', {
         body: {
           action: action,
+          userId: user.id, // Ensure userId is passed
           interests: ['hello', `user_${user.id}`]
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Push subscription error:', error);
+        // Don't throw here as we've already updated the profile preference
+        toast.warning('Notification preference saved, but there was an issue with the push service');
+      }
 
-      // Update local state
+      // Update local state regardless of push service result
       setProfile(prev => ({
         ...prev,
         push_notifications_enabled: action === 'subscribe',
@@ -461,9 +479,6 @@ const AccountPage = () => {
         toast.success('Push notifications enabled!', {
           description: 'You will now receive browser notifications for important updates.'
         });
-        
-        // The actual Pusher Beams subscription is handled by your PushNotificationSetup component
-        // It will automatically detect the permission change and subscribe
       } else {
         toast.success('Push notifications disabled', {
           description: 'You will no longer receive browser notifications.'
