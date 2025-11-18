@@ -126,48 +126,6 @@ const QUICK_LINKS = [
   { href: '/wishlist', label: 'Wishlist', icon: Heart, color: 'text-pink-500' },
 ];
 
-// Pusher Beams Client Setup
-const initializePusherBeams = async (userId: string) => {
-  try {
-    // Check if Pusher is available
-    if (typeof window !== 'undefined' && (window as any).PusherPushNotifications) {
-      const beamsClient = new (window as any).PusherPushNotifications.Client({
-        instanceId: '572e383b-e0d2-4eff-86ac-d066550451e0',
-      });
-
-      await beamsClient.start();
-      
-      // Add user-specific interest
-      await beamsClient.addDeviceInterest(`user_${userId}`);
-      
-      // Add general interest
-      await beamsClient.addDeviceInterest('hello');
-      
-      console.log('Pusher Beams initialized successfully for user:', userId);
-      return beamsClient;
-    }
-    return null;
-  } catch (error) {
-    console.error('Error initializing Pusher Beams:', error);
-    return null;
-  }
-};
-
-const stopPusherBeams = async () => {
-  try {
-    if (typeof window !== 'undefined' && (window as any).PusherPushNotifications) {
-      const beamsClient = new (window as any).PusherPushNotifications.Client({
-        instanceId: '572e383b-e0d2-4eff-86ac-d066550451e0',
-      });
-      
-      await beamsClient.stop();
-      console.log('Pusher Beams stopped successfully');
-    }
-  } catch (error) {
-    console.error('Error stopping Pusher Beams:', error);
-  }
-};
-
 const AccountPage = () => {
   const { user } = useAuth();
   const { currentCurrency, formatPrice } = useCurrency();
@@ -263,10 +221,7 @@ const AccountPage = () => {
           // Fetch user preferences
           await fetchUserPreferences(data.id);
 
-          // Initialize Pusher Beams if notifications are enabled
-          if (data.push_notifications_enabled) {
-            await initializePusherBeams(data.id);
-          }
+          // Pusher Beams is now handled by the global PusherBeamsInitializer in App.tsx
         }
       } catch (error) {
         console.error('Error:', error);
@@ -485,16 +440,18 @@ const AccountPage = () => {
         }
       }
 
-      // Handle Pusher Beams subscription/unsubscription
-      if (action === 'subscribe') {
-        // Initialize Pusher Beams
-        const beamsClient = await initializePusherBeams(user.id);
-        if (!beamsClient) {
-          throw new Error('Failed to initialize push notifications');
+      // Call the existing subscribe-push function that your PushNotificationSetup uses
+      const { error } = await supabase.functions.invoke('subscribe-push', {
+        body: {
+          action: action,
+          userId: user.id,
+          interests: ['hello', `user_${user.id}`]
         }
-      } else {
-        // Stop Pusher Beams
-        await stopPusherBeams();
+      });
+
+      if (error) {
+        console.error('Error toggling push notifications:', error);
+        throw error;
       }
 
       // Update profile in database
