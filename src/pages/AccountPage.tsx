@@ -17,7 +17,6 @@ import ProfilePictureUpload from '@/components/user/ProfilePictureUpload';
 import CurrencySwitcher from '@/components/currency/CurrencySwitcher';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { SUPPORTED_CURRENCIES, CurrencyCode } from '@/constants/currencies';
-import PusherPushNotifications from '@pusher/push-notifications-web';
 
 interface ProfileData {
   id: string;
@@ -420,6 +419,26 @@ const AccountPage = () => {
     try {
       const action = profile.push_notifications_enabled ? 'unsubscribe' : 'subscribe';
       
+      // Check browser support
+      if (!('Notification' in window)) {
+        toast.error('Browser not supported', {
+          description: 'Your browser does not support push notifications.'
+        });
+        return;
+      }
+
+      // Request permission if subscribing
+      if (action === 'subscribe') {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          toast.error('Permission denied', {
+            description: 'Please allow notifications in your browser settings.'
+          });
+          return;
+        }
+      }
+
+      // Only update the tracking in the database
       const { data, error } = await supabase.functions.invoke('subscribe-push', {
         body: {
           action: action,
@@ -427,11 +446,9 @@ const AccountPage = () => {
         }
       });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      // Update local profile state
+      // Update local state
       setProfile(prev => ({
         ...prev,
         push_notifications_enabled: action === 'subscribe',
@@ -439,24 +456,14 @@ const AccountPage = () => {
         push_last_unsubscribed: action === 'unsubscribe' ? new Date().toISOString() : prev.push_last_unsubscribed
       }));
 
+      // Show success message
       if (action === 'subscribe') {
         toast.success('Push notifications enabled!', {
           description: 'You will now receive browser notifications for important updates.'
         });
         
-        // Also start Pusher Beams in the frontend
-        try {
-          const beamsClient = new PusherPushNotifications.Client({
-            instanceId: '572e383b-e0d2-4eff-86ac-d066550451e0',
-          });
-
-          await beamsClient.start();
-          await beamsClient.addDeviceInterest('hello');
-          await beamsClient.addDeviceInterest(`user_${user.id}`);
-          console.log('Pusher Beams subscription completed');
-        } catch (beamsError) {
-          console.error('Pusher Beams subscription error:', beamsError);
-        }
+        // The actual Pusher Beams subscription is handled by your PushNotificationSetup component
+        // It will automatically detect the permission change and subscribe
       } else {
         toast.success('Push notifications disabled', {
           description: 'You will no longer receive browser notifications.'
