@@ -126,6 +126,48 @@ const QUICK_LINKS = [
   { href: '/wishlist', label: 'Wishlist', icon: Heart, color: 'text-pink-500' },
 ];
 
+// Pusher Beams Client Setup
+const initializePusherBeams = async (userId: string) => {
+  try {
+    // Check if Pusher is available
+    if (typeof window !== 'undefined' && (window as any).PusherPushNotifications) {
+      const beamsClient = new (window as any).PusherPushNotifications.Client({
+        instanceId: '572e383b-e0d2-4eff-86ac-d066550451e0',
+      });
+
+      await beamsClient.start();
+      
+      // Add user-specific interest
+      await beamsClient.addDeviceInterest(`user_${userId}`);
+      
+      // Add general interest
+      await beamsClient.addDeviceInterest('hello');
+      
+      console.log('Pusher Beams initialized successfully for user:', userId);
+      return beamsClient;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error initializing Pusher Beams:', error);
+    return null;
+  }
+};
+
+const stopPusherBeams = async () => {
+  try {
+    if (typeof window !== 'undefined' && (window as any).PusherPushNotifications) {
+      const beamsClient = new (window as any).PusherPushNotifications.Client({
+        instanceId: '572e383b-e0d2-4eff-86ac-d066550451e0',
+      });
+      
+      await beamsClient.stop();
+      console.log('Pusher Beams stopped successfully');
+    }
+  } catch (error) {
+    console.error('Error stopping Pusher Beams:', error);
+  }
+};
+
 const AccountPage = () => {
   const { user } = useAuth();
   const { currentCurrency, formatPrice } = useCurrency();
@@ -220,6 +262,11 @@ const AccountPage = () => {
 
           // Fetch user preferences
           await fetchUserPreferences(data.id);
+
+          // Initialize Pusher Beams if notifications are enabled
+          if (data.push_notifications_enabled) {
+            await initializePusherBeams(data.id);
+          }
         }
       } catch (error) {
         console.error('Error:', error);
@@ -438,35 +485,33 @@ const AccountPage = () => {
         }
       }
 
-      // Update the profile first to track the preference
+      // Handle Pusher Beams subscription/unsubscription
+      if (action === 'subscribe') {
+        // Initialize Pusher Beams
+        const beamsClient = await initializePusherBeams(user.id);
+        if (!beamsClient) {
+          throw new Error('Failed to initialize push notifications');
+        }
+      } else {
+        // Stop Pusher Beams
+        await stopPusherBeams();
+      }
+
+      // Update profile in database
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
           push_notifications_enabled: action === 'subscribe',
           push_last_subscribed: action === 'subscribe' ? new Date().toISOString() : null,
           push_last_unsubscribed: action === 'unsubscribe' ? new Date().toISOString() : null,
+          push_last_updated: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
 
       if (profileError) throw profileError;
 
-      // Call the push subscription function with proper userId
-      const { data, error } = await supabase.functions.invoke('subscribe-push', {
-        body: {
-          action: action,
-          userId: user.id, // Ensure userId is passed
-          interests: ['hello', `user_${user.id}`]
-        }
-      });
-
-      if (error) {
-        console.error('Push subscription error:', error);
-        // Don't throw here as we've already updated the profile preference
-        toast.warning('Notification preference saved, but there was an issue with the push service');
-      }
-
-      // Update local state regardless of push service result
+      // Update local state
       setProfile(prev => ({
         ...prev,
         push_notifications_enabled: action === 'subscribe',
