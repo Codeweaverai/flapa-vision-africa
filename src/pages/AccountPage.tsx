@@ -12,11 +12,12 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { LayoutDashboard, ChevronRight, User, UserPlus, Settings, ExternalLink, Heart, BookOpen, Mail, Shield, Clock, Star, Users, Award, Globe, CreditCard, FileText, Gift, MessageSquare, Calendar, ShoppingCart } from 'lucide-react';
+import { LayoutDashboard, ChevronRight, User, UserPlus, Settings, ExternalLink, Heart, BookOpen, Mail, Shield, Clock, Star, Users, Award, Globe, CreditCard, FileText, Gift, MessageSquare, Calendar, ShoppingCart, Bell } from 'lucide-react';
 import ProfilePictureUpload from '@/components/user/ProfilePictureUpload';
 import CurrencySwitcher from '@/components/currency/CurrencySwitcher';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { SUPPORTED_CURRENCIES, CurrencyCode } from '@/constants/currencies';
+import PusherPushNotifications from '@pusher/push-notifications-web';
 
 interface ProfileData {
   id: string;
@@ -27,6 +28,10 @@ interface ProfileData {
   avatar_storage_path: string | null;
   is_creator: boolean;
   role: string;
+  push_notifications_enabled?: boolean;
+  push_interests?: string[];
+  push_last_subscribed?: string;
+  push_last_unsubscribed?: string;
 }
 
 interface UserStats {
@@ -130,6 +135,7 @@ const AccountPage = () => {
   const [saving, setSaving] = useState(false);
   const [enablingCreator, setEnablingCreator] = useState(false);
   const [savingPreferences, setSavingPreferences] = useState(false);
+  const [notificationLoading, setNotificationLoading] = useState(false);
   const [userStats, setUserStats] = useState<UserStats>({ 
     courses_enrolled: 0, 
     events_booked: 0 
@@ -148,7 +154,11 @@ const AccountPage = () => {
     bio: '',
     avatar_storage_path: null,
     is_creator: false,
-    role: 'user'
+    role: 'user',
+    push_notifications_enabled: false,
+    push_interests: ['hello'],
+    push_last_subscribed: undefined,
+    push_last_unsubscribed: undefined
   });
   const [languagePreference, setLanguagePreference] = useState<LanguagePreference>({
     user_id: '',
@@ -194,7 +204,11 @@ const AccountPage = () => {
             bio: data.bio || '',
             avatar_storage_path: data.avatar_storage_path || null,
             is_creator: data.is_creator || false,
-            role: data.role || 'user'
+            role: data.role || 'user',
+            push_notifications_enabled: data.push_notifications_enabled || false,
+            push_interests: data.push_interests || ['hello'],
+            push_last_subscribed: data.push_last_subscribed,
+            push_last_unsubscribed: data.push_last_unsubscribed
           });
 
           // Fetch user stats (courses enrolled and events booked)
@@ -396,6 +410,64 @@ const AccountPage = () => {
       toast.error('Failed to update preferences');
     } finally {
       setSavingPreferences(false);
+    }
+  };
+
+  const handlePushNotificationToggle = async () => {
+    if (!user) return;
+
+    setNotificationLoading(true);
+    try {
+      const action = profile.push_notifications_enabled ? 'unsubscribe' : 'subscribe';
+      
+      const { data, error } = await supabase.functions.invoke('subscribe-push', {
+        body: {
+          action: action,
+          interests: ['hello', `user_${user.id}`]
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      // Update local profile state
+      setProfile(prev => ({
+        ...prev,
+        push_notifications_enabled: action === 'subscribe',
+        push_last_subscribed: action === 'subscribe' ? new Date().toISOString() : prev.push_last_subscribed,
+        push_last_unsubscribed: action === 'unsubscribe' ? new Date().toISOString() : prev.push_last_unsubscribed
+      }));
+
+      if (action === 'subscribe') {
+        toast.success('Push notifications enabled!', {
+          description: 'You will now receive browser notifications for important updates.'
+        });
+        
+        // Also start Pusher Beams in the frontend
+        try {
+          const beamsClient = new PusherPushNotifications.Client({
+            instanceId: '572e383b-e0d2-4eff-86ac-d066550451e0',
+          });
+
+          await beamsClient.start();
+          await beamsClient.addDeviceInterest('hello');
+          await beamsClient.addDeviceInterest(`user_${user.id}`);
+          console.log('Pusher Beams subscription completed');
+        } catch (beamsError) {
+          console.error('Pusher Beams subscription error:', beamsError);
+        }
+      } else {
+        toast.success('Push notifications disabled', {
+          description: 'You will no longer receive browser notifications.'
+        });
+      }
+
+    } catch (error) {
+      console.error('Error toggling push notifications:', error);
+      toast.error('Failed to update notification settings');
+    } finally {
+      setNotificationLoading(false);
     }
   };
   
@@ -749,7 +821,7 @@ const AccountPage = () => {
                       Profile Settings
                     </CardTitle>
                     <CardDescription className="text-gray-600">
-                      Customize your language and currency preferences
+                      Customize your language, currency, and notification preferences
                     </CardDescription>
                   </CardHeader>
                   
@@ -805,27 +877,83 @@ const AccountPage = () => {
                       </p>
                     </div>
 
+                    {/* Push Notifications Toggle */}
+                    <div className="space-y-3">
+                      <Label htmlFor="notifications" className="text-gray-700 font-medium flex items-center">
+                        <Bell className="h-4 w-4 mr-2 text-orange-500" />
+                        Push Notifications
+                      </Label>
+                      <div className="flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg border border-orange-200/50">
+                        <div className="flex items-center space-x-3">
+                          <div className="flex-shrink-0">
+                            <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full flex items-center justify-center">
+                              <Bell className="h-5 w-5 text-white" />
+                            </div>
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-gray-800">Browser Notifications</h4>
+                            <p className="text-sm text-gray-600">
+                              Receive updates about courses, events, and messages
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          onClick={handlePushNotificationToggle}
+                          disabled={notificationLoading}
+                          variant={profile.push_notifications_enabled ? "default" : "outline"}
+                          className={`${
+                            profile.push_notifications_enabled 
+                              ? 'bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-lg' 
+                              : 'bg-white text-gray-700 border-orange-200 hover:bg-orange-50'
+                          } transition-all duration-300 min-w-20`}
+                        >
+                          {notificationLoading ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                          ) : profile.push_notifications_enabled ? (
+                            'Enabled'
+                          ) : (
+                            'Enable'
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        {profile.push_notifications_enabled 
+                          ? 'You will receive browser notifications for important updates'
+                          : 'Enable to get notified about new courses, events, and messages'
+                        }
+                      </p>
+                    </div>
+
                     {/* Current Settings Summary */}
                     <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-4 rounded-lg border border-orange-200/50">
-                      <h4 className="font-semibold text-gray-800 mb-2">Current Settings</h4>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
+                      <h4 className="font-semibold text-gray-800 mb-3">Current Settings</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                         <div>
                           <span className="text-gray-600">Language:</span>
-                          <div className="font-medium text-gray-800 flex items-center gap-2">
+                          <div className="font-medium text-gray-800 flex items-center gap-2 mt-1">
                             <span>🇺🇸</span>
                             <span>English</span>
                           </div>
                         </div>
                         <div>
                           <span className="text-gray-600">Currency:</span>
-                          <div className="font-medium text-gray-800 flex items-center gap-2">
+                          <div className="font-medium text-gray-800 flex items-center gap-2 mt-1">
                             <span>{SUPPORTED_CURRENCIES[currentCurrency as CurrencyCode]?.flag}</span>
                             <span>{currentCurrency} - {SUPPORTED_CURRENCIES[currentCurrency as CurrencyCode]?.name}</span>
                           </div>
                         </div>
-                      </div>
-                      <div className="mt-3 pt-3 border-t border-orange-200/30">
-            
+                        <div className="md:col-span-2">
+                          <span className="text-gray-600">Notifications:</span>
+                          <div className="font-medium text-gray-800 flex items-center gap-2 mt-1">
+                            <Bell className={`h-4 w-4 ${profile.push_notifications_enabled ? 'text-green-500' : 'text-gray-400'}`} />
+                            <span>{profile.push_notifications_enabled ? 'Enabled' : 'Disabled'}</span>
+                            {profile.push_last_subscribed && (
+                              <span className="text-xs text-gray-500 ml-2">
+                                since {new Date(profile.push_last_subscribed).toLocaleDateString()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
@@ -842,7 +970,7 @@ const AccountPage = () => {
                           Saving Preferences...
                         </>
                       ) : (
-                        'Save Language Preference'
+                        'Save All Preferences'
                       )}
                     </Button>
                   </CardFooter>
