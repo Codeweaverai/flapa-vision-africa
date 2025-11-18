@@ -146,6 +146,133 @@ export type Database = {
           },
         ]
       }
+      ai_course_proposals: {
+        Row: {
+          created_at: string | null
+          creator_id: string
+          expires_at: string
+          id: string
+          proposal_data: Json
+        }
+        Insert: {
+          created_at?: string | null
+          creator_id: string
+          expires_at?: string
+          id?: string
+          proposal_data: Json
+        }
+        Update: {
+          created_at?: string | null
+          creator_id?: string
+          expires_at?: string
+          id?: string
+          proposal_data?: Json
+        }
+        Relationships: []
+      }
+      ai_event_proposals: {
+        Row: {
+          created_at: string | null
+          creator_id: string
+          expires_at: string
+          id: string
+          proposal_data: Json
+          workplace_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          creator_id: string
+          expires_at?: string
+          id?: string
+          proposal_data: Json
+          workplace_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          creator_id?: string
+          expires_at?: string
+          id?: string
+          proposal_data?: Json
+          workplace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_event_proposals_workplace_id_fkey"
+            columns: ["workplace_id"]
+            isOneToOne: false
+            referencedRelation: "creator_workplaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_generation_progress: {
+        Row: {
+          agent_activity: Json | null
+          created_at: string | null
+          current_step: string | null
+          id: string
+          progress_percentage: number | null
+          proposal_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          agent_activity?: Json | null
+          created_at?: string | null
+          current_step?: string | null
+          id?: string
+          progress_percentage?: number | null
+          proposal_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          agent_activity?: Json | null
+          created_at?: string | null
+          current_step?: string | null
+          id?: string
+          progress_percentage?: number | null
+          proposal_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_generation_progress_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "ai_course_proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_usage_costs: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          feature_type: string
+          id: string
+          is_active: boolean | null
+          token_cost: number
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          feature_type: string
+          id?: string
+          is_active?: boolean | null
+          token_cost: number
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          feature_type?: string
+          id?: string
+          is_active?: boolean | null
+          token_cost?: number
+        }
+        Relationships: []
+      }
       broadcast_messages: {
         Row: {
           admin_id: string
@@ -182,6 +309,246 @@ export type Database = {
           status?: string
           subject?: string
           total_recipients?: number | null
+        }
+        Relationships: []
+      }
+      campaign_categories: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      campaign_contributions: {
+        Row: {
+          amount: number
+          campaign_id: string | null
+          created_at: string | null
+          currency: string | null
+          id: string
+          is_anonymous: boolean | null
+          message_to_creator: string | null
+          net_amount: number | null
+          payment_method: string | null
+          payment_provider: string | null
+          reward_id: string | null
+          status: string | null
+          supporter_id: string | null
+          transaction_fee: number | null
+          transaction_id: string | null
+        }
+        Insert: {
+          amount: number
+          campaign_id?: string | null
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          is_anonymous?: boolean | null
+          message_to_creator?: string | null
+          net_amount?: number | null
+          payment_method?: string | null
+          payment_provider?: string | null
+          reward_id?: string | null
+          status?: string | null
+          supporter_id?: string | null
+          transaction_fee?: number | null
+          transaction_id?: string | null
+        }
+        Update: {
+          amount?: number
+          campaign_id?: string | null
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          is_anonymous?: boolean | null
+          message_to_creator?: string | null
+          net_amount?: number | null
+          payment_method?: string | null
+          payment_provider?: string | null
+          reward_id?: string | null
+          status?: string | null
+          supporter_id?: string | null
+          transaction_fee?: number | null
+          transaction_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_contributions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "fundraising_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_contributions_reward_id_fkey"
+            columns: ["reward_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_rewards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_contributions_supporter_id_fkey"
+            columns: ["supporter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_rewards: {
+        Row: {
+          amount: number
+          campaign_id: string | null
+          claimed_count: number | null
+          created_at: string | null
+          delivery_estimate: string | null
+          description: string | null
+          id: string
+          stock_limit: number | null
+          title: string
+        }
+        Insert: {
+          amount: number
+          campaign_id?: string | null
+          claimed_count?: number | null
+          created_at?: string | null
+          delivery_estimate?: string | null
+          description?: string | null
+          id?: string
+          stock_limit?: number | null
+          title: string
+        }
+        Update: {
+          amount?: number
+          campaign_id?: string | null
+          claimed_count?: number | null
+          created_at?: string | null
+          delivery_estimate?: string | null
+          description?: string | null
+          id?: string
+          stock_limit?: number | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_rewards_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "fundraising_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_transactions: {
+        Row: {
+          amount: number
+          bearer: string | null
+          billing_city: string | null
+          billing_country: string | null
+          billing_postal_code: string | null
+          billing_state: string | null
+          billing_street_address: string | null
+          card_bin: string | null
+          card_last4: string | null
+          card_type: string | null
+          completed_at: string | null
+          created_at: string | null
+          currency: string
+          customer_first_name: string | null
+          customer_last_name: string | null
+          email: string
+          fee: number | null
+          id: string
+          initiated_at: string | null
+          lenco_reference: string | null
+          payment_status: string
+          reason_for_failure: string | null
+          redirect_url: string | null
+          reference: string
+          settlement_status: string | null
+          source: string | null
+          three_ds_redirect_url: string | null
+          type: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount: number
+          bearer?: string | null
+          billing_city?: string | null
+          billing_country?: string | null
+          billing_postal_code?: string | null
+          billing_state?: string | null
+          billing_street_address?: string | null
+          card_bin?: string | null
+          card_last4?: string | null
+          card_type?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          currency?: string
+          customer_first_name?: string | null
+          customer_last_name?: string | null
+          email: string
+          fee?: number | null
+          id?: string
+          initiated_at?: string | null
+          lenco_reference?: string | null
+          payment_status: string
+          reason_for_failure?: string | null
+          redirect_url?: string | null
+          reference: string
+          settlement_status?: string | null
+          source?: string | null
+          three_ds_redirect_url?: string | null
+          type?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          bearer?: string | null
+          billing_city?: string | null
+          billing_country?: string | null
+          billing_postal_code?: string | null
+          billing_state?: string | null
+          billing_street_address?: string | null
+          card_bin?: string | null
+          card_last4?: string | null
+          card_type?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          currency?: string
+          customer_first_name?: string | null
+          customer_last_name?: string | null
+          email?: string
+          fee?: number | null
+          id?: string
+          initiated_at?: string | null
+          lenco_reference?: string | null
+          payment_status?: string
+          reason_for_failure?: string | null
+          redirect_url?: string | null
+          reference?: string
+          settlement_status?: string | null
+          source?: string | null
+          three_ds_redirect_url?: string | null
+          type?: string | null
+          updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -937,6 +1304,50 @@ export type Database = {
           },
         ]
       }
+      course_skill_outcomes: {
+        Row: {
+          course_id: string
+          created_at: string | null
+          id: string
+          is_core_skill: boolean | null
+          order_index: number
+          skill_description: string | null
+          skill_level: string | null
+          skill_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          course_id: string
+          created_at?: string | null
+          id?: string
+          is_core_skill?: boolean | null
+          order_index?: number
+          skill_description?: string | null
+          skill_level?: string | null
+          skill_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          course_id?: string
+          created_at?: string | null
+          id?: string
+          is_core_skill?: boolean | null
+          order_index?: number
+          skill_description?: string | null
+          skill_level?: string | null
+          skill_name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_skill_outcomes_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       courses: {
         Row: {
           category: string
@@ -1008,11 +1419,18 @@ export type Database = {
       creator_payouts: {
         Row: {
           amount: number
+          bank_transfer_details: Json | null
+          completed_at: string | null
           created_at: string
           creator_id: string
           currency: string
           destination: string
+          environment: string | null
+          external_reference: string | null
+          failure_reason: string | null
+          fee: number | null
           id: string
+          lenco_reference: string | null
           method: string
           minimum_threshold_met: boolean | null
           mobile_money_details: Json | null
@@ -1026,11 +1444,18 @@ export type Database = {
         }
         Insert: {
           amount: number
+          bank_transfer_details?: Json | null
+          completed_at?: string | null
           created_at?: string
           creator_id: string
           currency?: string
           destination: string
+          environment?: string | null
+          external_reference?: string | null
+          failure_reason?: string | null
+          fee?: number | null
           id?: string
+          lenco_reference?: string | null
           method: string
           minimum_threshold_met?: boolean | null
           mobile_money_details?: Json | null
@@ -1044,11 +1469,18 @@ export type Database = {
         }
         Update: {
           amount?: number
+          bank_transfer_details?: Json | null
+          completed_at?: string | null
           created_at?: string
           creator_id?: string
           currency?: string
           destination?: string
+          environment?: string | null
+          external_reference?: string | null
+          failure_reason?: string | null
+          fee?: number | null
           id?: string
+          lenco_reference?: string | null
           method?: string
           minimum_threshold_met?: boolean | null
           mobile_money_details?: Json | null
@@ -1836,6 +2268,68 @@ export type Database = {
           },
         ]
       }
+      fundraising_campaigns: {
+        Row: {
+          category: string | null
+          cover_image_url: string | null
+          created_at: string | null
+          creator_id: string | null
+          currency: string | null
+          description: string | null
+          end_date: string | null
+          goal_amount: number
+          id: string
+          start_date: string | null
+          status: string | null
+          title: string
+          updated_at: string | null
+          use_of_funds: string | null
+          video_url: string | null
+        }
+        Insert: {
+          category?: string | null
+          cover_image_url?: string | null
+          created_at?: string | null
+          creator_id?: string | null
+          currency?: string | null
+          description?: string | null
+          end_date?: string | null
+          goal_amount: number
+          id?: string
+          start_date?: string | null
+          status?: string | null
+          title: string
+          updated_at?: string | null
+          use_of_funds?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          category?: string | null
+          cover_image_url?: string | null
+          created_at?: string | null
+          creator_id?: string | null
+          currency?: string | null
+          description?: string | null
+          end_date?: string | null
+          goal_amount?: number
+          id?: string
+          start_date?: string | null
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+          use_of_funds?: string | null
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fundraising_campaigns_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       general_settings: {
         Row: {
           contact_email: string | null
@@ -2379,6 +2873,7 @@ export type Database = {
           linkedin_url: string | null
           name: string
           order_index: number
+          role: string
           speaking_topic: string | null
           title: string | null
           twitter_url: string | null
@@ -2395,6 +2890,7 @@ export type Database = {
           linkedin_url?: string | null
           name: string
           order_index?: number
+          role?: string
           speaking_topic?: string | null
           title?: string | null
           twitter_url?: string | null
@@ -2411,6 +2907,7 @@ export type Database = {
           linkedin_url?: string | null
           name?: string
           order_index?: number
+          role?: string
           speaking_topic?: string | null
           title?: string | null
           twitter_url?: string | null
@@ -2735,22 +3232,30 @@ export type Database = {
           created_at: string | null
           duration_minutes: number | null
           episode_number: string | null
+          featured: boolean | null
           file_storage_path: string | null
           guest_names: string | null
           id: string
           image_url: string | null
           is_published: boolean | null
+          language: string | null
+          last_updated_at: string | null
           media_type: string | null
           media_url: string | null
+          meta_description: string | null
           post_type: string
           published_at: string | null
+          reading_time: number | null
           recording_date: string | null
           scheduled_publish_at: string | null
+          seo_title: string | null
           series_name: string | null
           summary: string | null
           tags: string[] | null
           title: string
           updated_at: string | null
+          updated_by: string | null
+          view_count: number | null
         }
         Insert: {
           author_id?: string | null
@@ -2759,22 +3264,30 @@ export type Database = {
           created_at?: string | null
           duration_minutes?: number | null
           episode_number?: string | null
+          featured?: boolean | null
           file_storage_path?: string | null
           guest_names?: string | null
           id?: string
           image_url?: string | null
           is_published?: boolean | null
+          language?: string | null
+          last_updated_at?: string | null
           media_type?: string | null
           media_url?: string | null
+          meta_description?: string | null
           post_type: string
           published_at?: string | null
+          reading_time?: number | null
           recording_date?: string | null
           scheduled_publish_at?: string | null
+          seo_title?: string | null
           series_name?: string | null
           summary?: string | null
           tags?: string[] | null
           title: string
           updated_at?: string | null
+          updated_by?: string | null
+          view_count?: number | null
         }
         Update: {
           author_id?: string | null
@@ -2783,22 +3296,30 @@ export type Database = {
           created_at?: string | null
           duration_minutes?: number | null
           episode_number?: string | null
+          featured?: boolean | null
           file_storage_path?: string | null
           guest_names?: string | null
           id?: string
           image_url?: string | null
           is_published?: boolean | null
+          language?: string | null
+          last_updated_at?: string | null
           media_type?: string | null
           media_url?: string | null
+          meta_description?: string | null
           post_type?: string
           published_at?: string | null
+          reading_time?: number | null
           recording_date?: string | null
           scheduled_publish_at?: string | null
+          seo_title?: string | null
           series_name?: string | null
           summary?: string | null
           tags?: string[] | null
           title?: string
           updated_at?: string | null
+          updated_by?: string | null
+          view_count?: number | null
         }
         Relationships: []
       }
@@ -3117,8 +3638,10 @@ export type Database = {
       orders: {
         Row: {
           applied_gift_card_id: string | null
+          card_transaction_id: string | null
           created_at: string | null
           currency: string | null
+          deposit_id: string | null
           email: string
           gift_card_discount: number | null
           id: string
@@ -3126,8 +3649,10 @@ export type Database = {
           payment_method: string
           payment_provider_id: string | null
           payment_status: string
+          processing_fee: number | null
           receipt_generated_at: string | null
           receipt_url: string | null
+          reference_id: string | null
           stripe_payment_intent_id: string | null
           stripe_session_id: string | null
           tax_amount: number | null
@@ -3137,8 +3662,10 @@ export type Database = {
         }
         Insert: {
           applied_gift_card_id?: string | null
+          card_transaction_id?: string | null
           created_at?: string | null
           currency?: string | null
+          deposit_id?: string | null
           email: string
           gift_card_discount?: number | null
           id?: string
@@ -3146,8 +3673,10 @@ export type Database = {
           payment_method: string
           payment_provider_id?: string | null
           payment_status?: string
+          processing_fee?: number | null
           receipt_generated_at?: string | null
           receipt_url?: string | null
+          reference_id?: string | null
           stripe_payment_intent_id?: string | null
           stripe_session_id?: string | null
           tax_amount?: number | null
@@ -3157,8 +3686,10 @@ export type Database = {
         }
         Update: {
           applied_gift_card_id?: string | null
+          card_transaction_id?: string | null
           created_at?: string | null
           currency?: string | null
+          deposit_id?: string | null
           email?: string
           gift_card_discount?: number | null
           id?: string
@@ -3166,8 +3697,10 @@ export type Database = {
           payment_method?: string
           payment_provider_id?: string | null
           payment_status?: string
+          processing_fee?: number | null
           receipt_generated_at?: string | null
           receipt_url?: string | null
+          reference_id?: string | null
           stripe_payment_intent_id?: string | null
           stripe_session_id?: string | null
           tax_amount?: number | null
@@ -3181,6 +3714,13 @@ export type Database = {
             columns: ["applied_gift_card_id"]
             isOneToOne: false
             referencedRelation: "gift_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_card_transaction_id_fkey"
+            columns: ["card_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "card_transactions"
             referencedColumns: ["id"]
           },
         ]
@@ -3359,10 +3899,12 @@ export type Database = {
           creator_enabled_at: string | null
           default_payout_method: string | null
           email_verified: boolean | null
+          expo_push_token: string | null
           full_name: string | null
           id: string
           is_creator: boolean | null
           last_activity: string | null
+          mobile_money_country: string | null
           mobile_money_details: Json | null
           mobile_money_number: string | null
           mobile_money_operator: string | null
@@ -3386,10 +3928,12 @@ export type Database = {
           creator_enabled_at?: string | null
           default_payout_method?: string | null
           email_verified?: boolean | null
+          expo_push_token?: string | null
           full_name?: string | null
           id: string
           is_creator?: boolean | null
           last_activity?: string | null
+          mobile_money_country?: string | null
           mobile_money_details?: Json | null
           mobile_money_number?: string | null
           mobile_money_operator?: string | null
@@ -3413,10 +3957,12 @@ export type Database = {
           creator_enabled_at?: string | null
           default_payout_method?: string | null
           email_verified?: boolean | null
+          expo_push_token?: string | null
           full_name?: string | null
           id?: string
           is_creator?: boolean | null
           last_activity?: string | null
+          mobile_money_country?: string | null
           mobile_money_details?: Json | null
           mobile_money_number?: string | null
           mobile_money_operator?: string | null
@@ -3624,6 +4170,7 @@ export type Database = {
       quiz_questions: {
         Row: {
           created_at: string | null
+          explanation: string | null
           id: string
           order_index: number
           question: string
@@ -3632,6 +4179,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          explanation?: string | null
           id?: string
           order_index: number
           question: string
@@ -3640,6 +4188,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          explanation?: string | null
           id?: string
           order_index?: number
           question?: string
@@ -3898,6 +4447,78 @@ export type Database = {
         }
         Relationships: []
       }
+      token_transactions: {
+        Row: {
+          amount: number
+          amount_paid: number | null
+          created_at: string | null
+          deposit_id: string | null
+          description: string | null
+          id: string
+          payment_status: string | null
+          reference_id: string | null
+          token_price: number | null
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          amount: number
+          amount_paid?: number | null
+          created_at?: string | null
+          deposit_id?: string | null
+          description?: string | null
+          id?: string
+          payment_status?: string | null
+          reference_id?: string | null
+          token_price?: number | null
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          amount_paid?: number | null
+          created_at?: string | null
+          deposit_id?: string | null
+          description?: string | null
+          id?: string
+          payment_status?: string | null
+          reference_id?: string | null
+          token_price?: number | null
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      top_up_config: {
+        Row: {
+          created_at: string | null
+          default_amounts: number[] | null
+          id: string
+          max_amount: number | null
+          min_amount: number | null
+          token_price: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          default_amounts?: number[] | null
+          id?: string
+          max_amount?: number | null
+          min_amount?: number | null
+          token_price?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          default_amounts?: number[] | null
+          id?: string
+          max_amount?: number | null
+          min_amount?: number | null
+          token_price?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       user_achievements: {
         Row: {
           achievement_id: string
@@ -4086,6 +4707,45 @@ export type Database = {
         }
         Relationships: []
       }
+      user_tokens: {
+        Row: {
+          balance: number | null
+          created_at: string | null
+          free_tokens_available: number | null
+          free_tokens_used: number | null
+          has_used_free_trial: boolean | null
+          id: string
+          total_purchased: number | null
+          total_used: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          balance?: number | null
+          created_at?: string | null
+          free_tokens_available?: number | null
+          free_tokens_used?: number | null
+          has_used_free_trial?: boolean | null
+          id?: string
+          total_purchased?: number | null
+          total_used?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          balance?: number | null
+          created_at?: string | null
+          free_tokens_available?: number | null
+          free_tokens_used?: number | null
+          has_used_free_trial?: boolean | null
+          id?: string
+          total_purchased?: number | null
+          total_used?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       video_metadata: {
         Row: {
           content_type: string
@@ -4249,19 +4909,17 @@ export type Database = {
         Args: { workplace_uuid: string }
         Returns: boolean
       }
-      cleanup_expired_otps: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      cleanup_expired_otps: { Args: never; Returns: undefined }
+      cleanup_expired_proposals: { Args: never; Returns: undefined }
       count_bookings_by_event: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           count: string
           event_id: string
         }[]
       }
       count_registrations_by_event: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           count: string
           event_id: string
@@ -4275,53 +4933,26 @@ export type Database = {
         Args: { country_code: string }
         Returns: string
       }
-      generate_booking_code: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_gift_card_code: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_gift_code: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_ticket_code: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_ticket_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_unique_ticket_code: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      get_available_tickets: {
-        Args: { ticket_id: string }
-        Returns: number
-      }
+      generate_booking_code: { Args: never; Returns: string }
+      generate_gift_card_code: { Args: never; Returns: string }
+      generate_gift_code: { Args: never; Returns: string }
+      generate_ticket_code: { Args: never; Returns: string }
+      generate_ticket_number: { Args: never; Returns: string }
+      generate_unique_ticket_code: { Args: never; Returns: string }
+      get_available_tickets: { Args: { ticket_id: string }; Returns: number }
       get_current_exchange_rates: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           exchange_rate: number
           target_currency: string
         }[]
       }
-      get_current_user_email: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      get_current_user_email: { Args: never; Returns: string }
       get_exchange_rate: {
         Args: { from_currency: string; to_currency: string }
         Returns: number
       }
-      get_user_currency: {
-        Args: { user_uuid: string }
-        Returns: string
-      }
+      get_user_currency: { Args: { user_uuid: string }; Returns: string }
       get_user_emails: {
         Args: { user_ids: string[] }
         Returns: {
@@ -4330,14 +4961,8 @@ export type Database = {
           id: string
         }[]
       }
-      get_user_workplace_ids: {
-        Args: Record<PropertyKey, never>
-        Returns: string[]
-      }
-      is_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      get_user_workplace_ids: { Args: never; Returns: string[] }
+      is_admin: { Args: never; Returns: boolean }
       is_creator_content_owner: {
         Args: {
           creator_uuid: string
@@ -4354,10 +4979,7 @@ export type Database = {
         Args: { workspace_uuid: string }
         Returns: boolean
       }
-      is_workspace_owner: {
-        Args: { workspace_uuid: string }
-        Returns: boolean
-      }
+      is_workspace_owner: { Args: { workspace_uuid: string }; Returns: boolean }
       process_payment_success: {
         Args: {
           p_order_id: string

@@ -6,6 +6,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+declare global {
+  interface Window {
+    PusherPushNotifications: any;
+  }
+}
+
 const PushNotificationSetup: React.FC = () => {
   const { user } = useAuth();
   const [isSupported, setIsSupported] = useState(false);
@@ -14,37 +20,56 @@ const PushNotificationSetup: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Check if push notifications are supported
-    const supported = 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
-    setIsSupported(supported);
-    
-    console.log('Push notification support:', supported);
-    console.log('Current user:', user ? 'logged in' : 'not logged in');
-    console.log('Notification permission:', Notification.permission);
-
-    if (supported && user) {
-      checkSubscriptionStatus();
+    // Load Pusher Beams SDK
+    const script = document.createElement('script');
+    script.src = 'https://js.pusher.com/beams/2.1.0/push-notifications-cdn.js';
+    script.async = true;
+    script.onload = () => {
+      const supported = 'Notification' in window && 'serviceWorker' in navigator;
+      setIsSupported(supported);
       
-      // Show prompt if not subscribed and permission not denied
-      if (Notification.permission === 'default') {
-        const dismissed = sessionStorage.getItem('push-notification-dismissed');
-        console.log('Notification dismissed?', dismissed);
-        if (!dismissed) {
-          // Shorter delay for better UX
-          setTimeout(() => {
-            console.log('Showing push notification prompt');
-            setIsVisible(true);
-          }, 2000);
+      console.log('Pusher Beams SDK loaded');
+      console.log('Push notification support:', supported);
+      console.log('Current user:', user ? 'logged in' : 'not logged in');
+      console.log('Notification permission:', Notification.permission);
+
+      if (supported && user) {
+        checkSubscriptionStatus();
+        
+        // Show prompt if not subscribed and permission not denied
+        if (Notification.permission === 'default') {
+          const dismissed = sessionStorage.getItem('push-notification-dismissed');
+          console.log('Notification dismissed?', dismissed);
+          if (!dismissed) {
+            setTimeout(() => {
+              console.log('Showing push notification prompt');
+              setIsVisible(true);
+            }, 2000);
+          }
         }
       }
-    }
+    };
+    document.head.appendChild(script);
+
+    return () => {
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    };
   }, [user]);
 
   const checkSubscriptionStatus = async () => {
     try {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
-      setIsSubscribed(!!subscription);
+      if (!window.PusherPushNotifications) {
+        return;
+      }
+      
+      const beamsClient = new window.PusherPushNotifications.Client({
+        instanceId: '572e383b-e0d2-4eff-86ac-d066550451e0',
+      });
+
+      const deviceId = await beamsClient.getDeviceId();
+      setIsSubscribed(!!deviceId);
     } catch (error) {
       console.error('Error checking subscription:', error);
     }
@@ -56,35 +81,29 @@ const PushNotificationSetup: React.FC = () => {
       return;
     }
 
+    if (!window.PusherPushNotifications) {
+      toast.error('Push notifications SDK not loaded');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // Request notification permission
-      const permission = await Notification.requestPermission();
-      
-      if (permission !== 'granted') {
-        toast.error('Notification permission denied');
-        setLoading(false);
-        return;
-      }
-
-      // Get service worker registration
-      const registration = await navigator.serviceWorker.ready;
-
-      // Subscribe to push notifications
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(
-          // This is a placeholder - you'll need to generate your own VAPID keys
-          // Run: npx web-push generate-vapid-keys
-          'BDx0agxfhemcb33xmWOT5Y96mVc71Ykd_3pn7VQ_HLe2_M95ECQ6Vrr2uWd09xMNhu8dNewCoR_Oj-9v2qZya9c'
-        ) as BufferSource,
+      const beamsClient = new window.PusherPushNotifications.Client({
+        instanceId: '572e383b-e0d2-4eff-86ac-d066550451e0',
       });
 
-      // Send subscription to backend
+      // Start Beams and subscribe to user-specific interest
+      await beamsClient.start();
+      await beamsClient.addDeviceInterest(user.id);
+      await beamsClient.addDeviceInterest('all-users');
+
+      // Store device ID in backend
+      const deviceId = await beamsClient.getDeviceId();
       const { error } = await supabase.functions.invoke('subscribe-push', {
         body: {
-          subscription: subscription.toJSON(),
+          deviceId,
+          userId: user.id,
           action: 'subscribe',
         },
       });
@@ -97,15 +116,7 @@ const PushNotificationSetup: React.FC = () => {
       setIsVisible(false);
       toast.success('Push notifications enabled!');
       
-      // Send a test notification
-      await Notification.requestPermission();
-      if (Notification.permission === 'granted') {
-        new Notification('SkillPulse Notifications Enabled', {
-          body: 'You\'ll now receive updates about your courses and events',
-          icon: '/lovable-uploads/logoskillpulse.png',
-          badge: '/lovable-uploads/logoskillpulse.png',
-        });
-      }
+      console.log('Successfully registered with Pusher Beams!');
     } catch (error) {
       console.error('Error subscribing to push:', error);
       toast.error('Failed to enable notifications');
@@ -115,27 +126,29 @@ const PushNotificationSetup: React.FC = () => {
   };
 
   const unsubscribeFromPush = async () => {
+    if (!user || !window.PusherPushNotifications) {
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
+      const beamsClient = new window.PusherPushNotifications.Client({
+        instanceId: '572e383b-e0d2-4eff-86ac-d066550451e0',
+      });
 
-      if (subscription) {
-        // Unsubscribe from push notifications
-        await subscription.unsubscribe();
+      await beamsClient.stop();
 
-        // Remove subscription from backend
-        const { error } = await supabase.functions.invoke('subscribe-push', {
-          body: {
-            subscription: subscription.toJSON(),
-            action: 'unsubscribe',
-          },
-        });
+      // Remove subscription from backend
+      const { error } = await supabase.functions.invoke('subscribe-push', {
+        body: {
+          userId: user.id,
+          action: 'unsubscribe',
+        },
+      });
 
-        if (error) {
-          throw error;
-        }
+      if (error) {
+        throw error;
       }
 
       setIsSubscribed(false);
@@ -151,21 +164,6 @@ const PushNotificationSetup: React.FC = () => {
   const handleDismiss = () => {
     setIsVisible(false);
     sessionStorage.setItem('push-notification-dismissed', 'true');
-  };
-
-  const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
-    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-    const base64 = (base64String + padding)
-      .replace(/-/g, '+')
-      .replace(/_/g, '/');
-
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-
-    for (let i = 0; i < rawData.length; ++i) {
-      outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
   };
 
   if (!isSupported || !user) {

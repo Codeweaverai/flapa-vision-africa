@@ -35,59 +35,60 @@ serve(async (req) => {
       );
     }
 
-    const { subscription, action } = await req.json();
+    const { deviceId, userId, action } = await req.json();
 
     if (action === 'subscribe') {
-      if (!subscription || !subscription.endpoint) {
+      if (!deviceId || !userId) {
         return new Response(
           JSON.stringify({ error: 'Invalid subscription data' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // Check if subscription already exists
+      // Check if device already exists
       const { data: existing } = await supabaseClient
         .from('push_subscriptions')
         .select('id')
-        .eq('user_id', user.id)
-        .eq('endpoint', subscription.endpoint)
+        .eq('user_id', userId)
+        .eq('device_id', deviceId)
         .single();
 
       if (existing) {
         return new Response(
-          JSON.stringify({ message: 'Subscription already exists' }),
+          JSON.stringify({ message: 'Device already registered' }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // Store subscription
+      // Store device ID
       const { error: insertError } = await supabaseClient
         .from('push_subscriptions')
         .insert({
-          user_id: user.id,
-          subscription: subscription,
-          endpoint: subscription.endpoint,
+          user_id: userId,
+          device_id: deviceId,
+          subscription: { deviceId }, // Store minimal data
+          endpoint: `pusher-beams-${deviceId}`, // For compatibility
         });
 
       if (insertError) {
-        console.error('Error storing subscription:', insertError);
+        console.error('Error storing device:', insertError);
         return new Response(
-          JSON.stringify({ error: 'Failed to store subscription' }),
+          JSON.stringify({ error: 'Failed to store device' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      console.log(`Push subscription created for user ${user.id}`);
+      console.log(`Pusher Beams device registered for user ${userId}`);
 
       return new Response(
-        JSON.stringify({ message: 'Subscription stored successfully' }),
+        JSON.stringify({ message: 'Device registered successfully' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
 
     } else if (action === 'unsubscribe') {
-      if (!subscription || !subscription.endpoint) {
+      if (!userId) {
         return new Response(
-          JSON.stringify({ error: 'Invalid subscription data' }),
+          JSON.stringify({ error: 'Invalid user data' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -95,21 +96,20 @@ serve(async (req) => {
       const { error: deleteError } = await supabaseClient
         .from('push_subscriptions')
         .delete()
-        .eq('user_id', user.id)
-        .eq('endpoint', subscription.endpoint);
+        .eq('user_id', userId);
 
       if (deleteError) {
-        console.error('Error removing subscription:', deleteError);
+        console.error('Error removing devices:', deleteError);
         return new Response(
-          JSON.stringify({ error: 'Failed to remove subscription' }),
+          JSON.stringify({ error: 'Failed to remove devices' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      console.log(`Push subscription removed for user ${user.id}`);
+      console.log(`Pusher Beams devices removed for user ${userId}`);
 
       return new Response(
-        JSON.stringify({ message: 'Subscription removed successfully' }),
+        JSON.stringify({ message: 'Devices removed successfully' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
 
