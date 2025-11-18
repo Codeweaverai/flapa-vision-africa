@@ -167,7 +167,6 @@ import NotFoundPage from '@/pages/NotFoundPage';
 import CardSuccessPage from '@/pages/CardSuccessPage';
 import LencoPaymentSuccessPage from '@/pages/LencoPaymentSuccessPage';
 
-
 // Import components
 import ProtectedRoute from '@/components/ProtectedRoute';
 import AdminRoute from '@/components/admin/AdminRoute';
@@ -175,6 +174,7 @@ import OTPManager from '@/components/auth/OTPManager';
 import InstallPrompt from '@/components/pwa/InstallPrompt';
 import OfflineIndicator from '@/components/pwa/OfflineIndicator';
 import PushNotificationSetup from '@/components/pwa/PushNotificationSetup';
+import PusherBeamsInitializer from '@/components/pwa/PusherBeamsInitializer';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -193,6 +193,9 @@ function App() {
           <CartProvider>
             <Router>
               <div className="min-h-screen bg-background">
+                {/* Global Pusher Beams Initializer - Ensures proper initialization */}
+                <PusherBeamsInitializer />
+                
                 <Routes>
                   {/* Public Routes */}
                   <Route path="/" element={<Index />} />
