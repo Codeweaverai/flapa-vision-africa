@@ -36,17 +36,8 @@ const PushNotificationSetup: React.FC = () => {
       if (supported && user) {
         checkSubscriptionStatus();
         
-        // Show prompt if not subscribed and permission not denied
-        if (Notification.permission === 'default') {
-          const dismissed = sessionStorage.getItem('push-notification-dismissed');
-          console.log('Notification dismissed?', dismissed);
-          if (!dismissed) {
-            setTimeout(() => {
-              console.log('Showing push notification prompt');
-              setIsVisible(true);
-            }, 2000);
-          }
-        }
+        // Check user's notification preference before showing prompt
+        checkUserNotificationPreference();
       }
     };
     document.head.appendChild(script);
@@ -57,6 +48,32 @@ const PushNotificationSetup: React.FC = () => {
       }
     };
   }, [user]);
+
+  const checkUserNotificationPreference = async () => {
+    if (!user) return;
+
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('push_notifications_enabled')
+        .eq('id', user.id)
+        .single();
+
+      // Only show prompt if user hasn't explicitly disabled notifications
+      // and permission is not yet granted/denied
+      if (profile && !profile.push_notifications_enabled && Notification.permission === 'default') {
+        const dismissed = sessionStorage.getItem('push-notification-dismissed');
+        if (!dismissed) {
+          setTimeout(() => {
+            console.log('Showing push notification prompt');
+            setIsVisible(true);
+          }, 2000);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking user preference:', error);
+    }
+  };
 
   const checkSubscriptionStatus = async () => {
     try {
@@ -89,16 +106,29 @@ const PushNotificationSetup: React.FC = () => {
     setLoading(true);
 
     try {
+      // First, update the user's preference in the database
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          push_notifications_enabled: true,
+          push_last_subscribed: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (updateError) {
+        console.error('Error updating user preference:', updateError);
+      }
+
       const beamsClient = new window.PusherPushNotifications.Client({
         instanceId: '572e383b-e0d2-4eff-86ac-d066550451e0',
       });
 
-      // Start Beams and subscribe to user-specific interest
+      // Start Beams and subscribe to interests
       await beamsClient.start();
-      await beamsClient.addDeviceInterest(user.id);
-      await beamsClient.addDeviceInterest('all-users');
+      await beamsClient.addDeviceInterest('hello');
+      await beamsClient.addDeviceInterest(`user_${user.id}`);
 
-      // Store device ID in backend
+      // Store device ID in backend via the subscribe-push function
       const deviceId = await beamsClient.getDeviceId();
       const { error } = await supabase.functions.invoke('subscribe-push', {
         body: {
@@ -109,7 +139,7 @@ const PushNotificationSetup: React.FC = () => {
       });
 
       if (error) {
-        throw error;
+        console.error('Error calling subscribe-push function:', error);
       }
 
       setIsSubscribed(true);
@@ -133,6 +163,19 @@ const PushNotificationSetup: React.FC = () => {
     setLoading(true);
 
     try {
+      // Update user's preference in database
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          push_notifications_enabled: false,
+          push_last_unsubscribed: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (updateError) {
+        console.error('Error updating user preference:', updateError);
+      }
+
       const beamsClient = new window.PusherPushNotifications.Client({
         instanceId: '572e383b-e0d2-4eff-86ac-d066550451e0',
       });
@@ -148,7 +191,7 @@ const PushNotificationSetup: React.FC = () => {
       });
 
       if (error) {
-        throw error;
+        console.error('Error calling subscribe-push function:', error);
       }
 
       setIsSubscribed(false);
