@@ -438,10 +438,34 @@ const AccountPage = () => {
           });
           return;
         }
+
+        // SUBSCRIBE TO PUSHER BEAMS (Frontend)
+        if (window.PusherPushNotifications) {
+          const beamsClient = new window.PusherPushNotifications.Client({
+            instanceId: '572e383b-e0d2-4eff-86ac-d066550451e0',
+          });
+          
+          await beamsClient.start();
+          await beamsClient.addDeviceInterest('hello');
+          await beamsClient.addDeviceInterest(`user_${user.id}`);
+          console.log('✅ Successfully subscribed to Pusher Beams');
+        } else {
+          console.error('Pusher Beams SDK not available');
+        }
+      } else {
+        // UNSUBSCRIBE FROM PUSHER BEAMS (Frontend)
+        if (window.PusherPushNotifications) {
+          const beamsClient = new window.PusherPushNotifications.Client({
+            instanceId: '572e383b-e0d2-4eff-86ac-d066550451e0',
+          });
+          
+          await beamsClient.stop();
+          console.log('✅ Successfully unsubscribed from Pusher Beams');
+        }
       }
 
-      // Call the existing subscribe-push function that your PushNotificationSetup uses
-      const { error } = await supabase.functions.invoke('subscribe-push', {
+      // Update database via edge function
+      const { data, error } = await supabase.functions.invoke('subscribe-push', {
         body: {
           action: action,
           userId: user.id,
@@ -450,30 +474,17 @@ const AccountPage = () => {
       });
 
       if (error) {
-        console.error('Error toggling push notifications:', error);
-        throw error;
+        console.error('Error updating database:', error);
+        throw new Error(error.message || 'Failed to update notification settings');
       }
-
-      // Update profile in database
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          push_notifications_enabled: action === 'subscribe',
-          push_last_subscribed: action === 'subscribe' ? new Date().toISOString() : null,
-          push_last_unsubscribed: action === 'unsubscribe' ? new Date().toISOString() : null,
-          push_last_updated: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
-
-      if (profileError) throw profileError;
 
       // Update local state
       setProfile(prev => ({
         ...prev,
         push_notifications_enabled: action === 'subscribe',
         push_last_subscribed: action === 'subscribe' ? new Date().toISOString() : prev.push_last_subscribed,
-        push_last_unsubscribed: action === 'unsubscribe' ? new Date().toISOString() : prev.push_last_unsubscribed
+        push_last_unsubscribed: action === 'unsubscribe' ? new Date().toISOString() : prev.push_last_unsubscribed,
+        push_interests: action === 'subscribe' ? ['hello', `user_${user.id}`] : prev.push_interests
       }));
 
       // Show success message
