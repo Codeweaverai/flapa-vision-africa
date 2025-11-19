@@ -205,7 +205,7 @@ export async function fetchCreatorPayouts(creatorId: string, limit: number = 10,
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
-    if (poutsError) throw payoutsError;
+    if (payoutsError) throw payoutsError;
 
     // Get profile information separately
     const { data: profileData, error: profileError } = await supabase
