@@ -27,7 +27,7 @@ const exchangeRates: { [key: string]: number } = {
   SLL: 0.000048
 };
 
-// Currency conversion function
+// FIXED: Correct currency conversion function
 const convertCurrency = async (
   amount: number,
   fromCurrency: string,
@@ -37,11 +37,19 @@ const convertCurrency = async (
     return amount;
   }
 
-  const fromRate = exchangeRates[fromCurrency] || 1;
-  const toRate = exchangeRates[toCurrency] || 1;
-  
-  const usdAmount = amount * fromRate;
-  const targetAmount = usdAmount / toRate;
+  // FIXED: Validate currencies exist
+  if (!exchangeRates[fromCurrency]) {
+    console.error(`Unsupported source currency: ${fromCurrency}`);
+    throw new Error(`Unsupported source currency: ${fromCurrency}`);
+  }
+  if (!exchangeRates[toCurrency]) {
+    console.error(`Unsupported target currency: ${toCurrency}`);
+    throw new Error(`Unsupported target currency: ${toCurrency}`);
+  }
+
+  // FIXED: Correct conversion direction - fromCurrency → USD → toCurrency
+  const usdAmount = amount / exchangeRates[fromCurrency]; // Divide to get USD equivalent
+  const targetAmount = usdAmount * exchangeRates[toCurrency]; // Multiply to get target currency
   
   return Number(targetAmount.toFixed(2));
 };
@@ -143,14 +151,22 @@ export async function fetchCreatorPayouts(creatorId: string, limit: number = 10,
   }
 }
 
-// Alternative method if you need to fetch fundraising transactions
+// FIXED: Updated fundraising transactions query to use net_amount and proper currency conversion
 export async function fetchFundraisingTransactions(campaignIds: string[]) {
   try {
-    // FIXED: Clean select parameter without comments
     const { data, error } = await supabase
       .from('campaign_contributions')
       .select(`
-        *,
+        id,
+        campaign_id,
+        amount,
+        net_amount,
+        currency,
+        status,
+        created_at,
+        transaction_fee,
+        payment_method,
+        payment_provider,
         fundraising_campaigns!inner (
           id,
           title,
@@ -170,9 +186,95 @@ export async function fetchFundraisingTransactions(campaignIds: string[]) {
 
     if (error) throw error;
     
-    return data;
+    // FIXED: Convert all amounts to USD using net_amount
+    const transactionsWithConvertedAmounts = await Promise.all(
+      data.map(async (transaction) => {
+        try {
+          const convertedNetAmount = await convertCurrency(
+            transaction.net_amount || transaction.amount, // Use net_amount if available, fallback to amount
+            transaction.currency || 'USD',
+            'USD'
+          );
+          
+          return {
+            ...transaction,
+            converted_amount: convertedNetAmount,
+            original_currency: transaction.currency,
+            original_amount: transaction.net_amount || transaction.amount
+          };
+        } catch (conversionError) {
+          console.error('Currency conversion error for transaction:', transaction.id, conversionError);
+          // Fallback: use original amount in USD if conversion fails
+          return {
+            ...transaction,
+            converted_amount: transaction.net_amount || transaction.amount,
+            original_currency: transaction.currency,
+            original_amount: transaction.net_amount || transaction.amount,
+            conversion_error: true
+          };
+        }
+      })
+    );
+    
+    return transactionsWithConvertedAmounts;
   } catch (error) {
     console.error('Error fetching fundraising transactions:', error);
+    throw error;
+  }
+}
+
+// NEW: Debug function to identify contribution calculation issues
+export async function debugContributionCalculation(contributionId: string) {
+  try {
+    const { data: contribution, error } = await supabase
+      .from('campaign_contributions')
+      .select(`
+        *,
+        fundraising_campaigns!inner (
+          id,
+          title,
+          creator_id
+        )
+      `)
+      .eq('id', contributionId)
+      .single();
+
+    if (error) throw error;
+
+    console.log('=== Contribution Debug ===');
+    console.log('Contribution ID:', contribution.id);
+    console.log('Gross amount:', contribution.amount);
+    console.log('Currency:', contribution.currency);
+    console.log('Net amount:', contribution.net_amount);
+    console.log('Transaction fee:', contribution.transaction_fee);
+    console.log('Status:', contribution.status);
+    
+    const convertedNetAmount = await convertCurrency(
+      contribution.net_amount || contribution.amount,
+      contribution.currency || 'USD',
+      'USD'
+    );
+    
+    console.log('Converted to USD:', convertedNetAmount);
+    
+    // Calculate what the amount should be after platform fee
+    const platformFee = convertedNetAmount * FUNDRAISING_TRANSACTION_FEE_RATE;
+    const creatorEarning = convertedNetAmount - platformFee;
+    
+    console.log('Platform fee (5%):', platformFee);
+    console.log('Creator earning:', creatorEarning);
+    console.log('====================');
+    
+    return {
+      gross_amount: contribution.amount,
+      net_amount: contribution.net_amount,
+      currency: contribution.currency,
+      converted_usd: convertedNetAmount,
+      platform_fee: platformFee,
+      creator_earning: creatorEarning
+    };
+  } catch (error) {
+    console.error('Debug contribution calculation error:', error);
     throw error;
   }
 }
