@@ -1,7 +1,8 @@
+
 {
-  "name": "SkillPulse - Built for the SkillDriven Generation",
+  "name": "SkillPulse - Skills and Event Booking Platform",
   "short_name": "SkillPulse",
-  "description": "Connect with professionals, book events, and enhance your skills. Built for the SkillDriven Generation.",
+  "description": "Connect with professionals, book events, and enhance your skills",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -12,25 +13,13 @@
   "dir": "ltr",
   "icons": [
     {
-      "src": "/lovable-uploads/favicon-16x16.png",
-      "sizes": "16x16",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/lovable-uploads/favicon-32x32.png",
-      "sizes": "32x32",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/lovable-uploads/android-chrome-192x192.png",
+      "src": "/lovable-uploads/27c18223-7364-4962-bccc-e8a42e0db9c0.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/lovable-uploads/android-chrome-512x512.png",
+      "src": "/lovable-uploads/27c18223-7364-4962-bccc-e8a42e0db9c0.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -38,7 +27,7 @@
   ],
   "screenshots": [
     {
-      "src": "/lovable-uploads/logoskillpulse.png",
+      "src": "/lovable-uploads/27c18223-7364-4962-bccc-e8a42e0db9c0.png",
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide"
@@ -52,8 +41,8 @@
       "url": "/courses",
       "icons": [
         {
-          "src": "/lovable-uploads/favicon-32x32.png",
-          "sizes": "32x32"
+          "src": "/lovable-uploads/27c18223-7364-4962-bccc-e8a42e0db9c0.png",
+          "sizes": "96x96"
         }
       ]
     },
@@ -64,8 +53,8 @@
       "url": "/events",
       "icons": [
         {
-          "src": "/lovable-uploads/favicon-32x32.png",
-          "sizes": "32x32"
+          "src": "/lovable-uploads/27c18223-7364-4962-bccc-e8a42e0db9c0.png",
+          "sizes": "96x96"
         }
       ]
     }
