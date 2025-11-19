@@ -437,6 +437,7 @@ const AccountPage = () => {
       }
 
       let deviceId: string | null = null;
+      let beamsToken: string | null = null;
 
       if (action === 'subscribe') {
         const permission = await Notification.requestPermission();
@@ -451,33 +452,44 @@ const AccountPage = () => {
           });
 
           try {
-            // Create token provider pointing to your Supabase function
-            const tokenProvider = new window.PusherPushNotifications.TokenProvider({
-              url: `${window.location.origin}/functions/v1/beams-generate-token`
-            });
+            // Try to get Beams token with fallback
+            let tokenSuccess = false;
+            try {
+              const { data: tokenData, error: tokenError } = await supabase.functions.invoke('beams-generate-token');
+              
+              if (!tokenError && tokenData?.token) {
+                beamsToken = tokenData.token;
+                await beamsClient.setUserId(user.id, beamsToken);
+                tokenSuccess = true;
+                console.log('✅ Using authenticated Beams flow');
+              }
+            } catch (tokenError) {
+              console.warn('Token generation failed, using device-only registration:', tokenError);
+            }
 
-            // Follow the authenticated user flow
+            // Start Beams (with or without authentication)
             await beamsClient.start();
-            await beamsClient.setUserId(user.id, tokenProvider);
             
-            // Subscribe to interests after authentication
+            // Subscribe to interests
             await beamsClient.addDeviceInterest('hello');
             await beamsClient.addDeviceInterest(`user_${user.id}`);
             
             deviceId = await beamsClient.getDeviceId();
             
-            console.log('✅ Successfully authenticated with Pusher Beams', { 
+            console.log('✅ Pusher Beams subscribed', { 
               deviceId, 
-              userId: user.id 
+              authenticated: tokenSuccess,
+              deviceId 
             });
 
-            toast.success('Push notifications enabled!', {
-              description: 'Successfully authenticated with secure notifications.'
-            });
-
+            if (!tokenSuccess) {
+              toast.success('Push notifications enabled (device registered)', {
+                description: 'You will receive basic notifications.'
+              });
+            }
           } catch (beamsError) {
-            console.error('Pusher Beams authentication error:', beamsError);
-            throw new Error('Failed to authenticate with notification service');
+            console.error('Pusher Beams setup error:', beamsError);
+            throw new Error('Failed to setup notifications');
           }
         }
       } else {
@@ -495,9 +507,23 @@ const AccountPage = () => {
           
           await beamsClient.stop();
           console.log('✅ Pusher Beams unsubscribed', { deviceId });
-          
-          toast.success('Push notifications disabled');
         }
+      }
+
+      // Update database
+      const { error } = await supabase.functions.invoke('subscribe-push', {
+        body: {
+          action: action,
+          userId: user.id,
+          deviceId: deviceId,
+          interests: ['hello', `user_${user.id}`],
+          beamsToken: beamsToken
+        }
+      });
+
+      if (error) {
+        console.error('Error in subscribe-push:', error);
+        // Continue with local state update
       }
 
       // Update local state
@@ -507,9 +533,15 @@ const AccountPage = () => {
         push_last_subscribed: action === 'subscribe' ? new Date().toISOString() : prev.push_last_subscribed,
         push_last_unsubscribed: action === 'unsubscribe' ? new Date().toISOString() : prev.push_last_unsubscribed,
         push_interests: action === 'subscribe' ? ['hello', `user_${user.id}`] : prev.push_interests,
-        beams_authenticated: action === 'subscribe',
-        beams_authenticated_at: action === 'subscribe' ? new Date().toISOString() : prev.beams_authenticated_at
+        beams_authenticated: action === 'subscribe' && !!beamsToken,
+        beams_authenticated_at: action === 'subscribe' && beamsToken ? new Date().toISOString() : prev.beams_authenticated_at
       }));
+
+      if (action === 'subscribe' && beamsToken) {
+        toast.success('Push notifications enabled!', {
+          description: 'Device registered and authenticated with secure notifications.'
+        });
+      }
 
     } catch (error: any) {
       console.error('Error toggling push notifications:', error);

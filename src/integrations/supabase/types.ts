@@ -3894,8 +3894,6 @@ export type Database = {
           avatar_storage_path: string | null
           avatar_url: string | null
           bank_account_details: Json | null
-          beams_authenticated: boolean | null
-          beams_authenticated_at: string | null
           bio: string | null
           created_at: string | null
           creator_enabled_at: string | null
@@ -3914,11 +3912,6 @@ export type Database = {
           otp_required: boolean | null
           otp_verified: boolean | null
           payout_method: string | null
-          push_interests: string[] | null
-          push_last_subscribed: string | null
-          push_last_unsubscribed: string | null
-          push_last_updated: string | null
-          push_notifications_enabled: boolean | null
           role: Database["public"]["Enums"]["user_role"] | null
           stripe_connect_account_id: string | null
           stripe_connect_id: string | null
@@ -3930,8 +3923,6 @@ export type Database = {
           avatar_storage_path?: string | null
           avatar_url?: string | null
           bank_account_details?: Json | null
-          beams_authenticated?: boolean | null
-          beams_authenticated_at?: string | null
           bio?: string | null
           created_at?: string | null
           creator_enabled_at?: string | null
@@ -3950,11 +3941,6 @@ export type Database = {
           otp_required?: boolean | null
           otp_verified?: boolean | null
           payout_method?: string | null
-          push_interests?: string[] | null
-          push_last_subscribed?: string | null
-          push_last_unsubscribed?: string | null
-          push_last_updated?: string | null
-          push_notifications_enabled?: boolean | null
           role?: Database["public"]["Enums"]["user_role"] | null
           stripe_connect_account_id?: string | null
           stripe_connect_id?: string | null
@@ -3966,8 +3952,6 @@ export type Database = {
           avatar_storage_path?: string | null
           avatar_url?: string | null
           bank_account_details?: Json | null
-          beams_authenticated?: boolean | null
-          beams_authenticated_at?: string | null
           bio?: string | null
           created_at?: string | null
           creator_enabled_at?: string | null
@@ -3986,11 +3970,6 @@ export type Database = {
           otp_required?: boolean | null
           otp_verified?: boolean | null
           payout_method?: string | null
-          push_interests?: string[] | null
-          push_last_subscribed?: string | null
-          push_last_unsubscribed?: string | null
-          push_last_updated?: string | null
-          push_notifications_enabled?: boolean | null
           role?: Database["public"]["Enums"]["user_role"] | null
           stripe_connect_account_id?: string | null
           stripe_connect_id?: string | null
@@ -4056,42 +4035,36 @@ export type Database = {
       }
       push_subscriptions: {
         Row: {
-          beams_token: string | null
-          beams_token_expires_at: string | null
+          auth_key: string
           created_at: string
-          device_id: string
+          endpoint: string
           id: string
-          interests: string[] | null
           is_active: boolean
-          platform: string | null
-          provider: string | null
+          p256dh_key: string
           updated_at: string
+          user_agent: string | null
           user_id: string
         }
         Insert: {
-          beams_token?: string | null
-          beams_token_expires_at?: string | null
+          auth_key: string
           created_at?: string
-          device_id: string
+          endpoint: string
           id?: string
-          interests?: string[] | null
           is_active?: boolean
-          platform?: string | null
-          provider?: string | null
+          p256dh_key: string
           updated_at?: string
+          user_agent?: string | null
           user_id: string
         }
         Update: {
-          beams_token?: string | null
-          beams_token_expires_at?: string | null
+          auth_key?: string
           created_at?: string
-          device_id?: string
+          endpoint?: string
           id?: string
-          interests?: string[] | null
           is_active?: boolean
-          platform?: string | null
-          provider?: string | null
+          p256dh_key?: string
           updated_at?: string
+          user_agent?: string | null
           user_id?: string
         }
         Relationships: []
