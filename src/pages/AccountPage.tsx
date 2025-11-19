@@ -439,6 +439,10 @@ const AccountPage = () => {
         return;
       }
 
+      let deviceId: string | null = null;
+      let beamsToken: string | null = null;
+      const interests = ['hello', `user_${user.id}`];
+
       if (action === 'subscribe') {
         // Request browser permission first
         const permission = await Notification.requestPermission();
@@ -463,15 +467,20 @@ const AccountPage = () => {
             throw new Error('Failed to authenticate with notification service');
           }
 
+          beamsToken = tokenData.token;
+
           // Step 2: Authenticate with Pusher Beams using the token
-          await beamsClient.setUserId(user.id, tokenData.token);
+          await beamsClient.setUserId(user.id, beamsToken);
           
           // Step 3: Start Beams and subscribe to interests
           await beamsClient.start();
           await beamsClient.addDeviceInterest('hello');
           await beamsClient.addDeviceInterest(`user_${user.id}`);
           
-          console.log('✅ Successfully authenticated and subscribed to Pusher Beams');
+          // Step 4: Get device ID for tracking
+          deviceId = await beamsClient.getDeviceId();
+          
+          console.log('✅ Successfully authenticated and subscribed to Pusher Beams', { deviceId });
         } else {
           console.error('Pusher Beams SDK not available');
           throw new Error('Notification service not available');
@@ -483,32 +492,71 @@ const AccountPage = () => {
             instanceId: '572e383b-e0d2-4eff-86ac-d066550451e0',
           });
           
+          // Get device ID before stopping
+          try {
+            deviceId = await beamsClient.getDeviceId();
+          } catch (error) {
+            console.log('Could not get device ID for unsubscribe, proceeding anyway');
+          }
+          
           await beamsClient.stop();
-          console.log('✅ Successfully unsubscribed from Pusher Beams');
+          console.log('✅ Successfully unsubscribed from Pusher Beams', { deviceId });
         }
       }
 
-      // Update database via edge function
+      // Call the subscribe-push function with device tracking and token
       const { data, error } = await supabase.functions.invoke('subscribe-push', {
         body: {
           action: action,
           userId: user.id,
-          interests: ['hello', `user_${user.id}`]
+          deviceId: deviceId, // Send deviceId for tracking
+          interests: interests,
+          beamsToken: beamsToken // Send token for storage
         }
       });
 
       if (error) {
-        console.error('Error updating database:', error);
-        throw new Error(error.message || 'Failed to update notification settings');
+        console.error('Error calling subscribe-push function:', error);
+        
+        // Fallback: Update profile directly if function fails
+        console.log('Attempting fallback profile update...');
+        const updateData: any = {
+          updated_at: new Date().toISOString(),
+          push_notifications_enabled: action === 'subscribe',
+        };
+
+        if (action === 'subscribe') {
+          updateData.push_last_subscribed = new Date().toISOString();
+          updateData.push_interests = interests;
+          updateData.beams_authenticated = true;
+          updateData.beams_authenticated_at = new Date().toISOString();
+        } else {
+          updateData.push_last_unsubscribed = new Date().toISOString();
+          updateData.beams_authenticated = false;
+        }
+
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update(updateData)
+          .eq('id', user.id);
+
+        if (profileError) {
+          console.error('Fallback update also failed:', profileError);
+          throw new Error('Failed to update notification settings');
+        }
+        
+        console.log('✅ Fallback profile update successful');
+      } else {
+        console.log('✅ subscribe-push function successful:', data);
       }
 
-      // Update local state with beams authentication status
+      // Update local state
       setProfile(prev => ({
         ...prev,
         push_notifications_enabled: action === 'subscribe',
         push_last_subscribed: action === 'subscribe' ? new Date().toISOString() : prev.push_last_subscribed,
         push_last_unsubscribed: action === 'unsubscribe' ? new Date().toISOString() : prev.push_last_unsubscribed,
-        push_interests: action === 'subscribe' ? ['hello', `user_${user.id}`] : prev.push_interests,
+        push_interests: action === 'subscribe' ? interests : prev.push_interests,
         beams_authenticated: action === 'subscribe',
         beams_authenticated_at: action === 'subscribe' ? new Date().toISOString() : prev.beams_authenticated_at
       }));
@@ -516,11 +564,11 @@ const AccountPage = () => {
       // Show success message
       if (action === 'subscribe') {
         toast.success('Push notifications enabled!', {
-          description: 'You will now receive secure, personalized notifications.'
+          description: `Device registered and authenticated. You will now receive secure notifications.`
         });
       } else {
         toast.success('Push notifications disabled', {
-          description: 'You will no longer receive browser notifications.'
+          description: 'Device unregistered. You will no longer receive browser notifications.'
         });
       }
 
@@ -534,6 +582,10 @@ const AccountPage = () => {
       } else if (error.message.includes('auth') || error.message.includes('token')) {
         toast.error('Authentication failed', {
           description: 'Unable to authenticate with notification service. Please try again.'
+        });
+      } else if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+        toast.error('Authentication required', {
+          description: 'Please sign in again to update notification settings.'
         });
       } else {
         toast.error('Failed to update notification settings');
