@@ -161,7 +161,7 @@ const SkillsYouWillGain = ({ skills }: { skills: Course['course_skill_outcomes']
     <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
       <CardContent className="p-6">
         <h3 className="text-xl font-semibold mb-6 bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-          Skills
+          Skills You'll Gain
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {skills
