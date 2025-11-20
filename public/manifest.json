@@ -6,7 +6,7 @@
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#ff6d9b",
+  "theme_color": "#5b04d4",
   "orientation": "portrait-primary",
   "categories": ["education", "business", "productivity"],
   "lang": "en",
