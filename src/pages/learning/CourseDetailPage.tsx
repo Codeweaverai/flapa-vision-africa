@@ -1272,7 +1272,7 @@ const CourseDetailPage = () => {
                         itemType="course"
                         className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-medium py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center"
                       >
-                        <Heart className="w-4 h-4 mr-2" />
+            
                         Add to Wishlist
                       </WishlistButton>
                     </div>
