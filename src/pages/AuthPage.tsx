@@ -477,19 +477,18 @@ const AuthPage = () => {
         
         {/* Animated Text Overlay */}
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center px-8">
-          <div className="moving-text">
+          <div className="typing-container text-center w-full max-w-4xl">
             <h2 className="text-6xl font-black text-white mb-6 drop-shadow-2xl tracking-tight bg-gradient-to-r from-white to-orange-100 bg-clip-text text-transparent">
               SkillPulse
             </h2>
-            <p className="text-2xl text-orange-100 font-light mb-8 drop-shadow-lg animate-pulse">
-              Built for the Skill-Driven Generation
-            </p>
-          </div>
-          
-          <div className="slogan-animation mt-12">
-            <h3 className="text-3xl font-bold text-white drop-shadow-2xl bg-gradient-to-r from-white via-orange-200 to-purple-200 bg-clip-text text-transparent">
-              Building Africa's Skills Ecosystem
-            </h3>
+            <div className="typing-animation-wrapper">
+              <p className="text-2xl text-orange-100 font-light mb-4 drop-shadow-lg typing-text-first">
+                Built for the Skill-Driven Generation
+              </p>
+              <p className="text-3xl font-bold text-white drop-shadow-2xl bg-gradient-to-r from-white via-orange-200 to-purple-200 bg-clip-text text-transparent typing-text-second">
+                Building Africa's Skills Ecosystem
+              </p>
+            </div>
           </div>
 
           {/* Floating elements */}
@@ -522,32 +521,46 @@ const AuthPage = () => {
         .animate-float-slow {
           animation: float-slow 10s ease-in-out infinite;
         }
-        .moving-text {
-          animation: slideIn 1.5s ease-out;
+        
+        /* Typing Animation */
+        .typing-text-first {
+          overflow: hidden;
+          border-right: 2px solid rgba(255, 255, 255, 0.7);
+          white-space: nowrap;
+          margin: 0 auto;
+          animation: 
+            typing-first 3s steps(40, end),
+            blink-caret 0.75s step-end infinite;
+          animation-fill-mode: both;
         }
-        .slogan-animation {
-          animation: fadeInUp 2s ease-out 0.5s both;
+        
+        .typing-text-second {
+          overflow: hidden;
+          border-right: 2px solid rgba(255, 255, 255, 0.7);
+          white-space: nowrap;
+          margin: 0 auto;
+          animation: 
+            typing-second 3s steps(40, end) 3s,
+            blink-caret 0.75s step-end infinite;
+          animation-fill-mode: both;
+          opacity: 0;
         }
-        @keyframes slideIn {
-          from {
-            opacity: 0;
-            transform: translateX(100px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
+        
+        @keyframes typing-first {
+          from { width: 0; opacity: 1; }
+          to { width: 100%; opacity: 1; }
         }
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(50px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+        
+        @keyframes typing-second {
+          from { width: 0; opacity: 1; }
+          to { width: 100%; opacity: 1; }
         }
+        
+        @keyframes blink-caret {
+          from, to { border-color: transparent; }
+          50% { border-color: rgba(255, 255, 255, 0.7); }
+        }
+        
         .pulse-animation {
           position: absolute;
           top: 50%;
@@ -559,6 +572,7 @@ const AuthPage = () => {
           border-radius: 50%;
           animation: pulse 2s infinite;
         }
+        
         @keyframes pulse {
           0% {
             transform: translate(-50%, -50%) scale(0.8);
@@ -572,6 +586,20 @@ const AuthPage = () => {
             transform: translate(-50%, -50%) scale(0.8);
             opacity: 0;
           }
+        }
+        
+        .typing-container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+        }
+        
+        .typing-animation-wrapper {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 1rem;
         }
       `}</style>
     </div>
