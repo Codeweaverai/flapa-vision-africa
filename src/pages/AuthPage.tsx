@@ -219,7 +219,7 @@ const AuthPage = () => {
                 <img 
                   src="/lovable-uploads/logoskillpulse.png" 
                   alt="SkillPulse Logo"
-                  className="h-30 mx-auto mb-4 drop-shadow-lg"
+                  className="h-20 mx-auto mb-4 drop-shadow-lg"
                 />
                 <div className="pulse-animation"></div>
               </div>
