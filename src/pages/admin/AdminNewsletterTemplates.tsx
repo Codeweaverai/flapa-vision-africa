@@ -1,6 +1,6 @@
 
 import React from 'react';
-import AdminLayout from '@/components/layout/AdminLayout';
+import AdminLayout from '@/components/admin/AdminLayout';
 import NewsletterTemplateManager from '@/components/admin/NewsletterTemplateManager';
 
 const AdminNewsletterTemplates = () => {
