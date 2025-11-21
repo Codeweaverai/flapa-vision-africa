@@ -219,11 +219,11 @@ const AuthPage = () => {
                 <img 
                   src="/lovable-uploads/logoskillpulse.png" 
                   alt="SkillPulse Logo"
-                  className="h-16 mx-auto mb-4 filter brightness-0 invert"
+                  className="h-30 mx-auto mb-4 drop-shadow-lg"
                 />
                 <div className="pulse-animation"></div>
               </div>
-              <h1 className="text-4xl font-bold mb-2 text-white drop-shadow-lg bg-gradient-to-r from-white to-orange-100 bg-clip-text text-transparent">
+              <h1 className="text-5xl font-bold mb-2 text-white drop-shadow-lg bg-gradient-to-r from-white to-orange-100 bg-clip-text text-transparent">
                 SkillPulse
               </h1>
               <p className="text-orange-100 text-lg font-light">
