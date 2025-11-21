@@ -217,7 +217,7 @@ const AuthPage = () => {
             <Link to="/" className="inline-block mb-4 hover:opacity-90 transition-opacity">
               <div className="relative">
                 <img 
-                  src="/lovable-uploads/logoskillpulse.png" 
+                  src="/lovable-uploads/splash-icon.png.png" 
                   alt="SkillPulse Logo"
                   className="h-20 mx-auto mb-4 drop-shadow-lg"
                 />
