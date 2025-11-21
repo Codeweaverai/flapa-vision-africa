@@ -1,4 +1,3 @@
-
 {
   "name": "SkillPulse - Skills and Event Booking Platform",
   "short_name": "SkillPulse",
@@ -13,13 +12,13 @@
   "dir": "ltr",
   "icons": [
     {
-      "src": "/lovable-uploads/27c18223-7364-4962-bccc-e8a42e0db9c0.png",
+      "src": "/lovable-uploads/logoskillpulse.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/lovable-uploads/27c18223-7364-4962-bccc-e8a42e0db9c0.png",
+      "src": "/lovable-uploads/logoskillpulse.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -27,7 +26,7 @@
   ],
   "screenshots": [
     {
-      "src": "/lovable-uploads/27c18223-7364-4962-bccc-e8a42e0db9c0.png",
+      "src": "/lovable-uploads/logoskillpulse.png",
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide"
@@ -41,7 +40,7 @@
       "url": "/courses",
       "icons": [
         {
-          "src": "/lovable-uploads/27c18223-7364-4962-bccc-e8a42e0db9c0.png",
+          "src": "/lovable-uploads/logoskillpulse.png",
           "sizes": "96x96"
         }
       ]
@@ -53,7 +52,7 @@
       "url": "/events",
       "icons": [
         {
-          "src": "/lovable-uploads/27c18223-7364-4962-bccc-e8a42e0db9c0.png",
+          "src": "/lovable-uploads/logoskillpulse.png",
           "sizes": "96x96"
         }
       ]
