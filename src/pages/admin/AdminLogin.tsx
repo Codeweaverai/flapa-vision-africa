@@ -8,8 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { Link } from 'react-router-dom';
+import { checkIsAdmin } from '@/services/adminService';
 
 const AdminLogin = () => {
   const { user, loading, signIn } = useAuth();
@@ -26,20 +26,10 @@ const AdminLogin = () => {
       if (user) {
         setCheckingAdmin(true);
         try {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single();
-          
-          if (error) {
-            console.error('Error checking admin status:', error);
-            setIsAdmin(false);
-          } else {
-            setIsAdmin(data?.role === 'admin');
-            if (data?.role === 'admin') {
-              navigate('/admin');
-            }
+          const isUserAdmin = await checkIsAdmin(user);
+          setIsAdmin(isUserAdmin);
+          if (isUserAdmin) {
+            navigate('/admin');
           }
         } catch (error) {
           console.error('Error checking admin status:', error);

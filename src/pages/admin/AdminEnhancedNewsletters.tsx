@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import AdminLayout from '@/components/layout/AdminLayout';
+import AdminLayout from '@/components/admin/AdminLayout';
 import EnhancedNewsletterForm from '@/components/admin/EnhancedNewsletterForm';
 
 const AdminEnhancedNewsletters = () => {

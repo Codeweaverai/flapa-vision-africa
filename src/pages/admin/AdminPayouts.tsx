@@ -11,7 +11,7 @@ import { DollarSign, Search, Eye, Calendar, User, CreditCard, Smartphone, Trendi
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import AdminLayout from '@/components/layout/AdminLayout';
+import AdminLayout from '@/components/admin/AdminLayout';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { calculateCreatorEarningsFromOrders } from '@/services/creatorEarningsService';
 

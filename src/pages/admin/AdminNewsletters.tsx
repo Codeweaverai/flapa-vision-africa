@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Star, Users, Calendar, Eye, Send, MapPin, User, Mail, Plus, Edit, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
-import AdminLayout from '@/components/layout/AdminLayout';
+import AdminLayout from '@/components/admin/AdminLayout';
 import EnhancedNewsletterForm from '@/components/admin/EnhancedNewsletterForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
