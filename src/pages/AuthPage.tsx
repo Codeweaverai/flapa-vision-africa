@@ -210,39 +210,29 @@ const AuthPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-400 via-purple-500 to-pink-500 flex">
-      {/* Left Side - Image */}
-      <div className="hidden lg:flex lg:w-1/2 relative">
-        <img 
-          src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset//2330.jpg"
-          alt="Learning illustration"
-          className="w-full h-full object-cover rounded-r-3xl shadow-2xl"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-orange-500/20 to-purple-600/20 rounded-r-3xl"></div>
-      </div>
-
-      {/* Right Side - Auth Form */}
+      {/* Left Side - Auth Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           <div className="mb-8 text-center">
             <Link to="/" className="inline-block mb-4 hover:opacity-90 transition-opacity">
-              <img 
-                src="https://rxqoczksnddbxcdwobnw.supabase.co/storage/v1/object/public/asset/Screenshot_2025-08-05_155641-removebg-preview.png" 
-                alt="SkillPulse Logo"
-                className="h-[200px] mx-auto"
-              />
+              <div className="relative">
+                <img 
+                  src="/lovable-uploads/logoskillpulse.png" 
+                  alt="SkillPulse Logo"
+                  className="h-16 mx-auto mb-4 filter brightness-0 invert"
+                />
+                <div className="pulse-animation"></div>
+              </div>
+              <h1 className="text-4xl font-bold mb-2 text-white drop-shadow-lg bg-gradient-to-r from-white to-orange-100 bg-clip-text text-transparent">
+                SkillPulse
+              </h1>
+              <p className="text-orange-100 text-lg font-light">
+                Built for the Skill-Driven Generation
+              </p>
             </Link>
-            <h1 className="text-4xl font-bold mb-2 text-white drop-shadow-lg">
-              {isInvitationFlow ? 'Join Workplace' : 'Welcome to SkillPulse'}
-            </h1>
-            <p className="text-orange-100">
-              {isInvitationFlow 
-                ? 'Sign in to accept your workplace invitation' 
-                : 'Secure access with email verification for every login'
-              }
-            </p>
           </div>
           
-          <Card className="backdrop-blur-md bg-white/20 border-0 shadow-2xl rounded-2xl">
+          <Card className="backdrop-blur-md bg-white/10 border-white/20 shadow-2xl rounded-2xl">
             <CardContent className="p-6">
               {errorMessage && (
                 <Alert variant="destructive" className="bg-red-500/20 border-red-300 backdrop-blur-sm mb-6">
@@ -285,13 +275,13 @@ const AuthPage = () => {
                 <TabsList className="grid w-full grid-cols-2 bg-white/20 backdrop-blur-sm border-0 rounded-xl mb-6">
                   <TabsTrigger 
                     value="login" 
-                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-lg"
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-lg transition-all duration-300"
                   >
                     Login
                   </TabsTrigger>
                   <TabsTrigger 
                     value="register"
-                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-lg"
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-lg transition-all duration-300"
                   >
                     Register
                   </TabsTrigger>
@@ -311,7 +301,7 @@ const AuthPage = () => {
                           onChange={(e) => setEmail(e.target.value)}
                           required
                           autoComplete="email"
-                          className="pl-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
+                          className="pl-10 bg-white/20 border-orange-200/30 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300 transition-all duration-300"
                         />
                       </div>
                     </div>
@@ -327,7 +317,7 @@ const AuthPage = () => {
                           required
                           autoComplete="current-password"
                           minLength={8}
-                          className="pl-10 pr-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
+                          className="pl-10 pr-10 bg-white/20 border-orange-200/30 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300 transition-all duration-300"
                         />
                         <Button
                           type="button"
@@ -346,7 +336,7 @@ const AuthPage = () => {
                     </div>
                     <Button 
                       type="submit" 
-                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 border-0 rounded-xl h-12 font-medium shadow-lg text-white" 
+                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 border-0 rounded-xl h-12 font-medium shadow-lg text-white transition-all duration-300 hover:shadow-xl" 
                       disabled={isSubmitting}
                     >
                       {isSubmitting ? (
@@ -361,7 +351,7 @@ const AuthPage = () => {
                     <div className="text-center">
                       <Link
                         to="/forgot-password"
-                        className="text-sm text-orange-100 hover:text-white underline"
+                        className="text-sm text-orange-100 hover:text-white underline transition-colors duration-300"
                       >
                         Forgot your password?
                       </Link>
@@ -381,7 +371,7 @@ const AuthPage = () => {
                           value={fullName}
                           onChange={(e) => setFullName(e.target.value)}
                           required
-                          className="pl-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
+                          className="pl-10 bg-white/20 border-orange-200/30 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300 transition-all duration-300"
                         />
                       </div>
                     </div>
@@ -395,7 +385,7 @@ const AuthPage = () => {
                           value={username}
                           onChange={(e) => setUsername(e.target.value)}
                           required
-                          className="pl-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
+                          className="pl-10 bg-white/20 border-orange-200/30 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300 transition-all duration-300"
                         />
                       </div>
                       <p className="text-xs text-orange-100">
@@ -414,7 +404,7 @@ const AuthPage = () => {
                           onChange={(e) => setEmail(e.target.value)}
                           required
                           autoComplete="email"
-                          className="pl-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
+                          className="pl-10 bg-white/20 border-orange-200/30 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300 transition-all duration-300"
                         />
                       </div>
                     </div>
@@ -430,7 +420,7 @@ const AuthPage = () => {
                           required
                           autoComplete="new-password"
                           minLength={8}
-                          className="pl-10 pr-10 bg-white/20 border-orange-200/50 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300"
+                          className="pl-10 pr-10 bg-white/20 border-orange-200/30 text-white placeholder:text-orange-100 rounded-xl h-12 backdrop-blur-sm focus:bg-white/30 focus:border-orange-300 transition-all duration-300"
                         />
                         <Button
                           type="button"
@@ -450,7 +440,7 @@ const AuthPage = () => {
                     </div>
                     <Button 
                       type="submit" 
-                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 border-0 rounded-xl h-12 font-medium shadow-lg text-white" 
+                      className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 border-0 rounded-xl h-12 font-medium shadow-lg text-white transition-all duration-300 hover:shadow-xl" 
                       disabled={isSubmitting}
                     >
                       {isSubmitting ? (
@@ -475,6 +465,115 @@ const AuthPage = () => {
           </Card>
         </div>
       </div>
+
+      {/* Right Side - Enhanced Image with Animations */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-orange-500/40 via-purple-600/40 to-pink-500/40 z-10"></div>
+        <img 
+          src="/lovable-uploads/42295.jpg"
+          alt="SkillPulse Community"
+          className="w-full h-full object-cover transform scale-105 transition-transform duration-10000 ease-in-out hover:scale-110"
+        />
+        
+        {/* Animated Text Overlay */}
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center px-8">
+          <div className="moving-text">
+            <h2 className="text-6xl font-black text-white mb-6 drop-shadow-2xl tracking-tight bg-gradient-to-r from-white to-orange-100 bg-clip-text text-transparent">
+              SkillPulse
+            </h2>
+            <p className="text-2xl text-orange-100 font-light mb-8 drop-shadow-lg animate-pulse">
+              Built for the Skill-Driven Generation
+            </p>
+          </div>
+          
+          <div className="slogan-animation mt-12">
+            <h3 className="text-3xl font-bold text-white drop-shadow-2xl bg-gradient-to-r from-white via-orange-200 to-purple-200 bg-clip-text text-transparent">
+              Building Africa's Skills Ecosystem
+            </h3>
+          </div>
+
+          {/* Floating elements */}
+          <div className="absolute top-1/4 left-1/4 w-4 h-4 bg-white rounded-full opacity-60 animate-float"></div>
+          <div className="absolute top-1/3 right-1/4 w-6 h-6 bg-orange-300 rounded-full opacity-40 animate-float-delayed"></div>
+          <div className="absolute bottom-1/4 left-1/3 w-5 h-5 bg-purple-300 rounded-full opacity-50 animate-float-slow"></div>
+          <div className="absolute bottom-1/3 right-1/3 w-3 h-3 bg-pink-300 rounded-full opacity-70 animate-float"></div>
+        </div>
+      </div>
+
+      <style jsx>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0px) scale(1); }
+          50% { transform: translateY(-20px) scale(1.05); }
+        }
+        @keyframes float-delayed {
+          0%, 100% { transform: translateY(-10px) scale(1); }
+          50% { transform: translateY(10px) scale(1.1); }
+        }
+        @keyframes float-slow {
+          0%, 100% { transform: translateY(5px) scale(1); }
+          50% { transform: translateY(-15px) scale(0.95); }
+        }
+        .animate-float {
+          animation: float 6s ease-in-out infinite;
+        }
+        .animate-float-delayed {
+          animation: float-delayed 8s ease-in-out infinite;
+        }
+        .animate-float-slow {
+          animation: float-slow 10s ease-in-out infinite;
+        }
+        .moving-text {
+          animation: slideIn 1.5s ease-out;
+        }
+        .slogan-animation {
+          animation: fadeInUp 2s ease-out 0.5s both;
+        }
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateX(100px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(50px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .pulse-animation {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 80px;
+          height: 80px;
+          border: 2px solid rgba(255, 255, 255, 0.3);
+          border-radius: 50%;
+          animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+          0% {
+            transform: translate(-50%, -50%) scale(0.8);
+            opacity: 1;
+          }
+          70% {
+            transform: translate(-50%, -50%) scale(1.2);
+            opacity: 0;
+          }
+          100% {
+            transform: translate(-50%, -50%) scale(0.8);
+            opacity: 0;
+          }
+        }
+      `}</style>
     </div>
   );
 };
