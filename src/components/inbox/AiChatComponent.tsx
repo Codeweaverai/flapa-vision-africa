@@ -1,40 +1,278 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Send, Sparkles, Bot, User } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Send, Sparkles, Bot, User, BookOpen, Calendar, Clock, Users, Star, MapPin, Play, ArrowRight, Zap } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface AiMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
-  actionIds?: {
-    courseId?: string;
-    eventId?: string;
-    bundleId?: string;
+  recommendations?: {
+    courses: Array<{
+      id: string;
+      title: string;
+      category: string;
+      difficulty_level: string;
+      price: number;
+      duration_minutes: number;
+      thumbnail_url?: string;
+      average_rating: number;
+      total_students: number;
+      creator_name: string;
+      creator_avatar?: string;
+      reason: string;
+      _ui?: {
+        cardType: string;
+        badge: string;
+        difficultyBadge: string;
+        duration: string;
+        rating: string;
+        students: number;
+      };
+    }>;
+    events: Array<{
+      id: string;
+      title: string;
+      event_type: string;
+      start_time: string;
+      location: string;
+      image_url?: string;
+      minPrice: number;
+      is_free: boolean;
+      creator_name: string;
+      creator_avatar?: string;
+      reason: string;
+      _ui?: {
+        cardType: string;
+        badge: string;
+        status: string;
+        date: string;
+        time: string;
+        registered: string;
+        rating: string;
+      };
+    }>;
   };
+  uiComponents?: {
+    showCourseGrid: boolean;
+    showEventGrid: boolean;
+    highlightCategory: string;
+  };
+  type?: string;
+  nextSteps?: string[];
+  followUpQuestions?: string[];
 }
+
+// Course Card Component
+const CourseRecommendationCard = ({ course, onCourseClick }: { course: any; onCourseClick: (id: string) => void }) => {
+  return (
+    <Card 
+      className="group cursor-pointer bg-white/80 backdrop-blur-sm border border-orange-200/50 hover:border-orange-300 transition-all duration-300 hover:shadow-xl hover:scale-[1.02]"
+      onClick={() => onCourseClick(course.id)}
+    >
+      <div className="relative h-40 overflow-hidden rounded-t-lg">
+        {course.thumbnail_url ? (
+          <img
+            src={course.thumbnail_url}
+            alt={course.title}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-orange-200 via-purple-200 to-pink-300 flex items-center justify-center">
+            <BookOpen className="h-12 w-12 text-white opacity-80" />
+          </div>
+        )}
+        
+        {/* Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        
+        {/* Badges */}
+        <div className="absolute top-3 left-3 right-3 flex justify-between">
+          <Badge className="bg-white/90 text-gray-700 backdrop-blur-sm font-medium text-xs">
+            {course.category}
+          </Badge>
+          <Badge className="bg-gradient-to-r from-orange-500 to-purple-600 text-white border-0 font-medium text-xs">
+            {course.difficulty_level}
+          </Badge>
+        </div>
+
+        {/* Play Button Overlay */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="bg-gradient-to-r from-orange-500 to-purple-600 rounded-full p-3 shadow-2xl transform group-hover:scale-110 transition-transform duration-300">
+            <Play className="h-6 w-6 text-white fill-current" />
+          </div>
+        </div>
+      </div>
+
+      <CardContent className="p-4">
+        <h4 className="font-bold text-gray-900 line-clamp-2 mb-2 group-hover:text-orange-600 transition-colors">
+          {course.title}
+        </h4>
+        
+        {/* Creator Info */}
+        <div className="flex items-center gap-2 mb-3">
+          <Avatar className="h-6 w-6 border border-orange-200">
+            <AvatarImage src={course.creator_avatar} alt={course.creator_name} />
+            <AvatarFallback className="bg-gradient-to-r from-orange-400 to-purple-500 text-white text-xs">
+              {course.creator_name?.charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <span className="text-xs text-gray-600 font-medium">by {course.creator_name}</span>
+        </div>
+
+        {/* Course Stats */}
+        <div className="flex items-center justify-between text-xs text-gray-600 mb-3">
+          <div className="flex items-center gap-1">
+            <Clock className="h-3 w-3 text-orange-500" />
+            <span>{course._ui?.duration || `${Math.floor(course.duration_minutes / 60)}h ${course.duration_minutes % 60}m`}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Users className="h-3 w-3 text-purple-500" />
+            <span>{course.total_students} students</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Star className="h-3 w-3 text-yellow-500 fill-current" />
+            <span>{course.average_rating?.toFixed(1) || '0.0'}</span>
+          </div>
+        </div>
+
+        {/* Price */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <span className={cn(
+              "font-bold text-lg",
+              course.is_free ? "bg-gradient-to-r from-green-500 to-emerald-600 bg-clip-text text-transparent" : "text-gray-900"
+            )}>
+              {course.is_free ? 'Free' : `$${course.price}`}
+            </span>
+          </div>
+          <Button size="sm" className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white text-xs">
+            Enroll Now
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// Event Card Component
+const EventRecommendationCard = ({ event, onEventClick }: { event: any; onEventClick: (id: string) => void }) => {
+  const eventDate = new Date(event.start_time);
+  const isUpcoming = eventDate > new Date();
+
+  return (
+    <Card 
+      className="group cursor-pointer bg-white/80 backdrop-blur-sm border border-purple-200/50 hover:border-purple-300 transition-all duration-300 hover:shadow-xl hover:scale-[1.02]"
+      onClick={() => onEventClick(event.id)}
+    >
+      <div className="relative h-40 overflow-hidden rounded-t-lg">
+        {event.image_url ? (
+          <img
+            src={event.image_url}
+            alt={event.title}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-purple-200 via-orange-200 to-pink-300 flex items-center justify-center">
+            <Calendar className="h-12 w-12 text-white opacity-80" />
+          </div>
+        )}
+        
+        {/* Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        
+        {/* Badges */}
+        <div className="absolute top-3 left-3 right-3 flex justify-between">
+          <Badge className={cn(
+            "text-white border-0 font-medium text-xs",
+            isUpcoming 
+              ? "bg-gradient-to-r from-green-500 to-emerald-600" 
+              : "bg-gradient-to-r from-red-500 to-pink-600 animate-pulse"
+          )}>
+            {isUpcoming ? 'Upcoming' : 'Live Now'}
+          </Badge>
+          <Badge className="bg-white/90 text-gray-700 backdrop-blur-sm font-medium text-xs">
+            {event.event_type}
+          </Badge>
+        </div>
+      </div>
+
+      <CardContent className="p-4">
+        <h4 className="font-bold text-gray-900 line-clamp-2 mb-2 group-hover:text-purple-600 transition-colors">
+          {event.title}
+        </h4>
+
+        {/* Event Details */}
+        <div className="space-y-2 mb-3">
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <Calendar className="h-3 w-3 text-purple-500" />
+            <span>{eventDate.toLocaleDateString()} at {eventDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+          {event.location && (
+            <div className="flex items-center gap-2 text-xs text-gray-600">
+              <MapPin className="h-3 w-3 text-orange-500" />
+              <span className="truncate">{event.location}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <Users className="h-3 w-3 text-purple-500" />
+            <span>{event._ui?.registered || `${event.sold_tickets || 0}/${event.total_capacity || 0}`} registered</span>
+          </div>
+        </div>
+
+        {/* Price and Action */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <span className={cn(
+              "font-bold text-lg",
+              event.is_free ? "bg-gradient-to-r from-green-500 to-emerald-600 bg-clip-text text-transparent" : "text-gray-900"
+            )}>
+              {event.is_free ? 'Free' : `From $${event.minPrice}`}
+            </span>
+          </div>
+          <Button size="sm" className="bg-gradient-to-r from-purple-500 to-orange-600 hover:from-purple-600 hover:to-orange-700 text-white text-xs">
+            {isUpcoming ? 'Register' : 'Join Now'}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
 const AiChatComponent = () => {
   const [messages, setMessages] = useState<AiMessage[]>([
     {
       id: 'welcome',
       role: 'assistant',
-      content: "Hi! I'm your AI Smart Advisor for SkillPulse. I can help you discover personalized courses, events, and learning paths. I have access to your learning history and can provide tailored recommendations. What would you like to learn about today?",
-      timestamp: new Date()
+      content: "Hi! I'm your AI Smart Advisor for SkillPulse! 🚀\n\nI can help you discover personalized courses, events, and learning paths tailored to your interests. I have access to your learning history and can provide smart recommendations.\n\nWhat would you like to learn about today?",
+      timestamp: new Date(),
+      type: 'welcome',
+      followUpQuestions: [
+        "What courses do you recommend for web development?",
+        "Show me upcoming events in my area",
+        "Help me choose my next learning path"
+      ]
     }
   ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
@@ -55,7 +293,10 @@ const AiChatComponent = () => {
         body: {
           message: inputMessage,
           userId: user?.id || null,
-          context: 'inbox_chat'
+          conversationHistory: messages.slice(-4).map(msg => ({
+            role: msg.role,
+            content: msg.content
+          }))
         }
       });
 
@@ -66,7 +307,11 @@ const AiChatComponent = () => {
         role: 'assistant',
         content: data.response,
         timestamp: new Date(),
-        actionIds: data.actionIds
+        recommendations: data.recommendations,
+        uiComponents: data.uiComponents,
+        type: data.type,
+        nextSteps: data.nextSteps,
+        followUpQuestions: data.followUpQuestions
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -77,7 +322,7 @@ const AiChatComponent = () => {
       const errorMessage: AiMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: "I'm sorry, I'm having trouble connecting right now. Please try again in a moment!",
+        content: "I'm sorry, I'm having trouble connecting right now. Please try again in a moment! ⚡",
         timestamp: new Date()
       };
       
@@ -87,12 +332,20 @@ const AiChatComponent = () => {
     }
   };
 
-  const handleActionClick = (actionType: string, id: string) => {
-    if (actionType === 'course') {
-      window.location.href = `/courses/${id}`;
-    } else if (actionType === 'event') {
-      window.location.href = `/events/${id}`;
-    }
+  const handleCourseClick = (courseId: string) => {
+    window.open(`/learning/course-detail/${courseId}`, '_blank');
+  };
+
+  const handleEventClick = (eventId: string) => {
+    window.open(`/events/${eventId}`, '_blank');
+  };
+
+  const handleQuickQuestion = (question: string) => {
+    setInputMessage(question);
+    // Auto-send after a brief delay
+    setTimeout(() => {
+      handleSendMessage();
+    }, 100);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -102,117 +355,227 @@ const AiChatComponent = () => {
     }
   };
 
+  const formatMessageContent = (content: string) => {
+    return content.split('\n').map((line, index) => (
+      <span key={index}>
+        {line}
+        {index < content.split('\n').length - 1 && <br />}
+      </span>
+    ));
+  };
+
   return (
-    <Card className="h-full bg-white/95 backdrop-blur-sm border-orange-200">
-      <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-white/20 rounded-full">
-            <Bot className="h-5 w-5" />
+    <Card className="h-full bg-gradient-to-br from-orange-50/80 via-purple-50/80 to-pink-50/80 backdrop-blur-sm border border-orange-200/30 shadow-2xl">
+      <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white relative overflow-hidden">
+        {/* Animated background elements */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute -top-4 -left-4 w-8 h-8 bg-white rounded-full animate-pulse"></div>
+          <div className="absolute -bottom-4 -right-4 w-12 h-12 bg-white rounded-full animate-pulse" style={{ animationDelay: '1s' }}></div>
+        </div>
+        
+        <div className="flex items-center gap-3 relative z-10">
+          <div className="p-2 bg-white/20 rounded-full backdrop-blur-sm">
+            <Bot className="h-6 w-6" />
           </div>
-          <div>
-            <CardTitle className="text-lg">AI Smart Advisor</CardTitle>
-            <p className="text-sm opacity-90">Ask me anything about courses and events</p>
+          <div className="flex-1">
+            <CardTitle className="text-xl flex items-center gap-2">
+              AI Smart Advisor 
+              <Sparkles className="h-5 w-5 text-yellow-300 animate-pulse" />
+            </CardTitle>
+            <p className="text-sm opacity-90 font-light">
+              {user ? 'Personalized recommendations based on your learning journey' : 'Ask me about courses, events, and learning paths'}
+            </p>
+          </div>
+          <div className="px-3 py-1 bg-white/20 rounded-full backdrop-blur-sm">
+            <Zap className="h-4 w-4 text-yellow-300 animate-bounce" />
           </div>
         </div>
       </CardHeader>
       
-      <CardContent className="p-0 flex flex-col h-[500px]">
-        <ScrollArea className="flex-1 p-4">
-          <div className="space-y-4">
+      <CardContent className="p-0 flex flex-col h-[600px]">
+        <ScrollArea className="flex-1 p-6" ref={scrollAreaRef}>
+          <div className="space-y-6">
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={`flex items-start gap-3 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
+                className={cn(
+                  "flex items-start gap-4 transition-all duration-300",
+                  message.role === 'user' ? 'flex-row-reverse' : ''
+                )}
               >
-                <Avatar className="w-8 h-8 flex-shrink-0">
-                  <AvatarFallback className={`${message.role === 'user' ? 'bg-purple-100 text-purple-600' : 'bg-orange-100 text-orange-600'}`}>
-                    {message.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+                <Avatar className={cn(
+                  "w-10 h-10 flex-shrink-0 transition-all duration-300",
+                  message.role === 'user' 
+                    ? 'bg-gradient-to-r from-purple-500 to-orange-500 shadow-lg' 
+                    : 'bg-gradient-to-r from-orange-500 to-purple-500 shadow-lg'
+                )}>
+                  <AvatarFallback className="bg-transparent text-white">
+                    {message.role === 'user' ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
                   </AvatarFallback>
                 </Avatar>
                 
-                <div className={`flex-1 max-w-[80%] ${message.role === 'user' ? 'text-right' : ''}`}>
+                <div className={cn(
+                  "flex-1 max-w-[85%] space-y-3",
+                  message.role === 'user' ? 'text-right' : ''
+                )}>
+                  {/* Message Bubble */}
                   <div
-                    className={`rounded-lg p-3 ${
+                    className={cn(
+                      "rounded-2xl p-4 transition-all duration-300",
                       message.role === 'user'
-                        ? 'bg-gradient-to-r from-purple-500 to-orange-500 text-white ml-auto'
-                        : 'bg-gray-100 text-gray-900'
-                    }`}
-                  >
-                    <div className="text-sm whitespace-pre-wrap">
-                      {message.content}
-                    </div>
-                    
-                    {/* Action Buttons */}
-                    {message.role === 'assistant' && message.actionIds && (
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        {message.actionIds.courseId && (
-                          <Badge 
-                            variant="secondary" 
-                            className="cursor-pointer hover:bg-orange-100 text-xs"
-                            onClick={() => handleActionClick('course', message.actionIds!.courseId!)}
-                          >
-                            View Course
-                          </Badge>
-                        )}
-                        {message.actionIds.eventId && (
-                          <Badge 
-                            variant="secondary" 
-                            className="cursor-pointer hover:bg-purple-100 text-xs"
-                            onClick={() => handleActionClick('event', message.actionIds!.eventId!)}
-                          >
-                            View Event
-                          </Badge>
-                        )}
-                      </div>
+                        ? 'bg-gradient-to-r from-purple-500 to-orange-500 text-white shadow-xl ml-auto'
+                        : 'bg-white/90 backdrop-blur-sm text-gray-900 shadow-lg border border-orange-100'
                     )}
+                  >
+                    <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {formatMessageContent(message.content)}
+                    </div>
                   </div>
-                  
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {message.timestamp.toLocaleTimeString()}
+
+                  {/* Recommendations Grid */}
+                  {message.role === 'assistant' && message.recommendations && (
+                    <div className="space-y-4">
+                      {/* Course Recommendations */}
+                      {message.recommendations.courses && message.recommendations.courses.length > 0 && (
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                            <BookOpen className="h-4 w-4 text-orange-500" />
+                            Recommended Courses
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {message.recommendations.courses.map((course) => (
+                              <CourseRecommendationCard
+                                key={course.id}
+                                course={course}
+                                onCourseClick={handleCourseClick}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Event Recommendations */}
+                      {message.recommendations.events && message.recommendations.events.length > 0 && (
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                            <Calendar className="h-4 w-4 text-purple-500" />
+                            Upcoming Events
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {message.recommendations.events.map((event) => (
+                              <EventRecommendationCard
+                                key={event.id}
+                                event={event}
+                                onEventClick={handleEventClick}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Follow-up Questions */}
+                  {message.role === 'assistant' && message.followUpQuestions && message.followUpQuestions.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-xs text-gray-500 font-medium">Quick questions:</div>
+                      <div className="flex flex-wrap gap-2">
+                        {message.followUpQuestions.map((question, index) => (
+                          <Badge
+                            key={index}
+                            variant="secondary"
+                            className="cursor-pointer bg-white/80 hover:bg-gradient-to-r hover:from-orange-500 hover:to-purple-600 hover:text-white transition-all duration-300 border border-orange-200 text-xs font-normal px-3 py-1"
+                            onClick={() => handleQuickQuestion(question)}
+                          >
+                            {question}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Next Steps */}
+                  {message.role === 'assistant' && message.nextSteps && message.nextSteps.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-xs text-gray-500 font-medium">Next steps:</div>
+                      <div className="space-y-1">
+                        {message.nextSteps.map((step, index) => (
+                          <div key={index} className="flex items-center gap-2 text-sm text-gray-700">
+                            <ArrowRight className="h-3 w-3 text-orange-500" />
+                            {step}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Timestamp */}
+                  <div className={cn(
+                    "text-xs text-gray-500 transition-opacity duration-300",
+                    message.role === 'user' ? 'text-right' : ''
+                  )}>
+                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
               </div>
             ))}
             
+            {/* Loading Indicator */}
             {isLoading && (
-              <div className="flex items-start gap-3">
-                <Avatar className="w-8 h-8">
-                  <AvatarFallback className="bg-orange-100 text-orange-600">
-                    <Bot className="w-4 h-4" />
+              <div className="flex items-start gap-4">
+                <Avatar className="w-10 h-10 bg-gradient-to-r from-orange-500 to-purple-500 shadow-lg">
+                  <AvatarFallback className="bg-transparent text-white">
+                    <Bot className="w-5 h-5" />
                   </AvatarFallback>
                 </Avatar>
-                <div className="bg-gray-100 rounded-lg p-3 max-w-[80%]">
-                  <div className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-orange-500 border-t-transparent"></div>
-                    <span className="text-sm text-gray-600">AI is thinking...</span>
+                <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-orange-100 max-w-[85%]">
+                  <div className="flex items-center gap-3">
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    </div>
+                    <span className="text-sm text-gray-600 font-medium">Finding the best recommendations for you...</span>
                   </div>
                 </div>
               </div>
             )}
+            
+            <div ref={messagesEndRef} />
           </div>
         </ScrollArea>
         
-        <div className="border-t p-4 bg-gray-50/50">
-          <div className="flex gap-2">
+        {/* Input Area */}
+        <div className="border-t border-orange-200/50 bg-white/50 backdrop-blur-sm p-4">
+          <div className="flex gap-3">
             <Input
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Ask about courses, events, or get learning advice..."
-              className="flex-1 border-orange-200 focus:border-orange-400"
+              className="flex-1 border-orange-200 focus:border-orange-400 bg-white/80 backdrop-blur-sm rounded-xl transition-all duration-300 focus:ring-2 focus:ring-orange-500/20"
               disabled={isLoading}
             />
             <Button
               onClick={handleSendMessage}
               disabled={isLoading || !inputMessage.trim()}
-              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 rounded-xl"
               size="icon"
             >
               <Send className="h-4 w-4" />
             </Button>
           </div>
-          <div className="text-xs text-gray-500 mt-2 text-center">
-            {user ? 'Getting personalized recommendations based on your profile' : 'Sign in for personalized recommendations'}
+          
+          {/* Quick Action Tips */}
+          <div className="text-xs text-gray-500 mt-3 text-center flex items-center justify-center gap-4">
+            <div className="flex items-center gap-1">
+              <Sparkles className="h-3 w-3 text-orange-500" />
+              <span>Try: "Show me web development courses"</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Calendar className="h-3 w-3 text-purple-500" />
+              <span>Or: "Upcoming events near me"</span>
+            </div>
           </div>
         </div>
       </CardContent>
