@@ -552,25 +552,27 @@ const AiChatComponent = () => {
 
   if (isLoadingHistory) {
     return (
-      <Card className="h-full bg-gradient-to-br from-orange-50/80 via-purple-50/80 to-pink-50/80 backdrop-blur-sm border border-orange-200/30 shadow-2xl">
-        <CardContent className="flex items-center justify-center h-64">
-          <div className="flex items-center gap-3">
-            <div className="flex space-x-1">
-              <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>
-              <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-              <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+      <div className="flex flex-col h-full min-h-[700px] mb-8"> {/* Added margin bottom */}
+        <Card className="h-full bg-gradient-to-br from-orange-50/80 via-purple-50/80 to-pink-50/80 backdrop-blur-sm border border-orange-200/30 shadow-2xl">
+          <CardContent className="flex items-center justify-center h-full">
+            <div className="flex items-center gap-3">
+              <div className="flex space-x-1">
+                <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              </div>
+              <span className="text-sm text-gray-600 font-medium">Loading your conversations...</span>
             </div>
-            <span className="text-sm text-gray-600 font-medium">Loading your conversations...</span>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <div className="h-[calc(100vh-200px)] min-h-[600px] max-h-[800px] lg:max-h-[900px]"> {/* Improved responsive height */}
-      <Card className="h-full bg-gradient-to-br from-orange-50/80 via-purple-50/80 to-pink-50/80 backdrop-blur-sm border border-orange-200/30 shadow-2xl">
-        <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white relative overflow-hidden">
+    <div className="flex flex-col h-full min-h-[700px] mb-8"> {/* Main container with proper spacing */}
+      <Card className="h-full bg-gradient-to-br from-orange-50/80 via-purple-50/80 to-pink-50/80 backdrop-blur-sm border border-orange-200/30 shadow-2xl flex flex-col">
+        <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white relative overflow-hidden flex-shrink-0">
           <div className="absolute inset-0 opacity-10">
             <div className="absolute -top-4 -left-4 w-8 h-8 bg-white rounded-full animate-pulse"></div>
             <div className="absolute -bottom-4 -right-4 w-12 h-12 bg-white rounded-full animate-pulse" style={{ animationDelay: '1s' }}></div>
@@ -635,7 +637,7 @@ const AiChatComponent = () => {
           )}
         </CardHeader>
         
-        <CardContent className="p-0 flex flex-col h-full">
+        <CardContent className="p-0 flex flex-col flex-1 min-h-0"> {/* Flex-1 and min-h-0 for proper flex behavior */}
           <ScrollArea 
             className="flex-1 p-4 md:p-6" 
             ref={scrollAreaRef}
@@ -793,7 +795,7 @@ const AiChatComponent = () => {
           </ScrollArea>
           
           {/* Input Area */}
-          <div className="border-t border-orange-200/50 bg-white/50 backdrop-blur-sm p-4">
+          <div className="border-t border-orange-200/50 bg-white/50 backdrop-blur-sm p-4 flex-shrink-0"> {/* flex-shrink-0 to prevent shrinking */}
             <div className="flex gap-2 md:gap-3">
               <Input
                 value={inputMessage}
