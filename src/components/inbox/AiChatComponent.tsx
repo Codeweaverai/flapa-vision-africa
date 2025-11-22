@@ -247,6 +247,8 @@ const AiChatComponent = () => {
   const { user } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const isInitialLoad = useRef(true);
+  const shouldScrollToBottom = useRef(true);
 
   // Load conversation threads and history
   useEffect(() => {
@@ -350,6 +352,10 @@ const AiChatComponent = () => {
 
       setMessages(formattedMessages);
       setCurrentThreadId(threadId);
+      
+      // Set flag to scroll to bottom on initial load
+      isInitialLoad.current = true;
+      shouldScrollToBottom.current = true;
     } catch (error) {
       console.error('Error loading thread messages:', error);
       toast.error('Failed to load conversation');
@@ -369,10 +375,41 @@ const AiChatComponent = () => {
     ]
   });
 
-  // Auto-scroll to bottom when new messages arrive
+  // Improved scroll behavior
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length === 0) return;
+
+    const scrollToBottom = () => {
+      if (scrollAreaRef.current && shouldScrollToBottom.current) {
+        const scrollElement = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+        if (scrollElement) {
+          scrollElement.scrollTop = scrollElement.scrollHeight;
+        }
+      }
+    };
+
+    // Use requestAnimationFrame for smoother scrolling
+    requestAnimationFrame(() => {
+      setTimeout(scrollToBottom, 100);
+    });
+
+    // Reset initial load flag after first render
+    if (isInitialLoad.current) {
+      isInitialLoad.current = false;
+    }
   }, [messages]);
+
+  // Handle scroll events to determine if we should auto-scroll
+  const handleScroll = () => {
+    if (scrollAreaRef.current) {
+      const scrollElement = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollElement) {
+        const { scrollTop, scrollHeight, clientHeight } = scrollElement;
+        // If user is near the bottom (within 100px), auto-scroll to bottom
+        shouldScrollToBottom.current = scrollHeight - scrollTop - clientHeight < 100;
+      }
+    }
+  };
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
@@ -384,6 +421,8 @@ const AiChatComponent = () => {
       timestamp: new Date()
     };
 
+    // Force scroll to bottom when user sends a message
+    shouldScrollToBottom.current = true;
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
     setIsLoading(true);
@@ -415,6 +454,8 @@ const AiChatComponent = () => {
         followUpQuestions: data.followUpQuestions
       };
 
+      // Force scroll to bottom when AI responds
+      shouldScrollToBottom.current = true;
       setMessages(prev => [...prev, assistantMessage]);
 
       // Update thread title if this is the first user message
@@ -527,7 +568,7 @@ const AiChatComponent = () => {
   }
 
   return (
-    <div className="h-[calc(100vh-200px)] min-h-[600px] max-h-[800px]"> {/* Fixed height container */}
+    <div className="h-[calc(100vh-200px)] min-h-[600px] max-h-[800px] lg:max-h-[900px]"> {/* Improved responsive height */}
       <Card className="h-full bg-gradient-to-br from-orange-50/80 via-purple-50/80 to-pink-50/80 backdrop-blur-sm border border-orange-200/30 shadow-2xl">
         <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white relative overflow-hidden">
           <div className="absolute inset-0 opacity-10">
@@ -568,22 +609,22 @@ const AiChatComponent = () => {
                 </Button>
               </div>
               <ScrollArea className="h-20">
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   {conversationThreads.map((thread) => (
                     <Badge
                       key={thread.id}
                       variant={currentThreadId === thread.id ? "default" : "secondary"}
                       className={cn(
-                        "cursor-pointer transition-all duration-300 text-xs font-normal px-3 py-1 flex items-center gap-1",
+                        "cursor-pointer transition-all duration-300 text-xs font-normal px-3 py-1 flex items-center gap-1 mb-1",
                         currentThreadId === thread.id 
                           ? "bg-white text-orange-600" 
                           : "bg-white/20 text-white hover:bg-white/30"
                       )}
                       onClick={() => loadThreadMessages(thread.id)}
                     >
-                      {thread.title}
+                      <span className="max-w-[120px] truncate">{thread.title}</span>
                       <Trash2 
-                        className="h-3 w-3 ml-1 opacity-70 hover:opacity-100" 
+                        className="h-3 w-3 ml-1 opacity-70 hover:opacity-100 flex-shrink-0" 
                         onClick={(e) => handleDeleteThread(thread.id, e)}
                       />
                     </Badge>
@@ -594,36 +635,40 @@ const AiChatComponent = () => {
           )}
         </CardHeader>
         
-        <CardContent className="p-0 flex flex-col h-full"> {/* Changed to h-full */}
-          <ScrollArea className="flex-1 p-6" ref={scrollAreaRef}>
-            <div className="space-y-6">
+        <CardContent className="p-0 flex flex-col h-full">
+          <ScrollArea 
+            className="flex-1 p-4 md:p-6" 
+            ref={scrollAreaRef}
+            onScroll={handleScroll}
+          >
+            <div className="space-y-4 md:space-y-6">
               {messages.map((message) => (
                 <div
                   key={message.id}
                   className={cn(
-                    "flex items-start gap-4 transition-all duration-300",
+                    "flex items-start gap-3 md:gap-4 transition-all duration-300",
                     message.role === 'user' ? 'flex-row-reverse' : ''
                   )}
                 >
                   <Avatar className={cn(
-                    "w-10 h-10 flex-shrink-0 transition-all duration-300",
+                    "w-8 h-8 md:w-10 md:h-10 flex-shrink-0 transition-all duration-300",
                     message.role === 'user' 
                       ? 'bg-gradient-to-r from-purple-500 to-orange-500 shadow-lg' 
                       : 'bg-gradient-to-r from-orange-500 to-purple-500 shadow-lg'
                   )}>
-                    <AvatarFallback className="bg-transparent text-white">
-                      {message.role === 'user' ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
+                    <AvatarFallback className="bg-transparent text-white text-xs md:text-sm">
+                      {message.role === 'user' ? <User className="w-3 h-3 md:w-5 md:h-5" /> : <Bot className="w-3 h-3 md:w-5 md:h-5" />}
                     </AvatarFallback>
                   </Avatar>
                   
                   <div className={cn(
-                    "flex-1 max-w-[85%] space-y-3",
+                    "flex-1 max-w-[80%] md:max-w-[85%] space-y-2 md:space-y-3",
                     message.role === 'user' ? 'text-right' : ''
                   )}>
                     {/* Message Bubble */}
                     <div
                       className={cn(
-                        "rounded-2xl p-4 transition-all duration-300",
+                        "rounded-2xl p-3 md:p-4 transition-all duration-300",
                         message.role === 'user'
                           ? 'bg-gradient-to-r from-purple-500 to-orange-500 text-white shadow-xl ml-auto'
                           : 'bg-white/90 backdrop-blur-sm text-gray-900 shadow-lg border border-orange-100'
@@ -636,15 +681,15 @@ const AiChatComponent = () => {
 
                     {/* Recommendations Grid */}
                     {message.role === 'assistant' && message.recommendations && (
-                      <div className="space-y-4">
+                      <div className="space-y-3 md:space-y-4">
                         {/* Course Recommendations */}
                         {message.recommendations.courses && message.recommendations.courses.length > 0 && (
-                          <div className="space-y-3">
+                          <div className="space-y-2 md:space-y-3">
                             <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
                               <BookOpen className="h-4 w-4 text-orange-500" />
                               Recommended Courses
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                               {message.recommendations.courses.map((course) => (
                                 <CourseRecommendationCard
                                   key={course.id}
@@ -658,12 +703,12 @@ const AiChatComponent = () => {
 
                         {/* Event Recommendations */}
                         {message.recommendations.events && message.recommendations.events.length > 0 && (
-                          <div className="space-y-3">
+                          <div className="space-y-2 md:space-y-3">
                             <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
                               <Calendar className="h-4 w-4 text-purple-500" />
                               Upcoming Events
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                               {message.recommendations.events.map((event) => (
                                 <EventRecommendationCard
                                   key={event.id}
@@ -724,14 +769,14 @@ const AiChatComponent = () => {
               
               {/* Loading Indicator */}
               {isLoading && (
-                <div className="flex items-start gap-4">
-                  <Avatar className="w-10 h-10 bg-gradient-to-r from-orange-500 to-purple-500 shadow-lg">
+                <div className="flex items-start gap-3 md:gap-4">
+                  <Avatar className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-r from-orange-500 to-purple-500 shadow-lg">
                     <AvatarFallback className="bg-transparent text-white">
-                      <Bot className="w-5 h-5" />
+                      <Bot className="w-3 h-3 md:w-5 md:h-5" />
                     </AvatarFallback>
                   </Avatar>
-                  <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-orange-100 max-w-[85%]">
-                    <div className="flex items-center gap-3">
+                  <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-3 md:p-4 shadow-lg border border-orange-100 max-w-[80%] md:max-w-[85%]">
+                    <div className="flex items-center gap-2 md:gap-3">
                       <div className="flex space-x-1">
                         <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>
                         <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -749,19 +794,19 @@ const AiChatComponent = () => {
           
           {/* Input Area */}
           <div className="border-t border-orange-200/50 bg-white/50 backdrop-blur-sm p-4">
-            <div className="flex gap-3">
+            <div className="flex gap-2 md:gap-3">
               <Input
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Ask about courses, events, or get learning advice..."
-                className="flex-1 border-orange-200 focus:border-orange-400 bg-white/80 backdrop-blur-sm rounded-xl transition-all duration-300 focus:ring-2 focus:ring-orange-500/20"
+                className="flex-1 border-orange-200 focus:border-orange-400 bg-white/80 backdrop-blur-sm rounded-xl transition-all duration-300 focus:ring-2 focus:ring-orange-500/20 text-sm md:text-base"
                 disabled={isLoading}
               />
               <Button
                 onClick={handleSendMessage}
                 disabled={isLoading || !inputMessage.trim()}
-                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 rounded-xl"
+                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 rounded-xl flex-shrink-0"
                 size="icon"
               >
                 <Send className="h-4 w-4" />
@@ -769,14 +814,16 @@ const AiChatComponent = () => {
             </div>
             
             {/* Quick Action Tips */}
-            <div className="text-xs text-gray-500 mt-3 text-center flex items-center justify-center gap-4">
+            <div className="text-xs text-gray-500 mt-3 text-center flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
               <div className="flex items-center gap-1">
                 <Sparkles className="h-3 w-3 text-orange-500" />
-                <span>Try: "Show me web development courses"</span>
+                <span className="hidden xs:inline">Try: "Show me web development courses"</span>
+                <span className="xs:hidden">"Web development courses"</span>
               </div>
               <div className="flex items-center gap-1">
                 <Calendar className="h-3 w-3 text-purple-500" />
-                <span>Or: "Upcoming events near me"</span>
+                <span className="hidden xs:inline">Or: "Upcoming events near me"</span>
+                <span className="xs:hidden">"Upcoming events"</span>
               </div>
             </div>
           </div>
