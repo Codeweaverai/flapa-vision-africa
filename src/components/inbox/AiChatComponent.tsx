@@ -9,6 +9,7 @@ import { Send, Sparkles, Bot, User, BookOpen, Calendar, Clock, Users, Star, MapP
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 import { cn } from '@/lib/utils';
 
 interface AiMessage {
@@ -141,13 +142,13 @@ const CourseRecommendationCard = ({ course, onCourseClick }: { course: any; onCo
 
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-            <span className={cn(
-              "font-bold text-lg",
-              course.is_free ? "bg-gradient-to-r from-green-500 to-emerald-600 bg-clip-text text-transparent" : "text-gray-900"
-            )}>
-              {course.is_free ? 'Free' : `$${course.price}`}
-            </span>
-          </div>
+        <span className={cn(
+           "font-bold text-lg",
+      course.is_free ? "bg-gradient-to-r from-green-500 to-emerald-600 bg-clip-text text-transparent" : "text-gray-900"
+       )}>
+       {course.is_free ? 'Free' : <PriceDisplay amount={course.price} originalCurrency="USD" />}
+        </span>
+         </div>
           <Button size="sm" className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white text-xs">
             Enroll Now
           </Button>
@@ -221,13 +222,13 @@ const EventRecommendationCard = ({ event, onEventClick }: { event: any; onEventC
 
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-            <span className={cn(
-              "font-bold text-lg",
-              event.is_free ? "bg-gradient-to-r from-green-500 to-emerald-600 bg-clip-text text-transparent" : "text-gray-900"
-            )}>
-              {event.is_free ? 'Free' : `From $${event.minPrice}`}
-            </span>
-          </div>
+  <span className={cn(
+    "font-bold text-lg",
+    event.is_free ? "bg-gradient-to-r from-green-500 to-emerald-600 bg-clip-text text-transparent" : "text-gray-900"
+  )}>
+    {event.is_free ? 'Free' : `From ${<PriceDisplay amount={event.minPrice} originalCurrency="USD" />}`}
+  </span>
+</div>
           <Button size="sm" className="bg-gradient-to-r from-purple-500 to-orange-600 hover:from-purple-600 hover:to-orange-700 text-white text-xs">
             {isUpcoming ? 'Register' : 'Join Now'}
           </Button>
