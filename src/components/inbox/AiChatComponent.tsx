@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Send, Sparkles, Bot, User, BookOpen, Calendar, Clock, Users, Star, MapPin, Play, ArrowRight, Zap, Trash2, MessageSquare } from 'lucide-react';
+import { Send, Sparkles, Bot, User, BookOpen, Calendar, Clock, Users, Star, MapPin, Play, ArrowRight, Zap, Trash2, MessageSquare, Plus, Menu } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -237,6 +237,71 @@ const EventRecommendationCard = ({ event, onEventClick }: { event: any; onEventC
   );
 };
 
+// Conversation Sidebar Component
+const ConversationSidebar = ({ 
+  threads, 
+  currentThreadId, 
+  onThreadSelect, 
+  onNewConversation, 
+  onDeleteThread 
+}: {
+  threads: ConversationThread[];
+  currentThreadId: string | null;
+  onThreadSelect: (threadId: string) => void;
+  onNewConversation: () => void;
+  onDeleteThread: (threadId: string, event: React.MouseEvent) => void;
+}) => {
+  return (
+    <div className="w-64 bg-white/90 backdrop-blur-sm border-r border-orange-200/50 flex flex-col h-full">
+      {/* Sidebar Header */}
+      <div className="p-4 border-b border-orange-200/50">
+        <Button
+          onClick={onNewConversation}
+          className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          New Chat
+        </Button>
+      </div>
+
+      {/* Threads List */}
+      <ScrollArea className="flex-1 p-2">
+        <div className="space-y-1">
+          {threads.map((thread) => (
+            <div
+              key={thread.id}
+              className={cn(
+                "group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all duration-200",
+                currentThreadId === thread.id
+                  ? "bg-gradient-to-r from-orange-500/20 to-purple-600/20 border border-orange-300/50"
+                  : "hover:bg-orange-50/80"
+              )}
+              onClick={() => onThreadSelect(thread.id)}
+            >
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <MessageSquare className={cn(
+                  "h-4 w-4 flex-shrink-0",
+                  currentThreadId === thread.id ? "text-orange-600" : "text-gray-500"
+                )} />
+                <span className={cn(
+                  "text-sm truncate",
+                  currentThreadId === thread.id ? "text-orange-900 font-medium" : "text-gray-700"
+                )}>
+                  {thread.title}
+                </span>
+              </div>
+              <Trash2
+                className="h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all duration-200 flex-shrink-0 ml-2"
+                onClick={(e) => onDeleteThread(thread.id, e)}
+              />
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+};
+
 const AiChatComponent = () => {
   const [messages, setMessages] = useState<AiMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -244,6 +309,7 @@ const AiChatComponent = () => {
   const [conversationThreads, setConversationThreads] = useState<ConversationThread[]>([]);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const { user } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -568,268 +634,244 @@ const AiChatComponent = () => {
   }
 
   return (
-    <div className="h-[calc(100vh-150px)] min-h-[500px] max-h-[600px] lg:max-h-[700px]"> {/* Reduced overall height */}
-      <Card className="h-full bg-gradient-to-br from-orange-50/80 via-purple-50/80 to-pink-50/80 backdrop-blur-sm border border-orange-200/30 shadow-2xl">
-        {/* Reduced header height with compact padding */}
-        <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white relative overflow-hidden py-4 px-4 md:px-6">
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute -top-4 -left-4 w-8 h-8 bg-white rounded-full animate-pulse"></div>
-            <div className="absolute -bottom-4 -right-4 w-12 h-12 bg-white rounded-full animate-pulse" style={{ animationDelay: '1s' }}></div>
-          </div>
-          
-          <div className="flex items-center gap-3 relative z-10">
-            <div className="p-2 bg-white/20 rounded-full backdrop-blur-sm">
-              <Bot className="h-5 w-5" /> {/* Slightly smaller icon */}
-            </div>
-            <div className="flex-1 min-w-0"> {/* Added min-w-0 for better text truncation */}
-              <CardTitle className="text-lg flex items-center gap-2"> {/* Reduced text size */}
-                AI Smart Advisor 
-                <Sparkles className="h-4 w-4 text-yellow-300 animate-pulse" /> {/* Smaller sparkle */}
-              </CardTitle>
-              <p className="text-xs opacity-90 font-light truncate"> {/* Smaller text and truncate */}
-                {user ? 'Personalized recommendations based on your learning journey' : 'Ask me about courses, events, and learning paths'}
-              </p>
-            </div>
-            <div className="px-2 py-1 bg-white/20 rounded-full backdrop-blur-sm flex-shrink-0">
-              <Zap className="h-3 w-3 text-yellow-300 animate-bounce" /> {/* Smaller zap icon */}
-            </div>
-          </div>
-
-          {/* Conversation History Sidebar - Made more compact */}
-          {user && conversationThreads.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-white/20"> {/* Reduced margins */}
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium">Your Conversations</span> {/* Smaller text */}
-                <Button
-                  size="sm"
-                  onClick={handleNewConversation}
-                  className="bg-white/20 hover:bg-white/30 text-white text-xs h-7 px-2" /* More compact button */
-                >
-                  <MessageSquare className="h-3 w-3 mr-1" />
-                  New
-                </Button>
+    <div className="h-[calc(100vh-120px)] min-h-[500px] max-h-[800px] lg:max-h-[900px]">
+      <Card className="h-full bg-gradient-to-br from-orange-50/80 via-purple-50/80 to-pink-50/80 backdrop-blur-sm border border-orange-200/30 shadow-2xl overflow-hidden">
+        {/* Compact Header */}
+        <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white py-3 px-4 relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="h-8 w-8 bg-white/20 hover:bg-white/30 text-white"
+              >
+                <Menu className="h-4 w-4" />
+              </Button>
+              <div className="flex items-center gap-2">
+                <Bot className="h-5 w-5" />
+                <CardTitle className="text-lg">AI Smart Advisor</CardTitle>
+                <Sparkles className="h-4 w-4 text-yellow-300 animate-pulse" />
               </div>
-              <ScrollArea className="h-16"> {/* Reduced height */}
-                <div className="flex gap-1 flex-wrap"> {/* Reduced gap */}
-                  {conversationThreads.map((thread) => (
-                    <Badge
-                      key={thread.id}
-                      variant={currentThreadId === thread.id ? "default" : "secondary"}
-                      className={cn(
-                        "cursor-pointer transition-all duration-300 text-xs font-normal px-2 py-1 flex items-center gap-1 mb-1", /* More compact padding */
-                        currentThreadId === thread.id 
-                          ? "bg-white text-orange-600" 
-                          : "bg-white/20 text-white hover:bg-white/30"
-                      )}
-                      onClick={() => loadThreadMessages(thread.id)}
-                    >
-                      <span className="max-w-[100px] truncate">{thread.title}</span> {/* Smaller max width */}
-                      <Trash2 
-                        className="h-3 w-3 ml-0.5 opacity-70 hover:opacity-100 flex-shrink-0" 
-                        onClick={(e) => handleDeleteThread(thread.id, e)}
-                      />
-                    </Badge>
-                  ))}
-                </div>
-              </ScrollArea>
             </div>
-          )}
+            <div className="flex items-center gap-2">
+              <Zap className="h-4 w-4 text-yellow-300 animate-bounce" />
+              <span className="text-sm opacity-90">
+                {user ? 'Personalized' : 'Ask me anything'}
+              </span>
+            </div>
+          </div>
         </CardHeader>
         
-        <CardContent className="p-0 flex flex-col h-full">
-          {/* Increased flex-1 to give more space to messages area */}
-          <ScrollArea 
-            className="flex-1 p-4 md:p-6" 
-            ref={scrollAreaRef}
-            onScroll={handleScroll}
-          >
-            <div className="space-y-4 md:space-y-6">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={cn(
-                    "flex items-start gap-3 md:gap-4 transition-all duration-300",
-                    message.role === 'user' ? 'flex-row-reverse' : ''
-                  )}
-                >
-                  <Avatar className={cn(
-                    "w-8 h-8 md:w-10 md:h-10 flex-shrink-0 transition-all duration-300",
-                    message.role === 'user' 
-                      ? 'bg-gradient-to-r from-purple-500 to-orange-500 shadow-lg' 
-                      : 'bg-gradient-to-r from-orange-500 to-purple-500 shadow-lg'
-                  )}>
-                    <AvatarFallback className="bg-transparent text-white text-xs md:text-sm">
-                      {message.role === 'user' ? <User className="w-3 h-3 md:w-5 md:h-5" /> : <Bot className="w-3 h-3 md:w-5 md:h-5" />}
-                    </AvatarFallback>
-                  </Avatar>
-                  
-                  <div className={cn(
-                    "flex-1 max-w-[80%] md:max-w-[85%] space-y-2 md:space-y-3",
-                    message.role === 'user' ? 'text-right' : ''
-                  )}>
-                    {/* Message Bubble */}
-                    <div
-                      className={cn(
-                        "rounded-2xl p-3 md:p-4 transition-all duration-300",
-                        message.role === 'user'
-                          ? 'bg-gradient-to-r from-purple-500 to-orange-500 text-white shadow-xl ml-auto'
-                          : 'bg-white/90 backdrop-blur-sm text-gray-900 shadow-lg border border-orange-100'
-                      )}
-                    >
-                      <div className="text-sm leading-relaxed whitespace-pre-wrap">
-                        {formatMessageContent(message.content)}
-                      </div>
-                    </div>
-
-                    {/* Recommendations Grid */}
-                    {message.role === 'assistant' && message.recommendations && (
-                      <div className="space-y-3 md:space-y-4">
-                        {/* Course Recommendations */}
-                        {message.recommendations.courses && message.recommendations.courses.length > 0 && (
-                          <div className="space-y-2 md:space-y-3">
-                            <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                              <BookOpen className="h-4 w-4 text-orange-500" />
-                              Recommended Courses
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-                              {message.recommendations.courses.map((course) => (
-                                <CourseRecommendationCard
-                                  key={course.id}
-                                  course={course}
-                                  onCourseClick={handleCourseClick}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Event Recommendations */}
-                        {message.recommendations.events && message.recommendations.events.length > 0 && (
-                          <div className="space-y-2 md:space-y-3">
-                            <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                              <Calendar className="h-4 w-4 text-purple-500" />
-                              Upcoming Events
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-                              {message.recommendations.events.map((event) => (
-                                <EventRecommendationCard
-                                  key={event.id}
-                                  event={event}
-                                  onEventClick={handleEventClick}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
+        <div className="flex flex-1 h-[calc(100%-80px)]">
+          {/* Sidebar */}
+          {sidebarOpen && user && (
+            <ConversationSidebar
+              threads={conversationThreads}
+              currentThreadId={currentThreadId}
+              onThreadSelect={loadThreadMessages}
+              onNewConversation={handleNewConversation}
+              onDeleteThread={handleDeleteThread}
+            />
+          )}
+          
+          {/* Main Chat Area */}
+          <div className="flex-1 flex flex-col">
+            <ScrollArea 
+              className="flex-1 p-4 md:p-6" 
+              ref={scrollAreaRef}
+              onScroll={handleScroll}
+            >
+              <div className="space-y-4 md:space-y-6 max-w-4xl mx-auto">
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={cn(
+                      "flex items-start gap-3 md:gap-4 transition-all duration-300",
+                      message.role === 'user' ? 'flex-row-reverse' : ''
                     )}
-
-                    {/* Follow-up Questions */}
-                    {message.role === 'assistant' && message.followUpQuestions && message.followUpQuestions.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="text-xs text-gray-500 font-medium">Quick questions:</div>
-                        <div className="flex flex-wrap gap-2">
-                          {message.followUpQuestions.map((question, index) => (
-                            <Badge
-                              key={index}
-                              variant="secondary"
-                              className="cursor-pointer bg-white/80 hover:bg-gradient-to-r hover:from-orange-500 hover:to-purple-600 hover:text-white transition-all duration-300 border border-orange-200 text-xs font-normal px-3 py-1"
-                              onClick={() => handleQuickQuestion(question)}
-                            >
-                              {question}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Next Steps */}
-                    {message.role === 'assistant' && message.nextSteps && message.nextSteps.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="text-xs text-gray-500 font-medium">Next steps:</div>
-                        <div className="space-y-1">
-                          {message.nextSteps.map((step, index) => (
-                            <div key={index} className="flex items-center gap-2 text-sm text-gray-700">
-                              <ArrowRight className="h-3 w-3 text-orange-500" />
-                              {step}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Timestamp */}
+                  >
+                    <Avatar className={cn(
+                      "w-8 h-8 md:w-10 md:h-10 flex-shrink-0 transition-all duration-300",
+                      message.role === 'user' 
+                        ? 'bg-gradient-to-r from-purple-500 to-orange-500 shadow-lg' 
+                        : 'bg-gradient-to-r from-orange-500 to-purple-500 shadow-lg'
+                    )}>
+                      <AvatarFallback className="bg-transparent text-white text-xs md:text-sm">
+                        {message.role === 'user' ? <User className="w-3 h-3 md:w-5 md:h-5" /> : <Bot className="w-3 h-3 md:w-5 md:h-5" />}
+                      </AvatarFallback>
+                    </Avatar>
+                    
                     <div className={cn(
-                      "text-xs text-gray-500 transition-opacity duration-300",
+                      "flex-1 max-w-[80%] md:max-w-[85%] space-y-2 md:space-y-3",
                       message.role === 'user' ? 'text-right' : ''
                     )}>
-                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                  </div>
-                </div>
-              ))}
-              
-              {/* Loading Indicator */}
-              {isLoading && (
-                <div className="flex items-start gap-3 md:gap-4">
-                  <Avatar className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-r from-orange-500 to-purple-500 shadow-lg">
-                    <AvatarFallback className="bg-transparent text-white">
-                      <Bot className="w-3 h-3 md:w-5 md:h-5" />
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-3 md:p-4 shadow-lg border border-orange-100 max-w-[80%] md:max-w-[85%]">
-                    <div className="flex items-center gap-2 md:gap-3">
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      {/* Message Bubble */}
+                      <div
+                        className={cn(
+                          "rounded-2xl p-3 md:p-4 transition-all duration-300",
+                          message.role === 'user'
+                            ? 'bg-gradient-to-r from-purple-500 to-orange-500 text-white shadow-xl ml-auto'
+                            : 'bg-white/90 backdrop-blur-sm text-gray-900 shadow-lg border border-orange-100'
+                        )}
+                      >
+                        <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                          {formatMessageContent(message.content)}
+                        </div>
                       </div>
-                      <span className="text-sm text-gray-600 font-medium">Finding the best recommendations for you...</span>
+
+                      {/* Recommendations Grid */}
+                      {message.role === 'assistant' && message.recommendations && (
+                        <div className="space-y-3 md:space-y-4">
+                          {/* Course Recommendations */}
+                          {message.recommendations.courses && message.recommendations.courses.length > 0 && (
+                            <div className="space-y-2 md:space-y-3">
+                              <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                                <BookOpen className="h-4 w-4 text-orange-500" />
+                                Recommended Courses
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                                {message.recommendations.courses.map((course) => (
+                                  <CourseRecommendationCard
+                                    key={course.id}
+                                    course={course}
+                                    onCourseClick={handleCourseClick}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Event Recommendations */}
+                          {message.recommendations.events && message.recommendations.events.length > 0 && (
+                            <div className="space-y-2 md:space-y-3">
+                              <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                                <Calendar className="h-4 w-4 text-purple-500" />
+                                Upcoming Events
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                                {message.recommendations.events.map((event) => (
+                                  <EventRecommendationCard
+                                    key={event.id}
+                                    event={event}
+                                    onEventClick={handleEventClick}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Follow-up Questions */}
+                      {message.role === 'assistant' && message.followUpQuestions && message.followUpQuestions.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="text-xs text-gray-500 font-medium">Quick questions:</div>
+                          <div className="flex flex-wrap gap-2">
+                            {message.followUpQuestions.map((question, index) => (
+                              <Badge
+                                key={index}
+                                variant="secondary"
+                                className="cursor-pointer bg-white/80 hover:bg-gradient-to-r hover:from-orange-500 hover:to-purple-600 hover:text-white transition-all duration-300 border border-orange-200 text-xs font-normal px-3 py-1"
+                                onClick={() => handleQuickQuestion(question)}
+                              >
+                                {question}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Next Steps */}
+                      {message.role === 'assistant' && message.nextSteps && message.nextSteps.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="text-xs text-gray-500 font-medium">Next steps:</div>
+                          <div className="space-y-1">
+                            {message.nextSteps.map((step, index) => (
+                              <div key={index} className="flex items-center gap-2 text-sm text-gray-700">
+                                <ArrowRight className="h-3 w-3 text-orange-500" />
+                                {step}
+                              </div>
+                            ))}
+                        </div>
+                        </div>
+                      )}
+
+                      {/* Timestamp */}
+                      <div className={cn(
+                        "text-xs text-gray-500 transition-opacity duration-300",
+                        message.role === 'user' ? 'text-right' : ''
+                      )}>
+                        {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-              
-              <div ref={messagesEndRef} />
-            </div>
-          </ScrollArea>
-          
-          {/* Input Area - Pushed upward with reduced padding */}
-          <div className="border-t border-orange-200/50 bg-white/50 backdrop-blur-sm p-3 md:p-4"> {/* Reduced padding */}
-            <div className="flex gap-2 md:gap-3">
-              <Input
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Ask about courses, events, or get learning advice..."
-                className="flex-1 border-orange-200 focus:border-orange-400 bg-white/80 backdrop-blur-sm rounded-xl transition-all duration-300 focus:ring-2 focus:ring-orange-500/20 text-sm md:text-base"
-                disabled={isLoading}
-              />
-              <Button
-                onClick={handleSendMessage}
-                disabled={isLoading || !inputMessage.trim()}
-                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 rounded-xl flex-shrink-0"
-                size="icon"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
-            
-            {/* Quick Action Tips - Made more compact */}
-            <div className="text-xs text-gray-500 mt-2 text-center flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-3"> {/* Reduced margins and gaps */}
-              <div className="flex items-center gap-1">
-                <Sparkles className="h-3 w-3 text-orange-500" />
-                <span className="hidden xs:inline">Try: "Show me web development courses"</span>
-                <span className="xs:hidden">"Web development courses"</span>
+                ))}
+                
+                {/* Loading Indicator */}
+                {isLoading && (
+                  <div className="flex items-start gap-3 md:gap-4">
+                    <Avatar className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-r from-orange-500 to-purple-500 shadow-lg">
+                      <AvatarFallback className="bg-transparent text-white">
+                        <Bot className="w-3 h-3 md:w-5 md:h-5" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-3 md:p-4 shadow-lg border border-orange-100 max-w-[80%] md:max-w-[85%]">
+                      <div className="flex items-center gap-2 md:gap-3">
+                        <div className="flex space-x-1">
+                          <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>
+                          <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                          <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        </div>
+                        <span className="text-sm text-gray-600 font-medium">Finding the best recommendations for you...</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <div ref={messagesEndRef} />
               </div>
-              <div className="flex items-center gap-1">
-                <Calendar className="h-3 w-3 text-purple-500" />
-                <span className="hidden xs:inline">Or: "Upcoming events near me"</span>
-                <span className="xs:hidden">"Upcoming events"</span>
+            </ScrollArea>
+            
+            {/* Input Area */}
+            <div className="border-t border-orange-200/50 bg-white/50 backdrop-blur-sm p-4">
+              <div className="max-w-4xl mx-auto">
+                <div className="flex gap-2 md:gap-3">
+                  <Input
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Ask about courses, events, or get learning advice..."
+                    className="flex-1 border-orange-200 focus:border-orange-400 bg-white/80 backdrop-blur-sm rounded-xl transition-all duration-300 focus:ring-2 focus:ring-orange-500/20 text-sm md:text-base"
+                    disabled={isLoading}
+                  />
+                  <Button
+                    onClick={handleSendMessage}
+                    disabled={isLoading || !inputMessage.trim()}
+                    className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 rounded-xl flex-shrink-0"
+                    size="icon"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                {/* Quick Action Tips */}
+                <div className="text-xs text-gray-500 mt-2 text-center flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-3">
+                  <div className="flex items-center gap-1">
+                    <Sparkles className="h-3 w-3 text-orange-500" />
+                    <span className="hidden xs:inline">Try: "Show me web development courses"</span>
+                    <span className="xs:hidden">"Web development courses"</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3 text-purple-500" />
+                    <span className="hidden xs:inline">Or: "Upcoming events near me"</span>
+                    <span className="xs:hidden">"Upcoming events"</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </CardContent>
+        </div>
       </Card>
     </div>
   );
