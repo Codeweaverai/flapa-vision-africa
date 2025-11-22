@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Send, Sparkles, Bot, User, BookOpen, Calendar, Clock, Users, Star, MapPin, Play, ArrowRight, Zap, Trash2, MessageSquare, Plus, Menu } from 'lucide-react';
+import { Send, Sparkles, Bot, User, BookOpen, Calendar, Clock, Users, Star, MapPin, Play, ArrowRight, Zap, Trash2, MessageSquare, Plus, Menu, History, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -81,6 +81,17 @@ interface ConversationThread {
   is_active: boolean;
 }
 
+interface StoredRecommendation {
+  id: string;
+  thread_id: string;
+  user_id: string;
+  recommendation_type: 'course' | 'event';
+  item_id: string;
+  item_data: any;
+  reason: string;
+  created_at: string;
+}
+
 // Updated Course Card Component - Removed "by Instructor"
 const CourseRecommendationCard = ({ course, onCourseClick }: { course: any; onCourseClick: (id: string) => void }) => {
   return (
@@ -142,13 +153,13 @@ const CourseRecommendationCard = ({ course, onCourseClick }: { course: any; onCo
 
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-        <span className={cn(
-           "font-bold text-lg",
-      course.is_free ? "bg-gradient-to-r from-green-500 to-emerald-600 bg-clip-text text-transparent" : "text-gray-900"
-       )}>
-       {course.is_free ? 'Free' : <PriceDisplay amount={course.price} originalCurrency="USD" />}
-        </span>
-         </div>
+            <span className={cn(
+              "font-bold text-lg",
+              course.is_free ? "bg-gradient-to-r from-green-500 to-emerald-600 bg-clip-text text-transparent" : "text-gray-900"
+            )}>
+              {course.is_free ? 'Free' : <PriceDisplay amount={course.price} originalCurrency="USD" />}
+            </span>
+          </div>
           <Button size="sm" className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white text-xs">
             Enroll Now
           </Button>
@@ -158,7 +169,7 @@ const CourseRecommendationCard = ({ course, onCourseClick }: { course: any; onCo
   );
 };
 
-// Event Card Component (unchanged)
+// Event Card Component
 const EventRecommendationCard = ({ event, onEventClick }: { event: any; onEventClick: (id: string) => void }) => {
   const eventDate = new Date(event.start_time);
   const isUpcoming = eventDate > new Date();
@@ -222,13 +233,13 @@ const EventRecommendationCard = ({ event, onEventClick }: { event: any; onEventC
 
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-  <span className={cn(
-    "font-bold text-lg",
-    event.is_free ? "bg-gradient-to-r from-green-500 to-emerald-600 bg-clip-text text-transparent" : "text-gray-900"
-  )}>
-    {event.is_free ? 'Free' : `From ${<PriceDisplay amount={event.minPrice} originalCurrency="USD" />}`}
-  </span>
-</div>
+            <span className={cn(
+              "font-bold text-lg",
+              event.is_free ? "bg-gradient-to-r from-green-500 to-emerald-600 bg-clip-text text-transparent" : "text-gray-900"
+            )}>
+              {event.is_free ? 'Free' : <>From <PriceDisplay amount={event.minPrice} originalCurrency="USD" /></>}
+            </span>
+          </div>
           <Button size="sm" className="bg-gradient-to-r from-purple-500 to-orange-600 hover:from-purple-600 hover:to-orange-700 text-white text-xs">
             {isUpcoming ? 'Register' : 'Join Now'}
           </Button>
@@ -238,19 +249,152 @@ const EventRecommendationCard = ({ event, onEventClick }: { event: any; onEventC
   );
 };
 
+// Past Recommendations Panel Component
+const PastRecommendationsPanel = ({ 
+  recommendations, 
+  onClose, 
+  onCourseClick, 
+  onEventClick 
+}: {
+  recommendations: StoredRecommendation[];
+  onClose: () => void;
+  onCourseClick: (id: string) => void;
+  onEventClick: (id: string) => void;
+}) => {
+  const courseRecommendations = recommendations.filter(rec => rec.recommendation_type === 'course');
+  const eventRecommendations = recommendations.filter(rec => rec.recommendation_type === 'event');
+
+  return (
+    <div className="w-80 bg-white/95 backdrop-blur-sm border-l border-orange-200/50 flex flex-col h-full">
+      <div className="p-4 border-b border-orange-200/50 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <History className="h-5 w-5 text-orange-500" />
+          <h3 className="font-semibold text-gray-900">Past Recommendations</h3>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
+          className="h-8 w-8"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <ScrollArea className="flex-1 p-4">
+        <div className="space-y-6">
+          {courseRecommendations.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                <BookOpen className="h-4 w-4 text-orange-500" />
+                Courses ({courseRecommendations.length})
+              </div>
+              <div className="space-y-3">
+                {courseRecommendations.map((recommendation) => (
+                  <Card 
+                    key={recommendation.id}
+                    className="cursor-pointer bg-white border border-orange-200/50 hover:border-orange-300 transition-all duration-300 hover:shadow-md"
+                    onClick={() => onCourseClick(recommendation.item_data.id)}
+                  >
+                    <CardContent className="p-3">
+                      <h4 className="font-medium text-gray-900 text-sm line-clamp-2 mb-2">
+                        {recommendation.item_data.title}
+                      </h4>
+                      <div className="flex items-center justify-between text-xs text-gray-600">
+                        <Badge variant="outline" className="text-xs">
+                          {recommendation.item_data.category}
+                        </Badge>
+                        <span className="font-medium">
+                          {recommendation.item_data.is_free ? 'Free' : <PriceDisplay amount={recommendation.item_data.price} originalCurrency="USD" />}
+                        </span>
+                      </div>
+                      {recommendation.reason && (
+                        <p className="text-xs text-gray-500 mt-2 line-clamp-2">
+                          {recommendation.reason}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-2">
+                        <Clock className="h-3 w-3" />
+                        <span>{new Date(recommendation.created_at).toLocaleDateString()}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {eventRecommendations.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                <Calendar className="h-4 w-4 text-purple-500" />
+                Events ({eventRecommendations.length})
+              </div>
+              <div className="space-y-3">
+                {eventRecommendations.map((recommendation) => (
+                  <Card 
+                    key={recommendation.id}
+                    className="cursor-pointer bg-white border border-purple-200/50 hover:border-purple-300 transition-all duration-300 hover:shadow-md"
+                    onClick={() => onEventClick(recommendation.item_data.id)}
+                  >
+                    <CardContent className="p-3">
+                      <h4 className="font-medium text-gray-900 text-sm line-clamp-2 mb-2">
+                        {recommendation.item_data.title}
+                      </h4>
+                      <div className="flex items-center justify-between text-xs text-gray-600">
+                        <Badge variant="outline" className="text-xs">
+                          {recommendation.item_data.event_type}
+                        </Badge>
+                        <span className="font-medium">
+                          {recommendation.item_data.is_free ? 'Free' : <>From <PriceDisplay amount={recommendation.item_data.minPrice} originalCurrency="USD" /></>}
+                        </span>
+                      </div>
+                      {recommendation.reason && (
+                        <p className="text-xs text-gray-500 mt-2 line-clamp-2">
+                          {recommendation.reason}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-2">
+                        <Clock className="h-3 w-3" />
+                        <span>{new Date(recommendation.created_at).toLocaleDateString()}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {recommendations.length === 0 && (
+            <div className="text-center text-gray-500 py-8">
+              <History className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+              <p className="text-sm">No recommendations yet</p>
+              <p className="text-xs mt-1">Start a conversation to get recommendations!</p>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+};
+
 // Conversation Sidebar Component
 const ConversationSidebar = ({ 
   threads, 
   currentThreadId, 
   onThreadSelect, 
   onNewConversation, 
-  onDeleteThread 
+  onDeleteThread,
+  onShowRecommendations,
+  pastRecommendationsCount
 }: {
   threads: ConversationThread[];
   currentThreadId: string | null;
   onThreadSelect: (threadId: string) => void;
   onNewConversation: () => void;
   onDeleteThread: (threadId: string, event: React.MouseEvent) => void;
+  onShowRecommendations: () => void;
+  pastRecommendationsCount: number;
 }) => {
   return (
     <div className="w-64 bg-white/90 backdrop-blur-sm border-r border-orange-200/50 flex flex-col h-full">
@@ -299,6 +443,24 @@ const ConversationSidebar = ({
           ))}
         </div>
       </ScrollArea>
+
+      {/* Past Recommendations Button */}
+      <div className="p-4 border-t border-orange-200/50">
+        <Button
+          variant="outline"
+          className="w-full justify-start"
+          onClick={onShowRecommendations}
+          disabled={pastRecommendationsCount === 0}
+        >
+          <History className="h-4 w-4 mr-2" />
+          View Past Recommendations
+          {pastRecommendationsCount > 0 && (
+            <Badge variant="secondary" className="ml-auto">
+              {pastRecommendationsCount}
+            </Badge>
+          )}
+        </Button>
+      </div>
     </div>
   );
 };
@@ -311,6 +473,8 @@ const AiChatComponent = () => {
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showPastRecommendations, setShowPastRecommendations] = useState(false);
+  const [pastRecommendations, setPastRecommendations] = useState<StoredRecommendation[]>([]);
   const { user } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -322,11 +486,37 @@ const AiChatComponent = () => {
     if (user) {
       loadConversationThreads();
     } else {
-      // For anonymous users, show welcome message
       setMessages([getWelcomeMessage()]);
       setIsLoadingHistory(false);
     }
   }, [user]);
+
+  // Load past recommendations when thread changes
+  useEffect(() => {
+    if (currentThreadId && user) {
+      loadPastRecommendations();
+    }
+  }, [currentThreadId, user]);
+
+  // Load past recommendations for the current thread
+  const loadPastRecommendations = async () => {
+    if (!currentThreadId || !user) return;
+
+    try {
+      const { data: recommendations, error } = await supabase
+        .from('conversation_recommendations')
+        .select('*')
+        .eq('thread_id', currentThreadId)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      setPastRecommendations(recommendations || []);
+    } catch (error) {
+      console.error('Error loading past recommendations:', error);
+    }
+  };
 
   // Load conversation threads for the user
   const loadConversationThreads = async () => {
@@ -344,7 +534,6 @@ const AiChatComponent = () => {
 
       setConversationThreads(threads || []);
 
-      // Load the most recent thread or create a new one
       if (threads && threads.length > 0) {
         await loadThreadMessages(threads[0].id);
       } else {
@@ -399,7 +588,6 @@ const AiChatComponent = () => {
 
       if (error) throw error;
 
-      // Convert database messages to AiMessage format
       const formattedMessages: AiMessage[] = messages.map(msg => ({
         id: msg.id,
         role: msg.role as 'user' | 'assistant',
@@ -412,7 +600,6 @@ const AiChatComponent = () => {
         followUpQuestions: msg.metadata?.followUpQuestions
       }));
 
-      // If no messages, add welcome message
       if (formattedMessages.length === 0) {
         formattedMessages.push(getWelcomeMessage());
       }
@@ -420,7 +607,6 @@ const AiChatComponent = () => {
       setMessages(formattedMessages);
       setCurrentThreadId(threadId);
       
-      // Set flag to scroll to bottom on initial load
       isInitialLoad.current = true;
       shouldScrollToBottom.current = true;
     } catch (error) {
@@ -438,7 +624,8 @@ const AiChatComponent = () => {
     followUpQuestions: [
       "What courses do you recommend for web development?",
       "Show me upcoming events in my area",
-      "Help me choose my next learning path"
+      "Help me choose my next learning path",
+      "Show my past recommendations"
     ]
   });
 
@@ -455,12 +642,10 @@ const AiChatComponent = () => {
       }
     };
 
-    // Use requestAnimationFrame for smoother scrolling
     requestAnimationFrame(() => {
       setTimeout(scrollToBottom, 100);
     });
 
-    // Reset initial load flag after first render
     if (isInitialLoad.current) {
       isInitialLoad.current = false;
     }
@@ -472,7 +657,6 @@ const AiChatComponent = () => {
       const scrollElement = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
       if (scrollElement) {
         const { scrollTop, scrollHeight, clientHeight } = scrollElement;
-        // If user is near the bottom (within 100px), auto-scroll to bottom
         shouldScrollToBottom.current = scrollHeight - scrollTop - clientHeight < 100;
       }
     }
@@ -481,6 +665,17 @@ const AiChatComponent = () => {
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
 
+    // Check if user is asking for past recommendations
+    if (inputMessage.toLowerCase().includes('past recommendation') || 
+        inputMessage.toLowerCase().includes('previous recommendation') ||
+        inputMessage.toLowerCase().includes('show my recommendation') ||
+        inputMessage.toLowerCase().includes('history') ||
+        inputMessage.toLowerCase().includes('what did you recommend')) {
+      setShowPastRecommendations(true);
+      setInputMessage('');
+      return;
+    }
+
     const userMessage: AiMessage = {
       id: `temp-${Date.now()}`,
       role: 'user',
@@ -488,7 +683,6 @@ const AiChatComponent = () => {
       timestamp: new Date()
     };
 
-    // Force scroll to bottom when user sends a message
     shouldScrollToBottom.current = true;
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
@@ -521,7 +715,6 @@ const AiChatComponent = () => {
         followUpQuestions: data.followUpQuestions
       };
 
-      // Force scroll to bottom when AI responds
       shouldScrollToBottom.current = true;
       setMessages(prev => [...prev, assistantMessage]);
 
@@ -532,6 +725,11 @@ const AiChatComponent = () => {
           .from('conversation_threads')
           .update({ title, updated_at: new Date().toISOString() })
           .eq('id', currentThreadId);
+      }
+
+      // Reload past recommendations to include new ones
+      if (data.recommendations && (data.recommendations.courses?.length > 0 || data.recommendations.events?.length > 0)) {
+        await loadPastRecommendations();
       }
     } catch (error) {
       console.error('AI chat error:', error);
@@ -567,7 +765,6 @@ const AiChatComponent = () => {
 
       setConversationThreads(prev => prev.filter(thread => thread.id !== threadId));
       
-      // If we deleted the current thread, switch to the most recent one or create new
       if (threadId === currentThreadId) {
         if (conversationThreads.length > 1) {
           const nextThread = conversationThreads.find(thread => thread.id !== threadId);
@@ -673,6 +870,8 @@ const AiChatComponent = () => {
               onThreadSelect={loadThreadMessages}
               onNewConversation={handleNewConversation}
               onDeleteThread={handleDeleteThread}
+              onShowRecommendations={() => setShowPastRecommendations(true)}
+              pastRecommendationsCount={pastRecommendations.length}
             />
           )}
           
@@ -864,14 +1063,24 @@ const AiChatComponent = () => {
                     <span className="xs:hidden">"Web development courses"</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3 text-purple-500" />
-                    <span className="hidden xs:inline">Or: "Upcoming events near me"</span>
-                    <span className="xs:hidden">"Upcoming events"</span>
+                    <History className="h-3 w-3 text-purple-500" />
+                    <span className="hidden xs:inline">Or: "Show my past recommendations"</span>
+                    <span className="xs:hidden">"Past recommendations"</span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
+
+          {/* Past Recommendations Panel */}
+          {showPastRecommendations && user && (
+            <PastRecommendationsPanel
+              recommendations={pastRecommendations}
+              onClose={() => setShowPastRecommendations(false)}
+              onCourseClick={handleCourseClick}
+              onEventClick={handleEventClick}
+            />
+          )}
         </div>
       </Card>
     </div>
