@@ -568,7 +568,7 @@ const AiChatComponent = () => {
   }
 
   return (
-    <div className="h-[calc(100vh-180px)] min-h-[550px] max-h-[750px] lg:max-h-[850px]"> {/* Reduced overall height */}
+    <div className="h-[calc(100vh-180px)] min-h-[500px] max-h-[650px] lg:max-h-[750px]"> {/* Reduced overall height */}
       <Card className="h-full bg-gradient-to-br from-orange-50/80 via-purple-50/80 to-pink-50/80 backdrop-blur-sm border border-orange-200/30 shadow-2xl">
         {/* Reduced header height with compact padding */}
         <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white relative overflow-hidden py-4 px-4 md:px-6">
