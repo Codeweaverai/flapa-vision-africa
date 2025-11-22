@@ -80,7 +80,7 @@ interface ConversationThread {
   is_active: boolean;
 }
 
-// Course Card Component (unchanged)
+// Updated Course Card Component - Removed "by Instructor"
 const CourseRecommendationCard = ({ course, onCourseClick }: { course: any; onCourseClick: (id: string) => void }) => {
   return (
     <Card 
@@ -119,21 +119,12 @@ const CourseRecommendationCard = ({ course, onCourseClick }: { course: any; onCo
       </div>
 
       <CardContent className="p-4">
-        <h4 className="font-bold text-gray-900 line-clamp-2 mb-2 group-hover:text-orange-600 transition-colors">
+        <h4 className="font-bold text-gray-900 line-clamp-2 mb-3 group-hover:text-orange-600 transition-colors">
           {course.title}
         </h4>
-        
-        <div className="flex items-center gap-2 mb-3">
-          <Avatar className="h-6 w-6 border border-orange-200">
-            <AvatarImage src={course.creator_avatar} alt={course.creator_name} />
-            <AvatarFallback className="bg-gradient-to-r from-orange-400 to-purple-500 text-white text-xs">
-              {course.creator_name?.charAt(0).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <span className="text-xs text-gray-600 font-medium">by {course.creator_name}</span>
-        </div>
 
-        <div className="flex items-center justify-between text-xs text-gray-600 mb-3">
+        {/* Course Stats - Removed creator section */}
+        <div className="flex items-center justify-between text-xs text-gray-600 mb-4">
           <div className="flex items-center gap-1">
             <Clock className="h-3 w-3 text-orange-500" />
             <span>{course._ui?.duration || `${Math.floor(course.duration_minutes / 60)}h ${course.duration_minutes % 60}m`}</span>
@@ -536,260 +527,262 @@ const AiChatComponent = () => {
   }
 
   return (
-    <Card className="h-full bg-gradient-to-br from-orange-50/80 via-purple-50/80 to-pink-50/80 backdrop-blur-sm border border-orange-200/30 shadow-2xl">
-      <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute -top-4 -left-4 w-8 h-8 bg-white rounded-full animate-pulse"></div>
-          <div className="absolute -bottom-4 -right-4 w-12 h-12 bg-white rounded-full animate-pulse" style={{ animationDelay: '1s' }}></div>
-        </div>
-        
-        <div className="flex items-center gap-3 relative z-10">
-          <div className="p-2 bg-white/20 rounded-full backdrop-blur-sm">
-            <Bot className="h-6 w-6" />
-          </div>
-          <div className="flex-1">
-            <CardTitle className="text-xl flex items-center gap-2">
-              AI Smart Advisor 
-              <Sparkles className="h-5 w-5 text-yellow-300 animate-pulse" />
-            </CardTitle>
-            <p className="text-sm opacity-90 font-light">
-              {user ? 'Personalized recommendations based on your learning journey' : 'Ask me about courses, events, and learning paths'}
-            </p>
-          </div>
-          <div className="px-3 py-1 bg-white/20 rounded-full backdrop-blur-sm">
-            <Zap className="h-4 w-4 text-yellow-300 animate-bounce" />
-          </div>
-        </div>
-
-        {/* Conversation History Sidebar */}
-        {user && conversationThreads.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-white/20">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">Your Conversations</span>
-              <Button
-                size="sm"
-                onClick={handleNewConversation}
-                className="bg-white/20 hover:bg-white/30 text-white text-xs"
-              >
-                <MessageSquare className="h-3 w-3 mr-1" />
-                New
-              </Button>
-            </div>
-            <ScrollArea className="h-20">
-              <div className="flex gap-2">
-                {conversationThreads.map((thread) => (
-                  <Badge
-                    key={thread.id}
-                    variant={currentThreadId === thread.id ? "default" : "secondary"}
-                    className={cn(
-                      "cursor-pointer transition-all duration-300 text-xs font-normal px-3 py-1 flex items-center gap-1",
-                      currentThreadId === thread.id 
-                        ? "bg-white text-orange-600" 
-                        : "bg-white/20 text-white hover:bg-white/30"
-                    )}
-                    onClick={() => loadThreadMessages(thread.id)}
-                  >
-                    {thread.title}
-                    <Trash2 
-                      className="h-3 w-3 ml-1 opacity-70 hover:opacity-100" 
-                      onClick={(e) => handleDeleteThread(thread.id, e)}
-                    />
-                  </Badge>
-                ))}
-              </div>
-            </ScrollArea>
-          </div>
-        )}
-      </CardHeader>
-      
-      <CardContent className="p-0 flex flex-col h-[600px]">
-        <ScrollArea className="flex-1 p-6" ref={scrollAreaRef}>
-          <div className="space-y-6">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={cn(
-                  "flex items-start gap-4 transition-all duration-300",
-                  message.role === 'user' ? 'flex-row-reverse' : ''
-                )}
-              >
-                <Avatar className={cn(
-                  "w-10 h-10 flex-shrink-0 transition-all duration-300",
-                  message.role === 'user' 
-                    ? 'bg-gradient-to-r from-purple-500 to-orange-500 shadow-lg' 
-                    : 'bg-gradient-to-r from-orange-500 to-purple-500 shadow-lg'
-                )}>
-                  <AvatarFallback className="bg-transparent text-white">
-                    {message.role === 'user' ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
-                  </AvatarFallback>
-                </Avatar>
-                
-                <div className={cn(
-                  "flex-1 max-w-[85%] space-y-3",
-                  message.role === 'user' ? 'text-right' : ''
-                )}>
-                  {/* Message Bubble */}
-                  <div
-                    className={cn(
-                      "rounded-2xl p-4 transition-all duration-300",
-                      message.role === 'user'
-                        ? 'bg-gradient-to-r from-purple-500 to-orange-500 text-white shadow-xl ml-auto'
-                        : 'bg-white/90 backdrop-blur-sm text-gray-900 shadow-lg border border-orange-100'
-                    )}
-                  >
-                    <div className="text-sm leading-relaxed whitespace-pre-wrap">
-                      {formatMessageContent(message.content)}
-                    </div>
-                  </div>
-
-                  {/* Recommendations Grid */}
-                  {message.role === 'assistant' && message.recommendations && (
-                    <div className="space-y-4">
-                      {/* Course Recommendations */}
-                      {message.recommendations.courses && message.recommendations.courses.length > 0 && (
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                            <BookOpen className="h-4 w-4 text-orange-500" />
-                            Recommended Courses
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {message.recommendations.courses.map((course) => (
-                              <CourseRecommendationCard
-                                key={course.id}
-                                course={course}
-                                onCourseClick={handleCourseClick}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Event Recommendations */}
-                      {message.recommendations.events && message.recommendations.events.length > 0 && (
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                            <Calendar className="h-4 w-4 text-purple-500" />
-                            Upcoming Events
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {message.recommendations.events.map((event) => (
-                              <EventRecommendationCard
-                                key={event.id}
-                                event={event}
-                                onEventClick={handleEventClick}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Follow-up Questions */}
-                  {message.role === 'assistant' && message.followUpQuestions && message.followUpQuestions.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="text-xs text-gray-500 font-medium">Quick questions:</div>
-                      <div className="flex flex-wrap gap-2">
-                        {message.followUpQuestions.map((question, index) => (
-                          <Badge
-                            key={index}
-                            variant="secondary"
-                            className="cursor-pointer bg-white/80 hover:bg-gradient-to-r hover:from-orange-500 hover:to-purple-600 hover:text-white transition-all duration-300 border border-orange-200 text-xs font-normal px-3 py-1"
-                            onClick={() => handleQuickQuestion(question)}
-                          >
-                            {question}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Next Steps */}
-                  {message.role === 'assistant' && message.nextSteps && message.nextSteps.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="text-xs text-gray-500 font-medium">Next steps:</div>
-                      <div className="space-y-1">
-                        {message.nextSteps.map((step, index) => (
-                          <div key={index} className="flex items-center gap-2 text-sm text-gray-700">
-                            <ArrowRight className="h-3 w-3 text-orange-500" />
-                            {step}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Timestamp */}
-                  <div className={cn(
-                    "text-xs text-gray-500 transition-opacity duration-300",
-                    message.role === 'user' ? 'text-right' : ''
-                  )}>
-                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                </div>
-              </div>
-            ))}
-            
-            {/* Loading Indicator */}
-            {isLoading && (
-              <div className="flex items-start gap-4">
-                <Avatar className="w-10 h-10 bg-gradient-to-r from-orange-500 to-purple-500 shadow-lg">
-                  <AvatarFallback className="bg-transparent text-white">
-                    <Bot className="w-5 h-5" />
-                  </AvatarFallback>
-                </Avatar>
-                <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-orange-100 max-w-[85%]">
-                  <div className="flex items-center gap-3">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    </div>
-                    <span className="text-sm text-gray-600 font-medium">Finding the best recommendations for you...</span>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            <div ref={messagesEndRef} />
-          </div>
-        </ScrollArea>
-        
-        {/* Input Area */}
-        <div className="border-t border-orange-200/50 bg-white/50 backdrop-blur-sm p-4">
-          <div className="flex gap-3">
-            <Input
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Ask about courses, events, or get learning advice..."
-              className="flex-1 border-orange-200 focus:border-orange-400 bg-white/80 backdrop-blur-sm rounded-xl transition-all duration-300 focus:ring-2 focus:ring-orange-500/20"
-              disabled={isLoading}
-            />
-            <Button
-              onClick={handleSendMessage}
-              disabled={isLoading || !inputMessage.trim()}
-              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 rounded-xl"
-              size="icon"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
+    <div className="h-[calc(100vh-200px)] min-h-[600px] max-h-[800px]"> {/* Fixed height container */}
+      <Card className="h-full bg-gradient-to-br from-orange-50/80 via-purple-50/80 to-pink-50/80 backdrop-blur-sm border border-orange-200/30 shadow-2xl">
+        <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white relative overflow-hidden">
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute -top-4 -left-4 w-8 h-8 bg-white rounded-full animate-pulse"></div>
+            <div className="absolute -bottom-4 -right-4 w-12 h-12 bg-white rounded-full animate-pulse" style={{ animationDelay: '1s' }}></div>
           </div>
           
-          {/* Quick Action Tips */}
-          <div className="text-xs text-gray-500 mt-3 text-center flex items-center justify-center gap-4">
-            <div className="flex items-center gap-1">
-              <Sparkles className="h-3 w-3 text-orange-500" />
-              <span>Try: "Show me web development courses"</span>
+          <div className="flex items-center gap-3 relative z-10">
+            <div className="p-2 bg-white/20 rounded-full backdrop-blur-sm">
+              <Bot className="h-6 w-6" />
             </div>
-            <div className="flex items-center gap-1">
-              <Calendar className="h-3 w-3 text-purple-500" />
-              <span>Or: "Upcoming events near me"</span>
+            <div className="flex-1">
+              <CardTitle className="text-xl flex items-center gap-2">
+                AI Smart Advisor 
+                <Sparkles className="h-5 w-5 text-yellow-300 animate-pulse" />
+              </CardTitle>
+              <p className="text-sm opacity-90 font-light">
+                {user ? 'Personalized recommendations based on your learning journey' : 'Ask me about courses, events, and learning paths'}
+              </p>
+            </div>
+            <div className="px-3 py-1 bg-white/20 rounded-full backdrop-blur-sm">
+              <Zap className="h-4 w-4 text-yellow-300 animate-bounce" />
             </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+
+          {/* Conversation History Sidebar */}
+          {user && conversationThreads.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-white/20">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium">Your Conversations</span>
+                <Button
+                  size="sm"
+                  onClick={handleNewConversation}
+                  className="bg-white/20 hover:bg-white/30 text-white text-xs"
+                >
+                  <MessageSquare className="h-3 w-3 mr-1" />
+                  New
+                </Button>
+              </div>
+              <ScrollArea className="h-20">
+                <div className="flex gap-2">
+                  {conversationThreads.map((thread) => (
+                    <Badge
+                      key={thread.id}
+                      variant={currentThreadId === thread.id ? "default" : "secondary"}
+                      className={cn(
+                        "cursor-pointer transition-all duration-300 text-xs font-normal px-3 py-1 flex items-center gap-1",
+                        currentThreadId === thread.id 
+                          ? "bg-white text-orange-600" 
+                          : "bg-white/20 text-white hover:bg-white/30"
+                      )}
+                      onClick={() => loadThreadMessages(thread.id)}
+                    >
+                      {thread.title}
+                      <Trash2 
+                        className="h-3 w-3 ml-1 opacity-70 hover:opacity-100" 
+                        onClick={(e) => handleDeleteThread(thread.id, e)}
+                      />
+                    </Badge>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+        </CardHeader>
+        
+        <CardContent className="p-0 flex flex-col h-full"> {/* Changed to h-full */}
+          <ScrollArea className="flex-1 p-6" ref={scrollAreaRef}>
+            <div className="space-y-6">
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={cn(
+                    "flex items-start gap-4 transition-all duration-300",
+                    message.role === 'user' ? 'flex-row-reverse' : ''
+                  )}
+                >
+                  <Avatar className={cn(
+                    "w-10 h-10 flex-shrink-0 transition-all duration-300",
+                    message.role === 'user' 
+                      ? 'bg-gradient-to-r from-purple-500 to-orange-500 shadow-lg' 
+                      : 'bg-gradient-to-r from-orange-500 to-purple-500 shadow-lg'
+                  )}>
+                    <AvatarFallback className="bg-transparent text-white">
+                      {message.role === 'user' ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
+                    </AvatarFallback>
+                  </Avatar>
+                  
+                  <div className={cn(
+                    "flex-1 max-w-[85%] space-y-3",
+                    message.role === 'user' ? 'text-right' : ''
+                  )}>
+                    {/* Message Bubble */}
+                    <div
+                      className={cn(
+                        "rounded-2xl p-4 transition-all duration-300",
+                        message.role === 'user'
+                          ? 'bg-gradient-to-r from-purple-500 to-orange-500 text-white shadow-xl ml-auto'
+                          : 'bg-white/90 backdrop-blur-sm text-gray-900 shadow-lg border border-orange-100'
+                      )}
+                    >
+                      <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                        {formatMessageContent(message.content)}
+                      </div>
+                    </div>
+
+                    {/* Recommendations Grid */}
+                    {message.role === 'assistant' && message.recommendations && (
+                      <div className="space-y-4">
+                        {/* Course Recommendations */}
+                        {message.recommendations.courses && message.recommendations.courses.length > 0 && (
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                              <BookOpen className="h-4 w-4 text-orange-500" />
+                              Recommended Courses
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {message.recommendations.courses.map((course) => (
+                                <CourseRecommendationCard
+                                  key={course.id}
+                                  course={course}
+                                  onCourseClick={handleCourseClick}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Event Recommendations */}
+                        {message.recommendations.events && message.recommendations.events.length > 0 && (
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                              <Calendar className="h-4 w-4 text-purple-500" />
+                              Upcoming Events
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {message.recommendations.events.map((event) => (
+                                <EventRecommendationCard
+                                  key={event.id}
+                                  event={event}
+                                  onEventClick={handleEventClick}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Follow-up Questions */}
+                    {message.role === 'assistant' && message.followUpQuestions && message.followUpQuestions.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="text-xs text-gray-500 font-medium">Quick questions:</div>
+                        <div className="flex flex-wrap gap-2">
+                          {message.followUpQuestions.map((question, index) => (
+                            <Badge
+                              key={index}
+                              variant="secondary"
+                              className="cursor-pointer bg-white/80 hover:bg-gradient-to-r hover:from-orange-500 hover:to-purple-600 hover:text-white transition-all duration-300 border border-orange-200 text-xs font-normal px-3 py-1"
+                              onClick={() => handleQuickQuestion(question)}
+                            >
+                              {question}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Next Steps */}
+                    {message.role === 'assistant' && message.nextSteps && message.nextSteps.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="text-xs text-gray-500 font-medium">Next steps:</div>
+                        <div className="space-y-1">
+                          {message.nextSteps.map((step, index) => (
+                            <div key={index} className="flex items-center gap-2 text-sm text-gray-700">
+                              <ArrowRight className="h-3 w-3 text-orange-500" />
+                              {step}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Timestamp */}
+                    <div className={cn(
+                      "text-xs text-gray-500 transition-opacity duration-300",
+                      message.role === 'user' ? 'text-right' : ''
+                    )}>
+                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              {/* Loading Indicator */}
+              {isLoading && (
+                <div className="flex items-start gap-4">
+                  <Avatar className="w-10 h-10 bg-gradient-to-r from-orange-500 to-purple-500 shadow-lg">
+                    <AvatarFallback className="bg-transparent text-white">
+                      <Bot className="w-5 h-5" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-orange-100 max-w-[85%]">
+                    <div className="flex items-center gap-3">
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      </div>
+                      <span className="text-sm text-gray-600 font-medium">Finding the best recommendations for you...</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div ref={messagesEndRef} />
+            </div>
+          </ScrollArea>
+          
+          {/* Input Area */}
+          <div className="border-t border-orange-200/50 bg-white/50 backdrop-blur-sm p-4">
+            <div className="flex gap-3">
+              <Input
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Ask about courses, events, or get learning advice..."
+                className="flex-1 border-orange-200 focus:border-orange-400 bg-white/80 backdrop-blur-sm rounded-xl transition-all duration-300 focus:ring-2 focus:ring-orange-500/20"
+                disabled={isLoading}
+              />
+              <Button
+                onClick={handleSendMessage}
+                disabled={isLoading || !inputMessage.trim()}
+                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 rounded-xl"
+                size="icon"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            {/* Quick Action Tips */}
+            <div className="text-xs text-gray-500 mt-3 text-center flex items-center justify-center gap-4">
+              <div className="flex items-center gap-1">
+                <Sparkles className="h-3 w-3 text-orange-500" />
+                <span>Try: "Show me web development courses"</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Calendar className="h-3 w-3 text-purple-500" />
+                <span>Or: "Upcoming events near me"</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
