@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Send, Sparkles, Bot, User, BookOpen, Calendar, Clock, Users, Star, MapPin, Play, ArrowRight, Zap } from 'lucide-react';
+import { Send, Sparkles, Bot, User, BookOpen, Calendar, Clock, Users, Star, MapPin, Play, ArrowRight, Zap, Trash2, MessageSquare } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -72,7 +72,15 @@ interface AiMessage {
   followUpQuestions?: string[];
 }
 
-// Course Card Component
+interface ConversationThread {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  is_active: boolean;
+}
+
+// Course Card Component (unchanged)
 const CourseRecommendationCard = ({ course, onCourseClick }: { course: any; onCourseClick: (id: string) => void }) => {
   return (
     <Card 
@@ -92,10 +100,8 @@ const CourseRecommendationCard = ({ course, onCourseClick }: { course: any; onCo
           </div>
         )}
         
-        {/* Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         
-        {/* Badges */}
         <div className="absolute top-3 left-3 right-3 flex justify-between">
           <Badge className="bg-white/90 text-gray-700 backdrop-blur-sm font-medium text-xs">
             {course.category}
@@ -105,7 +111,6 @@ const CourseRecommendationCard = ({ course, onCourseClick }: { course: any; onCo
           </Badge>
         </div>
 
-        {/* Play Button Overlay */}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
           <div className="bg-gradient-to-r from-orange-500 to-purple-600 rounded-full p-3 shadow-2xl transform group-hover:scale-110 transition-transform duration-300">
             <Play className="h-6 w-6 text-white fill-current" />
@@ -118,7 +123,6 @@ const CourseRecommendationCard = ({ course, onCourseClick }: { course: any; onCo
           {course.title}
         </h4>
         
-        {/* Creator Info */}
         <div className="flex items-center gap-2 mb-3">
           <Avatar className="h-6 w-6 border border-orange-200">
             <AvatarImage src={course.creator_avatar} alt={course.creator_name} />
@@ -129,7 +133,6 @@ const CourseRecommendationCard = ({ course, onCourseClick }: { course: any; onCo
           <span className="text-xs text-gray-600 font-medium">by {course.creator_name}</span>
         </div>
 
-        {/* Course Stats */}
         <div className="flex items-center justify-between text-xs text-gray-600 mb-3">
           <div className="flex items-center gap-1">
             <Clock className="h-3 w-3 text-orange-500" />
@@ -145,7 +148,6 @@ const CourseRecommendationCard = ({ course, onCourseClick }: { course: any; onCo
           </div>
         </div>
 
-        {/* Price */}
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <span className={cn(
@@ -164,7 +166,7 @@ const CourseRecommendationCard = ({ course, onCourseClick }: { course: any; onCo
   );
 };
 
-// Event Card Component
+// Event Card Component (unchanged)
 const EventRecommendationCard = ({ event, onEventClick }: { event: any; onEventClick: (id: string) => void }) => {
   const eventDate = new Date(event.start_time);
   const isUpcoming = eventDate > new Date();
@@ -187,10 +189,8 @@ const EventRecommendationCard = ({ event, onEventClick }: { event: any; onEventC
           </div>
         )}
         
-        {/* Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         
-        {/* Badges */}
         <div className="absolute top-3 left-3 right-3 flex justify-between">
           <Badge className={cn(
             "text-white border-0 font-medium text-xs",
@@ -211,7 +211,6 @@ const EventRecommendationCard = ({ event, onEventClick }: { event: any; onEventC
           {event.title}
         </h4>
 
-        {/* Event Details */}
         <div className="space-y-2 mb-3">
           <div className="flex items-center gap-2 text-xs text-gray-600">
             <Calendar className="h-3 w-3 text-purple-500" />
@@ -229,7 +228,6 @@ const EventRecommendationCard = ({ event, onEventClick }: { event: any; onEventC
           </div>
         </div>
 
-        {/* Price and Action */}
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <span className={cn(
@@ -249,25 +247,136 @@ const EventRecommendationCard = ({ event, onEventClick }: { event: any; onEventC
 };
 
 const AiChatComponent = () => {
-  const [messages, setMessages] = useState<AiMessage[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      content: "Hi! I'm your AI Smart Advisor for SkillPulse! 🚀\n\nI can help you discover personalized courses, events, and learning paths tailored to your interests. I have access to your learning history and can provide smart recommendations.\n\nWhat would you like to learn about today?",
-      timestamp: new Date(),
-      type: 'welcome',
-      followUpQuestions: [
-        "What courses do you recommend for web development?",
-        "Show me upcoming events in my area",
-        "Help me choose my next learning path"
-      ]
-    }
-  ]);
+  const [messages, setMessages] = useState<AiMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [conversationThreads, setConversationThreads] = useState<ConversationThread[]>([]);
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const { user } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  // Load conversation threads and history
+  useEffect(() => {
+    if (user) {
+      loadConversationThreads();
+    } else {
+      // For anonymous users, show welcome message
+      setMessages([getWelcomeMessage()]);
+      setIsLoadingHistory(false);
+    }
+  }, [user]);
+
+  // Load conversation threads for the user
+  const loadConversationThreads = async () => {
+    if (!user) return;
+
+    try {
+      const { data: threads, error } = await supabase
+        .from('conversation_threads')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+
+      setConversationThreads(threads || []);
+
+      // Load the most recent thread or create a new one
+      if (threads && threads.length > 0) {
+        await loadThreadMessages(threads[0].id);
+      } else {
+        await createNewThread();
+      }
+    } catch (error) {
+      console.error('Error loading conversation threads:', error);
+      toast.error('Failed to load conversation history');
+      setMessages([getWelcomeMessage()]);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  // Create a new conversation thread
+  const createNewThread = async () => {
+    if (!user) {
+      setMessages([getWelcomeMessage()]);
+      return;
+    }
+
+    try {
+      const { data: thread, error } = await supabase
+        .from('conversation_threads')
+        .insert({
+          user_id: user.id,
+          title: 'New Conversation'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setCurrentThreadId(thread.id);
+      setConversationThreads(prev => [thread, ...prev]);
+      setMessages([getWelcomeMessage()]);
+    } catch (error) {
+      console.error('Error creating new thread:', error);
+      toast.error('Failed to create new conversation');
+      setMessages([getWelcomeMessage()]);
+    }
+  };
+
+  // Load messages for a specific thread
+  const loadThreadMessages = async (threadId: string) => {
+    try {
+      const { data: messages, error } = await supabase
+        .from('conversation_messages')
+        .select('*')
+        .eq('thread_id', threadId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      // Convert database messages to AiMessage format
+      const formattedMessages: AiMessage[] = messages.map(msg => ({
+        id: msg.id,
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+        timestamp: new Date(msg.created_at),
+        recommendations: msg.metadata?.recommendations,
+        uiComponents: msg.metadata?.uiComponents,
+        type: msg.metadata?.type,
+        nextSteps: msg.metadata?.nextSteps,
+        followUpQuestions: msg.metadata?.followUpQuestions
+      }));
+
+      // If no messages, add welcome message
+      if (formattedMessages.length === 0) {
+        formattedMessages.push(getWelcomeMessage());
+      }
+
+      setMessages(formattedMessages);
+      setCurrentThreadId(threadId);
+    } catch (error) {
+      console.error('Error loading thread messages:', error);
+      toast.error('Failed to load conversation');
+    }
+  };
+
+  const getWelcomeMessage = (): AiMessage => ({
+    id: 'welcome',
+    role: 'assistant',
+    content: "Hi! I'm your AI Smart Advisor for SkillPulse! 🚀\n\nI can help you discover personalized courses, events, and learning paths tailored to your interests. I have access to your learning history and can provide smart recommendations.\n\nWhat would you like to learn about today?",
+    timestamp: new Date(),
+    type: 'welcome',
+    followUpQuestions: [
+      "What courses do you recommend for web development?",
+      "Show me upcoming events in my area",
+      "Help me choose my next learning path"
+    ]
+  });
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -278,7 +387,7 @@ const AiChatComponent = () => {
     if (!inputMessage.trim() || isLoading) return;
 
     const userMessage: AiMessage = {
-      id: Date.now().toString(),
+      id: `temp-${Date.now()}`,
       role: 'user',
       content: inputMessage,
       timestamp: new Date()
@@ -293,6 +402,7 @@ const AiChatComponent = () => {
         body: {
           message: inputMessage,
           userId: user?.id || null,
+          threadId: currentThreadId,
           conversationHistory: messages.slice(-4).map(msg => ({
             role: msg.role,
             content: msg.content
@@ -303,7 +413,7 @@ const AiChatComponent = () => {
       if (error) throw error;
 
       const assistantMessage: AiMessage = {
-        id: (Date.now() + 1).toString(),
+        id: data.messageId || `ai-${Date.now()}`,
         role: 'assistant',
         content: data.response,
         timestamp: new Date(),
@@ -315,12 +425,21 @@ const AiChatComponent = () => {
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+
+      // Update thread title if this is the first user message
+      if (messages.length === 1 && currentThreadId && user) {
+        const title = inputMessage.substring(0, 50) + (inputMessage.length > 50 ? '...' : '');
+        await supabase
+          .from('conversation_threads')
+          .update({ title, updated_at: new Date().toISOString() })
+          .eq('id', currentThreadId);
+      }
     } catch (error) {
       console.error('AI chat error:', error);
       toast.error('Failed to get response. Please try again.');
       
       const errorMessage: AiMessage = {
-        id: (Date.now() + 1).toString(),
+        id: `error-${Date.now()}`,
         role: 'assistant',
         content: "I'm sorry, I'm having trouble connecting right now. Please try again in a moment! ⚡",
         timestamp: new Date()
@@ -329,6 +448,42 @@ const AiChatComponent = () => {
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleNewConversation = async () => {
+    await createNewThread();
+  };
+
+  const handleDeleteThread = async (threadId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    
+    try {
+      const { error } = await supabase
+        .from('conversation_threads')
+        .update({ is_active: false })
+        .eq('id', threadId);
+
+      if (error) throw error;
+
+      setConversationThreads(prev => prev.filter(thread => thread.id !== threadId));
+      
+      // If we deleted the current thread, switch to the most recent one or create new
+      if (threadId === currentThreadId) {
+        if (conversationThreads.length > 1) {
+          const nextThread = conversationThreads.find(thread => thread.id !== threadId);
+          if (nextThread) {
+            await loadThreadMessages(nextThread.id);
+          } else {
+            await createNewThread();
+          }
+        } else {
+          await createNewThread();
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting thread:', error);
+      toast.error('Failed to delete conversation');
     }
   };
 
@@ -342,7 +497,6 @@ const AiChatComponent = () => {
 
   const handleQuickQuestion = (question: string) => {
     setInputMessage(question);
-    // Auto-send after a brief delay
     setTimeout(() => {
       handleSendMessage();
     }, 100);
@@ -364,10 +518,26 @@ const AiChatComponent = () => {
     ));
   };
 
+  if (isLoadingHistory) {
+    return (
+      <Card className="h-full bg-gradient-to-br from-orange-50/80 via-purple-50/80 to-pink-50/80 backdrop-blur-sm border border-orange-200/30 shadow-2xl">
+        <CardContent className="flex items-center justify-center h-64">
+          <div className="flex items-center gap-3">
+            <div className="flex space-x-1">
+              <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>
+              <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+              <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            </div>
+            <span className="text-sm text-gray-600 font-medium">Loading your conversations...</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="h-full bg-gradient-to-br from-orange-50/80 via-purple-50/80 to-pink-50/80 backdrop-blur-sm border border-orange-200/30 shadow-2xl">
       <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white relative overflow-hidden">
-        {/* Animated background elements */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute -top-4 -left-4 w-8 h-8 bg-white rounded-full animate-pulse"></div>
           <div className="absolute -bottom-4 -right-4 w-12 h-12 bg-white rounded-full animate-pulse" style={{ animationDelay: '1s' }}></div>
@@ -390,6 +560,46 @@ const AiChatComponent = () => {
             <Zap className="h-4 w-4 text-yellow-300 animate-bounce" />
           </div>
         </div>
+
+        {/* Conversation History Sidebar */}
+        {user && conversationThreads.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-white/20">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">Your Conversations</span>
+              <Button
+                size="sm"
+                onClick={handleNewConversation}
+                className="bg-white/20 hover:bg-white/30 text-white text-xs"
+              >
+                <MessageSquare className="h-3 w-3 mr-1" />
+                New
+              </Button>
+            </div>
+            <ScrollArea className="h-20">
+              <div className="flex gap-2">
+                {conversationThreads.map((thread) => (
+                  <Badge
+                    key={thread.id}
+                    variant={currentThreadId === thread.id ? "default" : "secondary"}
+                    className={cn(
+                      "cursor-pointer transition-all duration-300 text-xs font-normal px-3 py-1 flex items-center gap-1",
+                      currentThreadId === thread.id 
+                        ? "bg-white text-orange-600" 
+                        : "bg-white/20 text-white hover:bg-white/30"
+                    )}
+                    onClick={() => loadThreadMessages(thread.id)}
+                  >
+                    {thread.title}
+                    <Trash2 
+                      className="h-3 w-3 ml-1 opacity-70 hover:opacity-100" 
+                      onClick={(e) => handleDeleteThread(thread.id, e)}
+                    />
+                  </Badge>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
       </CardHeader>
       
       <CardContent className="p-0 flex flex-col h-[600px]">
