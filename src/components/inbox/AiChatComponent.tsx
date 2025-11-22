@@ -568,9 +568,10 @@ const AiChatComponent = () => {
   }
 
   return (
-    <div className="h-[calc(100vh-200px)] min-h-[600px] max-h-[800px] lg:max-h-[900px]"> {/* Improved responsive height */}
+    <div className="h-[calc(100vh-180px)] min-h-[550px] max-h-[750px] lg:max-h-[850px]"> {/* Reduced overall height */}
       <Card className="h-full bg-gradient-to-br from-orange-50/80 via-purple-50/80 to-pink-50/80 backdrop-blur-sm border border-orange-200/30 shadow-2xl">
-        <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white relative overflow-hidden">
+        {/* Reduced header height with compact padding */}
+        <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white relative overflow-hidden py-4 px-4 md:px-6">
           <div className="absolute inset-0 opacity-10">
             <div className="absolute -top-4 -left-4 w-8 h-8 bg-white rounded-full animate-pulse"></div>
             <div className="absolute -bottom-4 -right-4 w-12 h-12 bg-white rounded-full animate-pulse" style={{ animationDelay: '1s' }}></div>
@@ -578,53 +579,53 @@ const AiChatComponent = () => {
           
           <div className="flex items-center gap-3 relative z-10">
             <div className="p-2 bg-white/20 rounded-full backdrop-blur-sm">
-              <Bot className="h-6 w-6" />
+              <Bot className="h-5 w-5" /> {/* Slightly smaller icon */}
             </div>
-            <div className="flex-1">
-              <CardTitle className="text-xl flex items-center gap-2">
+            <div className="flex-1 min-w-0"> {/* Added min-w-0 for better text truncation */}
+              <CardTitle className="text-lg flex items-center gap-2"> {/* Reduced text size */}
                 AI Smart Advisor 
-                <Sparkles className="h-5 w-5 text-yellow-300 animate-pulse" />
+                <Sparkles className="h-4 w-4 text-yellow-300 animate-pulse" /> {/* Smaller sparkle */}
               </CardTitle>
-              <p className="text-sm opacity-90 font-light">
+              <p className="text-xs opacity-90 font-light truncate"> {/* Smaller text and truncate */}
                 {user ? 'Personalized recommendations based on your learning journey' : 'Ask me about courses, events, and learning paths'}
               </p>
             </div>
-            <div className="px-3 py-1 bg-white/20 rounded-full backdrop-blur-sm">
-              <Zap className="h-4 w-4 text-yellow-300 animate-bounce" />
+            <div className="px-2 py-1 bg-white/20 rounded-full backdrop-blur-sm flex-shrink-0">
+              <Zap className="h-3 w-3 text-yellow-300 animate-bounce" /> {/* Smaller zap icon */}
             </div>
           </div>
 
-          {/* Conversation History Sidebar */}
+          {/* Conversation History Sidebar - Made more compact */}
           {user && conversationThreads.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-white/20">
+            <div className="mt-3 pt-3 border-t border-white/20"> {/* Reduced margins */}
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium">Your Conversations</span>
+                <span className="text-xs font-medium">Your Conversations</span> {/* Smaller text */}
                 <Button
                   size="sm"
                   onClick={handleNewConversation}
-                  className="bg-white/20 hover:bg-white/30 text-white text-xs"
+                  className="bg-white/20 hover:bg-white/30 text-white text-xs h-7 px-2" /* More compact button */
                 >
                   <MessageSquare className="h-3 w-3 mr-1" />
                   New
                 </Button>
               </div>
-              <ScrollArea className="h-20">
-                <div className="flex gap-2 flex-wrap">
+              <ScrollArea className="h-16"> {/* Reduced height */}
+                <div className="flex gap-1 flex-wrap"> {/* Reduced gap */}
                   {conversationThreads.map((thread) => (
                     <Badge
                       key={thread.id}
                       variant={currentThreadId === thread.id ? "default" : "secondary"}
                       className={cn(
-                        "cursor-pointer transition-all duration-300 text-xs font-normal px-3 py-1 flex items-center gap-1 mb-1",
+                        "cursor-pointer transition-all duration-300 text-xs font-normal px-2 py-1 flex items-center gap-1 mb-1", /* More compact padding */
                         currentThreadId === thread.id 
                           ? "bg-white text-orange-600" 
                           : "bg-white/20 text-white hover:bg-white/30"
                       )}
                       onClick={() => loadThreadMessages(thread.id)}
                     >
-                      <span className="max-w-[120px] truncate">{thread.title}</span>
+                      <span className="max-w-[100px] truncate">{thread.title}</span> {/* Smaller max width */}
                       <Trash2 
-                        className="h-3 w-3 ml-1 opacity-70 hover:opacity-100 flex-shrink-0" 
+                        className="h-3 w-3 ml-0.5 opacity-70 hover:opacity-100 flex-shrink-0" 
                         onClick={(e) => handleDeleteThread(thread.id, e)}
                       />
                     </Badge>
@@ -636,6 +637,7 @@ const AiChatComponent = () => {
         </CardHeader>
         
         <CardContent className="p-0 flex flex-col h-full">
+          {/* Increased flex-1 to give more space to messages area */}
           <ScrollArea 
             className="flex-1 p-4 md:p-6" 
             ref={scrollAreaRef}
@@ -792,8 +794,8 @@ const AiChatComponent = () => {
             </div>
           </ScrollArea>
           
-          {/* Input Area */}
-          <div className="border-t border-orange-200/50 bg-white/50 backdrop-blur-sm p-4">
+          {/* Input Area - Pushed upward with reduced padding */}
+          <div className="border-t border-orange-200/50 bg-white/50 backdrop-blur-sm p-3 md:p-4"> {/* Reduced padding */}
             <div className="flex gap-2 md:gap-3">
               <Input
                 value={inputMessage}
@@ -813,8 +815,8 @@ const AiChatComponent = () => {
               </Button>
             </div>
             
-            {/* Quick Action Tips */}
-            <div className="text-xs text-gray-500 mt-3 text-center flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
+            {/* Quick Action Tips - Made more compact */}
+            <div className="text-xs text-gray-500 mt-2 text-center flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-3"> {/* Reduced margins and gaps */}
               <div className="flex items-center gap-1">
                 <Sparkles className="h-3 w-3 text-orange-500" />
                 <span className="hidden xs:inline">Try: "Show me web development courses"</span>
