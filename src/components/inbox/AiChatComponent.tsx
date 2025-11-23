@@ -516,9 +516,10 @@ const AiChatComponent = () => {
     }
   };
 
-  // Load messages for a specific thread
+  // UPDATED: Load messages for a specific thread with recommendations
   const loadThreadMessages = async (threadId: string) => {
     try {
+      // Load conversation messages
       const { data: messages, error } = await supabase
         .from('conversation_messages')
         .select('*')
@@ -527,18 +528,59 @@ const AiChatComponent = () => {
 
       if (error) throw error;
 
-      const formattedMessages: AiMessage[] = messages.map(msg => ({
-        id: msg.id,
-        role: msg.role as 'user' | 'assistant',
-        content: msg.content,
-        timestamp: new Date(msg.created_at),
-        recommendations: msg.metadata?.recommendations,
-        uiComponents: msg.metadata?.uiComponents,
-        type: msg.metadata?.type,
-        nextSteps: msg.metadata?.nextSteps,
-        followUpQuestions: msg.metadata?.followUpQuestions
-      }));
+      // Load recommendations for this thread to enhance the messages
+      const { data: recommendations } = await supabase
+        .from('conversation_recommendations')
+        .select('*')
+        .eq('thread_id', threadId)
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: true });
 
+      // Create a map of message IDs to their recommendations
+      const recommendationMap = new Map();
+      if (recommendations) {
+        recommendations.forEach(rec => {
+          if (!recommendationMap.has(rec.thread_id)) {
+            recommendationMap.set(rec.thread_id, []);
+          }
+          recommendationMap.get(rec.thread_id).push(rec);
+        });
+      }
+
+      // Convert database messages to AiMessage format with recommendations
+      const formattedMessages: AiMessage[] = messages.map(msg => {
+        const messageRecommendations = msg.metadata?.recommendations;
+        
+        // If the message has stored recommendations in metadata, use them
+        if (messageRecommendations && (messageRecommendations.courses || messageRecommendations.events)) {
+          return {
+            id: msg.id,
+            role: msg.role as 'user' | 'assistant',
+            content: msg.content,
+            timestamp: new Date(msg.created_at),
+            recommendations: messageRecommendations,
+            uiComponents: msg.metadata?.uiComponents,
+            type: msg.metadata?.type,
+            nextSteps: msg.metadata?.nextSteps,
+            followUpQuestions: msg.metadata?.followUpQuestions
+          };
+        }
+
+        // Otherwise, return the basic message
+        return {
+          id: msg.id,
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content,
+          timestamp: new Date(msg.created_at),
+          recommendations: msg.metadata?.recommendations,
+          uiComponents: msg.metadata?.uiComponents,
+          type: msg.metadata?.type,
+          nextSteps: msg.metadata?.nextSteps,
+          followUpQuestions: msg.metadata?.followUpQuestions
+        };
+      });
+
+      // If no messages, add welcome message
       if (formattedMessages.length === 0) {
         formattedMessages.push(getWelcomeMessage());
       }
