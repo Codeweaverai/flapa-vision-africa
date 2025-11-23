@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Send, Sparkles, Bot, User, BookOpen, Calendar, Clock, Users, Star, MapPin, Play, ArrowRight, Zap, Trash2, MessageSquare, Plus, Menu, History, X } from 'lucide-react';
+import { Send, Sparkles, Bot, User, BookOpen, Calendar, Clock, Users, Star, MapPin, Play, ArrowRight, Zap, Trash2, MessageSquare, Plus, Menu, History } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -92,7 +92,7 @@ interface StoredRecommendation {
   created_at: string;
 }
 
-// Updated Course Card Component - Removed "by Instructor"
+// Updated Course Card Component
 const CourseRecommendationCard = ({ course, onCourseClick }: { course: any; onCourseClick: (id: string) => void }) => {
   return (
     <Card 
@@ -135,7 +135,7 @@ const CourseRecommendationCard = ({ course, onCourseClick }: { course: any; onCo
           {course.title}
         </h4>
 
-        {/* Course Stats - Removed creator section */}
+        {/* Course Stats */}
         <div className="flex items-center justify-between text-xs text-gray-600 mb-4">
           <div className="flex items-center gap-1">
             <Clock className="h-3 w-3 text-orange-500" />
@@ -249,132 +249,93 @@ const EventRecommendationCard = ({ event, onEventClick }: { event: any; onEventC
   );
 };
 
-// Past Recommendations Panel Component
-const PastRecommendationsPanel = ({ 
-  recommendations, 
-  onClose, 
-  onCourseClick, 
-  onEventClick 
-}: {
-  recommendations: StoredRecommendation[];
-  onClose: () => void;
-  onCourseClick: (id: string) => void;
-  onEventClick: (id: string) => void;
-}) => {
-  const courseRecommendations = recommendations.filter(rec => rec.recommendation_type === 'course');
-  const eventRecommendations = recommendations.filter(rec => rec.recommendation_type === 'event');
-
+// Compact Course Card for Past Recommendations
+const CompactCourseCard = ({ course, onCourseClick }: { course: any; onCourseClick: (id: string) => void }) => {
   return (
-    <div className="w-80 bg-white/95 backdrop-blur-sm border-l border-orange-200/50 flex flex-col h-full">
-      <div className="p-4 border-b border-orange-200/50 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <History className="h-5 w-5 text-orange-500" />
-          <h3 className="font-semibold text-gray-900">Past Recommendations</h3>
+    <Card 
+      className="cursor-pointer bg-white border border-orange-200/50 hover:border-orange-300 transition-all duration-300 hover:shadow-md"
+      onClick={() => onCourseClick(course.id)}
+    >
+      <div className="flex">
+        <div className="w-20 h-20 flex-shrink-0 overflow-hidden">
+          {course.thumbnail_url ? (
+            <img
+              src={course.thumbnail_url}
+              alt={course.title}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-orange-200 via-purple-200 to-pink-300 flex items-center justify-center">
+              <BookOpen className="h-6 w-6 text-white opacity-80" />
+            </div>
+          )}
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onClose}
-          className="h-8 w-8"
-        >
-          <X className="h-4 w-4" />
-        </Button>
+        <CardContent className="p-3 flex-1">
+          <h4 className="font-medium text-gray-900 text-sm line-clamp-2 mb-1">
+            {course.title}
+          </h4>
+          <div className="flex items-center justify-between text-xs text-gray-600">
+            <Badge variant="outline" className="text-xs">
+              {course.category}
+            </Badge>
+            <span className="font-medium">
+              {course.is_free ? 'Free' : <PriceDisplay amount={course.price} originalCurrency="USD" />}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+            <Star className="h-3 w-3 text-yellow-500 fill-current" />
+            <span>{course.average_rating?.toFixed(1) || '0.0'}</span>
+            <Users className="h-3 w-3 text-purple-500 ml-1" />
+            <span>{course.total_students}</span>
+          </div>
+        </CardContent>
       </div>
+    </Card>
+  );
+};
 
-      <ScrollArea className="flex-1 p-4">
-        <div className="space-y-6">
-          {courseRecommendations.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <BookOpen className="h-4 w-4 text-orange-500" />
-                Courses ({courseRecommendations.length})
-              </div>
-              <div className="space-y-3">
-                {courseRecommendations.map((recommendation) => (
-                  <Card 
-                    key={recommendation.id}
-                    className="cursor-pointer bg-white border border-orange-200/50 hover:border-orange-300 transition-all duration-300 hover:shadow-md"
-                    onClick={() => onCourseClick(recommendation.item_data.id)}
-                  >
-                    <CardContent className="p-3">
-                      <h4 className="font-medium text-gray-900 text-sm line-clamp-2 mb-2">
-                        {recommendation.item_data.title}
-                      </h4>
-                      <div className="flex items-center justify-between text-xs text-gray-600">
-                        <Badge variant="outline" className="text-xs">
-                          {recommendation.item_data.category}
-                        </Badge>
-                        <span className="font-medium">
-                          {recommendation.item_data.is_free ? 'Free' : <PriceDisplay amount={recommendation.item_data.price} originalCurrency="USD" />}
-                        </span>
-                      </div>
-                      {recommendation.reason && (
-                        <p className="text-xs text-gray-500 mt-2 line-clamp-2">
-                          {recommendation.reason}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-2">
-                        <Clock className="h-3 w-3" />
-                        <span>{new Date(recommendation.created_at).toLocaleDateString()}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {eventRecommendations.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <Calendar className="h-4 w-4 text-purple-500" />
-                Events ({eventRecommendations.length})
-              </div>
-              <div className="space-y-3">
-                {eventRecommendations.map((recommendation) => (
-                  <Card 
-                    key={recommendation.id}
-                    className="cursor-pointer bg-white border border-purple-200/50 hover:border-purple-300 transition-all duration-300 hover:shadow-md"
-                    onClick={() => onEventClick(recommendation.item_data.id)}
-                  >
-                    <CardContent className="p-3">
-                      <h4 className="font-medium text-gray-900 text-sm line-clamp-2 mb-2">
-                        {recommendation.item_data.title}
-                      </h4>
-                      <div className="flex items-center justify-between text-xs text-gray-600">
-                        <Badge variant="outline" className="text-xs">
-                          {recommendation.item_data.event_type}
-                        </Badge>
-                        <span className="font-medium">
-                          {recommendation.item_data.is_free ? 'Free' : <>From <PriceDisplay amount={recommendation.item_data.minPrice} originalCurrency="USD" /></>}
-                        </span>
-                      </div>
-                      {recommendation.reason && (
-                        <p className="text-xs text-gray-500 mt-2 line-clamp-2">
-                          {recommendation.reason}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-2">
-                        <Clock className="h-3 w-3" />
-                        <span>{new Date(recommendation.created_at).toLocaleDateString()}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {recommendations.length === 0 && (
-            <div className="text-center text-gray-500 py-8">
-              <History className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-              <p className="text-sm">No recommendations yet</p>
-              <p className="text-xs mt-1">Start a conversation to get recommendations!</p>
+// Compact Event Card for Past Recommendations
+const CompactEventCard = ({ event, onEventClick }: { event: any; onEventClick: (id: string) => void }) => {
+  const eventDate = new Date(event.start_time);
+  
+  return (
+    <Card 
+      className="cursor-pointer bg-white border border-purple-200/50 hover:border-purple-300 transition-all duration-300 hover:shadow-md"
+      onClick={() => onEventClick(event.id)}
+    >
+      <div className="flex">
+        <div className="w-20 h-20 flex-shrink-0 overflow-hidden">
+          {event.image_url ? (
+            <img
+              src={event.image_url}
+              alt={event.title}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-purple-200 via-orange-200 to-pink-300 flex items-center justify-center">
+              <Calendar className="h-6 w-6 text-white opacity-80" />
             </div>
           )}
         </div>
-      </ScrollArea>
-    </div>
+        <CardContent className="p-3 flex-1">
+          <h4 className="font-medium text-gray-900 text-sm line-clamp-2 mb-1">
+            {event.title}
+          </h4>
+          <div className="flex items-center justify-between text-xs text-gray-600">
+            <Badge variant="outline" className="text-xs">
+              {event.event_type}
+            </Badge>
+            <span className="font-medium">
+              {event.is_free ? 'Free' : <>From <PriceDisplay amount={event.minPrice} originalCurrency="USD" /></>}
+            </span>
+          </div>
+          <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
+            <Calendar className="h-3 w-3 text-purple-500" />
+            <span>{eventDate.toLocaleDateString()}</span>
+          </div>
+        </CardContent>
+      </div>
+    </Card>
   );
 };
 
@@ -384,17 +345,13 @@ const ConversationSidebar = ({
   currentThreadId, 
   onThreadSelect, 
   onNewConversation, 
-  onDeleteThread,
-  onShowRecommendations,
-  pastRecommendationsCount
+  onDeleteThread 
 }: {
   threads: ConversationThread[];
   currentThreadId: string | null;
   onThreadSelect: (threadId: string) => void;
   onNewConversation: () => void;
   onDeleteThread: (threadId: string, event: React.MouseEvent) => void;
-  onShowRecommendations: () => void;
-  pastRecommendationsCount: number;
 }) => {
   return (
     <div className="w-64 bg-white/90 backdrop-blur-sm border-r border-orange-200/50 flex flex-col h-full">
@@ -443,24 +400,6 @@ const ConversationSidebar = ({
           ))}
         </div>
       </ScrollArea>
-
-      {/* Past Recommendations Button */}
-      <div className="p-4 border-t border-orange-200/50">
-        <Button
-          variant="outline"
-          className="w-full justify-start"
-          onClick={onShowRecommendations}
-          disabled={pastRecommendationsCount === 0}
-        >
-          <History className="h-4 w-4 mr-2" />
-          View Past Recommendations
-          {pastRecommendationsCount > 0 && (
-            <Badge variant="secondary" className="ml-auto">
-              {pastRecommendationsCount}
-            </Badge>
-          )}
-        </Button>
-      </div>
     </div>
   );
 };
@@ -473,8 +412,8 @@ const AiChatComponent = () => {
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [showPastRecommendations, setShowPastRecommendations] = useState(false);
   const [pastRecommendations, setPastRecommendations] = useState<StoredRecommendation[]>([]);
+  const [showPastRecommendations, setShowPastRecommendations] = useState(false);
   const { user } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -814,6 +753,74 @@ const AiChatComponent = () => {
     ));
   };
 
+  // Render past recommendations in chat
+  const renderPastRecommendations = () => {
+    const courseRecommendations = pastRecommendations.filter(rec => rec.recommendation_type === 'course');
+    const eventRecommendations = pastRecommendations.filter(rec => rec.recommendation_type === 'event');
+
+    return (
+      <div className="flex items-start gap-3 md:gap-4">
+        <Avatar className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-r from-orange-500 to-purple-500 shadow-lg">
+          <AvatarFallback className="bg-transparent text-white">
+            <Bot className="w-3 h-3 md:w-5 md:h-5" />
+          </AvatarFallback>
+        </Avatar>
+        
+        <div className="flex-1 max-w-[85%] space-y-4">
+          {/* Message Bubble */}
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-orange-100">
+            <div className="text-sm leading-relaxed">
+              Here are your past recommendations from this conversation:
+            </div>
+          </div>
+
+          {/* Past Course Recommendations */}
+          {courseRecommendations.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                <BookOpen className="h-4 w-4 text-orange-500" />
+                Previously Recommended Courses ({courseRecommendations.length})
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {courseRecommendations.map((recommendation) => (
+                  <CompactCourseCard
+                    key={recommendation.id}
+                    course={recommendation.item_data}
+                    onCourseClick={handleCourseClick}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Past Event Recommendations */}
+          {eventRecommendations.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                <Calendar className="h-4 w-4 text-purple-500" />
+                Previously Recommended Events ({eventRecommendations.length})
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {eventRecommendations.map((recommendation) => (
+                  <CompactEventCard
+                    key={recommendation.id}
+                    event={recommendation.item_data}
+                    onEventClick={handleEventClick}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Timestamp */}
+          <div className="text-xs text-gray-500">
+            {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (isLoadingHistory) {
     return (
       <Card className="h-full bg-gradient-to-br from-orange-50/80 via-purple-50/80 to-pink-50/80 backdrop-blur-sm border border-orange-200/30 shadow-2xl">
@@ -870,8 +877,6 @@ const AiChatComponent = () => {
               onThreadSelect={loadThreadMessages}
               onNewConversation={handleNewConversation}
               onDeleteThread={handleDeleteThread}
-              onShowRecommendations={() => setShowPastRecommendations(true)}
-              pastRecommendationsCount={pastRecommendations.length}
             />
           )}
           
@@ -883,6 +888,10 @@ const AiChatComponent = () => {
               onScroll={handleScroll}
             >
               <div className="space-y-4 md:space-y-6 max-w-4xl mx-auto">
+                {/* Show past recommendations in chat when toggled */}
+                {showPastRecommendations && renderPastRecommendations()}
+                
+                {/* Regular chat messages */}
                 {messages.map((message) => (
                   <div
                     key={message.id}
@@ -920,7 +929,7 @@ const AiChatComponent = () => {
                         </div>
                       </div>
 
-                      {/* Recommendations Grid */}
+                      {/* Current Recommendations Grid */}
                       {message.role === 'assistant' && message.recommendations && (
                         <div className="space-y-3 md:space-y-4">
                           {/* Course Recommendations */}
@@ -993,7 +1002,7 @@ const AiChatComponent = () => {
                                 {step}
                               </div>
                             ))}
-                        </div>
+                          </div>
                         </div>
                       )}
 
@@ -1071,16 +1080,6 @@ const AiChatComponent = () => {
               </div>
             </div>
           </div>
-
-          {/* Past Recommendations Panel */}
-          {showPastRecommendations && user && (
-            <PastRecommendationsPanel
-              recommendations={pastRecommendations}
-              onClose={() => setShowPastRecommendations(false)}
-              onCourseClick={handleCourseClick}
-              onEventClick={handleEventClick}
-            />
-          )}
         </div>
       </Card>
     </div>
