@@ -670,7 +670,7 @@ const AiChatComponent = () => {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('smart-advisor', {
+      const { data, error } = await supabase.functions.invoke('smart-advisor-ai', {
         body: {
           message: inputMessage,
           userId: user?.id || null,
