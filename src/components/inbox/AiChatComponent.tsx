@@ -508,7 +508,27 @@ const AiChatComponent = () => {
 
       setCurrentThreadId(thread.id);
       setConversationThreads(prev => [thread, ...prev]);
-      setMessages([getWelcomeMessage()]);
+      
+      // Store welcome message in database
+      const welcomeMessage = getWelcomeMessage();
+      const { error: welcomeMessageError } = await supabase
+        .from('conversation_messages')
+        .insert({
+          id: welcomeMessage.id,
+          thread_id: thread.id,
+          role: 'assistant',
+          content: welcomeMessage.content,
+          metadata: {
+            type: welcomeMessage.type,
+            followUpQuestions: welcomeMessage.followUpQuestions
+          }
+        });
+
+      if (welcomeMessageError) {
+        console.error('Error storing welcome message:', welcomeMessageError);
+      }
+
+      setMessages([welcomeMessage]);
     } catch (error) {
       console.error('Error creating new thread:', error);
       toast.error('Failed to create new conversation');
@@ -516,10 +536,10 @@ const AiChatComponent = () => {
     }
   };
 
-  // UPDATED: Load messages for a specific thread with recommendations
+  // UPDATED: Load messages for a specific thread with FULL metadata
   const loadThreadMessages = async (threadId: string) => {
     try {
-      // Load conversation messages
+      // Load conversation messages with their full metadata
       const { data: messages, error } = await supabase
         .from('conversation_messages')
         .select('*')
@@ -528,57 +548,18 @@ const AiChatComponent = () => {
 
       if (error) throw error;
 
-      // Load recommendations for this thread to enhance the messages
-      const { data: recommendations } = await supabase
-        .from('conversation_recommendations')
-        .select('*')
-        .eq('thread_id', threadId)
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: true });
-
-      // Create a map of message IDs to their recommendations
-      const recommendationMap = new Map();
-      if (recommendations) {
-        recommendations.forEach(rec => {
-          if (!recommendationMap.has(rec.thread_id)) {
-            recommendationMap.set(rec.thread_id, []);
-          }
-          recommendationMap.get(rec.thread_id).push(rec);
-        });
-      }
-
-      // Convert database messages to AiMessage format with recommendations
-      const formattedMessages: AiMessage[] = messages.map(msg => {
-        const messageRecommendations = msg.metadata?.recommendations;
-        
-        // If the message has stored recommendations in metadata, use them
-        if (messageRecommendations && (messageRecommendations.courses || messageRecommendations.events)) {
-          return {
-            id: msg.id,
-            role: msg.role as 'user' | 'assistant',
-            content: msg.content,
-            timestamp: new Date(msg.created_at),
-            recommendations: messageRecommendations,
-            uiComponents: msg.metadata?.uiComponents,
-            type: msg.metadata?.type,
-            nextSteps: msg.metadata?.nextSteps,
-            followUpQuestions: msg.metadata?.followUpQuestions
-          };
-        }
-
-        // Otherwise, return the basic message
-        return {
-          id: msg.id,
-          role: msg.role as 'user' | 'assistant',
-          content: msg.content,
-          timestamp: new Date(msg.created_at),
-          recommendations: msg.metadata?.recommendations,
-          uiComponents: msg.metadata?.uiComponents,
-          type: msg.metadata?.type,
-          nextSteps: msg.metadata?.nextSteps,
-          followUpQuestions: msg.metadata?.followUpQuestions
-        };
-      });
+      // Convert database messages to AiMessage format with FULL metadata
+      const formattedMessages: AiMessage[] = messages.map(msg => ({
+        id: msg.id,
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+        timestamp: new Date(msg.created_at),
+        recommendations: msg.metadata?.recommendations,
+        uiComponents: msg.metadata?.uiComponents,
+        type: msg.metadata?.type,
+        nextSteps: msg.metadata?.nextSteps,
+        followUpQuestions: msg.metadata?.followUpQuestions
+      }));
 
       // If no messages, add welcome message
       if (formattedMessages.length === 0) {
@@ -588,11 +569,17 @@ const AiChatComponent = () => {
       setMessages(formattedMessages);
       setCurrentThreadId(threadId);
       
+      // Also load past recommendations for the sidebar
+      await loadPastRecommendations();
+      
       isInitialLoad.current = true;
       shouldScrollToBottom.current = true;
     } catch (error) {
       console.error('Error loading thread messages:', error);
       toast.error('Failed to load conversation');
+      
+      // Fallback to welcome message
+      setMessages([getWelcomeMessage()]);
     }
   };
 
@@ -657,8 +644,36 @@ const AiChatComponent = () => {
       return;
     }
 
+    // Handle guest users (no storage)
+    if (!user || !currentThreadId) {
+      const userMessage: AiMessage = {
+        id: `temp-user-${Date.now()}`,
+        role: 'user',
+        content: inputMessage,
+        timestamp: new Date()
+      };
+
+      // For guest users, just show a basic response
+      const tempAssistantMessage: AiMessage = {
+        id: `temp-ai-${Date.now()}`,
+        role: 'assistant',
+        content: "I'd be happy to help! However, to save your conversation history and provide personalized recommendations, please sign in to your SkillPulse account.",
+        timestamp: new Date(),
+        followUpQuestions: [
+          "What courses do you recommend for web development?",
+          "Show me upcoming events in my area",
+          "Help me choose my next learning path"
+        ]
+      };
+
+      setMessages(prev => [...prev, userMessage, tempAssistantMessage]);
+      setInputMessage('');
+      return;
+    }
+
+    const userMessageId = `user-${Date.now()}`;
     const userMessage: AiMessage = {
-      id: `temp-${Date.now()}`,
+      id: userMessageId,
       role: 'user',
       content: inputMessage,
       timestamp: new Date()
@@ -670,10 +685,27 @@ const AiChatComponent = () => {
     setIsLoading(true);
 
     try {
+      // 🔧 STORE USER MESSAGE
+      const { error: userMessageError } = await supabase
+        .from('conversation_messages')
+        .insert({
+          id: userMessageId,
+          thread_id: currentThreadId,
+          role: 'user',
+          content: inputMessage,
+          metadata: {} // Empty metadata for user messages
+        });
+
+      if (userMessageError) {
+        console.error('Error storing user message:', userMessageError);
+        throw userMessageError;
+      }
+
+      // Call AI Edge Function
       const { data, error } = await supabase.functions.invoke('smart-advisor-ai', {
         body: {
           message: inputMessage,
-          userId: user?.id || null,
+          userId: user.id,
           threadId: currentThreadId,
           conversationHistory: messages.slice(-4).map(msg => ({
             role: msg.role,
@@ -684,8 +716,9 @@ const AiChatComponent = () => {
 
       if (error) throw error;
 
+      const assistantMessageId = data.messageId || `ai-${Date.now()}`;
       const assistantMessage: AiMessage = {
-        id: data.messageId || `ai-${Date.now()}`,
+        id: assistantMessageId,
         role: 'assistant',
         content: data.response,
         timestamp: new Date(),
@@ -696,15 +729,89 @@ const AiChatComponent = () => {
         followUpQuestions: data.followUpQuestions
       };
 
+      // 🔧 STORE AI ASSISTANT MESSAGE WITH FULL METADATA
+      const { error: assistantMessageError } = await supabase
+        .from('conversation_messages')
+        .insert({
+          id: assistantMessageId,
+          thread_id: currentThreadId,
+          role: 'assistant',
+          content: data.response,
+          metadata: {
+            recommendations: data.recommendations,
+            uiComponents: data.uiComponents,
+            type: data.type,
+            nextSteps: data.nextSteps,
+            followUpQuestions: data.followUpQuestions
+          }
+        });
+
+      if (assistantMessageError) {
+        console.error('Error storing assistant message:', assistantMessageError);
+        throw assistantMessageError;
+      }
+
+      // 🔧 STORE INDIVIDUAL RECOMMENDATIONS
+      if (data.recommendations) {
+        const recommendationsToStore = [];
+
+        // Store course recommendations
+        if (data.recommendations.courses && data.recommendations.courses.length > 0) {
+          data.recommendations.courses.forEach(course => {
+            recommendationsToStore.push({
+              thread_id: currentThreadId,
+              user_id: user.id,
+              recommendation_type: 'course',
+              item_id: course.id,
+              item_data: course,
+              reason: course.reason,
+              created_at: new Date().toISOString()
+            });
+          });
+        }
+
+        // Store event recommendations
+        if (data.recommendations.events && data.recommendations.events.length > 0) {
+          data.recommendations.events.forEach(event => {
+            recommendationsToStore.push({
+              thread_id: currentThreadId,
+              user_id: user.id,
+              recommendation_type: 'event',
+              item_id: event.id,
+              item_data: event,
+              reason: event.reason,
+              created_at: new Date().toISOString()
+            });
+          });
+        }
+
+        // Batch insert all recommendations
+        if (recommendationsToStore.length > 0) {
+          const { error: recommendationsError } = await supabase
+            .from('conversation_recommendations')
+            .insert(recommendationsToStore);
+
+          if (recommendationsError) {
+            console.error('Error storing recommendations:', recommendationsError);
+            // Don't throw here - we still want to show the message even if recommendations fail
+          }
+        }
+      }
+
+      // Update UI with the new assistant message
       shouldScrollToBottom.current = true;
       setMessages(prev => [...prev, assistantMessage]);
 
       // Update thread title if this is the first user message
-      if (messages.length === 1 && currentThreadId && user) {
+      const currentMessages = messages.filter(msg => msg.role === 'user');
+      if (currentMessages.length === 0 && currentThreadId) {
         const title = inputMessage.substring(0, 50) + (inputMessage.length > 50 ? '...' : '');
         await supabase
           .from('conversation_threads')
-          .update({ title, updated_at: new Date().toISOString() })
+          .update({ 
+            title, 
+            updated_at: new Date().toISOString() 
+          })
           .eq('id', currentThreadId);
       }
 
@@ -712,6 +819,7 @@ const AiChatComponent = () => {
       if (data.recommendations && (data.recommendations.courses?.length > 0 || data.recommendations.events?.length > 0)) {
         await loadPastRecommendations();
       }
+
     } catch (error) {
       console.error('AI chat error:', error);
       toast.error('Failed to get response. Please try again.');
