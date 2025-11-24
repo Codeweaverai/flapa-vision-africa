@@ -597,7 +597,7 @@ const AiChatComponent = () => {
   const getWelcomeMessage = (): AiMessage => ({
     id: `welcome-${Date.now()}`, // Temporary ID for welcome message
     role: 'assistant',
-    content: "Hi! I'm your AI Smart Advisor for SkillPulse! 🚀\n\nI can help you discover personalized courses, events, and learning paths tailored to your interests. I have access to your learning history and can provide smart recommendations.\n\nWhat would you like to learn about today?",
+    content: "Hi! I'm Lumo AI your AI Smart Advisor for SkillPulse! 🚀\n\nI can help you discover personalized courses, events, and learning paths tailored to your interests. I have access to your learning history and can provide smart recommendations.\n\nWhat would you like to learn about today?",
     timestamp: new Date(),
     type: 'welcome',
     followUpQuestions: [
