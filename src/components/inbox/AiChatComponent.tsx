@@ -1024,7 +1024,7 @@ const AiChatComponent = () => {
               </Button>
               <div className="flex items-center gap-2">
                 <Bot className="h-5 w-5" />
-                <CardTitle className="text-lg">AI Smart Advisor</CardTitle>
+                <CardTitle className="text-lg">Lumo AI</CardTitle>
                 <Sparkles className="h-4 w-4 text-yellow-300 animate-pulse" />
               </div>
             </div>
