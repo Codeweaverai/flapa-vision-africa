@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Bot, Sparkles, BookOpen, Clock, Users, Zap, CheckCircle, ArrowRight, Play, Star, FileText, Target, GraduationCap, Coins, Gift, History, ChevronRight, RefreshCw, AlertTriangle, Calendar, Send, Brain, Lightbulb, Rocket } from 'lucide-react';
+import { Bot, Sparkles, BookOpen, Clock, Users, Zap, CheckCircle, ArrowRight, Play, Star, FileText, Target, GraduationCap, Coins, Gift, History, ChevronRight, RefreshCw, AlertTriangle, Calendar  } from 'lucide-react';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
@@ -78,50 +80,26 @@ const CreatorCourseCreateWithAI = () => {
   
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'input' | 'generating' | 'proposal' | 'creating'>('input');
-  const [prompt, setPrompt] = useState('');
+  const [courseData, setCourseData] = useState({
+    title: '',
+    description: '',
+    targetAudience: '',
+    learningGoals: '',
+    duration: '',
+    difficulty: 'beginner'
+  });
   const [proposal, setProposal] = useState<any>(null);
   const [proposalId, setProposalId] = useState<string | null>(null);
   
+  // Simplified states - removed complex progress tracking
   const [pastProposals, setPastProposals] = useState<any[]>([]);
   const [functionError, setFunctionError] = useState<string | null>(null);
-  const [typingIndex, setTypingIndex] = useState(0);
   
   // Token usage states
   const [showTokenDialog, setShowTokenDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [requiredTokens, setRequiredTokens] = useState(0);
   const [featureName, setFeatureName] = useState('');
-
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // Example prompts for typing animation
-  const examplePrompts = [
-    "Create a comprehensive course on modern web development using React, TypeScript, and Next.js, tailored for intermediate developers who want to build scalable and production-ready applications.",
-    "Build a complete Python data science course for beginners, covering essential topics such as pandas, NumPy, data visualization, and an introduction to machine learning techniques....",
-    "Design an advanced digital marketing strategy course that includes in-depth training on social media marketing, SEO, content strategy, paid ads, and analytics—perfect for business owners and marketing professionals....",
-    "Develop a full mobile app development course using Flutter and Dart, guiding learners step-by-step in creating high-quality cross-platform applications...."
-    "Create an AI and automation productivity course that teaches students how to use tools like ChatGPT, DeepSeek, Make.com, and Zapier to automate business workflows........"
-    "Develop a user-friendly SQL and database fundamentals course for absolute beginners, featuring hands-on practice with queries, joins, indexes, and data modeling........"
-    "Develop a financial accounting fundamentals course that simplifies core concepts such as ledgers, trial balances, bank reconciliation, and financial statements........."
-  ];
-
-  // Typing animation effect
-  useEffect(() => {
-    if (step === 'input' && !prompt) {
-      const interval = setInterval(() => {
-        setTypingIndex((prev) => (prev + 1) % examplePrompts.length);
-      }, 3000);
-      return () => clearInterval(interval);
-    }
-  }, [step, prompt]);
-
-  // Auto-resize textarea
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
-    }
-  }, [prompt]);
 
   // Fetch past proposals
   useEffect(() => {
@@ -142,6 +120,27 @@ const CreatorCourseCreateWithAI = () => {
 
     fetchPastProposals();
   }, [user?.id]);
+
+  const handleInputChange = (field: string, value: string) => {
+    setCourseData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // Load proposal data into form for reuse
+  const loadProposalIntoForm = (proposalData: any) => {
+    setCourseData({
+      title: proposalData.course_title || '',
+      description: proposalData.course_description || '',
+      targetAudience: proposalData.target_audience || '',
+      learningGoals: proposalData.learning_outcomes?.join(', ') || '',
+      duration: `${Math.ceil(proposalData.duration_minutes / 60)} hours` || '',
+      difficulty: proposalData.difficulty_level?.toLowerCase() || 'beginner'
+    });
+    setStep('input');
+    toast.success('Proposal loaded! Review and generate a new course.');
+  };
 
   const checkTokensAndProceed = async (action: 'proposal' | 'full_course', callback: () => void) => {
     try {
@@ -165,8 +164,8 @@ const CreatorCourseCreateWithAI = () => {
   };
 
   const generateProposal = async () => {
-    if (!prompt.trim()) {
-      toast.error('Please describe the course you want to create');
+    if (!courseData.title.trim() || !courseData.description.trim()) {
+      toast.error('Please provide at least a course title and description');
       return;
     }
 
@@ -180,6 +179,16 @@ const CreatorCourseCreateWithAI = () => {
     setFunctionError(null);
 
     try {
+      const prompt = `Create a comprehensive course about: ${courseData.title}
+      
+Description: ${courseData.description}
+Target Audience: ${courseData.targetAudience}
+Learning Goals: ${courseData.learningGoals}
+Estimated Duration: ${courseData.duration}
+Difficulty Level: ${courseData.difficulty}
+
+Please generate a detailed course proposal with modules, lessons, and learning outcomes.`;
+
       const tokenResult = await deductTokens('course_proposal', `course_proposal_${Date.now()}`);
       
       console.log('Calling generate-course function for proposal...');
@@ -197,12 +206,12 @@ const CreatorCourseCreateWithAI = () => {
       }
 
       if (data?.success) {
+        // Store proposal in ai_course_proposals table
         const { data: proposalData, error: proposalError } = await supabase
           .from('ai_course_proposals')
           .insert({
             creator_id: user.id,
-            proposal_data: data.proposal,
-            user_prompt: prompt
+            proposal_data: data.proposal
           })
           .select()
           .single();
@@ -238,6 +247,7 @@ const CreatorCourseCreateWithAI = () => {
     }
   };
 
+  // SIMPLIFIED: Course creation without progress tracking
   const createFullCourse = async () => {
     if (!proposal || !proposalId) {
       toast.error('No proposal found to create course from');
@@ -262,7 +272,7 @@ const CreatorCourseCreateWithAI = () => {
           creator_id: user.id,
           action: 'generate_full_course',
           proposal_id: proposalId,
-          use_gpt4: true
+          use_gpt4: true // Force GPT-4 usage
         }
       });
 
@@ -275,6 +285,7 @@ const CreatorCourseCreateWithAI = () => {
         console.log('✅ Course creation completed successfully');
         toast.success('Course created successfully!');
         
+        // Refresh tokens and navigate
         await refetchTokens();
         setTimeout(() => {
           navigate('/creator/courses');
@@ -315,49 +326,62 @@ const CreatorCourseCreateWithAI = () => {
     checkTokensAndProceed('full_course', createFullCourse);
   };
 
-  const loadProposalIntoForm = (proposalData: any, userPrompt?: string) => {
-    setPrompt(userPrompt || '');
-    setStep('input');
-    toast.success('Proposal loaded! You can modify your prompt and generate a new course.');
-  };
+  const features = [
+    {
+      icon: <Zap className="h-5 w-5" />,
+      title: "AI-Powered",
+      description: "Advanced GPT-4 technology for comprehensive course creation"
+    },
+    {
+      icon: <BookOpen className="h-5 w-5" />,
+      title: "Complete Content",
+      description: "Includes lessons, quizzes, exams, and professional thumbnail"
+    },
+    {
+      icon: <Clock className="h-5 w-5" />,
+      title: "Fast Generation",
+      description: "Typically completes in 2-3 minutes"
+    },
+    {
+      icon: <Users className="h-5 w-5" />,
+      title: "Engaging Content",
+      description: "Optimized for student engagement and retention"
+    }
+  ];
 
   // Gradient utilities
   const gradientClass = "bg-gradient-to-r from-orange-500 to-purple-600";
   const gradientTextClass = "bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent";
   const gradientHoverClass = "hover:from-orange-600 hover:to-purple-700";
-  const subtleGradient = "bg-gradient-to-br from-orange-50 via-white to-purple-50";
+  const orangePurpleGradient = "bg-gradient-to-r from-orange-500 to-purple-600";
 
   const availableTokens = getAvailableTokens();
 
   return (
-    <CreatorLayout title="Create Course with Lumo AI">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <CreatorLayout title="Create Course with AI">
+      <div className="max-w-6xl mx-auto space-y-8">
         {/* Free Trial Banner */}
         <FreeTrialBanner />
 
         {/* Header */}
-        <div className="text-center space-y-6">
-          <div className="flex justify-center items-center space-x-4 mb-4">
-            <div className={`rounded-2xl ${gradientClass} p-4 shadow-2xl relative`}>
+        <div className="text-center space-y-4">
+          <div className="flex justify-center items-center space-x-3">
+            <div className={`rounded-full ${gradientClass} p-3 shadow-lg`}>
               <Bot className="h-8 w-8 text-white" />
-              <div className="absolute -top-1 -right-1">
-                <div className="rounded-full bg-green-500 p-1 animate-pulse">
-                  <Sparkles className="h-3 w-3 text-white" />
-                </div>
-              </div>
             </div>
+            <Sparkles className="h-8 w-8 text-orange-500" />
           </div>
-          <h1 className={`text-5xl font-bold ${gradientTextClass} mb-4`}>
-            Lumo AI
+          <h1 className={`text-4xl font-bold ${gradientTextClass}`}>
+            AI Course Creator
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
-            Transform your ideas into complete, engaging courses with intelligent AI analysis
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            Create complete, production-ready courses with AI in minutes
           </p>
         </div>
 
         {/* Error Display */}
         {functionError && (
-          <Card className="border-0 shadow-xl bg-red-50 border-l-4 border-l-red-500 animate-pulse">
+          <Card className="border-0 shadow-xl bg-red-50 border-l-4 border-l-red-500">
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center text-xl text-red-700">
                 <AlertTriangle className="h-5 w-5 mr-2" />
@@ -371,300 +395,302 @@ const CreatorCourseCreateWithAI = () => {
               <Button
                 onClick={() => {
                   setFunctionError(null);
-                  setStep('input');
+                  setStep('proposal');
                 }}
                 variant="outline"
                 className="border-red-300 text-red-700 hover:bg-red-100"
               >
-                Try Again
+                Back to Proposal
               </Button>
             </CardContent>
           </Card>
         )}
 
-        {/* Main Input Section */}
-        {step === 'input' && !functionError && (
-          <div className="space-y-8">
-            {/* Token Balance Card */}
-            <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-sm">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className={`rounded-xl ${gradientClass} p-3 shadow-lg`}>
-                      <Coins className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">AI Tokens Available</h3>
-                      <p className="text-sm text-gray-600">Create amazing courses with Lumo AI</p>
-                    </div>
+        {/* Token Balance */}
+        <Card className="bg-gradient-to-r from-orange-50 to-purple-50 border-orange-200">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Your Token Balance</h3>
+                <p className="text-sm text-gray-600">Tokens available for AI features</p>
+              </div>
+              <div className="text-right space-y-2">
+                {availableTokens.free > 0 && !tokenBalance?.has_used_free_trial && (
+                  <div className="flex items-center justify-end space-x-2">
+                    <Gift className="h-4 w-4 text-green-500" />
+                    <span className="font-semibold text-green-600">
+                      {availableTokens.free} free tokens
+                    </span>
+                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                      Trial
+                    </Badge>
                   </div>
-                  <div className="text-right space-y-2">
-                    <div className="flex items-center justify-end space-x-3">
-                      {availableTokens.free > 0 && !tokenBalance?.has_used_free_trial && (
-                        <Badge className="bg-green-100 text-green-700 border-green-200">
-                          <Gift className="h-3 w-3 mr-1" />
-                          {availableTokens.free} Free
-                        </Badge>
-                      )}
-                      <div className="flex items-center space-x-2">
-                        <div className="text-2xl font-bold text-orange-600">
-                          {availableTokens.paid}
-                        </div>
-                        <span className="text-gray-500">paid</span>
-                      </div>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => navigate('/creator/tokens')}
-                      className="text-orange-600 border-orange-300 hover:bg-orange-50"
-                    >
-                      Get More Tokens
-                    </Button>
-                  </div>
+                )}
+                
+                <div className="flex items-center justify-end space-x-2">
+                  <Coins className="h-5 w-5 text-orange-600" />
+                  <span className="text-xl font-bold text-orange-600">
+                    {availableTokens.paid}
+                  </span>
                 </div>
+                <p className="text-sm text-gray-500">paid tokens available</p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-4 text-sm text-gray-600">
+              <div>
+                <div className="flex justify-between">
+                  <span>Course Proposal:</span>
+                  <span className="font-semibold">8 tokens</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Full Course:</span>
+                  <span className="font-semibold">25 tokens</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => navigate('/creator/tokens')}
+                  className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                >
+                  <Coins className="h-4 w-4 mr-1" />
+                  Top Up Tokens
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Features Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {features.map((feature, index) => (
+            <Card key={index} className="text-center border-0 shadow-lg bg-white/90 backdrop-blur-sm hover:shadow-xl transition-all duration-300">
+              <CardContent className="pt-6">
+                <div className={`mx-auto w-12 h-12 rounded-full ${gradientClass} flex items-center justify-center text-white mb-4 shadow-md`}>
+                  {feature.icon}
+                </div>
+                <h3 className="font-semibold mb-2 text-gray-800">{feature.title}</h3>
+                <p className="text-sm text-gray-600">{feature.description}</p>
               </CardContent>
             </Card>
+          ))}
+        </div>
 
-            {/* AI Input Card */}
-            <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-sm overflow-hidden">
-              <div className={`${gradientClass} p-1`}>
-                <div className="bg-white rounded-lg p-1">
-                  <CardHeader className="text-center pb-4">
-                    <CardTitle className="text-2xl font-bold text-gray-800">
-                      Describe Your Vision
-                    </CardTitle>
-                    <CardDescription className="text-lg text-gray-600">
-                      Tell Lumo AI what course you want to create. Be as detailed as you like!
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Prompt Input */}
-                    <div className="relative">
-                      <Textarea
-                        ref={textareaRef}
-                        value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
-                        placeholder=""
-                        className="min-h-[120px] p-4 text-lg border-2 border-gray-200 rounded-xl resize-none focus:border-orange-300 transition-all duration-300 bg-white/50 backdrop-blur-sm"
-                        disabled={loading}
-                      />
-                      
-                      {/* Typing Animation Placeholder */}
-                      {!prompt && (
-                        <div className="absolute inset-0 pointer-events-none">
-                          <div className="p-4 text-lg text-gray-400">
-                            <TypewriterAnimation 
-                              text={examplePrompts[typingIndex]}
-                              speed={50}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Prompt Tips */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                      <div className="flex items-start space-x-2 p-3 bg-orange-50 rounded-lg">
-                        <Lightbulb className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
-                        <span>Include target audience and skill level</span>
-                      </div>
-                      <div className="flex items-start space-x-2 p-3 bg-purple-50 rounded-lg">
-                        <Target className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
-                        <span>Specify key topics and learning goals</span>
-                      </div>
-                      <div className="flex items-start space-x-2 p-3 bg-orange-50 rounded-lg">
-                        <BookOpen className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
-                        <span>Mention preferred course format</span>
-                      </div>
-                    </div>
-
-                    {/* Action Button */}
-                    <Button
-                      onClick={handleGenerateProposal}
-                      disabled={loading || !prompt.trim()}
-                      className={`w-full ${gradientClass} text-white font-semibold py-4 rounded-xl ${gradientHoverClass} transition-all duration-300 shadow-2xl hover:shadow-3xl transform hover:scale-[1.02] text-lg`}
-                    >
-                      {loading ? (
-                        <>
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                          Analyzing Your Vision...
-                        </>
-                      ) : (
-                        <>
-                          <Brain className="h-5 w-5 mr-2" />
-                          Generate Course Proposal (8 tokens)
-                          <Rocket className="h-5 w-5 ml-2" />
-                        </>
-                      )}
-                    </Button>
-                  </CardContent>
-                </div>
-              </div>
-            </Card>
-          </div>
-        )}
-
-        {/* Generating Proposal */}
-        {step === 'generating' && !functionError && (
-          <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-sm text-center">
-            <CardContent className="py-16">
-              <div className="relative mx-auto mb-8">
-                {/* Orbital Animation */}
-                <div className="relative w-32 h-32 mx-auto">
-                  <div className="absolute inset-0 rounded-full border-4 border-orange-200 animate-ping"></div>
-                  <div className="absolute inset-2 rounded-full border-4 border-purple-200 animate-pulse"></div>
-                  <div className="absolute inset-0 rounded-full border-4 border-transparent">
-                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                      <div className={`w-6 h-6 rounded-full ${gradientClass} animate-bounce`}></div>
-                    </div>
-                    <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2">
-                      <div className="w-4 h-4 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    </div>
-                  </div>
-                  <div className={`absolute inset-4 rounded-full ${gradientClass} flex items-center justify-center`}>
-                    <Bot className="h-8 w-8 text-white animate-pulse" />
-                  </div>
-                </div>
-              </div>
-              
-              <h3 className="text-2xl font-bold mb-4 text-gray-800">Lumo AI is Analyzing Your Vision</h3>
-              <p className="text-gray-600 mb-6 max-w-md mx-auto text-lg">
-                We're understanding your requirements and crafting the perfect course structure...
-              </p>
-              
-              {/* Intelligent Analysis Indicators */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-md mx-auto text-sm text-gray-500">
-                <div className="flex items-center justify-center space-x-1">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <span>Analyzing Topics</span>
-                </div>
-                <div className="flex items-center justify-center space-x-1">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.1s' }}></div>
-                  <span>Structuring Content</span>
-                </div>
-                <div className="flex items-center justify-center space-x-1">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                  <span>Designing Curriculum</span>
-                </div>
-                <div className="flex items-center justify-center space-x-1">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" style={{ animationDelay: '0.3s' }}></div>
-                  <span>Optimizing Flow</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Course Creation Loading */}
-        {step === 'creating' && !functionError && (
-          <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-sm text-center">
-            <CardContent className="py-16">
-              {/* Advanced Animation */}
-              <div className="relative mx-auto mb-8">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-40 h-40 border-4 border-orange-200 rounded-full animate-spin"></div>
-                  <div className="w-32 h-32 border-4 border-purple-200 rounded-full animate-spin" style={{ animationDirection: 'reverse' }}></div>
-                </div>
-                <div className="relative rounded-full bg-gradient-to-r from-orange-500 to-purple-600 w-24 h-24 flex items-center justify-center mx-auto shadow-2xl">
-                  <Bot className="h-10 w-10 text-white animate-bounce" />
-                </div>
-              </div>
-              
-              <h3 className="text-3xl font-bold mb-4 text-gray-800">Creating Your Masterpiece</h3>
-              <p className="text-gray-600 mb-6 max-w-md mx-auto text-lg">
-                Lumo AI is generating your complete course with intelligent content, quizzes, and materials...
-              </p>
-              
-              {/* Progress Indicators */}
-              <div className="max-w-md mx-auto space-y-4">
-                {[
-                  'Designing course structure',
-                  'Creating engaging lessons',
-                  'Developing assessments',
-                  'Generating resources',
-                  'Finalizing course materials'
-                ].map((task, index) => (
-                  <div key={task} className="flex items-center space-x-3 text-left">
-                    <div className={`w-3 h-3 rounded-full ${index < 2 ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
-                    <span className={`flex-1 ${index < 2 ? 'text-gray-700' : 'text-gray-400'}`}>{task}</span>
-                    {index < 2 && <CheckCircle className="h-4 w-4 text-green-500" />}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Proposal Review */}
-        {step === 'proposal' && proposal && !functionError && (
-          <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-sm">
+        {/* Step 1: Course Input */}
+        {step === 'input' && !functionError && (
+          <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
             <CardHeader className="text-center pb-4">
-              <CardTitle className={`text-3xl font-bold ${gradientTextClass}`}>
-                🎉 Course Blueprint Ready!
+              <CardTitle className={`text-2xl font-bold ${gradientTextClass}`}>
+                Describe Your Course
               </CardTitle>
               <CardDescription className="text-lg">
-                Lumo AI has analyzed your vision and created this comprehensive course structure
+                Provide some details about the course you want to create
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="title" className="text-base font-semibold">Course Title *</Label>
+                  <Input
+                    id="title"
+                    placeholder="e.g., Advanced React Patterns"
+                    value={courseData.title}
+                    onChange={(e) => handleInputChange('title', e.target.value)}
+                    className="h-12 border-2 focus:border-orange-300 transition-colors"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="difficulty" className="text-base font-semibold">Difficulty Level</Label>
+                  <select
+                    id="difficulty"
+                    className="w-full px-3 py-3 border-2 border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                    value={courseData.difficulty}
+                    onChange={(e) => handleInputChange('difficulty', e.target.value)}
+                  >
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description" className="text-base font-semibold">Course Description *</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Describe what students will learn in this course..."
+                  rows={4}
+                  value={courseData.description}
+                  onChange={(e) => handleInputChange('description', e.target.value)}
+                  className="border-2 focus:border-orange-300 resize-none transition-colors"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="targetAudience" className="text-base font-semibold">Target Audience</Label>
+                <Input
+                  id="targetAudience"
+                  placeholder="e.g., Web developers with basic JavaScript knowledge"
+                  value={courseData.targetAudience}
+                  onChange={(e) => handleInputChange('targetAudience', e.target.value)}
+                  className="border-2 focus:border-orange-300 transition-colors"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="learningGoals" className="text-base font-semibold">Key Learning Goals</Label>
+                <Textarea
+                  id="learningGoals"
+                  placeholder="What specific skills will students gain?"
+                  rows={3}
+                  value={courseData.learningGoals}
+                  onChange={(e) => handleInputChange('learningGoals', e.target.value)}
+                  className="border-2 focus:border-orange-300 resize-none transition-colors"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="duration" className="text-base font-semibold">Estimated Duration</Label>
+                <Input
+                  id="duration"
+                  placeholder="e.g., 8 hours, 6 weeks"
+                  value={courseData.duration}
+                  onChange={(e) => handleInputChange('duration', e.target.value)}
+                  className="border-2 focus:border-orange-300 transition-colors"
+                />
+              </div>
+
+              <Button
+                onClick={handleGenerateProposal}
+                disabled={loading || !courseData.title.trim() || !courseData.description.trim()}
+                className={`w-full ${gradientClass} text-white font-semibold py-3 rounded-lg ${gradientHoverClass} transition-all duration-200 shadow-lg hover:shadow-xl`}
+              >
+                <Bot className="h-5 w-5 mr-2" />
+                {loading ? 'Generating Proposal...' : 'Generate Course Proposal (8 tokens)'}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 2: Generating Proposal */}
+        {step === 'generating' && !functionError && (
+          <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm text-center">
+            <CardContent className="pt-12 pb-12">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto mb-6"></div>
+              <h3 className="text-xl font-semibold mb-2 text-gray-800">Generating Your Course Proposal</h3>
+              <p className="text-gray-600 mb-4">Our AI is crafting a comprehensive course structure...</p>
+              <div className="flex justify-center space-x-2">
+                <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* SIMPLIFIED: Course Creation Loading */}
+        {step === 'creating' && !functionError && (
+          <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm text-center">
+            <CardContent className="pt-16 pb-16">
+              {/* Pulse Animation */}
+              <div className="relative mx-auto mb-8">
+                <div className="absolute inset-0 rounded-full bg-orange-500 animate-ping opacity-20"></div>
+                <div className="relative rounded-full bg-gradient-to-r from-orange-500 to-purple-600 w-20 h-20 flex items-center justify-center mx-auto">
+                  <Bot className="h-10 w-10 text-white" />
+                </div>
+              </div>
+              
+              <h3 className="text-2xl font-bold mb-4 text-gray-800">Creating Your Course</h3>
+              <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                Our AI is generating your complete course with lessons, quizzes, and exams. 
+                This typically takes 2-3 minutes.
+              </p>
+              
+              {/* Simple Pulse Animation */}
+              <div className="flex justify-center space-x-3 mb-6">
+                <div className="w-3 h-3 bg-orange-500 rounded-full animate-pulse"></div>
+                <div className="w-3 h-3 bg-purple-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                <div className="w-3 h-3 bg-orange-400 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+              </div>
+              
+              <div className="text-sm text-gray-500">
+                Please don't close this window...
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 3: Proposal Review */}
+        {step === 'proposal' && proposal && !functionError && (
+          <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
+            <CardHeader className="text-center pb-4">
+              <CardTitle className={`text-2xl font-bold ${gradientTextClass}`}>
+                Course Proposal Generated!
+              </CardTitle>
+              <CardDescription className="text-lg">
+                Review the course structure and create your course
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Course Overview */}
-              <div className="bg-gradient-to-r from-orange-50 to-purple-50 rounded-2xl p-6 border border-orange-200">
+              <div className="bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg p-6 border border-orange-200">
                 <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-start space-x-4">
-                    <div className={`rounded-xl ${gradientClass} p-3 text-white shadow-lg`}>
+                  <div className="flex items-center space-x-3">
+                    <div className={`rounded-lg ${gradientClass} p-2 text-white`}>
                       <Play className="h-6 w-6" />
                     </div>
                     <div>
-                      <h3 className="text-2xl font-bold text-gray-900">{proposal.course_title}</h3>
-                      <p className="text-gray-700 mt-2 text-lg leading-relaxed">{proposal.course_summary}</p>
+                      <h3 className="text-xl font-bold text-gray-900">{proposal.course_title}</h3>
+                      <p className="text-gray-700 mt-1">{proposal.course_summary}</p>
                     </div>
                   </div>
-                  <Badge className={`${gradientClass} text-white border-0 text-sm px-3 py-1`}>
+                  <Badge className={`${gradientClass} text-white border-0`}>
                     {proposal.difficulty_level}
                   </Badge>
                 </div>
                 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div className="text-center p-4 bg-white rounded-xl border border-orange-100 shadow-sm">
-                    <Clock className="h-6 w-6 mx-auto mb-2 text-orange-500" />
-                    <p className="font-bold text-gray-900 text-lg">{Math.ceil(proposal.duration_minutes / 60)}h</p>
-                    <p className="text-xs text-gray-600">Total Duration</p>
+                  <div className="text-center p-3 bg-white rounded-lg border border-orange-100">
+                    <Clock className="h-5 w-5 mx-auto mb-1 text-orange-500" />
+                    <p className="font-semibold text-gray-900">{Math.ceil(proposal.duration_minutes / 60)}h</p>
+                    <p className="text-xs text-gray-600">Duration</p>
                   </div>
-                  <div className="text-center p-4 bg-white rounded-xl border border-orange-100 shadow-sm">
-                    <BookOpen className="h-6 w-6 mx-auto mb-2 text-purple-500" />
-                    <p className="font-bold text-gray-900 text-lg">{proposal.module_outline?.length || 0}</p>
-                    <p className="text-xs text-gray-600">Learning Modules</p>
+                  <div className="text-center p-3 bg-white rounded-lg border border-orange-100">
+                    <BookOpen className="h-5 w-5 mx-auto mb-1 text-purple-500" />
+                    <p className="font-semibold text-gray-900">{proposal.module_outline?.length || 0}</p>
+                    <p className="text-xs text-gray-600">Modules</p>
                   </div>
-                  <div className="text-center p-4 bg-white rounded-xl border border-orange-100 shadow-sm">
-                    <FileText className="h-6 w-6 mx-auto mb-2 text-orange-500" />
-                    <p className="font-bold text-gray-900 text-lg">
+                  <div className="text-center p-3 bg-white rounded-lg border border-orange-100">
+                    <FileText className="h-5 w-5 mx-auto mb-1 text-orange-500" />
+                    <p className="font-semibold text-gray-900">
                       {proposal.module_outline?.reduce((acc: number, mod: any) => acc + (mod.lessons?.length || 0), 0) || 0}
                     </p>
                     <p className="text-xs text-gray-600">Lessons</p>
                   </div>
-                  <div className="text-center p-4 bg-white rounded-xl border border-orange-100 shadow-sm">
-                    <Target className="h-6 w-6 mx-auto mb-2 text-purple-500" />
-                    <p className="font-bold text-gray-900 text-lg">
+                  <div className="text-center p-3 bg-white rounded-lg border border-orange-100">
+                    <Target className="h-5 w-5 mx-auto mb-1 text-purple-500" />
+                    <p className="font-semibold text-gray-900">
                       {proposal.is_free ? 'Free' : `$${proposal.price}`}
                     </p>
-                    <p className="text-xs text-gray-600">Price Point</p>
+                    <p className="text-xs text-gray-600">Price</p>
                   </div>
                 </div>
               </div>
 
               {/* Learning Outcomes */}
               {proposal.learning_outcomes && proposal.learning_outcomes.length > 0 && (
-                <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-                  <h4 className="font-bold text-xl mb-4 flex items-center">
-                    <GraduationCap className="h-6 w-6 mr-3 text-orange-500" />
-                    What Students Will Master
+                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                  <h4 className="font-semibold text-lg mb-3 flex items-center">
+                    <GraduationCap className="h-5 w-5 mr-2 text-orange-500" />
+                    What You'll Learn
                   </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {proposal.learning_outcomes.slice(0, 6).map((outcome: string, index: number) => (
-                      <div key={index} className="flex items-start space-x-3 p-3 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg">
-                        <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                        <span className="text-gray-700 font-medium">{outcome}</span>
+                      <div key={index} className="flex items-center space-x-2 text-sm">
+                        <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                        <span className="text-gray-700">{outcome}</span>
                       </div>
                     ))}
                   </div>
@@ -674,43 +700,43 @@ const CreatorCourseCreateWithAI = () => {
               {/* Modules Preview */}
               {proposal.module_outline && proposal.module_outline.length > 0 && (
                 <div className="space-y-4">
-                  <h4 className="font-bold text-xl flex items-center">
-                    <BookOpen className="h-6 w-6 mr-3 text-purple-500" />
-                    Course Journey
+                  <h4 className="font-semibold text-lg flex items-center">
+                    <BookOpen className="h-5 w-5 mr-2 text-purple-500" />
+                    Course Modules
                   </h4>
                   {proposal.module_outline.map((module: any, index: number) => (
-                    <Card key={index} className="border border-orange-100 hover:border-orange-300 transition-all duration-300 shadow-sm hover:shadow-md">
-                      <CardContent className="p-5">
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="flex items-start space-x-4">
-                            <div className={`w-8 h-8 rounded-full ${gradientClass} flex items-center justify-center text-white text-sm font-bold shadow-md`}>
-                              {module.module_number || index + 1}
+                    <Card key={index} className="border border-orange-100 hover:border-orange-300 transition-colors">
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <div className="flex items-center space-x-2 mb-1">
+                              <div className={`w-6 h-6 rounded-full ${gradientClass} flex items-center justify-center text-white text-xs font-bold`}>
+                                {module.module_number || index + 1}
+                              </div>
+                              <h5 className="font-semibold text-gray-900">{module.module_title}</h5>
                             </div>
-                            <div>
-                              <h5 className="font-bold text-lg text-gray-900">{module.module_title}</h5>
-                              <p className="text-gray-600 mt-1">{module.module_description}</p>
-                            </div>
+                            <p className="text-sm text-gray-600">{module.module_description}</p>
                           </div>
-                          <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 font-semibold">
+                          <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
                             {module.lessons?.length || 0} lessons
                           </Badge>
                         </div>
                         {module.lessons && module.lessons.length > 0 && (
-                          <div className="mt-4 grid grid-cols-1 gap-2">
+                          <div className="mt-3 grid grid-cols-1 gap-2">
                             {module.lessons.slice(0, 4).map((lesson: any, lessonIndex: number) => (
-                              <div key={lessonIndex} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-white transition-colors">
-                                <div className="flex items-center space-x-3">
-                                  <Play className="h-4 w-4 text-orange-500" />
-                                  <span className="font-medium text-gray-700">{lesson.lesson_title}</span>
+                              <div key={lessonIndex} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                                <div className="flex items-center space-x-2">
+                                  <Play className="h-3 w-3 text-orange-500" />
+                                  <span className="text-sm font-medium text-gray-700">{lesson.lesson_title}</span>
                                 </div>
-                                <span className="text-sm text-gray-500 bg-white px-2 py-1 rounded border">
+                                <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded">
                                   {lesson.duration_minutes}min
                                 </span>
                               </div>
                             ))}
                             {module.lessons.length > 4 && (
-                              <div className="text-center py-2 text-gray-500 font-medium">
-                                +{module.lessons.length - 4} more lessons in this module
+                              <div className="text-sm text-gray-500 text-center py-1">
+                                +{module.lessons.length - 4} more lessons
                               </div>
                             )}
                           </div>
@@ -730,25 +756,25 @@ const CreatorCourseCreateWithAI = () => {
                     setProposalId(null);
                   }}
                   variant="outline"
-                  className="flex-1 border-2 border-gray-300 hover:border-orange-300 transition-colors py-3 text-lg rounded-xl"
+                  className="flex-1 border-2 border-gray-300 hover:border-orange-300 transition-colors"
                 >
-                  Start New Project
+                  Start Over
                 </Button>
                 <Button
                   onClick={handleCreateFullCourse}
                   disabled={loading}
-                  className={`flex-1 ${gradientClass} text-white font-bold py-3 rounded-xl ${gradientHoverClass} transition-all duration-300 shadow-2xl hover:shadow-3xl transform hover:scale-[1.02] text-lg`}
+                  className={`flex-1 ${gradientClass} text-white font-semibold py-3 rounded-lg ${gradientHoverClass} transition-all duration-200 shadow-lg hover:shadow-xl`}
                 >
                   {loading ? (
                     <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                      Creating Your Course...
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Creating Course...
                     </>
                   ) : (
                     <>
-                      <Bot className="h-5 w-5 mr-2" />
+                      <Bot className="h-4 w-4 mr-2" />
                       Create Complete Course (25 tokens)
-                      <ArrowRight className="h-5 w-5 ml-2" />
+                      <ArrowRight className="h-4 w-4 ml-2" />
                     </>
                   )}
                 </Button>
@@ -757,18 +783,18 @@ const CreatorCourseCreateWithAI = () => {
           </Card>
         )}
 
-        {/* Past Proposals */}
-        {pastProposals.length > 0 && step === 'input' && (
-          <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-sm">
+        {/* Past Proposals Section */}
+        {pastProposals.length > 0 && (
+          <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="flex items-center text-2xl font-bold">
-                    <History className="h-6 w-6 mr-3 text-purple-500" />
-                    Your AI Course History
+                  <CardTitle className="flex items-center text-xl">
+                    <History className="h-5 w-5 mr-2 text-purple-500" />
+                    Your AI Course Proposals
                   </CardTitle>
-                  <CardDescription className="text-lg">
-                    Revisit and modify your previous course proposals
+                  <CardDescription>
+                    Click any proposal to reuse it. Proposals never expire.
                   </CardDescription>
                 </div>
               </div>
@@ -781,31 +807,31 @@ const CreatorCourseCreateWithAI = () => {
                   return (
                     <div 
                       key={proposalItem.id} 
-                      className="flex items-center justify-between p-5 bg-gradient-to-r from-orange-50 to-purple-50 rounded-xl border border-orange-200 hover:border-orange-400 transition-all duration-300 cursor-pointer hover:shadow-lg group"
-                      onClick={() => loadProposalIntoForm(proposalData, proposalItem.user_prompt)}
+                      className="flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg border border-orange-200 hover:border-orange-400 transition-all duration-300 cursor-pointer hover:shadow-md group"
+                      onClick={() => loadProposalIntoForm(proposalData)}
                     >
                       <div className="flex items-center space-x-4">
-                        <div className={`w-12 h-12 rounded-xl ${gradientClass} flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300 shadow-md`}>
+                        <div className={`w-12 h-12 rounded-full ${gradientClass} flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300`}>
                           <BookOpen className="h-6 w-6" />
                         </div>
                         <div>
-                          <h4 className="font-bold text-gray-900 group-hover:text-orange-700 transition-colors text-lg">
+                          <h4 className="font-semibold text-gray-900 group-hover:text-orange-700 transition-colors">
                             {proposalData.course_title}
                           </h4>
-                          <p className="text-gray-600 line-clamp-1 mt-1">{proposalData.course_summary}</p>
-                          <div className="flex items-center space-x-3 mt-2">
+                          <p className="text-sm text-gray-600 line-clamp-1">{proposalData.course_summary}</p>
+                          <div className="flex items-center space-x-2 mt-1">
                             <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
                               {proposalData.difficulty_level}
                             </Badge>
-                            <div className="flex items-center text-sm text-gray-500">
-                              <Calendar className="h-4 w-4 mr-1" />
+                            <div className="flex items-center text-xs text-gray-500">
+                              <Calendar className="h-3 w-3 mr-1" />
                               {new Date(proposalItem.created_at).toLocaleDateString()}
                             </div>
                           </div>
                         </div>
                       </div>
                       <div className="text-right">
-                        <Badge className="bg-white text-purple-700 border-purple-200 group-hover:bg-purple-50 transition-colors shadow-sm">
+                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 group-hover:bg-purple-100 transition-colors">
                           Click to Reuse
                         </Badge>
                       </div>
@@ -828,30 +854,6 @@ const CreatorCourseCreateWithAI = () => {
         />
       </div>
     </CreatorLayout>
-  );
-};
-
-// Typewriter Animation Component
-const TypewriterAnimation = ({ text, speed = 50 }: { text: string; speed?: number }) => {
-  const [displayText, setDisplayText] = useState('');
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  useEffect(() => {
-    if (currentIndex < text.length) {
-      const timer = setTimeout(() => {
-        setDisplayText(prev => prev + text[currentIndex]);
-        setCurrentIndex(prev => prev + 1);
-      }, speed);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [currentIndex, text, speed]);
-
-  return (
-    <span>
-      {displayText}
-      <span className="animate-pulse">|</span>
-    </span>
   );
 };
 
