@@ -509,12 +509,11 @@ const AiChatComponent = () => {
       setCurrentThreadId(thread.id);
       setConversationThreads(prev => [thread, ...prev]);
       
-      // Store welcome message in database
+      // Store welcome message in database (let DB generate UUID)
       const welcomeMessage = getWelcomeMessage();
-      const { error: welcomeMessageError } = await supabase
+      const { data: storedWelcomeMessage, error: welcomeMessageError } = await supabase
         .from('conversation_messages')
         .insert({
-          id: welcomeMessage.id,
           thread_id: thread.id,
           role: 'assistant',
           content: welcomeMessage.content,
@@ -522,13 +521,25 @@ const AiChatComponent = () => {
             type: welcomeMessage.type,
             followUpQuestions: welcomeMessage.followUpQuestions
           }
-        });
+        })
+        .select()
+        .single();
 
       if (welcomeMessageError) {
         console.error('Error storing welcome message:', welcomeMessageError);
+        setMessages([welcomeMessage]);
+      } else {
+        // Use the stored message with database-generated ID
+        const storedMessage: AiMessage = {
+          id: storedWelcomeMessage.id,
+          role: 'assistant',
+          content: storedWelcomeMessage.content,
+          timestamp: new Date(storedWelcomeMessage.created_at),
+          type: storedWelcomeMessage.metadata?.type,
+          followUpQuestions: storedWelcomeMessage.metadata?.followUpQuestions
+        };
+        setMessages([storedMessage]);
       }
-
-      setMessages([welcomeMessage]);
     } catch (error) {
       console.error('Error creating new thread:', error);
       toast.error('Failed to create new conversation');
@@ -584,7 +595,7 @@ const AiChatComponent = () => {
   };
 
   const getWelcomeMessage = (): AiMessage => ({
-    id: 'welcome',
+    id: `welcome-${Date.now()}`, // Temporary ID for welcome message
     role: 'assistant',
     content: "Hi! I'm your AI Smart Advisor for SkillPulse! 🚀\n\nI can help you discover personalized courses, events, and learning paths tailored to your interests. I have access to your learning history and can provide smart recommendations.\n\nWhat would you like to learn about today?",
     timestamp: new Date(),
@@ -671,35 +682,43 @@ const AiChatComponent = () => {
       return;
     }
 
-    const userMessageId = `user-${Date.now()}`;
-    const userMessage: AiMessage = {
-      id: userMessageId,
+    // Create temporary user message for immediate UI update
+    const tempUserMessage: AiMessage = {
+      id: `temp-user-${Date.now()}`,
       role: 'user',
       content: inputMessage,
       timestamp: new Date()
     };
 
     shouldScrollToBottom.current = true;
-    setMessages(prev => [...prev, userMessage]);
+    setMessages(prev => [...prev, tempUserMessage]);
     setInputMessage('');
     setIsLoading(true);
 
     try {
-      // 🔧 STORE USER MESSAGE
-      const { error: userMessageError } = await supabase
+      // 🔧 STORE USER MESSAGE (let DB generate UUID)
+      const { data: storedUserMessage, error: userMessageError } = await supabase
         .from('conversation_messages')
         .insert({
-          id: userMessageId,
           thread_id: currentThreadId,
           role: 'user',
           content: inputMessage,
           metadata: {} // Empty metadata for user messages
-        });
+        })
+        .select()
+        .single();
 
       if (userMessageError) {
         console.error('Error storing user message:', userMessageError);
         throw userMessageError;
       }
+
+      // Replace temporary message with stored message
+      setMessages(prev => prev.map(msg => 
+        msg.id === tempUserMessage.id 
+          ? { ...msg, id: storedUserMessage.id, timestamp: new Date(storedUserMessage.created_at) }
+          : msg
+      ));
 
       // Call AI Edge Function
       const { data, error } = await supabase.functions.invoke('smart-advisor-ai', {
@@ -716,24 +735,10 @@ const AiChatComponent = () => {
 
       if (error) throw error;
 
-      const assistantMessageId = data.messageId || `ai-${Date.now()}`;
-      const assistantMessage: AiMessage = {
-        id: assistantMessageId,
-        role: 'assistant',
-        content: data.response,
-        timestamp: new Date(),
-        recommendations: data.recommendations,
-        uiComponents: data.uiComponents,
-        type: data.type,
-        nextSteps: data.nextSteps,
-        followUpQuestions: data.followUpQuestions
-      };
-
-      // 🔧 STORE AI ASSISTANT MESSAGE WITH FULL METADATA
-      const { error: assistantMessageError } = await supabase
+      // 🔧 STORE AI ASSISTANT MESSAGE WITH FULL METADATA (let DB generate UUID)
+      const { data: storedAssistantMessage, error: assistantMessageError } = await supabase
         .from('conversation_messages')
         .insert({
-          id: assistantMessageId,
           thread_id: currentThreadId,
           role: 'assistant',
           content: data.response,
@@ -744,14 +749,28 @@ const AiChatComponent = () => {
             nextSteps: data.nextSteps,
             followUpQuestions: data.followUpQuestions
           }
-        });
+        })
+        .select()
+        .single();
 
       if (assistantMessageError) {
         console.error('Error storing assistant message:', assistantMessageError);
         throw assistantMessageError;
       }
 
-      // 🔧 STORE INDIVIDUAL RECOMMENDATIONS
+      const assistantMessage: AiMessage = {
+        id: storedAssistantMessage.id,
+        role: 'assistant',
+        content: storedAssistantMessage.content,
+        timestamp: new Date(storedAssistantMessage.created_at),
+        recommendations: storedAssistantMessage.metadata?.recommendations,
+        uiComponents: storedAssistantMessage.metadata?.uiComponents,
+        type: storedAssistantMessage.metadata?.type,
+        nextSteps: storedAssistantMessage.metadata?.nextSteps,
+        followUpQuestions: storedAssistantMessage.metadata?.followUpQuestions
+      };
+
+      // 🔧 STORE INDIVIDUAL RECOMMENDATIONS (let DB generate UUIDs)
       if (data.recommendations) {
         const recommendationsToStore = [];
 
