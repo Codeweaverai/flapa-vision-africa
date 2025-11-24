@@ -96,10 +96,13 @@ const CreatorCourseCreateWithAI = () => {
 
   // Example prompts for typing animation
   const examplePrompts = [
-    "Create a comprehensive course about modern web development with React, TypeScript, and Next.js for intermediate developers...",
-    "Build a complete Python data science course covering pandas, numpy, and machine learning for beginners...",
-    "Design an advanced digital marketing strategy course with social media, SEO, and analytics for business owners...",
-    "Develop a mobile app development course using Flutter and Dart for creating cross-platform applications..."
+    "Create a comprehensive course on modern web development using React, TypeScript, and Next.js, tailored for intermediate developers who want to build scalable and production-ready applications.",
+    "Build a complete Python data science course for beginners, covering essential topics such as pandas, NumPy, data visualization, and an introduction to machine learning techniques....",
+    "Design an advanced digital marketing strategy course that includes in-depth training on social media marketing, SEO, content strategy, paid ads, and analytics—perfect for business owners and marketing professionals....",
+    "Develop a full mobile app development course using Flutter and Dart, guiding learners step-by-step in creating high-quality cross-platform applications...."
+    "Create an AI and automation productivity course that teaches students how to use tools like ChatGPT, DeepSeek, Make.com, and Zapier to automate business workflows........"
+    "Develop a user-friendly SQL and database fundamentals course for absolute beginners, featuring hands-on practice with queries, joins, indexes, and data modeling........"
+    "Develop a financial accounting fundamentals course that simplifies core concepts such as ledgers, trial balances, bank reconciliation, and financial statements........."
   ];
 
   // Typing animation effect
