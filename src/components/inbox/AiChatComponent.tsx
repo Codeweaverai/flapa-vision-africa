@@ -881,10 +881,10 @@ const AiChatComponent = () => {
   }
 
   return (
-    <div className="h-[calc(100vh-120px)] min-h-[500px] max-h-[800px] lg:max-h-[900px]">
+    <div className="h-[calc(100vh-80px)] min-h-[700px] max-h-[1100px] lg:max-h-[1300px]">
       <Card className="h-full bg-gradient-to-br from-orange-50/80 via-purple-50/80 to-pink-50/80 backdrop-blur-sm border border-orange-200/30 shadow-2xl overflow-hidden">
         {/* Compact Header */}
-        <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white py-3 px-4 relative overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-orange-500 to-purple-600 text-white py-4 px-6 relative overflow-hidden">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Button
@@ -925,11 +925,11 @@ const AiChatComponent = () => {
           {/* Main Chat Area */}
           <div className="flex-1 flex flex-col">
             <ScrollArea 
-              className="flex-1 p-4 md:p-6" 
+              className="flex-1 p-6 md:p-8" 
               ref={scrollAreaRef}
               onScroll={handleScroll}
             >
-              <div className="space-y-4 md:space-y-6 max-w-4xl mx-auto">
+              <div className="space-y-6 md:space-y-8 max-w-4xl mx-auto">
                 {/* Show past recommendations in chat when toggled */}
                 {showPastRecommendations && renderPastRecommendations()}
                 
@@ -954,13 +954,13 @@ const AiChatComponent = () => {
                     </Avatar>
                     
                     <div className={cn(
-                      "flex-1 max-w-[80%] md:max-w-[85%] space-y-2 md:space-y-3",
+                      "flex-1 max-w-[80%] md:max-w-[85%] space-y-3 md:space-y-4",
                       message.role === 'user' ? 'text-right' : ''
                     )}>
                       {/* Message Bubble */}
                       <div
                         className={cn(
-                          "rounded-2xl p-3 md:p-4 transition-all duration-300",
+                          "rounded-2xl p-4 md:p-5 transition-all duration-300",
                           message.role === 'user'
                             ? 'bg-gradient-to-r from-purple-500 to-orange-500 text-white shadow-xl ml-auto'
                             : 'bg-white/90 backdrop-blur-sm text-gray-900 shadow-lg border border-orange-100'
@@ -973,15 +973,15 @@ const AiChatComponent = () => {
 
                       {/* Current Recommendations Grid */}
                       {message.role === 'assistant' && message.recommendations && (
-                        <div className="space-y-3 md:space-y-4">
+                        <div className="space-y-4 md:space-y-5">
                           {/* Course Recommendations */}
                           {message.recommendations.courses && message.recommendations.courses.length > 0 && (
-                            <div className="space-y-2 md:space-y-3">
+                            <div className="space-y-3 md:space-y-4">
                               <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
                                 <BookOpen className="h-4 w-4 text-orange-500" />
                                 Recommended Courses
                               </div>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5">
                                 {message.recommendations.courses.map((course) => (
                                   <CourseRecommendationCard
                                     key={course.id}
@@ -995,12 +995,12 @@ const AiChatComponent = () => {
 
                           {/* Event Recommendations */}
                           {message.recommendations.events && message.recommendations.events.length > 0 && (
-                            <div className="space-y-2 md:space-y-3">
+                            <div className="space-y-3 md:space-y-4">
                               <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
                                 <Calendar className="h-4 w-4 text-purple-500" />
                                 Upcoming Events
                               </div>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5">
                                 {message.recommendations.events.map((event) => (
                                   <EventRecommendationCard
                                     key={event.id}
@@ -1067,7 +1067,7 @@ const AiChatComponent = () => {
                         <Bot className="w-3 h-3 md:w-5 md:h-5" />
                       </AvatarFallback>
                     </Avatar>
-                    <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-3 md:p-4 shadow-lg border border-orange-100 max-w-[80%] md:max-w-[85%]">
+                    <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-4 md:p-5 shadow-lg border border-orange-100 max-w-[80%] md:max-w-[85%]">
                       <div className="flex items-center gap-2 md:gap-3">
                         <div className="flex space-x-1">
                           <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>
@@ -1085,7 +1085,7 @@ const AiChatComponent = () => {
             </ScrollArea>
             
             {/* Input Area */}
-            <div className="border-t border-orange-200/50 bg-white/50 backdrop-blur-sm p-4">
+            <div className="border-t border-orange-200/50 bg-white/50 backdrop-blur-sm p-4 md:p-5">
               <div className="max-w-4xl mx-auto">
                 <div className="flex gap-2 md:gap-3">
                   <Input
