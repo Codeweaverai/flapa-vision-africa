@@ -23,7 +23,7 @@ const ModernInboxComponent = () => {
             className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white flex items-center gap-2 font-medium"
           >
             <Bot className="h-4 w-4" />
-            AI Smart Advisor
+            Lumo Ai
           </TabsTrigger>
         </TabsList>
         
