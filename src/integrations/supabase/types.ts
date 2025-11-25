@@ -148,25 +148,40 @@ export type Database = {
       }
       ai_course_proposals: {
         Row: {
+          category_embedding: string | null
+          course_summary_embedding: string | null
+          course_title_embedding: string | null
           created_at: string | null
           creator_id: string
-          expires_at: string
           id: string
+          prompt_embedding: string | null
           proposal_data: Json
+          updated_at: string | null
+          user_prompt: string
         }
         Insert: {
+          category_embedding?: string | null
+          course_summary_embedding?: string | null
+          course_title_embedding?: string | null
           created_at?: string | null
           creator_id: string
-          expires_at?: string
           id?: string
+          prompt_embedding?: string | null
           proposal_data: Json
+          updated_at?: string | null
+          user_prompt: string
         }
         Update: {
+          category_embedding?: string | null
+          course_summary_embedding?: string | null
+          course_title_embedding?: string | null
           created_at?: string | null
           creator_id?: string
-          expires_at?: string
           id?: string
+          prompt_embedding?: string | null
           proposal_data?: Json
+          updated_at?: string | null
+          user_prompt?: string
         }
         Relationships: []
       }
@@ -236,15 +251,7 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "ai_generation_progress_proposal_id_fkey"
-            columns: ["proposal_id"]
-            isOneToOne: false
-            referencedRelation: "ai_course_proposals"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       ai_usage_costs: {
         Row: {
@@ -957,6 +964,130 @@ export type Database = {
         }
         Relationships: []
       }
+      conversation_messages: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          role: string
+          thread_id: string | null
+          token_count: number | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          role: string
+          thread_id?: string | null
+          token_count?: number | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          role?: string
+          thread_id?: string | null
+          token_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_recommendations: {
+        Row: {
+          created_at: string | null
+          id: string
+          item_data: Json
+          item_id: string
+          reason: string | null
+          recommendation_type: string
+          thread_id: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          item_data: Json
+          item_id: string
+          reason?: string | null
+          recommendation_type: string
+          thread_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          item_data?: Json
+          item_id?: string
+          reason?: string | null
+          recommendation_type?: string
+          thread_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_recommendations_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_threads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_recommendations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_threads: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          title: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          title: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_threads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       country_currency_mapping: {
         Row: {
           country_code: string
@@ -1009,6 +1140,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "course_comments_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_embeddings: {
+        Row: {
+          content_text: string
+          course_id: string
+          created_at: string | null
+          embedding: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          content_text: string
+          course_id: string
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          content_text?: string
+          course_id?: string
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_embeddings_course_id_fkey"
             columns: ["course_id"]
             isOneToOne: false
             referencedRelation: "courses"
@@ -1753,6 +1919,91 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_embeddings: {
+        Row: {
+          content_text: string
+          created_at: string | null
+          embedding: string | null
+          event_id: string
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          content_text: string
+          created_at?: string | null
+          embedding?: string | null
+          event_id: string
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          content_text?: string
+          created_at?: string | null
+          embedding?: string | null
+          event_id?: string
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_embeddings_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_embeddings_ai: {
+        Row: {
+          created_at: string | null
+          creator_id: string
+          embedding: string | null
+          event_description: string | null
+          event_title: string
+          event_type: string | null
+          id: string
+          key_topics: string[] | null
+          proposal_id: string | null
+          target_audience: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          creator_id: string
+          embedding?: string | null
+          event_description?: string | null
+          event_title: string
+          event_type?: string | null
+          id?: string
+          key_topics?: string[] | null
+          proposal_id?: string | null
+          target_audience?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          creator_id?: string
+          embedding?: string | null
+          event_description?: string | null
+          event_title?: string
+          event_type?: string | null
+          id?: string
+          key_topics?: string[] | null
+          proposal_id?: string | null
+          target_audience?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_embeddings_ai_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "ai_event_proposals"
             referencedColumns: ["id"]
           },
         ]
@@ -4920,7 +5171,31 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      event_embeddings_ai_with_users: {
+        Row: {
+          created_at: string | null
+          creator_email: string | null
+          creator_id: string | null
+          embedding: string | null
+          event_description: string | null
+          event_title: string | null
+          event_type: string | null
+          id: string | null
+          key_topics: string[] | null
+          proposal_id: string | null
+          target_audience: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_embeddings_ai_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "ai_event_proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       broadcast_message_to_all_users: {
@@ -4959,6 +5234,10 @@ export type Database = {
       }
       cleanup_expired_otps: { Args: never; Returns: undefined }
       cleanup_expired_proposals: { Args: never; Returns: undefined }
+      cleanup_old_event_embeddings_ai: {
+        Args: { days_old?: number }
+        Returns: number
+      }
       count_bookings_by_event: {
         Args: never
         Returns: {
@@ -4996,6 +5275,16 @@ export type Database = {
         }[]
       }
       get_current_user_email: { Args: never; Returns: string }
+      get_event_embeddings_ai_stats: {
+        Args: { user_id?: string }
+        Returns: {
+          event_types: string[]
+          newest_embedding: string
+          oldest_embedding: string
+          total_embeddings: number
+          user_embeddings: number
+        }[]
+      }
       get_exchange_rate: {
         Args: { from_currency: string; to_currency: string }
         Returns: number
@@ -5035,6 +5324,22 @@ export type Database = {
         Returns: boolean
       }
       is_workspace_owner: { Args: { workspace_uuid: string }; Returns: boolean }
+      match_event_embeddings_ai: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          event_description: string
+          event_title: string
+          event_type: string
+          id: string
+          key_topics: string[]
+          similarity: number
+          target_audience: string
+        }[]
+      }
       process_payment_success: {
         Args: {
           p_order_id: string
@@ -5042,6 +5347,45 @@ export type Database = {
           p_session_id?: string
         }
         Returns: boolean
+      }
+      search_courses_by_embedding: {
+        Args: {
+          match_count: number
+          match_threshold: number
+          query_embedding: string
+        }
+        Returns: {
+          category: string
+          creator_id: string
+          difficulty_level: string
+          duration_minutes: number
+          id: string
+          is_free: boolean
+          price: number
+          similarity: number
+          thumbnail_url: string
+          title: string
+        }[]
+      }
+      search_events_by_embedding: {
+        Args: {
+          match_count: number
+          match_threshold: number
+          query_embedding: string
+        }
+        Returns: {
+          creator_id: string
+          end_time: string
+          event_type: string
+          id: string
+          image_url: string
+          is_free: boolean
+          location: string
+          price: number
+          similarity: number
+          start_time: string
+          title: string
+        }[]
       }
       update_newsletter_stats: {
         Args: { newsletter_id: string }
