@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,11 +6,65 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Bot, Sparkles, Calendar, Clock, Users, Zap, CheckCircle, ArrowRight, Play, Star, MapPin, Ticket, Mic, Plus, X, User, Music, Camera, Image, Shield, AlertCircle, History, Trash2, Copy } from 'lucide-react';
+import { Bot, Sparkles, Calendar, Clock, Users, Zap, CheckCircle, ArrowRight, Play, Star, MapPin, Ticket, Mic, Plus, X, User, Music, Camera, Image, Shield, AlertCircle, History, Trash2, Copy, Coins, Gift, Brain, Rocket, Search, Lightbulb, Target, BookOpen, Cpu, Layers, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTokens } from '@/hooks/useTokens';
+import TokenUsageDialog from '@/components/creator/TokenUsageDialog';
+import FreeTrialBanner from '@/components/creator/FreeTrialBanner';
+
+// Safe token hook wrapper
+const useSafeTokens = () => {
+  const tokenHook = useTokens();
+  
+  const safeHasEnoughTokens = (cost: number) => {
+    if (typeof tokenHook.hasEnoughTokens === 'function') {
+      return tokenHook.hasEnoughTokens(cost);
+    }
+    console.warn('hasEnoughTokens is not available');
+    return false;
+  };
+
+  const safeDeductTokens = async (featureType: string, referenceId?: string) => {
+    if (typeof tokenHook.deductTokens === 'function') {
+      return await tokenHook.deductTokens(featureType, referenceId);
+    }
+    console.warn('deductTokens is not available, proceeding without token deduction');
+    return { success: true, tokensUsed: 0, wasFree: false, remainingTokens: 0 };
+  };
+
+  const safeGetFeatureCost = async (featureType: string) => {
+    if (typeof tokenHook.getFeatureCost === 'function') {
+      return await tokenHook.getFeatureCost(featureType);
+    }
+    return featureType === 'event_proposal' ? 6 : 20;
+  };
+
+  const safeGetAvailableTokens = () => {
+    if (typeof tokenHook.getAvailableTokens === 'function') {
+      return tokenHook.getAvailableTokens();
+    }
+    return { free: 0, paid: 0 };
+  };
+
+  const safeRefetchTokens = () => {
+    if (typeof tokenHook.refetch === 'function') {
+      return tokenHook.refetch();
+    }
+    return Promise.resolve();
+  };
+
+  return {
+    ...tokenHook,
+    hasEnoughTokens: safeHasEnoughTokens,
+    deductTokens: safeDeductTokens,
+    getFeatureCost: safeGetFeatureCost,
+    getAvailableTokens: safeGetAvailableTokens,
+    refetch: safeRefetchTokens,
+  };
+};
 
 // Custom hook for real-time progress tracking
 const useAIProgress = (progressId: string | null) => {
@@ -121,195 +175,259 @@ interface SpeakerInput {
 const CreatorEventCreateWithAI = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { 
+    tokenBalance, 
+    hasEnoughTokens, 
+    deductTokens, 
+    getFeatureCost, 
+    getAvailableTokens, 
+    refetch: refetchTokens 
+  } = useSafeTokens();
+
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'input' | 'generating' | 'proposal' | 'creating'>('input');
-  const [eventData, setEventData] = useState({
-    title: '',
-    description: '',
-    eventType: 'webinar',
-    targetAudience: '',
-    duration: '',
-    location: '',
-    keyTopics: '',
-    maxPrice: '25'
-  });
-  
   const [detailedPrompt, setDetailedPrompt] = useState('');
-  const [speakers, setSpeakers] = useState<SpeakerInput[]>([
-    {
-      id: '1',
-      name: '',
-      role: 'keynote',
-      linkedinUrl: '',
-      twitterUrl: '',
-      websiteUrl: '',
-      expertise: ''
-    }
-  ]);
-  
   const [proposal, setProposal] = useState<any>(null);
   const [proposalId, setProposalId] = useState<string | null>(null);
   const [progressId, setProgressId] = useState<string | null>(null);
   const [showPastGenerations, setShowPastGenerations] = useState(false);
+  const [functionError, setFunctionError] = useState<string | null>(null);
+  const [typingIndex, setTypingIndex] = useState(0);
   
+  // Token usage states
+  const [showTokenDialog, setShowTokenDialog] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+  const [requiredTokens, setRequiredTokens] = useState(0);
+  const [featureName, setFeatureName] = useState('');
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   // Use the progress tracking hook
   const { progress: realTimeProgress, loading: progressLoading } = useAIProgress(progressId);
   
   // Use the past proposals hook
   const { proposals: pastProposals, loading: pastProposalsLoading } = usePastProposals(user?.id);
 
-  const handleInputChange = (field: string, value: string) => {
-    setEventData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
+  // Example prompts for typing animation
+  const examplePrompts = [
+    "Create a 2-hour virtual tech webinar about AI innovation happening on March 15, 2025. Target audience: developers and product managers. Ticket price: $15. Include speakers: Elon Musk (CEO of Tesla), Satya Nadella (CEO of Microsoft). Topics: AI trends, machine learning, future of technology.",
+    "Design a weekend music festival in Central Park featuring popular indie artists and established performers. Include food vendors, multiple stages, and VIP experiences. Target audience: young adults and music enthusiasts. Ticket prices: $25-$75.",
+    "Organize a business networking conference for entrepreneurs and investors in the tech startup ecosystem. Include keynote speakers, pitch sessions, and workshops on fundraising and growth strategies. Location: San Francisco. Duration: 2 days.",
+    "Create a wellness retreat focused on mindfulness and yoga in a natural setting. Include meditation sessions, yoga classes, healthy meals, and workshops on stress management. Target audience: professionals seeking work-life balance.",
+    "Plan a corporate team-building event with interactive workshops, group activities, and professional development sessions. Focus on communication skills, leadership, and collaboration. Duration: 1 day. Location: company headquarters.",
+    "Design a food and wine tasting event featuring local chefs and wineries. Include cooking demonstrations, wine pairings, and gourmet food stations. Target audience: food enthusiasts and culinary professionals.",
+    "Organize a charity gala fundraiser for environmental conservation. Include celebrity guests, auction items, dinner, and entertainment. Target audience: philanthropists and corporate sponsors.",
+    "Create a professional development workshop series for digital marketing professionals. Cover SEO, social media strategy, content marketing, and analytics. Include hands-on exercises and case studies.",
+    "Plan a community cultural festival celebrating diversity through music, dance, food, and art. Include performances, workshops, and international cuisine. Family-friendly event.",
+    "Design a tech product launch event with live demonstrations, keynote presentations, and hands-on experience zones. Include media coverage and influencer partnerships."
+  ];
 
-  const addSpeaker = () => {
-    setSpeakers(prev => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        name: '',
-        role: 'keynote',
-        linkedinUrl: '',
-        twitterUrl: '',
-        websiteUrl: '',
-        expertise: ''
-      }
-    ]);
-  };
-
-  const removeSpeaker = (id: string) => {
-    if (speakers.length > 1) {
-      setSpeakers(prev => prev.filter(speaker => speaker.id !== id));
+  // Typing animation effect
+  useEffect(() => {
+    if (step === 'input' && !detailedPrompt) {
+      const interval = setInterval(() => {
+        setTypingIndex((prev) => (prev + 1) % examplePrompts.length);
+      }, 3000);
+      return () => clearInterval(interval);
     }
-  };
+  }, [step, detailedPrompt]);
 
-  const updateSpeaker = (id: string, field: string, value: string) => {
-    setSpeakers(prev => prev.map(speaker => 
-      speaker.id === id ? { ...speaker, [field]: value } : speaker
-    ));
-  };
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+    }
+  }, [detailedPrompt]);
 
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case 'keynote': return <Mic className="h-4 w-4" />;
-      case 'performer': return <Music className="h-4 w-4" />;
-      case 'artist': return <Camera className="h-4 w-4" />;
-      case 'panelist': return <Users className="h-4 w-4" />;
-      default: return <User className="h-4 w-4" />;
+  const checkTokensAndProceed = async (action: 'proposal' | 'full_event', callback: () => void) => {
+    try {
+      const featureType = action === 'proposal' ? 'event_proposal' : 'full_event';
+      const cost = await getFeatureCost(featureType);
+      const featureName = action === 'proposal' ? 'Event Proposal' : 'Full Event Creation';
+      
+      setRequiredTokens(cost);
+      setFeatureName(featureName);
+      
+      if (hasEnoughTokens(cost)) {
+        callback();
+      } else {
+        setPendingAction(() => callback);
+        setShowTokenDialog(true);
+      }
+    } catch (error) {
+      console.error('Error checking token cost:', error);
+      toast.error('Unable to verify token requirements');
     }
   };
 
   const generateProposal = async () => {
-    // Use detailed prompt if provided, otherwise use structured form data
-    const promptToUse = detailedPrompt.trim() || buildPromptFromFormData();
+    if (!detailedPrompt.trim()) {
+      toast.error('Please describe the event you want to create');
+      return;
+    }
 
-    if (!promptToUse) {
-      toast.error('Please provide event details or use the detailed description field');
+    if (!user?.id) {
+      toast.error('User not authenticated');
       return;
     }
 
     setLoading(true);
     setStep('generating');
+    setFunctionError(null);
 
     try {
+      const tokenResult = await deductTokens('event_proposal', `event_proposal_${Date.now()}`);
+      
+      console.log('Calling generate-event function for proposal...');
       const { data, error } = await supabase.functions.invoke('generate-event', {
         body: {
-          user_prompt: promptToUse,
-          creator_id: user?.id,
+          user_prompt: detailedPrompt,
+          creator_id: user.id,
           action: 'generate_proposal'
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Function call error:', error);
+        throw new Error(error.message || 'Failed to generate proposal');
+      }
 
-      if (data.success) {
+      if (data?.success) {
         setProposal(data.proposal);
         setProposalId(data.proposal_id);
         setStep('proposal');
-        toast.success('Event proposal generated successfully!');
+        
+        let successMessage = 'Event proposal generated successfully!';
+        if (tokenResult?.wasFree) successMessage += ' (Used free tokens)';
+        
+        toast.success(successMessage);
       } else {
-        throw new Error(data.error || 'Failed to generate proposal');
+        throw new Error(data?.error || 'Failed to generate proposal');
       }
     } catch (error: any) {
       console.error('Error generating proposal:', error);
-      toast.error(error.message || 'Failed to generate event proposal');
+      
+      let errorMessage = error.message || 'Failed to generate event proposal';
+      
+      if (error.message?.includes('Insufficient tokens')) {
+        errorMessage = 'Insufficient tokens to generate event proposal';
+        await refetchTokens();
+      } else if (error.message?.includes('Edge Function')) {
+        errorMessage = 'AI service temporarily unavailable. Please try again.';
+      } else if (error.message?.includes('timeout')) {
+        errorMessage = 'Request timed out. Please try again.';
+      }
+      
+      toast.error(errorMessage);
       setStep('input');
+      setFunctionError(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  const buildPromptFromFormData = () => {
-    const validSpeakers = speakers.filter(s => s.name.trim() !== '');
-    if (validSpeakers.length === 0) {
-      toast.error('Please add at least one speaker or performer');
-      return '';
+  const createFullEvent = async () => {
+    if (!proposal || !proposalId) {
+      toast.error('No proposal found to create event from');
+      return;
     }
 
-    const speakerDetails = validSpeakers.map(speaker => 
-      `Name: ${speaker.name}, Role: ${speaker.role}, Expertise: ${speaker.expertise}, LinkedIn: ${speaker.linkedinUrl || 'Not provided'}, Twitter: ${speaker.twitterUrl || 'Not provided'}, Website: ${speaker.websiteUrl || 'Not provided'}`
-    ).join('\n');
-
-    return `Create a comprehensive event about: ${eventData.title}
-      
-Description: ${eventData.description}
-Event Type: ${eventData.eventType}
-Target Audience: ${eventData.targetAudience}
-Duration: ${eventData.duration}
-Location: ${eventData.location}
-Key Topics: ${eventData.keyTopics}
-Maximum Ticket Price: $${eventData.maxPrice}
-
-SPECIFIC SPEAKERS/PERFORMERS TO RESEARCH AND INCLUDE:
-${speakerDetails}
-
-Please generate a detailed event proposal with agenda, speaker profiles based on the provided names and links, and tickets. Ensure ticket prices are between $3 and $${eventData.maxPrice}.`;
-  };
-
-  const createFullEvent = async () => {
-    if (!proposal) return;
+    if (!user?.id) {
+      toast.error('User not authenticated');
+      return;
+    }
 
     setLoading(true);
     setStep('creating');
+    setFunctionError(null);
 
     try {
+      const tokenResult = await deductTokens('full_event', `full_event_${proposalId}`);
+      
+      console.log('Calling generate-event function for full event...');
       const { data, error } = await supabase.functions.invoke('generate-event', {
         body: {
-          creator_id: user?.id,
+          creator_id: user.id,
           action: 'generate_full_event',
           proposal_id: proposalId
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Function call error:', error);
+        throw new Error(error.message || 'Failed to create event');
+      }
 
-      if (data.success) {
+      if (data?.success) {
+        console.log('✅ Event creation completed successfully');
+        toast.success('Event created successfully with multi-agent system!');
+        
+        await refetchTokens();
         setTimeout(() => {
-          toast.success('Event created successfully with AI Agents!');
           navigate(`/creator/events/${data.event_id}/edit`);
-        }, 1000);
+        }, 2000);
       } else {
-        throw new Error(data.error || 'Failed to create event');
+        throw new Error(data?.error || 'Failed to create event');
       }
     } catch (error: any) {
       console.error('Error creating event:', error);
       
-      if (error.message?.includes('Stored proposal not found')) {
-        toast.error('The event proposal expired. Please generate a new proposal.');
-        setStep('input');
-      } else if (error.message?.includes('timeout')) {
-        toast.error('Event generation is taking longer than expected. Please try again.');
+      let errorMessage = error.message || 'Failed to create event. Please try again.';
+      
+      if (error.message?.includes('Insufficient tokens')) {
+        errorMessage = 'Insufficient tokens to create full event';
+        await refetchTokens();
         setStep('proposal');
-      } else {
-        toast.error(error.message || 'Failed to create event. Please try again.');
+      } else if (error.message?.includes('timeout')) {
+        errorMessage = 'Event generation is taking longer than expected. Please try again.';
+        setStep('proposal');
+      } else if (error.message?.includes('Edge Function')) {
+        errorMessage = 'AI service temporarily unavailable. Please try again in a moment.';
         setStep('proposal');
       }
+      
+      toast.error(errorMessage);
+      setFunctionError(errorMessage);
+      setStep('proposal');
     } finally {
       setLoading(false);
     }
+  };
+
+  const searchSimilarProposals = async () => {
+    if (!detailedPrompt.trim()) {
+      toast.error('Please enter a prompt to search for similar proposals');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-event', {
+        body: {
+          user_prompt: detailedPrompt,
+          creator_id: user.id,
+          action: 'search_similar_proposals'
+        }
+      });
+
+      if (error) throw new Error(error.message);
+      
+      if (data?.success) {
+        toast.success(`Found ${data.count} similar proposals`);
+        console.log('Similar proposals:', data.similar_proposals);
+      }
+    } catch (error: any) {
+      console.error('Error searching proposals:', error);
+      toast.error('Failed to search similar proposals');
+    }
+  };
+
+  const handleGenerateProposal = () => {
+    checkTokensAndProceed('proposal', generateProposal);
+  };
+
+  const handleCreateFullEvent = () => {
+    checkTokensAndProceed('full_event', createFullEvent);
   };
 
   const loadPastProposal = (pastProposal: any) => {
@@ -329,7 +447,6 @@ ${JSON.stringify(pastProposal.proposal_data, null, 2)}`);
       if (error) throw error;
 
       toast.success('Proposal deleted successfully');
-      // The list will update automatically due to the hook
     } catch (error: any) {
       console.error('Error deleting proposal:', error);
       toast.error('Failed to delete proposal');
@@ -342,601 +459,444 @@ ${JSON.stringify(pastProposal.proposal_data, null, 2)}`);
     toast.success('Proposal copied to clipboard');
   };
 
-  const features = [
-    {
-      icon: <Zap className="h-5 w-5" />,
-      title: "AI Manager Agent",
-      description: "Intelligent coordination of specialized AI agents"
-    },
-    {
-      icon: <Calendar className="h-5 w-5" />,
-      title: "Complete Agenda",
-      description: "Includes detailed event schedule and timing"
-    },
-    {
-      icon: <Shield className="h-5 w-5" />,
-      title: "Real Speaker Verification",
-      description: "Authentic speaker profiles with verification"
-    },
-    {
-      icon: <Image className="h-5 w-5" />,
-      title: "AI Image Generation",
-      description: "Automated event banners & speaker portraits"
-    },
-    {
-      icon: <Mic className="h-5 w-5" />,
-      title: "Specific Speaker Research",
-      description: "Research real speakers based on your inputs"
-    },
-    {
-      icon: <Ticket className="h-5 w-5" />,
-      title: "Affordable Pricing",
-      description: "Ticket prices optimized between $3-$40"
-    }
-  ];
-
-  const eventTypes = [
-    'webinar', 'conferences', 'live-music', 'sports-events', 'night-life',
-    'concerts', 'comedy-shows', 'business-events', 'wellness-events', 'summit',
-    'workshops', 'festivals', 'tech-meetups', 'cultural-events'
-  ];
-
-  const speakerRoles = [
-    { value: 'keynote', label: 'Keynote Speaker', icon: <Mic className="h-4 w-4" /> },
-    { value: 'performer', label: 'Music Performer', icon: <Music className="h-4 w-4" /> },
-    { value: 'artist', label: 'Visual Artist', icon: <Camera className="h-4 w-4" /> },
-    { value: 'panelist', label: 'Panelist', icon: <Users className="h-4 w-4" /> }
-  ];
-
+  // Gradient utilities
   const gradientClass = "bg-gradient-to-r from-orange-500 to-purple-600";
   const gradientTextClass = "bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent";
   const gradientHoverClass = "hover:from-orange-600 hover:to-purple-700";
 
-  // Enhanced progress tracking with real-time data
-  const currentProgress = realTimeProgress ? {
-    percentage: realTimeProgress.progress_percentage || 0,
-    step: realTimeProgress.current_step || 'Initializing...',
-    agentActivity: realTimeProgress.agent_activity || {}
-  } : {
-    percentage: 0,
-    step: 'Initializing...',
-    agentActivity: {}
-  };
-
-  const getAgentStatus = (agent: string) => {
-    if (!currentProgress.agentActivity) return 'pending';
-    return currentProgress.agentActivity[agent] || 'pending';
-  };
-
-  const getAgentStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'bg-green-500';
-      case 'active': return 'bg-orange-500 animate-pulse';
-      case 'error': return 'bg-red-500';
-      default: return 'bg-gray-300';
-    }
-  };
-
-  const getAgentDisplayName = (agent: string) => {
-    const agentNames: { [key: string]: string } = {
-      manager: 'Manager Agent',
-      structure: 'Structure Agent',
-      agenda: 'Agenda Agent',
-      speaker: 'Speaker Agent',
-      ticket: 'Ticket Agent',
-      image: 'Image Agent'
-    };
-    return agentNames[agent] || agent;
-  };
-
-  const getAgentIcon = (agent: string) => {
-    switch (agent) {
-      case 'manager': return <Bot className="h-4 w-4" />;
-      case 'structure': return <Calendar className="h-4 w-4" />;
-      case 'agenda': return <Clock className="h-4 w-4" />;
-      case 'speaker': return <Mic className="h-4 w-4" />;
-      case 'ticket': return <Ticket className="h-4 w-4" />;
-      case 'image': return <Image className="h-4 w-4" />;
-      default: return <Sparkles className="h-4 w-4" />;
-    }
-  };
+  const availableTokens = getAvailableTokens();
 
   return (
-    <CreatorLayout title="Create Event with AI">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <CreatorLayout title="Create Event with Lumo AI">
+      <div className="max-w-4xl mx-auto space-y-8">
+        {/* Free Trial Banner */}
+        <FreeTrialBanner />
+
         {/* Header */}
-        <div className="text-center space-y-4">
-          <div className="flex justify-center items-center space-x-3">
-            <div className={`rounded-full ${gradientClass} p-3 shadow-lg`}>
+        <div className="text-center space-y-6">
+          <div className="flex justify-center items-center space-x-4 mb-4">
+            <div className={`rounded-2xl ${gradientClass} p-4 shadow-2xl relative`}>
               <Bot className="h-8 w-8 text-white" />
+              <div className="absolute -top-1 -right-1">
+                <div className="rounded-full bg-green-500 p-1 animate-pulse">
+                  <Sparkles className="h-3 w-3 text-white" />
+                </div>
+              </div>
             </div>
-            <Sparkles className="h-8 w-8 text-orange-500" />
-            <Image className="h-8 w-8 text-purple-500" />
           </div>
-          <h1 className={`text-4xl font-bold ${gradientTextClass}`}>
-            AI Event Creator
+          <h1 className={`text-5xl font-bold ${gradientTextClass} mb-4`}>
+            Lumo AI
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Create complete, production-ready events with real speaker verification and AI-generated visuals
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
+            Transform your ideas into complete, engaging events with intelligent AI analysis
           </p>
+          
+          {/* Feature Badges */}
+          <div className="flex justify-center gap-4 flex-wrap">
+            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+              <Cpu className="h-3 w-3 mr-1" />
+              Multi-Agent System
+            </Badge>
+            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+              <Layers className="h-3 w-3 mr-1" />
+              Smart Context
+            </Badge>
+            <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+              <Brain className="h-3 w-3 mr-1" />
+              AI Powered
+            </Badge>
+          </div>
         </div>
 
-        {/* Features Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {features.map((feature, index) => (
-            <Card key={index} className="text-center border-0 shadow-lg bg-white/90 backdrop-blur-sm hover:shadow-xl transition-all duration-300">
-              <CardContent className="pt-6">
-                <div className={`mx-auto w-12 h-12 rounded-full ${gradientClass} flex items-center justify-center text-white mb-4 shadow-md`}>
-                  {feature.icon}
-                </div>
-                <h3 className="font-semibold mb-2 text-gray-800">{feature.title}</h3>
-                <p className="text-sm text-gray-600">{feature.description}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {/* Error Display */}
+        {functionError && (
+          <Card className="border-0 shadow-xl bg-red-50 border-l-4 border-l-red-500 animate-pulse">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center text-xl text-red-700">
+                <AlertTriangle className="h-5 w-5 mr-2" />
+                Operation Failed
+              </CardTitle>
+              <CardDescription className="text-red-600">
+                {functionError}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                onClick={() => {
+                  setFunctionError(null);
+                  setStep('input');
+                }}
+                variant="outline"
+                className="border-red-300 text-red-700 hover:bg-red-100"
+              >
+                Try Again
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Step 1: Event Input */}
-        {step === 'input' && (
-          <div className="space-y-6">
-            <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
-              <CardHeader className="text-center pb-4">
-                <CardTitle className={`text-2xl font-bold ${gradientTextClass}`}>
-                  Describe Your Event
-                </CardTitle>
-                <CardDescription className="text-lg">
-                  Provide detailed information about your event or use the form below
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Detailed Description Input */}
-                <div className="space-y-3">
-                  <Label htmlFor="detailedPrompt" className="text-base font-semibold">
-                    Detailed Event Description (Recommended)
-                  </Label>
-                  <Textarea
-                    id="detailedPrompt"
-                    placeholder={`Example: Create a 2-hour virtual tech webinar about AI innovation happening on March 15, 2025. Target audience: developers and product managers. Ticket price: $15. Include speakers: Elon Musk (CEO of Tesla, Twitter: @elonmusk), Satya Nadella (CEO of Microsoft, LinkedIn: linkedin.com/in/satyanadella). Topics: AI trends, machine learning, future of technology. Location: Virtual event with Google Meet integration.`}
-                    rows={6}
-                    value={detailedPrompt}
-                    onChange={(e) => setDetailedPrompt(e.target.value)}
-                    className="border-2 focus:border-orange-300 resize-none transition-colors text-base"
-                  />
-                  <p className="text-sm text-gray-600">
-                    Include: Event title, description, dates, duration, pricing, target audience, speakers with social links, topics, and location.
-                  </p>
-                </div>
-
-                <div className="flex items-center">
-                  <div className="flex-1 border-t border-gray-300"></div>
-                  <span className="px-4 text-gray-500 text-sm">OR use form</span>
-                  <div className="flex-1 border-t border-gray-300"></div>
-                </div>
-
-                {/* Existing Form Fields */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="title" className="text-base font-semibold">Event Title *</Label>
-                    <Input
-                      id="title"
-                      placeholder="e.g., Tech Innovation Summit 2024"
-                      value={eventData.title}
-                      onChange={(e) => handleInputChange('title', e.target.value)}
-                      className="h-12 border-2 focus:border-orange-300 transition-colors"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="eventType" className="text-base font-semibold">Event Type</Label>
-                    <select
-                      id="eventType"
-                      className="w-full px-3 py-3 border-2 border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                      value={eventData.eventType}
-                      onChange={(e) => handleInputChange('eventType', e.target.value)}
-                    >
-                      {eventTypes.map(type => (
-                        <option key={type} value={type}>
-                          {type.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description" className="text-base font-semibold">Event Description *</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Describe what attendees can expect from your event..."
-                    rows={3}
-                    value={eventData.description}
-                    onChange={(e) => handleInputChange('description', e.target.value)}
-                    className="border-2 focus:border-orange-300 resize-none transition-colors"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="targetAudience" className="text-base font-semibold">Target Audience</Label>
-                    <Input
-                      id="targetAudience"
-                      placeholder="e.g., Tech professionals, entrepreneurs"
-                      value={eventData.targetAudience}
-                      onChange={(e) => handleInputChange('targetAudience', e.target.value)}
-                      className="border-2 focus:border-orange-300 transition-colors"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="duration" className="text-base font-semibold">Estimated Duration</Label>
-                    <Input
-                      id="duration"
-                      placeholder="e.g., 2 hours, full day, 3 days"
-                      value={eventData.duration}
-                      onChange={(e) => handleInputChange('duration', e.target.value)}
-                      className="border-2 focus:border-orange-300 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="location" className="text-base font-semibold">Location Type</Label>
-                    <Input
-                      id="location"
-                      placeholder="e.g., Virtual, New York City, Hybrid"
-                      value={eventData.location}
-                      onChange={(e) => handleInputChange('location', e.target.value)}
-                      className="border-2 focus:border-orange-300 transition-colors"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="maxPrice" className="text-base font-semibold">Maximum Ticket Price ($3-$40)</Label>
-                    <Input
-                      id="maxPrice"
-                      type="number"
-                      min="3"
-                      max="40"
-                      placeholder="25"
-                      value={eventData.maxPrice}
-                      onChange={(e) => handleInputChange('maxPrice', e.target.value)}
-                      className="border-2 focus:border-orange-300 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="keyTopics" className="text-base font-semibold">Key Topics/Themes</Label>
-                  <Input
-                    id="keyTopics"
-                    placeholder="e.g., AI, Innovation, Sustainability"
-                    value={eventData.keyTopics}
-                    onChange={(e) => handleInputChange('keyTopics', e.target.value)}
-                    className="border-2 focus:border-orange-300 transition-colors"
-                  />
-                </div>
-
-                {/* Speakers/Performers Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <Label className="text-base font-semibold">Speakers & Performers *</Label>
-                      <p className="text-sm text-gray-600 flex items-center">
-                        <Shield className="h-3 w-3 mr-1 text-green-500" />
-                        Real speaker verification enabled
-                      </p>
+        {/* Main Input Section */}
+        {step === 'input' && !functionError && (
+          <div className="space-y-8">
+            {/* Token Balance Card */}
+            <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className={`rounded-xl ${gradientClass} p-3 shadow-lg`}>
+                      <Coins className="h-6 w-6 text-white" />
                     </div>
-                    <Button
-                      type="button"
-                      onClick={addSpeaker}
-                      variant="outline"
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">AI Tokens Available</h3>
+                      <p className="text-sm text-gray-600">Create amazing events with Lumo AI</p>
+                    </div>
+                  </div>
+                  <div className="text-right space-y-2">
+                    <div className="flex items-center justify-end space-x-3">
+                      {availableTokens.free > 0 && !tokenBalance?.has_used_free_trial && (
+                        <Badge className="bg-green-100 text-green-700 border-green-200">
+                          <Gift className="h-3 w-3 mr-1" />
+                          {availableTokens.free} Free
+                        </Badge>
+                      )}
+                      <div className="flex items-center space-x-2">
+                        <div className="text-2xl font-bold text-orange-600">
+                          {availableTokens.paid}
+                        </div>
+                        <span className="text-gray-500">paid</span>
+                      </div>
+                    </div>
+                    <Button 
+                      variant="outline" 
                       size="sm"
-                      className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                      onClick={() => navigate('/creator/tokens')}
+                      className="text-orange-600 border-orange-300 hover:bg-orange-50"
                     >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Speaker
+                      Get More Tokens
                     </Button>
                   </div>
-                  
-                  <div className="space-y-4">
-                    {speakers.map((speaker, index) => (
-                      <Card key={speaker.id} className="border-2 border-orange-100 bg-orange-50/50">
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="flex items-center space-x-2">
-                              {getRoleIcon(speaker.role)}
-                              <span className="font-medium text-sm text-orange-800">
-                                {speakerRoles.find(r => r.value === speaker.role)?.label}
-                              </span>
-                            </div>
-                            {speakers.length > 1 && (
-                              <Button
-                                type="button"
-                                onClick={() => removeSpeaker(speaker.id)}
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div className="space-y-2">
-                              <Label className="text-sm font-medium">Full Name *</Label>
-                              <Input
-                                placeholder="e.g., Elon Musk, Taylor Swift"
-                                value={speaker.name}
-                                onChange={(e) => updateSpeaker(speaker.id, 'name', e.target.value)}
-                                className="border-orange-200 focus:border-orange-400"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-sm font-medium">Role</Label>
-                              <select
-                                value={speaker.role}
-                                onChange={(e) => updateSpeaker(speaker.id, 'role', e.target.value)}
-                                className="w-full px-3 py-2 border border-orange-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                              >
-                                {speakerRoles.map(role => (
-                                  <option key={role.value} value={role.value}>
-                                    {role.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
-
-                          <div className="space-y-2 mb-4">
-                            <Label className="text-sm font-medium">Expertise/Specialization</Label>
-                            <Input
-                              placeholder="e.g., AI Research, Pop Music, Digital Art"
-                              value={speaker.expertise}
-                              onChange={(e) => updateSpeaker(speaker.id, 'expertise', e.target.value)}
-                              className="border-orange-200 focus:border-orange-400"
-                            />
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="space-y-2">
-                              <Label className="text-sm font-medium">LinkedIn URL</Label>
-                              <Input
-                                placeholder="https://linkedin.com/in/..."
-                                value={speaker.linkedinUrl}
-                                onChange={(e) => updateSpeaker(speaker.id, 'linkedinUrl', e.target.value)}
-                                className="border-orange-200 focus:border-orange-400"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-sm font-medium">Twitter URL</Label>
-                              <Input
-                                placeholder="https://twitter.com/..."
-                                value={speaker.twitterUrl}
-                                onChange={(e) => updateSpeaker(speaker.id, 'twitterUrl', e.target.value)}
-                                className="border-orange-200 focus:border-orange-400"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-sm font-medium">Website/Portfolio</Label>
-                              <Input
-                                placeholder="https://example.com"
-                                value={speaker.websiteUrl}
-                                onChange={(e) => updateSpeaker(speaker.id, 'websiteUrl', e.target.value)}
-                                className="border-orange-200 focus:border-orange-400"
-                              />
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-
-                {/* AI Features Notice */}
-                <div className="bg-gradient-to-r from-purple-50 to-orange-50 rounded-lg p-4 border border-purple-200">
-                  <div className="flex items-start space-x-3">
-                    <div className="flex-shrink-0">
-                      <div className={`rounded-full ${gradientClass} p-2 text-white`}>
-                        <Bot className="h-5 w-5" />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <h4 className="font-semibold text-gray-800">AI-Powered Event Creation</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
-                        <div className="flex items-center space-x-2">
-                          <Shield className="h-4 w-4 text-green-500" />
-                          <span>Real speaker verification with Google Search</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Image className="h-4 w-4 text-purple-500" />
-                          <span>AI-generated event thumbnails</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Camera className="h-4 w-4 text-orange-500" />
-                          <span>Speaker portrait generation</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <CheckCircle className="h-4 w-4 text-blue-500" />
-                          <span>Anti-hallucination safeguards</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <Button
-                  onClick={generateProposal}
-                  disabled={loading || (!detailedPrompt.trim() && (!eventData.title.trim() || !eventData.description.trim() || speakers.every(s => !s.name.trim())))}
-                  className={`w-full ${gradientClass} text-white font-semibold py-3 rounded-lg ${gradientHoverClass} transition-all duration-200 shadow-lg hover:shadow-xl`}
-                >
-                  <Bot className="h-5 w-5 mr-2" />
-                  {loading ? 'Generating Proposal...' : 'Generate Event Proposal'}
-                </Button>
-
-                {/* Past Generations Toggle */}
-                <div className="text-center">
-                  <Button
-                    variant="ghost"
-                    onClick={() => setShowPastGenerations(!showPastGenerations)}
-                    className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                  >
-                    <History className="h-4 w-4 mr-2" />
-                    {showPastGenerations ? 'Hide Past Generations' : 'Show Past Generations'}
-                  </Button>
                 </div>
               </CardContent>
+            </Card>
+
+            {/* AI Input Card */}
+            <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-sm overflow-hidden">
+              <div className={`${gradientClass} p-1`}>
+                <div className="bg-white rounded-lg p-1">
+                  <CardHeader className="text-center pb-4">
+                    <CardTitle className="text-2xl font-bold text-gray-800">
+                      Describe Your Vision
+                    </CardTitle>
+                    <CardDescription className="text-lg text-gray-600">
+                      Tell Lumo AI what event you want to create. Be as detailed as you like!
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Prompt Input */}
+                    <div className="relative">
+                      <Textarea
+                        ref={textareaRef}
+                        value={detailedPrompt}
+                        onChange={(e) => setDetailedPrompt(e.target.value)}
+                        placeholder=""
+                        className="min-h-[120px] p-4 text-lg border-2 border-gray-200 rounded-xl resize-none focus:border-orange-300 transition-all duration-300 bg-white/50 backdrop-blur-sm"
+                        disabled={loading}
+                      />
+                      
+                      {/* Typing Animation Placeholder */}
+                      {!detailedPrompt && (
+                        <div className="absolute inset-0 pointer-events-none">
+                          <div className="p-4 text-lg text-gray-400">
+                            <TypewriterAnimation 
+                              text={examplePrompts[typingIndex]}
+                              speed={50}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Prompt Tips */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div className="flex items-start space-x-2 p-3 bg-orange-50 rounded-lg">
+                        <Lightbulb className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
+                        <span>Include event type and target audience</span>
+                      </div>
+                      <div className="flex items-start space-x-2 p-3 bg-purple-50 rounded-lg">
+                        <Target className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
+                        <span>Specify speakers, performers, or special guests</span>
+                      </div>
+                      <div className="flex items-start space-x-2 p-3 bg-orange-50 rounded-lg">
+                        <BookOpen className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
+                        <span>Mention location, date, and ticket pricing</span>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <Button
+                        onClick={handleGenerateProposal}
+                        disabled={loading || !detailedPrompt.trim()}
+                        className={`flex-1 ${gradientClass} text-white font-semibold py-4 rounded-xl ${gradientHoverClass} transition-all duration-300 shadow-2xl hover:shadow-3xl transform hover:scale-[1.02] text-lg`}
+                      >
+                        {loading ? (
+                          <>
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                            Analyzing Your Vision...
+                          </>
+                        ) : (
+                          <>
+                            <Brain className="h-5 w-5 mr-2" />
+                            Generate Event Proposal (6 tokens)
+                            <Rocket className="h-5 w-5 ml-2" />
+                          </>
+                        )}
+                      </Button>
+                      
+                      <Button
+                        onClick={searchSimilarProposals}
+                        disabled={loading || !detailedPrompt.trim()}
+                        variant="outline"
+                        className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                      >
+                        <Search className="h-4 w-4 mr-2" />
+                        Find Similar
+                      </Button>
+                    </div>
+                  </CardContent>
+                </div>
+              </div>
             </Card>
 
             {/* Past Generations Section */}
-            {showPastGenerations && (
-              <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
+            {pastProposals.length > 0 && (
+              <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-sm">
                 <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <History className="h-5 w-5 mr-2 text-orange-500" />
-                    Your Past Event Proposals
-                  </CardTitle>
-                  <CardDescription>
-                    Previously generated event proposals that you can reuse or reference
-                  </CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center text-2xl font-bold">
+                        <History className="h-6 w-6 mr-3 text-purple-500" />
+                        Your AI Event History
+                      </CardTitle>
+                      <CardDescription className="text-lg">
+                        Revisit and modify your previous event proposals
+                      </CardDescription>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  {pastProposalsLoading ? (
-                    <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto"></div>
-                      <p className="text-gray-600 mt-2">Loading past proposals...</p>
-                    </div>
-                  ) : pastProposals.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <History className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                      <p>No past proposals found</p>
-                      <p className="text-sm">Your generated proposals will appear here</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {pastProposals.map((proposal) => (
-                        <Card key={proposal.id} className="border border-gray-200 hover:border-orange-300 transition-colors">
-                          <CardContent className="p-4">
-                            <div className="flex items-start justify-between mb-3">
-                              <div className="flex-1">
-                                <h4 className="font-semibold text-lg text-gray-900">
-                                  {proposal.proposal_data.event_title}
-                                </h4>
-                                <p className="text-sm text-gray-600 mt-1">
-                                  {proposal.proposal_data.event_description}
-                                </p>
-                                <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                                  <span>Type: {proposal.proposal_data.event_type}</span>
-                                  <span>•</span>
-                                  <span>Price: ${proposal.proposal_data.price}</span>
-                                  <span>•</span>
-                                  <span>
-                                    Created: {new Date(proposal.created_at).toLocaleDateString()}
-                                  </span>
+                  <div className="space-y-4">
+                    {pastProposals.map((proposalItem) => {
+                      const proposalData = proposalItem.proposal_data;
+                      
+                      return (
+                        <div 
+                          key={proposalItem.id} 
+                          className="flex items-center justify-between p-5 bg-gradient-to-r from-orange-50 to-purple-50 rounded-xl border border-orange-200 hover:border-orange-400 transition-all duration-300 cursor-pointer hover:shadow-lg group"
+                          onClick={() => loadPastProposal(proposalItem)}
+                        >
+                          <div className="flex items-center space-x-4">
+                            <div className={`w-12 h-12 rounded-xl ${gradientClass} flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300 shadow-md`}>
+                              <Calendar className="h-6 w-6" />
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-gray-900 group-hover:text-orange-700 transition-colors text-lg">
+                                {proposalData.event_title}
+                              </h4>
+                              <p className="text-gray-600 line-clamp-1 mt-1">{proposalData.event_description}</p>
+                              <div className="flex items-center space-x-3 mt-2">
+                                <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                                  {proposalData.event_type}
+                                </Badge>
+                                <div className="flex items-center text-sm text-gray-500">
+                                  <Calendar className="h-4 w-4 mr-1" />
+                                  {new Date(proposalItem.created_at).toLocaleDateString()}
                                 </div>
                               </div>
-                              <div className="flex space-x-2 ml-4">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => loadPastProposal(proposal)}
-                                  className="h-8 text-orange-600 border-orange-300 hover:bg-orange-50"
-                                >
-                                  Use
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => copyProposalToClipboard(proposal.proposal_data)}
-                                  className="h-8"
-                                >
-                                  <Copy className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => deletePastProposal(proposal.id)}
-                                  className="h-8 text-red-600 border-red-300 hover:bg-red-50"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
                             </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
+                          </div>
+                          <div className="text-right">
+                            <Badge className="bg-white text-purple-700 border-purple-200 group-hover:bg-purple-50 transition-colors shadow-sm">
+                              Click to Reuse
+                            </Badge>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </CardContent>
               </Card>
             )}
           </div>
         )}
 
-        {/* Step 2: Generating */}
-        {step === 'generating' && (
-          <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm text-center">
-            <CardContent className="pt-12 pb-12">
-              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto mb-6"></div>
-              <h3 className="text-xl font-semibold mb-2 text-gray-800">Generating Your Event Proposal</h3>
-              <p className="text-gray-600 mb-4">Our AI is crafting a comprehensive event structure with real speaker verification...</p>
-              <div className="flex justify-center space-x-2">
-                <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+        {/* Generating Proposal */}
+        {step === 'generating' && !functionError && (
+          <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-sm text-center">
+            <CardContent className="py-16">
+              <div className="relative mx-auto mb-8">
+                {/* Enhanced Orbital Animation */}
+                <div className="relative w-32 h-32 mx-auto">
+                  <div className="absolute inset-0 rounded-full border-4 border-orange-200 animate-ping"></div>
+                  <div className="absolute inset-2 rounded-full border-4 border-purple-200 animate-pulse"></div>
+                  <div className="absolute inset-0 rounded-full border-4 border-transparent">
+                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                      <div className={`w-6 h-6 rounded-full ${gradientClass} animate-bounce`}></div>
+                    </div>
+                    <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2">
+                      <div className="w-4 h-4 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    </div>
+                  </div>
+                  <div className={`absolute inset-4 rounded-full ${gradientClass} flex items-center justify-center`}>
+                    <Bot className="h-8 w-8 text-white animate-pulse" />
+                  </div>
+                </div>
+              </div>
+              
+              <h3 className="text-2xl font-bold mb-4 text-gray-800">
+                Lumo AI is Analyzing Your Vision
+              </h3>
+              <p className="text-gray-600 mb-6 max-w-md mx-auto text-lg">
+                Understanding your requirements and crafting the perfect event structure...
+              </p>
+              
+              {/* Enhanced Analysis Indicators */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-md mx-auto text-sm text-gray-500">
+                <div className="flex items-center justify-center space-x-1">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.1s' }}></div>
+                  <span>Structuring Event</span>
+                </div>
+                <div className="flex items-center justify-center space-x-1">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                  <span>Designing Agenda</span>
+                </div>
+                <div className="flex items-center justify-center space-x-1">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" style={{ animationDelay: '0.3s' }}></div>
+                  <span>Researching Speakers</span>
+                </div>
+              </div>
+
+              {/* Model Indicator */}
+              <div className="mt-6">
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                  Multi-Agent System
+                </Badge>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Step 3: Proposal Review */}
-        {step === 'proposal' && proposal && (
-          <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
+        {/* Event Creation Loading */}
+        {step === 'creating' && !functionError && (
+          <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-sm text-center">
+            <CardContent className="py-16">
+              {/* Enhanced Animation */}
+              <div className="relative mx-auto mb-8">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-40 h-40 border-4 border-orange-200 rounded-full animate-spin"></div>
+                  <div className="w-32 h-32 border-4 border-purple-200 rounded-full animate-spin" style={{ animationDirection: 'reverse' }}></div>
+                  <div className="w-24 h-24 border-4 border-blue-200 rounded-full animate-spin"></div>
+                </div>
+                <div className="relative rounded-full bg-gradient-to-r from-orange-500 to-purple-600 w-24 h-24 flex items-center justify-center mx-auto shadow-2xl">
+                  <Bot className="h-10 w-10 text-white animate-bounce" />
+                </div>
+              </div>
+              
+              <h3 className="text-3xl font-bold mb-4 text-gray-800">Multi-Agent Event Creation</h3>
+              <p className="text-gray-600 mb-6 max-w-md mx-auto text-lg">
+                Lumo AI agents are collaborating to create your complete event...
+              </p>
+              
+              {/* Enhanced Progress Indicators */}
+              <div className="max-w-md mx-auto space-y-4">
+                {[
+                  { task: 'Structure Agent: Designing event framework', agent: '🏗️' },
+                  { task: 'Agenda Agent: Creating event schedule', agent: '📅' },
+                  { task: 'Speaker Agent: Researching performers', agent: '🎤' },
+                  { task: 'Ticket Agent: Setting pricing strategy', agent: '🎫' },
+                  { task: 'Image Agent: Generating visuals', agent: '🖼️' },
+                  { task: 'Manager Agent: Assembling event', agent: '🎯' }
+                ].map((item, index) => (
+                  <div key={item.task} className="flex items-center space-x-3 text-left">
+                    <div className={`w-3 h-3 rounded-full ${index < 2 ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
+                    <span className="flex-1 text-gray-700">
+                      <span className="mr-2">{item.agent}</span>
+                      {item.task}
+                    </span>
+                    {index < 2 && <CheckCircle className="h-4 w-4 text-green-500" />}
+                  </div>
+                ))}
+              </div>
+
+              {/* Agent System Status */}
+              <div className="mt-6">
+                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                  <Cpu className="h-3 w-3 mr-1" />
+                  6 AI Agents Collaborating
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Proposal Review */}
+        {step === 'proposal' && proposal && !functionError && (
+          <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-sm">
             <CardHeader className="text-center pb-4">
-              <CardTitle className={`text-2xl font-bold ${gradientTextClass}`}>
-                Event Proposal Generated!
+              <CardTitle className={`text-3xl font-bold ${gradientTextClass}`}>
+                🎉 Event Blueprint Ready!
               </CardTitle>
               <CardDescription className="text-lg">
-                Review the event structure and create your event
+                Lumo AI has analyzed your vision and created this comprehensive event structure
               </CardDescription>
+              
+              {/* Generation Features Used */}
+              <div className="flex justify-center gap-2 mt-2">
+                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                  <Cpu className="h-3 w-3 mr-1" />
+                  Multi-Agent
+                </Badge>
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Event Overview */}
-              <div className="bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg p-6 border border-orange-200">
+              <div className="bg-gradient-to-r from-orange-50 to-purple-50 rounded-2xl p-6 border border-orange-200">
                 <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center space-x-3">
-                    <div className={`rounded-lg ${gradientClass} p-2 text-white`}>
+                  <div className="flex items-start space-x-4">
+                    <div className={`rounded-xl ${gradientClass} p-3 text-white shadow-lg`}>
                       <Calendar className="h-6 w-6" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold text-gray-900">{proposal.event_title}</h3>
-                      <p className="text-gray-700 mt-1">{proposal.event_description}</p>
+                      <h3 className="text-2xl font-bold text-gray-900">{proposal.event_title}</h3>
+                      <p className="text-gray-700 mt-2 text-lg leading-relaxed">{proposal.event_description}</p>
                     </div>
                   </div>
-                  <Badge className={`${gradientClass} text-white border-0`}>
+                  <Badge className={`${gradientClass} text-white border-0 text-sm px-3 py-1`}>
                     {proposal.event_type}
                   </Badge>
                 </div>
                 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div className="text-center p-3 bg-white rounded-lg border border-orange-100">
-                    <Clock className="h-5 w-5 mx-auto mb-1 text-orange-500" />
-                    <p className="font-semibold text-gray-900">
+                  <div className="text-center p-4 bg-white rounded-xl border border-orange-100 shadow-sm">
+                    <Clock className="h-6 w-6 mx-auto mb-2 text-orange-500" />
+                    <p className="font-bold text-gray-900 text-lg">
                       {new Date(proposal.start_time).toLocaleDateString()}
                     </p>
-                    <p className="text-xs text-gray-600">Date</p>
+                    <p className="text-xs text-gray-600">Event Date</p>
                   </div>
-                  <div className="text-center p-3 bg-white rounded-lg border border-orange-100">
-                    <Users className="h-5 w-5 mx-auto mb-1 text-purple-500" />
-                    <p className="font-semibold text-gray-900">{proposal.capacity}</p>
+                  <div className="text-center p-4 bg-white rounded-xl border border-orange-100 shadow-sm">
+                    <Users className="h-6 w-6 mx-auto mb-2 text-purple-500" />
+                    <p className="font-bold text-gray-900 text-lg">{proposal.capacity}</p>
                     <p className="text-xs text-gray-600">Capacity</p>
                   </div>
-                  <div className="text-center p-3 bg-white rounded-lg border border-orange-100">
-                    <MapPin className="h-5 w-5 mx-auto mb-1 text-orange-500" />
-                    <p className="font-semibold text-gray-900 truncate">{proposal.location}</p>
+                  <div className="text-center p-4 bg-white rounded-xl border border-orange-100 shadow-sm">
+                    <MapPin className="h-6 w-6 mx-auto mb-2 text-orange-500" />
+                    <p className="font-bold text-gray-900 text-lg truncate">{proposal.location}</p>
                     <p className="text-xs text-gray-600">Location</p>
                   </div>
-                  <div className="text-center p-3 bg-white rounded-lg border border-orange-100">
-                    <Ticket className="h-5 w-5 mx-auto mb-1 text-purple-500" />
-                    <p className="font-semibold text-gray-900">
+                  <div className="text-center p-4 bg-white rounded-xl border border-orange-100 shadow-sm">
+                    <Ticket className="h-6 w-6 mx-auto mb-2 text-purple-500" />
+                    <p className="font-bold text-gray-900 text-lg">
                       {proposal.is_free ? 'Free' : `$${proposal.price}`}
                     </p>
                     <p className="text-xs text-gray-600">Price</p>
@@ -946,55 +906,21 @@ ${JSON.stringify(pastProposal.proposal_data, null, 2)}`);
 
               {/* Learning Objectives */}
               {proposal.learning_objectives && proposal.learning_objectives.length > 0 && (
-                <div className="bg-white rounded-lg p-4 border border-gray-200">
-                  <h4 className="font-semibold text-lg mb-3 flex items-center">
-                    <Star className="h-5 w-5 mr-2 text-orange-500" />
+                <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                  <h4 className="font-bold text-xl mb-4 flex items-center">
+                    <Star className="h-6 w-6 mr-3 text-orange-500" />
                     Key Objectives
                   </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {proposal.learning_objectives.slice(0, 6).map((objective: string, index: number) => (
-                      <div key={index} className="flex items-center space-x-2 text-sm">
-                        <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
-                        <span className="text-gray-700">{objective}</span>
+                      <div key={index} className="flex items-start space-x-3 p-3 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg">
+                        <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                        <span className="text-gray-700 font-medium">{objective}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
-
-              {/* Enhanced AI Agent Features */}
-              <div className="bg-gradient-to-r from-purple-50 to-orange-50 rounded-lg p-4 border border-purple-200">
-                <h4 className="font-semibold text-lg mb-3 flex items-center">
-                  <Bot className="h-5 w-5 mr-2 text-purple-500" />
-                  AI Agent System Features
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span>Manager Agent coordination</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span>Complete event agenda</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Shield className="h-4 w-4 text-green-500" />
-                    <span>Real speaker verification</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Image className="h-4 w-4 text-purple-500" />
-                    <span>AI-generated event banners</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Camera className="h-4 w-4 text-orange-500" />
-                    <span>Speaker portrait generation</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span>Affordable pricing ($3-$40)</span>
-                  </div>
-                </div>
-              </div>
 
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-gray-200">
@@ -1005,25 +931,25 @@ ${JSON.stringify(pastProposal.proposal_data, null, 2)}`);
                     setProposalId(null);
                   }}
                   variant="outline"
-                  className="flex-1 border-2 border-gray-300 hover:border-orange-300 transition-colors"
+                  className="flex-1 border-2 border-gray-300 hover:border-orange-300 transition-colors py-3 text-lg rounded-xl"
                 >
-                  Start Over
+                  Start New Project
                 </Button>
                 <Button
-                  onClick={createFullEvent}
+                  onClick={handleCreateFullEvent}
                   disabled={loading}
-                  className={`flex-1 ${gradientClass} text-white font-semibold py-3 rounded-lg ${gradientHoverClass} transition-all duration-200 shadow-lg hover:shadow-xl`}
+                  className={`flex-1 ${gradientClass} text-white font-bold py-3 rounded-xl ${gradientHoverClass} transition-all duration-300 shadow-2xl hover:shadow-3xl transform hover:scale-[1.02] text-lg`}
                 >
                   {loading ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Creating Event...
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                      Multi-Agent Creation...
                     </>
                   ) : (
                     <>
-                      <Bot className="h-4 w-4 mr-2" />
-                      Create with AI Agents
-                      <ArrowRight className="h-4 w-4 ml-2" />
+                      <Cpu className="h-5 w-5 mr-2" />
+                      Create Complete Event (20 tokens)
+                      <ArrowRight className="h-5 w-5 ml-2" />
                     </>
                   )}
                 </Button>
@@ -1032,202 +958,41 @@ ${JSON.stringify(pastProposal.proposal_data, null, 2)}`);
           </Card>
         )}
 
-        {/* Step 4: Creating Event with Enhanced Real-time Progress */}
-        {step === 'creating' && (
-          <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
-            <CardHeader className="text-center pb-4">
-              <CardTitle className={`text-2xl font-bold ${gradientTextClass}`}>
-                Creating Your Event with AI Agents
-              </CardTitle>
-              <CardDescription className="text-lg">
-                Our Manager Agent is coordinating specialized AI agents to build your event
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Enhanced Progress Bar */}
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-700">Overall Progress</span>
-                  <span className="text-lg font-bold text-orange-600">{currentProgress.percentage}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-4">
-                  <div 
-                    className="bg-gradient-to-r from-orange-500 to-purple-600 h-4 rounded-full transition-all duration-1000 ease-out flex items-center justify-end pr-2"
-                    style={{ width: `${currentProgress.percentage}%`, minWidth: '40px' }}
-                  >
-                    {currentProgress.percentage > 10 && (
-                      <span className="text-xs font-bold text-white">
-                        {currentProgress.percentage}%
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Current Step with Enhanced Display */}
-              <div className="bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg p-4 border border-orange-200">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-2">
-                    <Bot className="h-5 w-5 text-orange-500" />
-                    <h4 className="font-semibold text-gray-800">Current Activity</h4>
-                  </div>
-                  <Badge variant="outline" className="bg-white text-orange-600 border-orange-300">
-                    {currentProgress.percentage}% Complete
-                  </Badge>
-                </div>
-                <p className="text-lg font-medium text-gray-900 text-center py-2">
-                  {currentProgress.step}
-                </p>
-                {currentProgress.percentage >= 50 && currentProgress.percentage < 100 && (
-                  <p className="text-sm text-gray-600 text-center mt-2">
-                    This may take a few moments as we research real speaker data and generate visuals...
-                  </p>
-                )}
-              </div>
-
-              {/* Enhanced Agent Activity Grid */}
-              <div className="space-y-4">
-                <h5 className="font-semibold text-gray-800 flex items-center">
-                  <Sparkles className="h-4 w-4 mr-2 text-purple-500" />
-                  AI Agent Activity
-                </h5>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {['manager', 'structure', 'agenda', 'speaker', 'ticket', 'image'].map((agent) => {
-                    const status = getAgentStatus(agent);
-                    const isCompleted = status === 'completed';
-                    const isActive = status === 'active';
-                    const isError = status === 'error';
-                    
-                    return (
-                      <div 
-                        key={agent} 
-                        className={`p-4 rounded-lg border-2 transition-all duration-300 ${
-                          isCompleted 
-                            ? 'bg-green-50 border-green-200 shadow-sm' 
-                            : isActive
-                            ? 'bg-orange-50 border-orange-200 shadow-md animate-pulse'
-                            : isError
-                            ? 'bg-red-50 border-red-200'
-                            : 'bg-gray-50 border-gray-200'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center space-x-2">
-                            <div className={`p-1 rounded ${
-                              isCompleted 
-                                ? 'bg-green-100 text-green-600' 
-                                : isActive
-                                ? 'bg-orange-100 text-orange-600'
-                                : isError
-                                ? 'bg-red-100 text-red-600'
-                                : 'bg-gray-100 text-gray-400'
-                            }`}>
-                              {getAgentIcon(agent)}
-                            </div>
-                            <span className="font-medium text-sm text-gray-800 capitalize">
-                              {getAgentDisplayName(agent)}
-                            </span>
-                          </div>
-                          <div className={`w-2 h-2 rounded-full ${getAgentStatusColor(status)}`}></div>
-                        </div>
-                        
-                        <div className="flex items-center justify-between text-xs">
-                          <span className={`font-medium capitalize ${
-                            isCompleted ? 'text-green-600' :
-                            isActive ? 'text-orange-600' :
-                            isError ? 'text-red-600' :
-                            'text-gray-500'
-                          }`}>
-                            {status}
-                          </span>
-                          {agent === 'speaker' && isCompleted && (
-                            <Shield className="h-3 w-3 text-green-500" />
-                          )}
-                          {agent === 'image' && isCompleted && (
-                            <Image className="h-3 w-3 text-purple-500" />
-                          )}
-                        </div>
-
-                        {/* Progress indicator for active agents */}
-                        {isActive && (
-                          <div className="mt-2 w-full bg-gray-200 rounded-full h-1">
-                            <div className="bg-orange-500 h-1 rounded-full animate-pulse" style={{ width: '60%' }}></div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Real-time Updates Notice */}
-              <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                <div className="flex items-center space-x-3">
-                  <div className="flex-shrink-0">
-                    <div className="rounded-full bg-blue-500 p-2 text-white">
-                      <Sparkles className="h-4 w-4" />
-                    </div>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-800 mb-1">Real-time Updates Active</h4>
-                    <p className="text-sm text-gray-600">
-                      Progress updates are streamed live from our AI agents. The page will automatically update as each agent completes its task.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Enhanced Features Notice */}
-              <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4 border border-green-200">
-                <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0">
-                    <div className="rounded-full bg-green-500 p-2 text-white">
-                      <Shield className="h-5 w-5" />
-                    </div>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-800 mb-2">Enhanced AI Features Active</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
-                      <div className="flex items-center space-x-2">
-                        <Shield className="h-4 w-4 text-green-500" />
-                        <span>Real speaker verification with Google Search</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Image className="h-4 w-4 text-purple-500" />
-                        <span>AI-generated event thumbnails</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <AlertCircle className="h-4 w-4 text-orange-500" />
-                        <span>Anti-hallucination safeguards</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <CheckCircle className="h-4 w-4 text-blue-500" />
-                        <span>Confidence scoring for speakers</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Estimated Time */}
-              <div className="text-center pt-4 border-t border-gray-200">
-                <p className="text-sm text-gray-500 mb-2">
-                  {currentProgress.percentage < 50 
-                    ? "Initializing AI agents and structuring your event..." 
-                    : currentProgress.percentage < 85
-                    ? "Researching real speaker data and generating content..."
-                    : "Finalizing event details and generating visuals..."
-                  }
-                </p>
-                <p className="text-xs text-gray-400">
-                  This usually takes 1-2 minutes. Please don't close this window.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Token Usage Dialog */}
+        <TokenUsageDialog
+          open={showTokenDialog}
+          onOpenChange={setShowTokenDialog}
+          featureType={requiredTokens === 6 ? 'event_proposal' : 'full_event'}
+          requiredTokens={requiredTokens}
+          featureName={featureName}
+          onContinue={pendingAction || (() => {})}
+        />
       </div>
     </CreatorLayout>
+  );
+};
+
+// Typewriter Animation Component
+const TypewriterAnimation = ({ text, speed = 50 }: { text: string; speed?: number }) => {
+  const [displayText, setDisplayText] = useState('');
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    if (currentIndex < text.length) {
+      const timer = setTimeout(() => {
+        setDisplayText(prev => prev + text[currentIndex]);
+        setCurrentIndex(prev => prev + 1);
+      }, speed);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [currentIndex, text, speed]);
+
+  return (
+    <span>
+      {displayText}
+      <span className="animate-pulse">|</span>
+    </span>
   );
 };
 
