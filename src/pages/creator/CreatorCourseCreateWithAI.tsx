@@ -85,8 +85,6 @@ const CreatorCourseCreateWithAI = () => {
   const [pastProposals, setPastProposals] = useState<any[]>([]);
   const [functionError, setFunctionError] = useState<string | null>(null);
   const [typingIndex, setTypingIndex] = useState(0);
-  const [enableRAG, setEnableRAG] = useState(true); // NEW: RAG toggle
-  const [useGPT4, setUseGPT4] = useState(false); // NEW: GPT-4 toggle
   
   // Token usage states
   const [showTokenDialog, setShowTokenDialog] = useState(false);
@@ -98,10 +96,10 @@ const CreatorCourseCreateWithAI = () => {
 
   // Example prompts for typing animation
   const examplePrompts = [
-    "Create a comprehensive course on modern web development using React, TypeScript, and Next.js, tailored for intermediate developers who want to build scalable and production-ready applications.",
+    "Create a comprehensive course on modern web development using React, TypeScript, and Next.js, tailored for intermediate developers who want to build scalable, production-ready applications.",
     "Build a complete Python data science course for beginners, covering essential topics such as pandas, NumPy, data visualization, and an introduction to machine learning techniques.",
     "Design an advanced digital marketing strategy course that includes in-depth training on social media marketing, SEO, content strategy, paid ads, and analytics—perfect for business owners and marketing professionals.",
-    "Develop a full mobile app development course using Flutter and Dart, guiding learners step-by-step in creating high-quality cross-platform applications...",
+    "Develop a full mobile app development course using Flutter and Dart, guiding learners step-by-step in creating high-quality cross-platform applications.",
     "Create an AI and automation productivity course that teaches students how to use tools like ChatGPT, DeepSeek, Make.com, and Zapier to automate business workflows.",
     "Develop a user-friendly SQL and database fundamentals course for absolute beginners, featuring hands-on practice with queries, joins, indexes, and data modeling.",
     "Develop a financial accounting fundamentals course that simplifies core concepts such as ledgers, trial balances, bank reconciliation, and financial statements.",
@@ -169,7 +167,6 @@ const CreatorCourseCreateWithAI = () => {
     }
   };
 
-  // UPDATED: Generate proposal with RAG and GPT-4 options
   const generateProposal = async () => {
     if (!prompt.trim()) {
       toast.error('Please describe the course you want to create');
@@ -193,9 +190,7 @@ const CreatorCourseCreateWithAI = () => {
         body: {
           user_prompt: prompt,
           creator_id: user.id,
-          action: 'generate_proposal',
-          enable_rag: enableRAG, // NEW: Send RAG preference
-          use_gpt4: useGPT4     // NEW: Send GPT-4 preference
+          action: 'generate_proposal'
         }
       });
 
@@ -205,15 +200,11 @@ const CreatorCourseCreateWithAI = () => {
       }
 
       if (data?.success) {
-        // Note: The Edge Function now automatically stores the proposal with embeddings
         setProposal(data.proposal);
         setProposalId(data.proposal_id);
         setStep('proposal');
         
-        // Enhanced success message based on features used
         let successMessage = 'Course proposal generated successfully!';
-        if (data.rag_enabled) successMessage += ' (RAG-enhanced)';
-        if (data.model_used === 'GPT-4') successMessage += ' (GPT-4)';
         if (tokenResult?.wasFree) successMessage += ' (Used free tokens)';
         
         toast.success(successMessage);
@@ -242,7 +233,6 @@ const CreatorCourseCreateWithAI = () => {
     }
   };
 
-  // UPDATED: Create full course with enhanced options
   const createFullCourse = async () => {
     if (!proposal || !proposalId) {
       toast.error('No proposal found to create course from');
@@ -266,8 +256,7 @@ const CreatorCourseCreateWithAI = () => {
         body: {
           creator_id: user.id,
           action: 'generate_full_course',
-          proposal_id: proposalId,
-          use_gpt4: useGPT4 // NEW: Use GPT-4 for full course creation
+          proposal_id: proposalId
         }
       });
 
@@ -312,7 +301,6 @@ const CreatorCourseCreateWithAI = () => {
     }
   };
 
-  // NEW: Search for similar proposals
   const searchSimilarProposals = async () => {
     if (!prompt.trim()) {
       toast.error('Please enter a prompt to search for similar proposals');
@@ -332,7 +320,6 @@ const CreatorCourseCreateWithAI = () => {
       
       if (data?.success) {
         toast.success(`Found ${data.count} similar proposals`);
-        // You could display these in a modal or sidebar
         console.log('Similar proposals:', data.similar_proposals);
       }
     } catch (error: any) {
@@ -388,7 +375,7 @@ const CreatorCourseCreateWithAI = () => {
             Transform your ideas into complete, engaging courses with intelligent AI analysis
           </p>
           
-          {/* NEW: Advanced Features Badge */}
+          {/* Feature Badges */}
           <div className="flex justify-center gap-4 flex-wrap">
             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
               <Cpu className="h-3 w-3 mr-1" />
@@ -396,11 +383,11 @@ const CreatorCourseCreateWithAI = () => {
             </Badge>
             <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
               <Layers className="h-3 w-3 mr-1" />
-              RAG Enhanced
+              Smart Context
             </Badge>
             <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
               <Brain className="h-3 w-3 mr-1" />
-              Vector Search
+              AI Powered
             </Badge>
           </div>
         </div>
@@ -476,88 +463,6 @@ const CreatorCourseCreateWithAI = () => {
               </CardContent>
             </Card>
 
-            {/* NEW: Advanced Settings Card */}
-            <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center text-lg">
-                  <Cpu className="h-5 w-5 mr-2 text-purple-500" />
-                  Advanced AI Settings
-                </CardTitle>
-                <CardDescription>
-                  Configure how Lumo AI generates your course
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-col sm:flex-row gap-4">
-                  {/* RAG Toggle */}
-                  <div className="flex items-center space-x-3 flex-1">
-                    <div className={`p-2 rounded-lg ${enableRAG ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                      <Layers className="h-4 w-4" />
-                    </div>
-                    <div className="flex-1">
-                      <label className="text-sm font-medium text-gray-900">
-                        RAG Enhancement
-                      </label>
-                      <p className="text-xs text-gray-500">
-                        Use your previous proposals as context
-                      </p>
-                    </div>
-                    <Button
-                      variant={enableRAG ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setEnableRAG(!enableRAG)}
-                      className={enableRAG ? gradientClass : ''}
-                    >
-                      {enableRAG ? 'Enabled' : 'Disabled'}
-                    </Button>
-                  </div>
-
-                  {/* GPT-4 Toggle */}
-                  <div className="flex items-center space-x-3 flex-1">
-                    <div className={`p-2 rounded-lg ${useGPT4 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
-                      <Brain className="h-4 w-4" />
-                    </div>
-                    <div className="flex-1">
-                      <label className="text-sm font-medium text-gray-900">
-                        GPT-4 Turbo
-                      </label>
-                      <p className="text-xs text-gray-500">
-                        Higher quality (more tokens)
-                      </p>
-                    </div>
-                    <Button
-                      variant={useGPT4 ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setUseGPT4(!useGPT4)}
-                      className={useGPT4 ? 'bg-blue-600 hover:bg-blue-700' : ''}
-                    >
-                      {useGPT4 ? 'Enabled' : 'Disabled'}
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Feature Indicators */}
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="flex items-center space-x-1 text-green-600">
-                    <CheckCircle className="h-3 w-3" />
-                    <span>Multi-Agent System</span>
-                  </div>
-                  <div className="flex items-center space-x-1 text-purple-600">
-                    <CheckCircle className="h-3 w-3" />
-                    <span>Vector Embeddings</span>
-                  </div>
-                  <div className="flex items-center space-x-1 text-blue-600">
-                    <CheckCircle className="h-3 w-3" />
-                    <span>Semantic Search</span>
-                  </div>
-                  <div className="flex items-center space-x-1 text-orange-600">
-                    <CheckCircle className="h-3 w-3" />
-                    <span>AI Thumbnails</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* AI Input Card */}
             <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-sm overflow-hidden">
               <div className={`${gradientClass} p-1`}>
@@ -621,18 +526,17 @@ const CreatorCourseCreateWithAI = () => {
                         {loading ? (
                           <>
                             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                            {enableRAG ? 'Analyzing Context...' : 'Generating Proposal...'}
+                            Analyzing Your Vision...
                           </>
                         ) : (
                           <>
                             <Brain className="h-5 w-5 mr-2" />
-                            Generate Course Proposal ({useGPT4 ? '12' : '8'} tokens)
+                            Generate Course Proposal (8 tokens)
                             <Rocket className="h-5 w-5 ml-2" />
                           </>
                         )}
                       </Button>
                       
-                      {/* NEW: Search Similar Button */}
                       <Button
                         onClick={searchSimilarProposals}
                         disabled={loading || !prompt.trim()}
@@ -643,22 +547,6 @@ const CreatorCourseCreateWithAI = () => {
                         Find Similar
                       </Button>
                     </div>
-
-                    {/* NEW: Feature Indicators */}
-                    <div className="flex justify-center gap-4 text-sm text-gray-500">
-                      {enableRAG && (
-                        <div className="flex items-center space-x-1">
-                          <Layers className="h-3 w-3 text-purple-500" />
-                          <span>RAG Enhanced</span>
-                        </div>
-                      )}
-                      {useGPT4 && (
-                        <div className="flex items-center space-x-1">
-                          <Brain className="h-3 w-3 text-blue-500" />
-                          <span>GPT-4 Turbo</span>
-                        </div>
-                      )}
-                    </div>
                   </CardContent>
                 </div>
               </div>
@@ -666,7 +554,7 @@ const CreatorCourseCreateWithAI = () => {
           </div>
         )}
 
-        {/* Generating Proposal - UPDATED with RAG indicators */}
+        {/* Generating Proposal */}
         {step === 'generating' && !functionError && (
           <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-sm text-center">
             <CardContent className="py-16">
@@ -675,9 +563,6 @@ const CreatorCourseCreateWithAI = () => {
                 <div className="relative w-32 h-32 mx-auto">
                   <div className="absolute inset-0 rounded-full border-4 border-orange-200 animate-ping"></div>
                   <div className="absolute inset-2 rounded-full border-4 border-purple-200 animate-pulse"></div>
-                  {enableRAG && (
-                    <div className="absolute inset-4 rounded-full border-4 border-green-200 animate-pulse" style={{ animationDelay: '0.5s' }}></div>
-                  )}
                   <div className="absolute inset-0 rounded-full border-4 border-transparent">
                     <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
                       <div className={`w-6 h-6 rounded-full ${gradientClass} animate-bounce`}></div>
@@ -685,11 +570,6 @@ const CreatorCourseCreateWithAI = () => {
                     <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2">
                       <div className="w-4 h-4 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                     </div>
-                    {enableRAG && (
-                      <div className="absolute right-0 top-1/2 transform translate-x-1/2 -translate-y-1/2">
-                        <div className="w-3 h-3 rounded-full bg-green-500 animate-bounce" style={{ animationDelay: '0.4s' }}></div>
-                      </div>
-                    )}
                   </div>
                   <div className={`absolute inset-4 rounded-full ${gradientClass} flex items-center justify-center`}>
                     <Bot className="h-8 w-8 text-white animate-pulse" />
@@ -698,23 +578,14 @@ const CreatorCourseCreateWithAI = () => {
               </div>
               
               <h3 className="text-2xl font-bold mb-4 text-gray-800">
-                {enableRAG ? 'Lumo AI is Analyzing Context' : 'Lumo AI is Analyzing Your Vision'}
+                Lumo AI is Analyzing Your Vision
               </h3>
               <p className="text-gray-600 mb-6 max-w-md mx-auto text-lg">
-                {enableRAG 
-                  ? 'Searching similar courses and crafting personalized content...' 
-                  : 'Understanding your requirements and crafting the perfect course structure...'
-                }
+                Understanding your requirements and crafting the perfect course structure...
               </p>
               
               {/* Enhanced Analysis Indicators */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-md mx-auto text-sm text-gray-500">
-                {enableRAG && (
-                  <div className="flex items-center justify-center space-x-1">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    <span>Context Search</span>
-                  </div>
-                )}
                 <div className="flex items-center justify-center space-x-1">
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.1s' }}></div>
                   <span>Structuring Content</span>
@@ -729,17 +600,17 @@ const CreatorCourseCreateWithAI = () => {
                 </div>
               </div>
 
-              {/* NEW: Model Indicator */}
+              {/* Model Indicator */}
               <div className="mt-6">
                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                  {useGPT4 ? 'GPT-4 Turbo' : 'GPT-3.5 Turbo'} • Multi-Agent System
+                  Multi-Agent System
                 </Badge>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Course Creation Loading - UPDATED with multi-agent indicators */}
+        {/* Course Creation Loading */}
         {step === 'creating' && !functionError && (
           <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-sm text-center">
             <CardContent className="py-16">
@@ -781,7 +652,7 @@ const CreatorCourseCreateWithAI = () => {
                 ))}
               </div>
 
-              {/* NEW: Agent System Status */}
+              {/* Agent System Status */}
               <div className="mt-6">
                 <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
                   <Cpu className="h-3 w-3 mr-1" />
@@ -792,7 +663,7 @@ const CreatorCourseCreateWithAI = () => {
           </Card>
         )}
 
-        {/* Proposal Review - UPDATED with enhanced features display */}
+        {/* Proposal Review */}
         {step === 'proposal' && proposal && !functionError && (
           <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-sm">
             <CardHeader className="text-center pb-4">
@@ -800,26 +671,11 @@ const CreatorCourseCreateWithAI = () => {
                 🎉 Course Blueprint Ready!
               </CardTitle>
               <CardDescription className="text-lg">
-                {enableRAG 
-                  ? 'Lumo AI has created a context-aware course using your previous work as inspiration' 
-                  : 'Lumo AI has analyzed your vision and created this comprehensive course structure'
-                }
+                Lumo AI has analyzed your vision and created this comprehensive course structure
               </CardDescription>
               
-              {/* NEW: Generation Features Used */}
+              {/* Generation Features Used */}
               <div className="flex justify-center gap-2 mt-2">
-                {enableRAG && (
-                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                    <Layers className="h-3 w-3 mr-1" />
-                    RAG Enhanced
-                  </Badge>
-                )}
-                {useGPT4 && (
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                    <Brain className="h-3 w-3 mr-1" />
-                    GPT-4 Turbo
-                  </Badge>
-                )}
                 <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
                   <Cpu className="h-3 w-3 mr-1" />
                   Multi-Agent
@@ -966,7 +822,7 @@ const CreatorCourseCreateWithAI = () => {
                   ) : (
                     <>
                       <Cpu className="h-5 w-5 mr-2" />
-                      Create Complete Course ({useGPT4 ? '35' : '25'} tokens)
+                      Create Complete Course (25 tokens)
                       <ArrowRight className="h-5 w-5 ml-2" />
                     </>
                   )}
@@ -976,7 +832,7 @@ const CreatorCourseCreateWithAI = () => {
           </Card>
         )}
 
-        {/* Past Proposals - UPDATED with vector search context */}
+        {/* Past Proposals */}
         {pastProposals.length > 0 && step === 'input' && (
           <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-sm">
             <CardHeader>
@@ -987,13 +843,9 @@ const CreatorCourseCreateWithAI = () => {
                     Your AI Course History
                   </CardTitle>
                   <CardDescription className="text-lg">
-                    Revisit and modify your previous course proposals • All proposals are vector-indexed for smart search
+                    Revisit and modify your previous course proposals
                   </CardDescription>
                 </div>
-                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                  <Layers className="h-3 w-3 mr-1" />
-                  Vector Search Ready
-                </Badge>
               </div>
             </CardHeader>
             <CardContent>
