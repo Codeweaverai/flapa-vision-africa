@@ -209,7 +209,7 @@ const CreatorPayments: React.FC = () => {
     total_platform_fees: 0,
     course_revenue: 0,
     event_revenue: 0,
-    fundraising_revenue: 0 // ✅ ADDED FUNDRAISING REVENUE
+    fundraising_revenue: 0
   });
 
   // Pagination states
@@ -510,13 +510,36 @@ const CreatorPayments: React.FC = () => {
         return 'Course Purchase';
       case 'event_ticket':
         return 'Event Registration';
-      case 'fundraising_contribution': // ✅ ADDED FUNDRAISING
+      case 'fundraising_contribution':
         return 'Campaign Contribution';
       case 'consultation':
         return 'Consultation Booking';
       default:
         return type;
     }
+  };
+
+  // NEW: Get platform fee percentage based on transaction type
+  const getPlatformFeePercentage = (transaction: any) => {
+    return transaction.item_type === 'fundraising_contribution' ? '5%' : '8%';
+  };
+
+  // NEW: Get hold period description based on transaction type
+  const getHoldPeriodDescription = (transaction: any) => {
+    if (transaction.item_type === 'fundraising_contribution') {
+      return 'Available after campaign ends';
+    }
+    return 'Funds in 7-day hold period';
+  };
+
+  // NEW: Check if transaction is fundraising and campaign has ended
+  const isCampaignEnded = (transaction: any) => {
+    if (transaction.item_type !== 'fundraising_contribution') return false;
+    
+    const payoutDate = transaction.payout_eligible_date ? new Date(transaction.payout_eligible_date) : null;
+    const now = new Date();
+    
+    return payoutDate && payoutDate <= now;
   };
 
   const hasBankTransferSetup = () => {
@@ -707,7 +730,10 @@ const CreatorPayments: React.FC = () => {
       ? 'bg-gradient-to-br from-orange-500 to-purple-600'
       : transaction.item_type === 'event_ticket'
       ? 'bg-gradient-to-br from-purple-500 to-orange-600'
-      : 'bg-gradient-to-br from-blue-500 to-blue-600'; // ✅ ADDED FUNDRAISING GRADIENT
+      : 'bg-gradient-to-br from-blue-500 to-blue-600';
+    
+    const isFundraising = transaction.item_type === 'fundraising_contribution';
+    const campaignEnded = isCampaignEnded(transaction);
     
     return (
       <Card key={transaction.id} className={`mb-3 ${gradientClass} text-white shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 w-full`}>
@@ -717,11 +743,23 @@ const CreatorPayments: React.FC = () => {
               <CardTitle className="text-lg line-clamp-1">{transaction.item_name}</CardTitle>
               <CardDescription className="text-white/80">
                 {format(new Date(transaction.created_at), 'MMM dd, yyyy')}
+                {isFundraising && (
+                  <span className="ml-2">
+                    • {campaignEnded ? 'Campaign Ended' : 'Campaign Active'}
+                  </span>
+                )}
               </CardDescription>
             </div>
-            <Badge variant="secondary" className="bg-white/20 text-white backdrop-blur-sm border-white/30">
-              {getPaymentTypeLabel(transaction.item_type)}
-            </Badge>
+            <div className="flex flex-col items-end gap-2">
+              <Badge variant="secondary" className="bg-white/20 text-white backdrop-blur-sm border-white/30">
+                {getPaymentTypeLabel(transaction.item_type)}
+              </Badge>
+              {isFundraising && (
+                <Badge variant="outline" className="bg-blue-500/20 text-blue-100 border-blue-300/30 text-xs">
+                  {getPlatformFeePercentage(transaction)} Platform Fee
+                </Badge>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -758,11 +796,16 @@ const CreatorPayments: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <p className="text-sm text-white/80">Platform Fee</p>
-              <PriceDisplay 
-                amount={transaction.platform_fee} 
-                originalCurrency="USD" 
-                className="text-white/90"
-              />
+              <div className="flex items-center gap-2">
+                <PriceDisplay 
+                  amount={transaction.platform_fee} 
+                  originalCurrency="USD" 
+                  className="text-white/90"
+                />
+                <Badge variant="outline" className="bg-white/20 text-white text-xs border-white/30">
+                  {getPlatformFeePercentage(transaction)}
+                </Badge>
+              </div>
             </div>
             <div>
               <p className="text-sm text-white/80">Status</p>
@@ -773,12 +816,29 @@ const CreatorPayments: React.FC = () => {
           </div>
           
           <div>
-            <p className="text-sm text-white/80">Payout Date</p>
-            <p className="font-medium">
-              {transaction.payout_eligible_date ? 
-                format(new Date(transaction.payout_eligible_date), 'MMM dd, yyyy') :
-                'N/A'
-              }
+            <p className="text-sm text-white/80">
+              {isFundraising ? 'Available Date' : 'Payout Date'}
+            </p>
+            <div className="flex items-center gap-2">
+              <p className="font-medium">
+                {transaction.payout_eligible_date ? 
+                  format(new Date(transaction.payout_eligible_date), 'MMM dd, yyyy') :
+                  'N/A'
+                }
+              </p>
+              {isFundraising && campaignEnded && (
+                <Badge variant="default" className="bg-green-500/20 text-green-100 text-xs">
+                  Available Now
+                </Badge>
+              )}
+              {isFundraising && !campaignEnded && (
+                <Badge variant="outline" className="bg-yellow-500/20 text-yellow-100 text-xs border-yellow-300/30">
+                  After Campaign
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-white/70 mt-1">
+              {getHoldPeriodDescription(transaction)}
             </p>
           </div>
         </CardContent>
@@ -981,7 +1041,7 @@ const CreatorPayments: React.FC = () => {
                   </div>
                 )}
                 <p className="text-xs text-purple-600/80 mt-1">
-                  Funds in 7-day hold period
+                  Includes funds in 7-day hold + campaign contributions
                 </p>
               </CardContent>
             </Card>
@@ -1000,7 +1060,7 @@ const CreatorPayments: React.FC = () => {
                   </div>
                 )}
                 <p className="text-xs text-orange-600/80 mt-1">
-                  Your share (92% of sales)
+                  Your share (92% courses/events, 95% fundraising)
                 </p>
               </CardContent>
             </Card>
@@ -1019,19 +1079,19 @@ const CreatorPayments: React.FC = () => {
                   </div>
                 )}
                 <p className="text-xs text-purple-600/80 mt-1">
-                  Platform fee (8% of sales)
+                  Platform fees (8% courses/events, 5% fundraising)
                 </p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Revenue Breakdown - UPDATED WITH FUNDRAISING */}
+          {/* Revenue Breakdown */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 w-full">
             <Card className="bg-gradient-to-br from-orange-500 to-orange-400 shadow-lg border-0 w-full">
               <CardHeader>
                 <CardTitle className="text-white text-lg sm:text-xl">Course Revenue</CardTitle>
                 <CardDescription className="text-white/80 text-sm">
-                  Earnings from course sales
+                  Earnings from course sales (92% share)
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1045,7 +1105,7 @@ const CreatorPayments: React.FC = () => {
               <CardHeader>
                 <CardTitle className="text-white text-lg sm:text-xl">Event Revenue</CardTitle>
                 <CardDescription className="text-white/80 text-sm">
-                  Earnings from event registrations
+                  Earnings from event registrations (92% share)
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1055,12 +1115,11 @@ const CreatorPayments: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* ✅ ADDED: Fundraising Revenue Card */}
             <Card className="bg-gradient-to-br from-blue-500 to-blue-400 shadow-lg border-0 w-full">
               <CardHeader>
                 <CardTitle className="text-white text-lg sm:text-xl">Fundraising Revenue</CardTitle>
                 <CardDescription className="text-white/80 text-sm">
-                  Earnings from campaign contributions
+                  Earnings from campaign contributions (95% share)
                 </CardDescription>
               </CardHeader>
               <CardContent>
