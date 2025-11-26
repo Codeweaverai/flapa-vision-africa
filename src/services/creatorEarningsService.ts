@@ -141,7 +141,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
       };
     }
 
-    // Fetch order items for courses
+    // Fetch order items for courses - FIXED: Simplified query without nested joins
     let courseOrderItems: any[] = [];
     if (courseIds.length > 0) {
       const { data: courseItems, error: courseError } = await supabase
@@ -171,7 +171,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
       }
     }
 
-    // Fetch order items for event tickets
+    // Fetch order items for event tickets - FIXED: Simplified query without nested joins
     let eventOrderItems: any[] = [];
     if (eventTicketIds.length > 0) {
       const { data: eventItems, error: eventError } = await supabase
@@ -369,7 +369,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
   }
 }
 
-// COMPLETELY REWRITTEN: fetchCreatorTransactions function without paginatedItems reference
+// FIXED: fetchCreatorTransactions function with proper queries
 export async function fetchCreatorTransactions(creatorId: string, limit: number = 10, offset: number = 0): Promise<{ transactions: CreatorTransaction[], total: number }> {
   try {
     console.log('🔍 Fetching creator transactions for:', creatorId, 'limit:', limit, 'offset:', offset);
@@ -401,7 +401,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
     // Step 3: Fetch transactions from all sources
     const allTransactions: CreatorTransaction[] = [];
 
-    // Fetch and process course transactions
+    // Fetch and process course transactions - FIXED: Simplified query
     if (courseIds.length > 0) {
       const { data: courseItems, error: courseError } = await supabase
         .from('order_items')
@@ -416,8 +416,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
             payment_status,
             payment_method,
             created_at,
-            tax_amount,
-            profiles:user_id(username, full_name)
+            tax_amount
           )
         `)
         .eq('orders.payment_status', 'completed')
@@ -426,8 +425,25 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
         .order('created_at', { ascending: false });
 
       if (courseError) {
-        console.error('Error fetching course transactions:', courseError);
+        console.error('❌ Error fetching course transactions:', courseError);
       } else if (courseItems) {
+        console.log(`📚 Found ${courseItems.length} course transactions`);
+        
+        // Get user profiles separately to avoid complex nested joins
+        const userIds = [...new Set(courseItems.map(item => item.orders.user_id).filter(Boolean))];
+        let userProfiles = new Map();
+        
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, username, full_name')
+            .in('id', userIds);
+          
+          if (profiles) {
+            userProfiles = new Map(profiles.map(p => [p.id, p]));
+          }
+        }
+
         for (const item of courseItems) {
           const itemTotal = Number(item.total_price);
           const orderTotal = Number(item.orders.total_amount);
@@ -441,11 +457,14 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
           const payoutEligibleDate = new Date(orderDate);
           payoutEligibleDate.setDate(payoutEligibleDate.getDate() + 7);
 
+          const userProfile = userProfiles.get(item.orders.user_id);
+          const customerName = userProfile?.full_name || userProfile?.username || 'Unknown Customer';
+
           allTransactions.push({
             id: item.id,
             order_id: item.orders.id,
             customer_email: item.orders.email,
-            customer_name: item.orders.profiles?.full_name || item.orders.profiles?.username || 'Unknown Customer',
+            customer_name: customerName,
             item_type: 'course',
             item_name: item.item_name || 'Course Purchase',
             item_id: item.item_id,
@@ -464,7 +483,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
       }
     }
 
-    // Fetch and process event transactions
+    // Fetch and process event transactions - FIXED: Simplified query
     if (eventTicketIds.length > 0) {
       const { data: eventItems, error: eventError } = await supabase
         .from('order_items')
@@ -479,8 +498,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
             payment_status,
             payment_method,
             created_at,
-            tax_amount,
-            profiles:user_id(username, full_name)
+            tax_amount
           )
         `)
         .eq('orders.payment_status', 'completed')
@@ -489,8 +507,25 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
         .order('created_at', { ascending: false });
 
       if (eventError) {
-        console.error('Error fetching event transactions:', eventError);
+        console.error('❌ Error fetching event transactions:', eventError);
       } else if (eventItems) {
+        console.log(`🎫 Found ${eventItems.length} event transactions`);
+        
+        // Get user profiles separately
+        const userIds = [...new Set(eventItems.map(item => item.orders.user_id).filter(Boolean))];
+        let userProfiles = new Map();
+        
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, username, full_name')
+            .in('id', userIds);
+          
+          if (profiles) {
+            userProfiles = new Map(profiles.map(p => [p.id, p]));
+          }
+        }
+
         for (const item of eventItems) {
           const itemTotal = Number(item.total_price);
           const orderTotal = Number(item.orders.total_amount);
@@ -504,11 +539,14 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
           const payoutEligibleDate = new Date(orderDate);
           payoutEligibleDate.setDate(payoutEligibleDate.getDate() + 7);
 
+          const userProfile = userProfiles.get(item.orders.user_id);
+          const customerName = userProfile?.full_name || userProfile?.username || 'Unknown Customer';
+
           allTransactions.push({
             id: item.id,
             order_id: item.orders.id,
             customer_email: item.orders.email,
-            customer_name: item.orders.profiles?.full_name || item.orders.profiles?.username || 'Unknown Customer',
+            customer_name: customerName,
             item_type: 'event_ticket',
             item_name: item.item_name || 'Event Registration',
             item_id: item.item_id,
@@ -539,15 +577,20 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
             end_date,
             status
           ),
-          profiles:supporter_id(username, full_name)
+          profiles!campaign_contributions_supporter_id_fkey(
+            username,
+            full_name
+          )
         `)
         .eq('status', 'completed')
         .in('campaign_id', campaignIds)
         .order('created_at', { ascending: false });
 
       if (contributionsError) {
-        console.error('Error fetching fundraising transactions:', contributionsError);
+        console.error('❌ Error fetching fundraising transactions:', contributionsError);
       } else if (contributions) {
+        console.log(`💰 Found ${contributions.length} fundraising transactions`);
+
         for (const contribution of contributions) {
           const contributionCurrency = contribution.currency || 'USD';
           const originalAmount = Number(contribution.amount);
