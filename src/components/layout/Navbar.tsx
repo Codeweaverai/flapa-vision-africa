@@ -236,7 +236,7 @@ const Navbar = () => {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center gap-1 text-sm">
                   <Compass className="h-4 w-4 mr-1" />
-                  Explore
+                  Home
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
