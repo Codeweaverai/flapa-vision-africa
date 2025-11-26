@@ -376,7 +376,7 @@ const Navbar = () => {
                   </Link>
                 ))}
                 <div className="pt-2 border-t border-border">
-                  <p className="text-sm text-muted-foreground mb-2">Explore</p>
+                  <p className="text-sm text-muted-foreground mb-2">Home</p>
                   {exploreLinks.map((link) => (
                     <Link
                       key={link.name}
