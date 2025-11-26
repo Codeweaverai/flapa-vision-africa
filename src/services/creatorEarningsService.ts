@@ -72,7 +72,7 @@ export interface CreatorTransaction {
 
 // Platform fee rates
 const PLATFORM_FEE_RATE = 0.08; // 8% for courses/events
-const FUNDRAISING_TRANSACTION_FEE_RATE = 0.05; // 5% for fundraising
+const FUNDRAISING_PLATFORM_FEE_RATE = 0.05; // 5% for fundraising
 
 export async function calculateCreatorEarningsFromOrders(creatorId: string): Promise<CreatorEarningsData> {
   try {
@@ -275,7 +275,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
       }
     });
 
-    // FIXED: Process fundraising contributions with currency conversion
+    // FIXED: Process fundraising contributions with currency conversion and proper platform fee
     for (const contribution of fundraisingContributions) {
       const contributionCurrency = contribution.currency || 'USD';
       const originalAmount = Number(contribution.amount);
@@ -297,7 +297,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
       }
 
       // Apply platform fee for fundraising (5%)
-      const platformFee = netAmountInUSD * FUNDRAISING_TRANSACTION_FEE_RATE;
+      const platformFee = netAmountInUSD * FUNDRAISING_PLATFORM_FEE_RATE;
       const creatorEarning = netAmountInUSD - platformFee;
 
       fundraisingRevenue += creatorEarning;
@@ -369,21 +369,202 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
   }
 }
 
-// FIXED: Also update the fetchCreatorTransactions function to handle currency conversion
+// FIXED: Complete rewrite of fetchCreatorTransactions function
 export async function fetchCreatorTransactions(creatorId: string, limit: number = 10, offset: number = 0): Promise<{ transactions: CreatorTransaction[], total: number }> {
   try {
-    // ... (existing code remains the same until transaction processing)
+    console.log('Fetching creator transactions for:', creatorId, 'limit:', limit, 'offset:', offset);
 
-    // Process transactions
-    const creatorTransactions: CreatorTransaction[] = [];
-    const now = new Date();
+    // Get creator's course IDs, event IDs, and campaign IDs
+    const [coursesResult, eventsResult, campaignsResult] = await Promise.all([
+      supabase.from('courses').select('id').eq('creator_id', creatorId),
+      supabase.from('events').select('id').eq('creator_id', creatorId),
+      supabase.from('fundraising_campaigns').select('id, title, end_date, status').eq('creator_id', creatorId)
+    ]);
 
-    for (const item of paginatedItems) {
-      if (item.source === 'fundraising') {
-        // FIXED: Process fundraising contribution with currency conversion
-        const contributionCurrency = item.currency || 'USD';
-        const originalAmount = Number(item.amount);
-        const originalNetAmount = Number(item.net_amount || item.amount);
+    const courseIds = coursesResult.data?.map(c => c.id) || [];
+    const eventIds = eventsResult.data?.map(e => e.id) || [];
+    const campaignIds = campaignsResult.data?.map(c => c.id) || [];
+    const campaignMap = new Map(campaignsResult.data?.map(c => [c.id, c]) || []);
+
+    // Get event ticket IDs
+    let eventTicketIds: string[] = [];
+    if (eventIds.length > 0) {
+      const { data: eventTickets } = await supabase
+        .from('event_tickets')
+        .select('id')
+        .in('event_id', eventIds);
+      eventTicketIds = eventTickets?.map(t => t.id) || [];
+    }
+
+    // Fetch transactions from different sources
+    const transactionPromises = [];
+
+    // Course transactions
+    if (courseIds.length > 0) {
+      transactionPromises.push(
+        supabase
+          .from('order_items')
+          .select(`
+            *,
+            orders!inner(
+              id,
+              user_id,
+              email,
+              total_amount,
+              currency,
+              payment_status,
+              payment_method,
+              created_at,
+              tax_amount,
+              profiles:user_id(username, full_name)
+            )
+          `)
+          .eq('orders.payment_status', 'completed')
+          .eq('item_type', 'course')
+          .in('item_id', courseIds)
+          .order('created_at', { ascending: false })
+      );
+    } else {
+      transactionPromises.push(Promise.resolve({ data: [], error: null }));
+    }
+
+    // Event transactions
+    if (eventTicketIds.length > 0) {
+      transactionPromises.push(
+        supabase
+          .from('order_items')
+          .select(`
+            *,
+            orders!inner(
+              id,
+              user_id,
+              email,
+              total_amount,
+              currency,
+              payment_status,
+              payment_method,
+              created_at,
+              tax_amount,
+              profiles:user_id(username, full_name)
+            )
+          `)
+          .eq('orders.payment_status', 'completed')
+          .eq('item_type', 'event_ticket')
+          .in('item_id', eventTicketIds)
+          .order('created_at', { ascending: false })
+      );
+    } else {
+      transactionPromises.push(Promise.resolve({ data: [], error: null }));
+    }
+
+    // Fundraising transactions
+    if (campaignIds.length > 0) {
+      transactionPromises.push(
+        supabase
+          .from('campaign_contributions')
+          .select(`
+            *,
+            fundraising_campaigns!inner(
+              id,
+              title,
+              end_date,
+              status
+            ),
+            profiles:supporter_id(username, full_name)
+          `)
+          .eq('status', 'completed')
+          .in('campaign_id', campaignIds)
+          .order('created_at', { ascending: false })
+      );
+    } else {
+      transactionPromises.push(Promise.resolve({ data: [], error: null }));
+    }
+
+    const [courseResult, eventResult, fundraisingResult] = await Promise.all(transactionPromises);
+
+    // Combine and process all transactions
+    const allTransactions: any[] = [];
+    
+    // Process course transactions
+    if (courseResult.data) {
+      for (const item of courseResult.data) {
+        const itemTotal = Number(item.total_price);
+        const orderTotal = Number(item.orders.total_amount);
+        const orderTax = Number(item.orders.tax_amount) || 0;
+        
+        const itemTaxAllocation = orderTotal > 0 ? (itemTotal / orderTotal) * orderTax : 0;
+        const platformFee = itemTotal * PLATFORM_FEE_RATE;
+        const creatorEarning = Math.max(0, itemTotal - platformFee - itemTaxAllocation);
+
+        const orderDate = new Date(item.orders.created_at);
+        const payoutEligibleDate = new Date(orderDate);
+        payoutEligibleDate.setDate(payoutEligibleDate.getDate() + 7);
+
+        allTransactions.push({
+          id: item.id,
+          order_id: item.orders.id,
+          customer_email: item.orders.email,
+          customer_name: item.orders.profiles?.full_name || item.orders.profiles?.username || 'Unknown',
+          item_type: 'course' as const,
+          item_name: item.item_name || 'Course Purchase',
+          item_id: item.item_id,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total_amount: itemTotal,
+          creator_earning: creatorEarning,
+          platform_fee: platformFee,
+          payment_status: item.orders.payment_status,
+          created_at: item.orders.created_at,
+          order_total: orderTotal,
+          payout_eligible_date: payoutEligibleDate.toISOString(),
+          payment_method: item.orders.payment_method
+        });
+      }
+    }
+
+    // Process event transactions
+    if (eventResult.data) {
+      for (const item of eventResult.data) {
+        const itemTotal = Number(item.total_price);
+        const orderTotal = Number(item.orders.total_amount);
+        const orderTax = Number(item.orders.tax_amount) || 0;
+        
+        const itemTaxAllocation = orderTotal > 0 ? (itemTotal / orderTotal) * orderTax : 0;
+        const platformFee = itemTotal * PLATFORM_FEE_RATE;
+        const creatorEarning = Math.max(0, itemTotal - platformFee - itemTaxAllocation);
+
+        const orderDate = new Date(item.orders.created_at);
+        const payoutEligibleDate = new Date(orderDate);
+        payoutEligibleDate.setDate(payoutEligibleDate.getDate() + 7);
+
+        allTransactions.push({
+          id: item.id,
+          order_id: item.orders.id,
+          customer_email: item.orders.email,
+          customer_name: item.orders.profiles?.full_name || item.orders.profiles?.username || 'Unknown',
+          item_type: 'event_ticket' as const,
+          item_name: item.item_name || 'Event Registration',
+          item_id: item.item_id,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total_amount: itemTotal,
+          creator_earning: creatorEarning,
+          platform_fee: platformFee,
+          payment_status: item.orders.payment_status,
+          created_at: item.orders.created_at,
+          order_total: orderTotal,
+          payout_eligible_date: payoutEligibleDate.toISOString(),
+          payment_method: item.orders.payment_method
+        });
+      }
+    }
+
+    // Process fundraising transactions with proper platform fee (5%)
+    if (fundraisingResult.data) {
+      for (const contribution of fundraisingResult.data) {
+        const contributionCurrency = contribution.currency || 'USD';
+        const originalAmount = Number(contribution.amount);
+        const originalNetAmount = Number(contribution.net_amount || contribution.amount);
         const originalTransactionFee = originalAmount - originalNetAmount;
 
         let netAmountInUSD = originalNetAmount;
@@ -395,55 +576,63 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
             netAmountInUSD = await convertCurrency(originalNetAmount, contributionCurrency, 'USD');
             feeInUSD = await convertCurrency(originalTransactionFee, contributionCurrency, 'USD');
           } catch (error) {
-            console.warn(`Currency conversion failed for transaction ${item.id}:`, error);
+            console.warn(`Currency conversion failed for transaction ${contribution.id}:`, error);
           }
         }
 
         // Apply platform fee for fundraising (5%)
-        const platformFee = netAmountInUSD * FUNDRAISING_TRANSACTION_FEE_RATE;
+        const platformFee = netAmountInUSD * FUNDRAISING_PLATFORM_FEE_RATE;
         const creatorEarning = netAmountInUSD - platformFee;
 
-        const campaignEndDate = item.fundraising_campaigns?.end_date;
-        const campaignStatus = item.fundraising_campaigns?.status;
+        const campaign = campaignMap.get(contribution.campaign_id);
+        const campaignEndDate = campaign?.end_date;
+        const campaignStatus = campaign?.status;
 
-        // Determine payout eligible date - campaign end date or creation date if no end date
-        let payoutEligibleDate = item.created_at;
+        // Determine payout eligible date - campaign end date for fundraising
+        let payoutEligibleDate = contribution.created_at;
         if (campaignEndDate) {
           payoutEligibleDate = campaignEndDate;
-        } else if (campaignStatus === 'completed') {
-          // If campaign is marked completed, use creation date
-          payoutEligibleDate = item.created_at;
         }
 
-        const customerName = item.is_anonymous 
+        const customerName = contribution.is_anonymous 
           ? 'Anonymous Supporter' 
-          : (item.profiles?.username || item.profiles?.full_name || 'Unknown Supporter');
+          : (contribution.profiles?.full_name || contribution.profiles?.username || 'Unknown Supporter');
 
-        creatorTransactions.push({
-          id: item.id,
-          order_id: item.id,
+        allTransactions.push({
+          id: contribution.id,
+          order_id: contribution.id,
           customer_email: 'campaign@supporter.com',
           customer_name: customerName,
-          item_type: 'fundraising_contribution',
-          item_name: `Campaign: ${item.fundraising_campaigns?.title}`,
-          item_id: item.campaign_id,
+          item_type: 'fundraising_contribution' as const,
+          item_name: `Campaign: ${campaign?.title || 'Unknown Campaign'}`,
+          item_id: contribution.campaign_id,
           quantity: 1,
-          unit_price: Number(originalAmount),
-          total_amount: Number(originalAmount),
+          unit_price: originalAmount,
+          total_amount: originalAmount,
           creator_earning: Number(creatorEarning.toFixed(2)),
           platform_fee: Number((feeInUSD + platformFee).toFixed(2)),
-          payment_status: item.status,
-          created_at: item.created_at,
-          order_total: Number(originalAmount),
+          payment_status: contribution.status,
+          created_at: contribution.created_at,
+          order_total: originalAmount,
           payout_eligible_date: payoutEligibleDate,
-          payment_method: item.payment_method || 'Unknown'
+          payment_method: contribution.payment_method || 'Unknown'
         });
-      } else {
-        // ... (existing course/event processing code remains the same)
       }
     }
 
-    return { transactions: creatorTransactions, total: totalCount };
+    // Sort all transactions by date (newest first)
+    allTransactions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    // Apply pagination
+    const total = allTransactions.length;
+    const paginatedTransactions = allTransactions.slice(offset, offset + limit);
+
+    console.log(`Found ${total} total transactions, returning ${paginatedTransactions.length} after pagination`);
+
+    return { 
+      transactions: paginatedTransactions, 
+      total 
+    };
   } catch (error) {
     console.error('Error fetching creator transactions:', error);
     return { transactions: [], total: 0 };
@@ -454,7 +643,7 @@ export async function getCreatorPayoutMethod(creatorId: string) {
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('payout_method, mobile_money_details, stripe_connect_id')
+      .select('payout_method, mobile_money_details, stripe_connect_id, bank_account_details')
       .eq('id', creatorId)
       .single();
 
@@ -464,6 +653,7 @@ export async function getCreatorPayoutMethod(creatorId: string) {
       payout_method: data?.payout_method || null,
       mobile_money_details: data?.mobile_money_details || null,
       stripe_connect_id: data?.stripe_connect_id || null,
+      bank_account_details: data?.bank_account_details || null,
       has_payout_method: !!(data?.payout_method)
     };
   } catch (error) {
