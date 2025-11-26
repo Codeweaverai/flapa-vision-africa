@@ -60,56 +60,67 @@ export interface CreatorPaymentTransaction extends CreatorTransaction {}
 
 export interface PayoutRequest {
   amount: number;
-  payout_method: 'stripe' | 'mobile_money';
+  payout_method: 'stripe' | 'mobile_money' | 'bank';
   mobile_money_details?: {
     phone_number: string;
     operator: string;
     country: string;
   };
+  bank_transfer_details?: {
+    bank_name: string;
+    account_number: string;
+    account_name: string;
+  };
 }
 
 // Platform fee rates
 const PLATFORM_FEE_RATE = 0.08; // 8% for courses/events
-const FUNDRAISING_TRANSACTION_FEE_RATE = 0.05; // 5% for fundraising
+const FUNDRAISING_PLATFORM_FEE_RATE = 0.05; // 5% for fundraising
 
-// Calculate fundraising revenue with proper currency conversion
+// FIXED: Calculate fundraising revenue with proper platform fee and payout timing
 async function calculateFundraisingRevenue(creatorId: string): Promise<{
   totalNetAmount: number;
   totalFees: number;
   availableAmount: number;
+  pendingAmount: number;
 }> {
   try {
-    // Get creator's fundraising campaigns
+    // Get creator's fundraising campaigns with end dates
     const { data: campaigns, error: campaignsError } = await supabase
       .from('fundraising_campaigns')
-      .select('id, currency')
+      .select('id, currency, end_date, status')
       .eq('creator_id', creatorId)
       .in('status', ['active', 'completed']);
 
     if (campaignsError) throw campaignsError;
     if (!campaigns || campaigns.length === 0) {
-      return { totalNetAmount: 0, totalFees: 0, availableAmount: 0 };
+      return { totalNetAmount: 0, totalFees: 0, availableAmount: 0, pendingAmount: 0 };
     }
 
     const campaignIds = campaigns.map(campaign => campaign.id);
+    const campaignEndDateMap = new Map(campaigns.map(camp => [camp.id, camp.end_date]));
+    const campaignStatusMap = new Map(campaigns.map(camp => [camp.id, camp.status]));
     
     // Get all completed contributions for these campaigns
     const { data: contributions, error: contributionsError } = await supabase
       .from('campaign_contributions')
-      .select('id, amount, net_amount, currency, transaction_fee, status, created_at')
+      .select('id, amount, net_amount, currency, transaction_fee, status, campaign_id, created_at')
       .in('campaign_id', campaignIds)
       .eq('status', 'completed')
       .order('created_at', { ascending: false });
 
     if (contributionsError) throw contributionsError;
     if (!contributions) {
-      return { totalNetAmount: 0, totalFees: 0, availableAmount: 0 };
+      return { totalNetAmount: 0, totalFees: 0, availableAmount: 0, pendingAmount: 0 };
     }
 
     let totalNetAmountUSD = 0;
     let totalFeesUSD = 0;
+    let availableAmountUSD = 0;
+    let pendingAmountUSD = 0;
+    const now = new Date();
 
-    // Process each contribution with proper currency conversion
+    // Process each contribution with proper currency conversion and payout timing
     for (const contribution of contributions) {
       const contributionCurrency = contribution.currency || 'USD';
       const originalNetAmount = Number(contribution.net_amount || contribution.amount || 0);
@@ -129,22 +140,38 @@ async function calculateFundraisingRevenue(creatorId: string): Promise<{
         }
       }
 
-      totalNetAmountUSD += netAmountInUSD;
-      totalFeesUSD += feeInUSD;
+      // Apply platform fee for fundraising (5%)
+      const platformFee = netAmountInUSD * FUNDRAISING_PLATFORM_FEE_RATE;
+      const creatorEarning = netAmountInUSD - platformFee;
+
+      totalNetAmountUSD += creatorEarning;
+      totalFeesUSD += (feeInUSD + platformFee);
+
+      // Check if campaign has ended for payout eligibility
+      const campaignEndDate = campaignEndDateMap.get(contribution.campaign_id);
+      const campaignStatus = campaignStatusMap.get(contribution.campaign_id);
+      
+      const isCampaignEnded = campaignEndDate ? new Date(campaignEndDate) <= now : false;
+      const isCampaignCompleted = campaignStatus === 'completed';
+
+      if (isCampaignEnded || isCampaignCompleted) {
+        // Campaign has ended - money is available
+        availableAmountUSD += creatorEarning;
+      } else {
+        // Campaign is still active - money is pending
+        pendingAmountUSD += creatorEarning;
+      }
     }
 
-    // Apply platform fee for fundraising (5%)
-    const platformFee = totalNetAmountUSD * FUNDRAISING_TRANSACTION_FEE_RATE;
-    const creatorEarning = totalNetAmountUSD - platformFee;
-
     return {
-      totalNetAmount: creatorEarning,
-      totalFees: totalFeesUSD + platformFee,
-      availableAmount: creatorEarning // Fundraising amounts are typically available immediately
+      totalNetAmount: totalNetAmountUSD,
+      totalFees: totalFeesUSD,
+      availableAmount: availableAmountUSD,
+      pendingAmount: pendingAmountUSD
     };
   } catch (error) {
     console.error('Error calculating fundraising revenue:', error);
-    return { totalNetAmount: 0, totalFees: 0, availableAmount: 0 };
+    return { totalNetAmount: 0, totalFees: 0, availableAmount: 0, pendingAmount: 0 };
   }
 }
 
@@ -155,7 +182,7 @@ export async function fetchCreatorEarnings(creatorId: string): Promise<CreatorEa
     // Get base earnings calculation from courses and events
     const earnings = await calculateCreatorEarningsFromOrders(creatorId);
     
-    // Calculate fundraising revenue separately with proper conversion
+    // Calculate fundraising revenue separately with proper conversion and payout timing
     const fundraisingRevenue = await calculateFundraisingRevenue(creatorId);
     
     // Update earnings with properly converted fundraising revenue
@@ -164,6 +191,7 @@ export async function fetchCreatorEarnings(creatorId: string): Promise<CreatorEa
       fundraising_revenue: fundraisingRevenue.totalNetAmount,
       total_earnings: earnings.total_earnings + fundraisingRevenue.totalNetAmount,
       available_balance: earnings.available_balance + fundraisingRevenue.availableAmount,
+      pending_balance: earnings.pending_balance + fundraisingRevenue.pendingAmount,
       total_platform_fees: earnings.total_platform_fees + fundraisingRevenue.totalFees
     };
     
@@ -234,7 +262,7 @@ export async function fetchCreatorPayouts(creatorId: string, limit: number = 10,
   }
 }
 
-// Updated fundraising transactions with proper conversion
+// FIXED: Updated fundraising transactions with proper conversion and platform fee
 export async function fetchFundraisingTransactions(campaignIds: string[]) {
   try {
     const { data, error } = await supabase
@@ -297,17 +325,28 @@ export async function fetchFundraisingTransactions(campaignIds: string[]) {
           }
         }
 
+        // Apply fundraising platform fee (5%)
+        const platformFee = netAmountInUSD * FUNDRAISING_PLATFORM_FEE_RATE;
+        const creatorEarning = netAmountInUSD - platformFee;
+
+        // Determine payout eligible date based on campaign end date
+        const campaignEndDate = transaction.fundraising_campaigns?.end_date;
+        let payoutEligibleDate = transaction.created_at;
+        if (campaignEndDate) {
+          payoutEligibleDate = campaignEndDate;
+        }
+
         return {
           ...transaction,
-          converted_amount: netAmountInUSD, // Use net amount for calculations
+          converted_amount: netAmountInUSD,
           original_currency: contributionCurrency,
           original_amount: originalAmount,
           original_net_amount: originalNetAmount,
           converted_gross_amount: amountInUSD,
           converted_fee: feeInUSD,
-          // Add platform fee calculation for consistency
-          platform_fee: netAmountInUSD * FUNDRAISING_TRANSACTION_FEE_RATE,
-          creator_earning: netAmountInUSD * (1 - FUNDRAISING_TRANSACTION_FEE_RATE)
+          platform_fee: platformFee,
+          creator_earning: creatorEarning,
+          payout_eligible_date: payoutEligibleDate
         };
       })
     );
@@ -319,12 +358,12 @@ export async function fetchFundraisingTransactions(campaignIds: string[]) {
   }
 }
 
-// Get fundraising stats for creator dashboard
+// FIXED: Get fundraising stats for creator dashboard with proper platform fee
 export async function getCreatorFundraisingStats(creatorId: string) {
   try {
     const { data: campaigns, error: campaignsError } = await supabase
       .from('fundraising_campaigns')
-      .select('id, title, currency, goal_amount, status, created_at')
+      .select('id, title, currency, goal_amount, status, created_at, end_date')
       .eq('creator_id', creatorId)
       .order('created_at', { ascending: false });
 
@@ -340,7 +379,10 @@ export async function getCreatorFundraisingStats(creatorId: string) {
         total_raised: 0,
         total_net_amount: 0,
         total_fees: 0,
+        total_platform_fees: 0,
         total_contributions: 0,
+        available_funds: 0,
+        pending_funds: 0,
         campaigns: []
       };
     }
@@ -356,7 +398,11 @@ export async function getCreatorFundraisingStats(creatorId: string) {
 
     let totalRaisedUSD = 0;
     let totalNetAmountUSD = 0;
-    let totalFeesUSD = 0;
+    let totalTransactionFeesUSD = 0;
+    let totalPlatformFeesUSD = 0;
+    let availableFundsUSD = 0;
+    let pendingFundsUSD = 0;
+    const now = new Date();
 
     // Use same conversion logic as fundraising page
     for (const contribution of contributions || []) {
@@ -379,9 +425,25 @@ export async function getCreatorFundraisingStats(creatorId: string) {
         }
       }
 
+      // Apply fundraising platform fee (5%)
+      const platformFee = netAmountInUSD * FUNDRAISING_PLATFORM_FEE_RATE;
+      const creatorEarning = netAmountInUSD - platformFee;
+
       totalRaisedUSD += amountInUSD;
       totalNetAmountUSD += netAmountInUSD;
-      totalFeesUSD += feeInUSD;
+      totalTransactionFeesUSD += feeInUSD;
+      totalPlatformFeesUSD += platformFee;
+
+      // Check if campaign has ended for this contribution
+      const campaign = campaigns?.find(c => c.id === contribution.campaign_id);
+      const isCampaignEnded = campaign?.end_date ? new Date(campaign.end_date) <= now : false;
+      const isCampaignCompleted = campaign?.status === 'completed';
+
+      if (isCampaignEnded || isCampaignCompleted) {
+        availableFundsUSD += creatorEarning;
+      } else {
+        pendingFundsUSD += creatorEarning;
+      }
     }
 
     const activeCampaigns = campaigns?.filter(camp => camp.status === 'active').length || 0;
@@ -394,7 +456,13 @@ export async function getCreatorFundraisingStats(creatorId: string) {
         
         let campaignRaisedUSD = 0;
         let campaignNetAmountUSD = 0;
-        let campaignFeesUSD = 0;
+        let campaignTransactionFeesUSD = 0;
+        let campaignPlatformFeesUSD = 0;
+        let campaignAvailableUSD = 0;
+        let campaignPendingUSD = 0;
+
+        const isCampaignEnded = campaign.end_date ? new Date(campaign.end_date) <= now : false;
+        const isCampaignCompleted = campaign.status === 'completed';
 
         for (const contribution of campaignContributions) {
           const contributionCurrency = contribution.currency || 'USD';
@@ -416,18 +484,33 @@ export async function getCreatorFundraisingStats(creatorId: string) {
             }
           }
 
+          // Apply fundraising platform fee (5%)
+          const platformFee = netAmountInUSD * FUNDRAISING_PLATFORM_FEE_RATE;
+          const creatorEarning = netAmountInUSD - platformFee;
+
           campaignRaisedUSD += amountInUSD;
           campaignNetAmountUSD += netAmountInUSD;
-          campaignFeesUSD += feeInUSD;
+          campaignTransactionFeesUSD += feeInUSD;
+          campaignPlatformFeesUSD += platformFee;
+
+          if (isCampaignEnded || isCampaignCompleted) {
+            campaignAvailableUSD += creatorEarning;
+          } else {
+            campaignPendingUSD += creatorEarning;
+          }
         }
 
         return {
           ...campaign,
           total_raised: campaignRaisedUSD,
           total_net_amount: campaignNetAmountUSD,
-          total_fees: campaignFeesUSD,
+          total_transaction_fees: campaignTransactionFeesUSD,
+          total_platform_fees: campaignPlatformFeesUSD,
+          available_funds: campaignAvailableUSD,
+          pending_funds: campaignPendingUSD,
           contributions_count: campaignContributions.length,
-          progress: campaign.goal_amount > 0 ? (campaignRaisedUSD / campaign.goal_amount) * 100 : 0
+          progress: campaign.goal_amount > 0 ? (campaignRaisedUSD / campaign.goal_amount) * 100 : 0,
+          creator_earnings: campaignNetAmountUSD - campaignPlatformFeesUSD
         };
       })
     );
@@ -438,8 +521,13 @@ export async function getCreatorFundraisingStats(creatorId: string) {
       completed_campaigns: completedCampaigns,
       total_raised: totalRaisedUSD,
       total_net_amount: totalNetAmountUSD,
-      total_fees: totalFeesUSD,
+      total_transaction_fees: totalTransactionFeesUSD,
+      total_platform_fees: totalPlatformFeesUSD,
+      total_fees: totalTransactionFeesUSD + totalPlatformFeesUSD,
       total_contributions: contributions?.length || 0,
+      available_funds: availableFundsUSD,
+      pending_funds: pendingFundsUSD,
+      creator_total_earnings: totalNetAmountUSD - totalPlatformFeesUSD,
       campaigns: campaignsWithStats
     };
   } catch (error) {
@@ -448,7 +536,7 @@ export async function getCreatorFundraisingStats(creatorId: string) {
   }
 }
 
-// Debug function to identify contribution calculation issues
+// FIXED: Debug function to identify contribution calculation issues with proper platform fee
 export async function debugContributionCalculation(contributionId: string) {
   try {
     const { data: contribution, error } = await supabase
@@ -459,7 +547,9 @@ export async function debugContributionCalculation(contributionId: string) {
           id,
           title,
           creator_id,
-          currency
+          currency,
+          end_date,
+          status
         )
       `)
       .eq('id', contributionId)
@@ -475,6 +565,8 @@ export async function debugContributionCalculation(contributionId: string) {
     console.log('Transaction fee:', contribution.transaction_fee);
     console.log('Status:', contribution.status);
     console.log('Campaign currency:', contribution.fundraising_campaigns.currency);
+    console.log('Campaign end date:', contribution.fundraising_campaigns.end_date);
+    console.log('Campaign status:', contribution.fundraising_campaigns.status);
     
     const convertedNetAmount = await convertCurrency(
       contribution.net_amount || contribution.amount,
@@ -484,12 +576,22 @@ export async function debugContributionCalculation(contributionId: string) {
     
     console.log('Converted to USD:', convertedNetAmount);
     
-    // Calculate what the amount should be after platform fee
-    const platformFee = convertedNetAmount * FUNDRAISING_TRANSACTION_FEE_RATE;
+    // Calculate what the amount should be after platform fee (5% for fundraising)
+    const platformFee = convertedNetAmount * FUNDRAISING_PLATFORM_FEE_RATE;
     const creatorEarning = convertedNetAmount - platformFee;
     
     console.log('Platform fee (5%):', platformFee);
     console.log('Creator earning:', creatorEarning);
+
+    // Check payout eligibility
+    const now = new Date();
+    const campaignEndDate = contribution.fundraising_campaigns.end_date;
+    const isCampaignEnded = campaignEndDate ? new Date(campaignEndDate) <= now : false;
+    const isCampaignCompleted = contribution.fundraising_campaigns.status === 'completed';
+    
+    console.log('Campaign ended:', isCampaignEnded);
+    console.log('Campaign completed:', isCampaignCompleted);
+    console.log('Funds available:', isCampaignEnded || isCampaignCompleted);
     console.log('====================');
     
     return {
@@ -498,7 +600,10 @@ export async function debugContributionCalculation(contributionId: string) {
       currency: contribution.currency,
       converted_usd: convertedNetAmount,
       platform_fee: platformFee,
-      creator_earning: creatorEarning
+      creator_earning: creatorEarning,
+      campaign_end_date: campaignEndDate,
+      campaign_status: contribution.fundraising_campaigns.status,
+      funds_available: isCampaignEnded || isCampaignCompleted
     };
   } catch (error) {
     console.error('Debug contribution calculation error:', error);
@@ -572,6 +677,28 @@ export async function requestCreatorPayout(
       }
     }
 
+    // Validate bank transfer details if bank payout
+    if (payoutRequest.payout_method === 'bank') {
+      if (!payoutRequest.bank_transfer_details) {
+        toast({
+          title: "Bank Transfer Details Required",
+          description: "Please provide bank transfer details for payout",
+          variant: "destructive"
+        });
+        return false;
+      }
+
+      const { bank_name, account_number, account_name } = payoutRequest.bank_transfer_details;
+      if (!bank_name || !account_number || !account_name) {
+        toast({
+          title: "Invalid Bank Transfer Details",
+          description: "Please provide valid bank name, account number, and account name",
+          variant: "destructive"
+        });
+        return false;
+      }
+    }
+
     const { data, error } = await supabase
       .from('creator_payouts')
       .insert({
@@ -582,8 +709,11 @@ export async function requestCreatorPayout(
         method: payoutRequest.payout_method,
         destination: payoutRequest.payout_method === 'stripe' 
           ? 'Stripe Connect Account' 
-          : `Mobile Money (${payoutRequest.mobile_money_details?.operator})`,
+          : payoutRequest.payout_method === 'mobile_money'
+          ? `Mobile Money (${payoutRequest.mobile_money_details?.operator})`
+          : `Bank Transfer (${payoutRequest.bank_transfer_details?.bank_name})`,
         mobile_money_details: payoutRequest.mobile_money_details,
+        bank_transfer_details: payoutRequest.bank_transfer_details,
         status: 'pending',
         minimum_threshold_met: true
       })
@@ -640,6 +770,54 @@ export async function requestCreatorPayout(
       }
     }
 
+    // If it's a bank transfer payout, call bank transfer service
+    if (payoutRequest.payout_method === 'bank' && payoutRequest.bank_transfer_details) {
+      try {
+        const { data: bankTransferResult, error: bankTransferError } = await supabase.functions.invoke('bank-transfer-payout', {
+          body: {
+            amount: payoutRequest.amount,
+            bank_name: payoutRequest.bank_transfer_details.bank_name,
+            account_number: payoutRequest.bank_transfer_details.account_number,
+            account_name: payoutRequest.bank_transfer_details.account_name,
+            payout_id: payoutId,
+            creator_id: creatorId
+          }
+        });
+
+        if (bankTransferError) {
+          // Update payout status to failed
+          await supabase
+            .from('creator_payouts')
+            .update({ 
+              status: 'failed',
+              failure_reason: bankTransferError.message || 'Bank transfer API error'
+            })
+            .eq('id', payoutId);
+          
+          throw bankTransferError;
+        }
+
+        // Update with bank transfer reference and mark as processing
+        await supabase
+          .from('creator_payouts')
+          .update({ 
+            external_reference: bankTransferResult.reference,
+            status: 'processing',
+            processed_at: new Date().toISOString()
+          })
+          .eq('id', payoutId);
+
+      } catch (bankTransferError) {
+        console.error('Bank transfer payout error:', bankTransferError);
+        toast({
+          title: "Bank Transfer Payout Failed",
+          description: "Failed to process bank transfer payout. Please try again.",
+          variant: "destructive"
+        });
+        return false;
+      }
+    }
+
     // If it's a Stripe payout, we'll handle it differently
     if (payoutRequest.payout_method === 'stripe') {
       // For Stripe Connect, the payout will be processed by Stripe automatically
@@ -655,7 +833,7 @@ export async function requestCreatorPayout(
 
     toast({
       title: "Payout Requested Successfully",
-      description: `Your payout of $${payoutRequest.amount.toFixed(2)} has been requested via ${payoutRequest.payout_method === 'stripe' ? 'Stripe Connect' : 'Mobile Money'}. It may take 1-3 business days to process.`,
+      description: `Your payout of $${payoutRequest.amount.toFixed(2)} has been requested via ${payoutRequest.payout_method === 'stripe' ? 'Stripe Connect' : payoutRequest.payout_method === 'mobile_money' ? 'Mobile Money' : 'Bank Transfer'}. It may take 1-3 business days to process.`,
     });
 
     return true;
@@ -791,7 +969,7 @@ export async function getCreatorPayoutMethod(creatorId: string) {
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('payout_method, mobile_money_details, stripe_connect_id')
+      .select('payout_method, mobile_money_details, stripe_connect_id, bank_account_details')
       .eq('id', creatorId)
       .single();
 
@@ -801,6 +979,7 @@ export async function getCreatorPayoutMethod(creatorId: string) {
       payout_method: data?.payout_method || null,
       mobile_money_details: data?.mobile_money_details || null,
       stripe_connect_id: data?.stripe_connect_id || null,
+      bank_account_details: data?.bank_account_details || null,
       has_payout_method: !!(data?.payout_method)
     };
   } catch (error) {
