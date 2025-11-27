@@ -185,7 +185,7 @@ const Navbar = () => {
   };
 
   const navLinks = [
-    { name: 'Explore', path: '/' },
+    { name: 'Home', path: '/' },
     { name: 'About Us', path: '/about' },
     { name: 'My Learning', path: '/my-courses' },
     { name: 'Community', path: '/community' },
