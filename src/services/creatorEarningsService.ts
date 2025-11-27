@@ -1,45 +1,5 @@
 import { supabase } from '@/lib/supabaseClient';
 
-// CORRECTED: Currency conversion rates - rates to convert TO USD
-const exchangeRates: { [key: string]: number } = {
-  USD: 1,
-  EUR: 1.18,      // 1 EUR = 1.18 USD
-  GBP: 1.37,      // 1 GBP = 1.37 USD
-  ZMW: 0.044,     // 1 ZMW = 0.044 USD
-  NGN: 0.0012,    // 1 NGN = 0.0012 USD
-  GHS: 0.082,     // 1 GHS = 0.082 USD
-  KES: 0.0078,    // 1 KES = 0.0078 USD
-  UGX: 0.00027,   // 1 UGX = 0.00027 USD
-  TZS: 0.00043,   // 1 TZS = 0.00043 USD
-  RWF: 0.0010,    // 1 RWF = 0.0010 USD
-  XOF: 0.0016,    // 1 XOF = 0.0016 USD
-  XAF: 0.0016,    // 1 XAF = 0.0016 USD
-  CDF: 0.00049,   // 1 CDF = 0.00049 USD
-  MZN: 0.015,     // 1 MZN = 0.015 USD
-  MWK: 0.0009,    // 1 MWK = 0.0009 USD
-  LSL: 0.054,     // 1 LSL = 0.054 USD
-  SLL: 0.000048   // 1 SLL = 0.000048 USD
-};
-
-// CORRECTED: Currency conversion function - properly converts TO USD
-const convertToUSD = async (
-  amount: number,
-  fromCurrency: string
-): Promise<number> => {
-  if (fromCurrency === 'USD') {
-    return amount;
-  }
-
-  const rate = exchangeRates[fromCurrency];
-  if (!rate) {
-    console.warn(`No conversion rate found for ${fromCurrency}, using USD`);
-    return amount;
-  }
-  
-  const usdAmount = amount * rate;
-  return Number(usdAmount.toFixed(2));
-};
-
 export interface CreatorEarningsData {
   available_balance: number;
   pending_balance: number;
@@ -198,20 +158,13 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
           const itemTotal = Number(item.total_price || 0);
           const orderTotal = Number(item.orders.total_amount || 0);
           const orderTax = Number(item.orders.tax_amount || 0);
-          const orderCurrency = item.orders.currency || 'USD';
-          
-          // Convert to USD if needed
-          let itemTotalUSD = itemTotal;
-          if (orderCurrency !== 'USD') {
-            itemTotalUSD = await convertToUSD(itemTotal, orderCurrency);
-          }
           
           // Calculate proportional tax allocation for this item
-          const itemTaxAllocation = orderTotal > 0 ? (itemTotalUSD / orderTotal) * orderTax : 0;
+          const itemTaxAllocation = orderTotal > 0 ? (itemTotal / orderTotal) * orderTax : 0;
           
           // Calculate platform fee and creator earning with tax consideration
-          const platformFee = itemTotalUSD * PLATFORM_FEE_RATE;
-          const creatorEarning = Math.max(0, itemTotalUSD - platformFee - itemTaxAllocation);
+          const platformFee = itemTotal * PLATFORM_FEE_RATE;
+          const creatorEarning = Math.max(0, itemTotal - platformFee - itemTaxAllocation);
           
           totalEarnings += creatorEarning;
           totalPlatformFees += platformFee;
@@ -252,17 +205,13 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
         console.log(`💰 Processing ${contributions.length} fundraising contributions`);
 
         for (const contribution of contributions) {
-          const contributionCurrency = contribution.currency || 'USD';
           const originalGrossAmount = Number(contribution.amount || 0);
 
-          // Convert gross amount to USD
-          let grossAmountInUSD = await convertToUSD(originalGrossAmount, contributionCurrency);
-
-          // CORRECTED: Platform fee calculated on GROSS amount
-          const platformFee = grossAmountInUSD * FUNDRAISING_PLATFORM_FEE_RATE;
+          // CORRECTED: Platform fee calculated on GROSS amount (5% for fundraising)
+          const platformFee = originalGrossAmount * FUNDRAISING_PLATFORM_FEE_RATE;
           
           // CORRECTED: Creator earning = gross amount - platform fee
-          const creatorEarning = grossAmountInUSD - platformFee;
+          const creatorEarning = originalGrossAmount - platformFee;
 
           fundraisingRevenue += creatorEarning;
           totalPlatformFees += platformFee;
@@ -420,17 +369,10 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
             const itemTotal = Number(item.total_price || 0);
             const orderTotal = Number(item.orders.total_amount || 0);
             const orderTax = Number(item.orders.tax_amount || 0);
-            const orderCurrency = item.orders.currency || 'USD';
             
-            // Convert to USD if needed
-            let itemTotalUSD = itemTotal;
-            if (orderCurrency !== 'USD') {
-              itemTotalUSD = await convertToUSD(itemTotal, orderCurrency);
-            }
-            
-            const itemTaxAllocation = orderTotal > 0 ? (itemTotalUSD / orderTotal) * orderTax : 0;
-            const platformFee = itemTotalUSD * PLATFORM_FEE_RATE;
-            const creatorEarning = Math.max(0, itemTotalUSD - platformFee - itemTaxAllocation);
+            const itemTaxAllocation = orderTotal > 0 ? (itemTotal / orderTotal) * orderTax : 0;
+            const platformFee = itemTotal * PLATFORM_FEE_RATE;
+            const creatorEarning = Math.max(0, itemTotal - platformFee - itemTaxAllocation);
 
             const orderDate = new Date(item.orders.created_at);
             const payoutEligibleDate = new Date(orderDate);
@@ -454,7 +396,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
               item_id: item.item_id,
               quantity: item.quantity || 1,
               unit_price: item.unit_price || itemTotal,
-              total_amount: itemTotalUSD,
+              total_amount: itemTotal,
               creator_earning: Number(creatorEarning.toFixed(2)),
               platform_fee: Number(platformFee.toFixed(2)),
               payment_status: item.orders.payment_status,
@@ -489,17 +431,13 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
         console.log(`🎁 Processing ${contributions.length} fundraising contributions`);
 
         for (const contribution of contributions) {
-          const contributionCurrency = contribution.currency || 'USD';
           const originalGrossAmount = Number(contribution.amount || 0);
 
-          // Convert gross amount to USD
-          const grossAmountInUSD = await convertToUSD(originalGrossAmount, contributionCurrency);
-
-          // CORRECTED: Platform fee calculated on GROSS amount
-          const platformFee = grossAmountInUSD * FUNDRAISING_PLATFORM_FEE_RATE;
+          // CORRECTED: Platform fee calculated on GROSS amount (5% for fundraising)
+          const platformFee = originalGrossAmount * FUNDRAISING_PLATFORM_FEE_RATE;
           
           // CORRECTED: Creator earning = gross amount - platform fee
-          const creatorEarning = grossAmountInUSD - platformFee;
+          const creatorEarning = originalGrossAmount - platformFee;
 
           const campaign = campaignMap.get(contribution.campaign_id);
           const campaignEndDate = campaign?.end_date;
@@ -524,12 +462,12 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
             item_id: contribution.campaign_id,
             quantity: 1,
             unit_price: originalGrossAmount,
-            total_amount: grossAmountInUSD,
+            total_amount: originalGrossAmount,
             creator_earning: Number(creatorEarning.toFixed(2)),
             platform_fee: Number(platformFee.toFixed(2)),
             payment_status: contribution.status,
             created_at: contribution.created_at,
-            order_total: grossAmountInUSD,
+            order_total: originalGrossAmount,
             payout_eligible_date: payoutEligibleDate,
             payment_method: contribution.payment_method || 'Unknown'
           });
