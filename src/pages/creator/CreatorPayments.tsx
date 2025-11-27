@@ -542,6 +542,24 @@ const CreatorPayments: React.FC = () => {
     return payoutDate && payoutDate <= now;
   };
 
+  // NEW: Calculate correct fundraising amounts with platform fee
+  const getCorrectedFundraisingAmounts = (transaction: any) => {
+    if (transaction.item_type !== 'fundraising_contribution') {
+      return transaction;
+    }
+
+    const grossAmount = transaction.total_amount;
+    const platformFee = grossAmount * 0.05; // 5% platform fee for fundraising
+    const creatorEarning = grossAmount - platformFee;
+
+    return {
+      ...transaction,
+      total_amount: grossAmount,
+      creator_earning: creatorEarning,
+      platform_fee: platformFee
+    };
+  };
+
   const hasBankTransferSetup = () => {
     return profileData?.bank_account_details && 
            profileData.bank_account_details.verified && 
@@ -726,23 +744,26 @@ const CreatorPayments: React.FC = () => {
   };
 
   const renderTransactionCard = (transaction: any) => {
-    const gradientClass = transaction.item_type === 'course' 
+    // CORRECTED: Apply proper platform fee calculation for fundraising transactions
+    const correctedTransaction = getCorrectedFundraisingAmounts(transaction);
+    
+    const gradientClass = correctedTransaction.item_type === 'course' 
       ? 'bg-gradient-to-br from-orange-500 to-purple-600'
-      : transaction.item_type === 'event_ticket'
+      : correctedTransaction.item_type === 'event_ticket'
       ? 'bg-gradient-to-br from-purple-500 to-orange-600'
       : 'bg-gradient-to-br from-blue-500 to-blue-600';
     
-    const isFundraising = transaction.item_type === 'fundraising_contribution';
-    const campaignEnded = isCampaignEnded(transaction);
+    const isFundraising = correctedTransaction.item_type === 'fundraising_contribution';
+    const campaignEnded = isCampaignEnded(correctedTransaction);
     
     return (
-      <Card key={transaction.id} className={`mb-3 ${gradientClass} text-white shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 w-full`}>
+      <Card key={correctedTransaction.id} className={`mb-3 ${gradientClass} text-white shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 w-full`}>
         <CardHeader className="pb-2">
           <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
             <div>
-              <CardTitle className="text-lg line-clamp-1">{transaction.item_name}</CardTitle>
+              <CardTitle className="text-lg line-clamp-1">{correctedTransaction.item_name}</CardTitle>
               <CardDescription className="text-white/80">
-                {format(new Date(transaction.created_at), 'MMM dd, yyyy')}
+                {format(new Date(correctedTransaction.created_at), 'MMM dd, yyyy')}
                 {isFundraising && (
                   <span className="ml-2">
                     • {campaignEnded ? 'Campaign Ended' : 'Campaign Active'}
@@ -752,11 +773,11 @@ const CreatorPayments: React.FC = () => {
             </div>
             <div className="flex flex-col items-end gap-2">
               <Badge variant="secondary" className="bg-white/20 text-white backdrop-blur-sm border-white/30">
-                {getPaymentTypeLabel(transaction.item_type)}
+                {getPaymentTypeLabel(correctedTransaction.item_type)}
               </Badge>
               {isFundraising && (
                 <Badge variant="outline" className="bg-blue-500/20 text-blue-100 border-blue-300/30 text-xs">
-                  {getPlatformFeePercentage(transaction)} Platform Fee
+                  {getPlatformFeePercentage(correctedTransaction)} Platform Fee
                 </Badge>
               )}
             </div>
@@ -766,11 +787,11 @@ const CreatorPayments: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <p className="text-sm text-white/80">Customer</p>
-              <p className="font-medium line-clamp-1">{transaction.customer_name || 'Unknown'}</p>
+              <p className="font-medium line-clamp-1">{correctedTransaction.customer_name || 'Unknown'}</p>
             </div>
             <div>
               <p className="text-sm text-white/80">Order ID</p>
-              <p className="font-mono text-sm font-medium line-clamp-1">{transaction.order_id?.substring(0, 8) || 'N/A'}</p>
+              <p className="font-mono text-sm font-medium line-clamp-1">{correctedTransaction.order_id?.substring(0, 8) || 'N/A'}</p>
             </div>
           </div>
           
@@ -778,7 +799,7 @@ const CreatorPayments: React.FC = () => {
             <div>
               <p className="text-sm text-white/80">Amount</p>
               <PriceDisplay 
-                amount={transaction.total_amount} 
+                amount={correctedTransaction.total_amount} 
                 originalCurrency="USD" 
                 className="font-medium text-white"
               />
@@ -786,7 +807,7 @@ const CreatorPayments: React.FC = () => {
             <div>
               <p className="text-sm text-white/80">Your Earning</p>
               <PriceDisplay 
-                amount={transaction.creator_earning} 
+                amount={correctedTransaction.creator_earning} 
                 originalCurrency="USD" 
                 className="font-bold text-white"
               />
@@ -798,19 +819,19 @@ const CreatorPayments: React.FC = () => {
               <p className="text-sm text-white/80">Platform Fee</p>
               <div className="flex items-center gap-2">
                 <PriceDisplay 
-                  amount={transaction.platform_fee} 
+                  amount={correctedTransaction.platform_fee} 
                   originalCurrency="USD" 
                   className="text-white/90"
                 />
                 <Badge variant="outline" className="bg-white/20 text-white text-xs border-white/30">
-                  {getPlatformFeePercentage(transaction)}
+                  {getPlatformFeePercentage(correctedTransaction)}
                 </Badge>
               </div>
             </div>
             <div>
               <p className="text-sm text-white/80">Status</p>
               <div className="mt-1">
-                {getStatusBadge(transaction.payment_status)}
+                {getStatusBadge(correctedTransaction.payment_status)}
               </div>
             </div>
           </div>
@@ -821,8 +842,8 @@ const CreatorPayments: React.FC = () => {
             </p>
             <div className="flex items-center gap-2">
               <p className="font-medium">
-                {transaction.payout_eligible_date ? 
-                  format(new Date(transaction.payout_eligible_date), 'MMM dd, yyyy') :
+                {correctedTransaction.payout_eligible_date ? 
+                  format(new Date(correctedTransaction.payout_eligible_date), 'MMM dd, yyyy') :
                   'N/A'
                 }
               </p>
@@ -838,7 +859,7 @@ const CreatorPayments: React.FC = () => {
               )}
             </div>
             <p className="text-xs text-white/70 mt-1">
-              {getHoldPeriodDescription(transaction)}
+              {getHoldPeriodDescription(correctedTransaction)}
             </p>
           </div>
         </CardContent>
