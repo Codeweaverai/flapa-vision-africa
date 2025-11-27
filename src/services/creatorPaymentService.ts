@@ -6,44 +6,52 @@ import {
   CreatorTransaction
 } from './creatorEarningsService';
 
-// CORRECTED: Currency conversion rates - rates to convert TO USD
+// CORRECTED: Currency conversion rates - rates to convert TO USD (matching fundraising page)
 const exchangeRates: { [key: string]: number } = {
   USD: 1,
-  EUR: 1.18,      // 1 EUR = 1.18 USD
-  GBP: 1.37,      // 1 GBP = 1.37 USD
-  ZMW: 0.044,     // 1 ZMW = 0.044 USD (corrected)
-  NGN: 0.0012,    // 1 NGN = 0.0012 USD (corrected)
-  GHS: 0.082,     // 1 GHS = 0.082 USD (corrected)
-  KES: 0.0078,    // 1 KES = 0.0078 USD (corrected)
-  UGX: 0.00027,   // 1 UGX = 0.00027 USD (corrected)
-  TZS: 0.00043,   // 1 TZS = 0.00043 USD (corrected)
-  RWF: 0.0010,    // 1 RWF = 0.0010 USD (corrected)
-  XOF: 0.0016,    // 1 XOF = 0.0016 USD (corrected)
-  XAF: 0.0016,    // 1 XAF = 0.0016 USD (corrected)
-  CDF: 0.00049,   // 1 CDF = 0.00049 USD (corrected)
-  MZN: 0.015,     // 1 MZN = 0.015 USD (corrected)
-  MWK: 0.0009,    // 1 MWK = 0.0009 USD (corrected)
-  LSL: 0.054,     // 1 LSL = 0.054 USD (corrected)
-  SLL: 0.000048   // 1 SLL = 0.000048 USD (corrected)
+  EUR: 0.85,      // 1 EUR = 0.85 USD (matches fundraising page)
+  GBP: 0.73,      // 1 GBP = 0.73 USD (matches fundraising page)
+  ZMW: 0.044,     // 1 ZMW = 0.044 USD (matches fundraising page)
+  NGN: 0.0012,    // 1 NGN = 0.0012 USD (matches fundraising page)
+  GHS: 0.082,     // 1 GHS = 0.082 USD (matches fundraising page)
+  KES: 0.0078,    // 1 KES = 0.0078 USD (matches fundraising page)
+  UGX: 0.00027,   // 1 UGX = 0.00027 USD (matches fundraising page)
+  TZS: 0.00043,   // 1 TZS = 0.00043 USD (matches fundraising page)
+  RWF: 0.0010,    // 1 RWF = 0.0010 USD (matches fundraising page)
+  XOF: 0.0016,    // 1 XOF = 0.0016 USD (matches fundraising page)
+  XAF: 0.0016,    // 1 XAF = 0.0016 USD (matches fundraising page)
+  CDF: 0.00049,   // 1 CDF = 0.00049 USD (matches fundraising page)
+  MZN: 0.015,     // 1 MZN = 0.015 USD (matches fundraising page)
+  MWK: 0.0009,    // 1 MWK = 0.0009 USD (matches fundraising page)
+  LSL: 0.054,     // 1 LSL = 0.054 USD (matches fundraising page)
+  SLL: 0.000048   // 1 SLL = 0.000048 USD (matches fundraising page)
 };
 
-// CORRECTED: Currency conversion function - properly converts TO USD
+// CORRECTED: Use the EXACT same conversion function as fundraising page
+const convertCurrency = async (
+  amount: number,
+  fromCurrency: string,
+  toCurrency: string
+): Promise<number> => {
+  if (fromCurrency === toCurrency) {
+    return amount;
+  }
+
+  const fromRate = exchangeRates[fromCurrency] || 1;
+  const toRate = exchangeRates[toCurrency] || 1;
+  
+  const usdAmount = amount * fromRate;
+  const targetAmount = usdAmount / toRate;
+  
+  return Number(targetAmount.toFixed(2));
+};
+
+// CORRECTED: Helper function to convert any currency to USD (base currency for earnings)
 const convertToUSD = async (
   amount: number,
   fromCurrency: string
 ): Promise<number> => {
-  if (fromCurrency === 'USD') {
-    return amount;
-  }
-
-  const rate = exchangeRates[fromCurrency];
-  if (!rate) {
-    console.warn(`No conversion rate found for ${fromCurrency}, using USD`);
-    return amount;
-  }
-  
-  const usdAmount = amount * rate;
-  return Number(usdAmount.toFixed(2));
+  return convertCurrency(amount, fromCurrency, 'USD');
 };
 
 export interface CreatorEarnings {
@@ -77,7 +85,7 @@ export interface PayoutRequest {
 const PLATFORM_FEE_RATE = 0.08; // 8% for courses/events
 const FUNDRAISING_PLATFORM_FEE_RATE = 0.05; // 5% for fundraising
 
-// FIXED: Calculate fundraising revenue with proper currency conversion
+// FIXED: Calculate fundraising revenue with EXACT same conversion as fundraising page
 async function calculateFundraisingRevenue(creatorId: string): Promise<{
   totalNetAmount: number;
   totalFees: number;
@@ -120,15 +128,25 @@ async function calculateFundraisingRevenue(creatorId: string): Promise<{
     let pendingAmountUSD = 0;
     const now = new Date();
 
-    // Process each contribution with proper currency conversion
+    // CORRECTED: Process each contribution with EXACT same conversion as fundraising page
     for (const contribution of contributions) {
       const contributionCurrency = contribution.currency || 'USD';
       const originalNetAmount = Number(contribution.net_amount || contribution.amount || 0);
       const originalTransactionFee = Number(contribution.transaction_fee || 0);
 
-      // CORRECTED: Convert original currency amounts to USD first
-      let netAmountInUSD = await convertToUSD(originalNetAmount, contributionCurrency);
-      let feeInUSD = await convertToUSD(originalTransactionFee, contributionCurrency);
+      // CORRECTED: Use same conversion pattern as fundraising page - convert to USD
+      let netAmountInUSD = originalNetAmount;
+      let feeInUSD = originalTransactionFee;
+
+      if (contributionCurrency !== 'USD') {
+        try {
+          netAmountInUSD = await convertCurrency(originalNetAmount, contributionCurrency, 'USD');
+          feeInUSD = await convertCurrency(originalTransactionFee, contributionCurrency, 'USD');
+        } catch (error) {
+          console.warn(`Currency conversion failed for contribution ${contribution.id}:`, error);
+          // Use original amounts if conversion fails (same as fundraising page)
+        }
+      }
 
       // Apply platform fee for fundraising (5%) on the USD amount
       const platformFee = netAmountInUSD * FUNDRAISING_PLATFORM_FEE_RATE;
@@ -172,7 +190,7 @@ export async function fetchCreatorEarnings(creatorId: string): Promise<CreatorEa
     // Get base earnings calculation from courses and events
     const earnings = await calculateCreatorEarningsFromOrders(creatorId);
     
-    // Calculate fundraising revenue separately with proper conversion
+    // Calculate fundraising revenue separately with EXACT same conversion
     const fundraisingRevenue = await calculateFundraisingRevenue(creatorId);
     
     // Update earnings with properly converted fundraising revenue
@@ -252,7 +270,7 @@ export async function fetchCreatorPayouts(creatorId: string, limit: number = 10,
   }
 }
 
-// FIXED: Updated fundraising transactions with proper currency conversion
+// FIXED: Updated fundraising transactions with EXACT same conversion as fundraising page
 export async function fetchFundraisingTransactions(campaignIds: string[]) {
   try {
     const { data, error } = await supabase
@@ -292,7 +310,7 @@ export async function fetchFundraisingTransactions(campaignIds: string[]) {
 
     if (error) throw error;
     
-    // CORRECTED: Convert all amounts to USD properly
+    // CORRECTED: Use EXACT same conversion pattern as fundraising page
     const transactionsWithConvertedAmounts = await Promise.all(
       (data || []).map(async (transaction) => {
         const contributionCurrency = transaction.currency || 'USD';
@@ -300,10 +318,20 @@ export async function fetchFundraisingTransactions(campaignIds: string[]) {
         const originalNetAmount = Number(transaction.net_amount || transaction.amount || 0);
         const originalTransactionFee = Number(transaction.transaction_fee || 0);
 
-        // CORRECTED: Convert original currency amounts to USD
-        const amountInUSD = await convertToUSD(originalAmount, contributionCurrency);
-        const netAmountInUSD = await convertToUSD(originalNetAmount, contributionCurrency);
-        const feeInUSD = await convertToUSD(originalTransactionFee, contributionCurrency);
+        // CORRECTED: Same conversion logic as fundraising page
+        let amountInUSD = originalAmount;
+        let netAmountInUSD = originalNetAmount;
+        let feeInUSD = originalTransactionFee;
+
+        if (contributionCurrency !== 'USD') {
+          try {
+            amountInUSD = await convertCurrency(originalAmount, contributionCurrency, 'USD');
+            netAmountInUSD = await convertCurrency(originalNetAmount, contributionCurrency, 'USD');
+            feeInUSD = await convertCurrency(originalTransactionFee, contributionCurrency, 'USD');
+          } catch (error) {
+            console.warn(`Currency conversion failed for transaction ${transaction.id}:`, error);
+          }
+        }
 
         // Apply fundraising platform fee (5%) on USD amount
         const platformFee = netAmountInUSD * FUNDRAISING_PLATFORM_FEE_RATE;
@@ -338,7 +366,7 @@ export async function fetchFundraisingTransactions(campaignIds: string[]) {
   }
 }
 
-// FIXED: Get fundraising stats for creator dashboard with proper currency conversion
+// FIXED: Get fundraising stats with EXACT same conversion as fundraising page
 export async function getCreatorFundraisingStats(creatorId: string) {
   try {
     const { data: campaigns, error: campaignsError } = await supabase
@@ -384,17 +412,27 @@ export async function getCreatorFundraisingStats(creatorId: string) {
     let pendingFundsUSD = 0;
     const now = new Date();
 
-    // CORRECTED: Use proper conversion logic
+    // CORRECTED: Use EXACT same conversion logic as fundraising page
     for (const contribution of contributions || []) {
       const contributionCurrency = contribution.currency || 'USD';
       const originalAmount = Number(contribution.amount || 0);
       const originalNetAmount = Number(contribution.net_amount || contribution.amount || 0);
       const originalFee = Number(contribution.transaction_fee || 0);
 
-      // Convert original currency amounts to USD
-      const amountInUSD = await convertToUSD(originalAmount, contributionCurrency);
-      const netAmountInUSD = await convertToUSD(originalNetAmount, contributionCurrency);
-      const feeInUSD = await convertToUSD(originalFee, contributionCurrency);
+      // Same conversion pattern as fundraising page
+      let amountInUSD = originalAmount;
+      let netAmountInUSD = originalNetAmount;
+      let feeInUSD = originalFee;
+
+      if (contributionCurrency !== 'USD') {
+        try {
+          amountInUSD = await convertCurrency(originalAmount, contributionCurrency, 'USD');
+          netAmountInUSD = await convertCurrency(originalNetAmount, contributionCurrency, 'USD');
+          feeInUSD = await convertCurrency(originalFee, contributionCurrency, 'USD');
+        } catch (error) {
+          console.warn(`Currency conversion failed for contribution ${contribution.id}:`, error);
+        }
+      }
 
       // Apply fundraising platform fee (5%) on USD amount
       const platformFee = netAmountInUSD * FUNDRAISING_PLATFORM_FEE_RATE;
@@ -420,7 +458,7 @@ export async function getCreatorFundraisingStats(creatorId: string) {
     const activeCampaigns = campaigns?.filter(camp => camp.status === 'active').length || 0;
     const completedCampaigns = campaigns?.filter(camp => camp.status === 'completed').length || 0;
 
-    // Calculate campaign-specific stats with proper conversion
+    // Calculate campaign-specific stats with same conversion
     const campaignsWithStats = await Promise.all(
       (campaigns || []).map(async (campaign) => {
         const campaignContributions = contributions?.filter(c => c.campaign_id === campaign.id) || [];
@@ -441,10 +479,20 @@ export async function getCreatorFundraisingStats(creatorId: string) {
           const originalNetAmount = Number(contribution.net_amount || contribution.amount || 0);
           const originalFee = Number(contribution.transaction_fee || 0);
 
-          // Convert original currency amounts to USD
-          const amountInUSD = await convertToUSD(originalAmount, contributionCurrency);
-          const netAmountInUSD = await convertToUSD(originalNetAmount, contributionCurrency);
-          const feeInUSD = await convertToUSD(originalFee, contributionCurrency);
+          // Same conversion pattern as fundraising page
+          let amountInUSD = originalAmount;
+          let netAmountInUSD = originalNetAmount;
+          let feeInUSD = originalFee;
+
+          if (contributionCurrency !== 'USD') {
+            try {
+              amountInUSD = await convertCurrency(originalAmount, contributionCurrency, 'USD');
+              netAmountInUSD = await convertCurrency(originalNetAmount, contributionCurrency, 'USD');
+              feeInUSD = await convertCurrency(originalFee, contributionCurrency, 'USD');
+            } catch (error) {
+              console.warn(`Currency conversion failed for campaign ${campaign.id}:`, error);
+            }
+          }
 
           // Apply fundraising platform fee (5%) on USD amount
           const platformFee = netAmountInUSD * FUNDRAISING_PLATFORM_FEE_RATE;
@@ -498,7 +546,7 @@ export async function getCreatorFundraisingStats(creatorId: string) {
   }
 }
 
-// FIXED: Debug function with proper currency conversion
+// FIXED: Debug function with EXACT same conversion as fundraising page
 export async function debugContributionCalculation(contributionId: string) {
   try {
     const { data: contribution, error } = await supabase
@@ -530,10 +578,11 @@ export async function debugContributionCalculation(contributionId: string) {
     console.log('Campaign end date:', contribution.fundraising_campaigns.end_date);
     console.log('Campaign status:', contribution.fundraising_campaigns.status);
     
-    // CORRECTED: Convert to USD properly
-    const convertedNetAmount = await convertToUSD(
+    // CORRECTED: Use same conversion as fundraising page
+    const convertedNetAmount = await convertCurrency(
       contribution.net_amount || contribution.amount,
-      contribution.currency || 'USD'
+      contribution.currency || 'USD',
+      'USD'
     );
     
     console.log('Converted to USD:', convertedNetAmount);
@@ -572,6 +621,8 @@ export async function debugContributionCalculation(contributionId: string) {
     throw error;
   }
 }
+
+// ... rest of the functions remain the same (requestCreatorPayout, getPayoutStatus, cancelPayoutRequest, etc.)
 
 export async function requestCreatorPayout(
   creatorId: string, 
