@@ -46,14 +46,6 @@ const convertCurrency = async (
   return Number(targetAmount.toFixed(2));
 };
 
-// CORRECTED: Helper function to convert any currency to USD (base currency for earnings)
-const convertToUSD = async (
-  amount: number,
-  fromCurrency: string
-): Promise<number> => {
-  return convertCurrency(amount, fromCurrency, 'USD');
-};
-
 export interface CreatorEarnings {
   available_balance: number;
   pending_balance: number;
@@ -85,7 +77,7 @@ export interface PayoutRequest {
 const PLATFORM_FEE_RATE = 0.08; // 8% for courses/events
 const FUNDRAISING_PLATFORM_FEE_RATE = 0.05; // 5% for fundraising
 
-// FIXED: Calculate fundraising revenue with EXACT same conversion as fundraising page
+// FIXED: Calculate fundraising revenue with campaign base currency (not hardcoded USD)
 async function calculateFundraisingRevenue(creatorId: string): Promise<{
   totalNetAmount: number;
   totalFees: number;
@@ -93,10 +85,10 @@ async function calculateFundraisingRevenue(creatorId: string): Promise<{
   pendingAmount: number;
 }> {
   try {
-    // Get creator's fundraising campaigns with end dates
+    // Get creator's fundraising campaigns with base currencies
     const { data: campaigns, error: campaignsError } = await supabase
       .from('fundraising_campaigns')
-      .select('id, currency, end_date, status')
+      .select('id, currency as campaign_currency, end_date, status')
       .eq('creator_id', creatorId)
       .in('status', ['active', 'completed']);
 
@@ -106,6 +98,7 @@ async function calculateFundraisingRevenue(creatorId: string): Promise<{
     }
 
     const campaignIds = campaigns.map(campaign => campaign.id);
+    const campaignCurrencyMap = new Map(campaigns.map(camp => [camp.id, camp.campaign_currency || 'USD']));
     const campaignEndDateMap = new Map(campaigns.map(camp => [camp.id, camp.end_date]));
     const campaignStatusMap = new Map(campaigns.map(camp => [camp.id, camp.status]));
     
@@ -122,38 +115,34 @@ async function calculateFundraisingRevenue(creatorId: string): Promise<{
       return { totalNetAmount: 0, totalFees: 0, availableAmount: 0, pendingAmount: 0 };
     }
 
-    let totalNetAmountUSD = 0;
-    let totalFeesUSD = 0;
-    let availableAmountUSD = 0;
-    let pendingAmountUSD = 0;
+    let totalNetAmount = 0;
+    let totalFees = 0;
+    let availableAmount = 0;
+    let pendingAmount = 0;
     const now = new Date();
 
-    // CORRECTED: Process each contribution with EXACT same conversion as fundraising page
+    // FIXED: Use campaign base currency for each contribution (same as fundraising page)
     for (const contribution of contributions) {
       const contributionCurrency = contribution.currency || 'USD';
-      const originalNetAmount = Number(contribution.net_amount || contribution.amount || 0);
-      const originalTransactionFee = Number(contribution.transaction_fee || 0);
+      const campaignBaseCurrency = campaignCurrencyMap.get(contribution.campaign_id) || 'USD';
+      
+      // Use the pre-calculated net_amount from database (already has all fees deducted)
+      const originalNetAmount = Number(contribution.net_amount || 0);
 
-      // CORRECTED: Use same conversion pattern as fundraising page - convert to USD
-      let netAmountInUSD = originalNetAmount;
-      let feeInUSD = originalTransactionFee;
+      // Convert to campaign base currency (same as fundraising page)
+      let netAmountInBaseCurrency = originalNetAmount;
 
-      if (contributionCurrency !== 'USD') {
+      if (contributionCurrency !== campaignBaseCurrency) {
         try {
-          netAmountInUSD = await convertCurrency(originalNetAmount, contributionCurrency, 'USD');
-          feeInUSD = await convertCurrency(originalTransactionFee, contributionCurrency, 'USD');
+          netAmountInBaseCurrency = await convertCurrency(originalNetAmount, contributionCurrency, campaignBaseCurrency);
         } catch (error) {
           console.warn(`Currency conversion failed for contribution ${contribution.id}:`, error);
-          // Use original amounts if conversion fails (same as fundraising page)
+          // Use original amount if conversion fails (same as fundraising page)
         }
       }
 
-      // Apply platform fee for fundraising (5%) on the USD amount
-      const platformFee = netAmountInUSD * FUNDRAISING_PLATFORM_FEE_RATE;
-      const creatorEarning = netAmountInUSD - platformFee;
-
-      totalNetAmountUSD += creatorEarning;
-      totalFeesUSD += (feeInUSD + platformFee);
+      // FIXED: No need to apply platform fees again - net_amount already has them deducted
+      totalNetAmount += netAmountInBaseCurrency;
 
       // Check if campaign has ended for payout eligibility
       const campaignEndDate = campaignEndDateMap.get(contribution.campaign_id);
@@ -163,19 +152,17 @@ async function calculateFundraisingRevenue(creatorId: string): Promise<{
       const isCampaignCompleted = campaignStatus === 'completed';
 
       if (isCampaignEnded || isCampaignCompleted) {
-        // Campaign has ended - money is available
-        availableAmountUSD += creatorEarning;
+        availableAmount += netAmountInBaseCurrency;
       } else {
-        // Campaign is still active - money is pending
-        pendingAmountUSD += creatorEarning;
+        pendingAmount += netAmountInBaseCurrency;
       }
     }
 
     return {
-      totalNetAmount: totalNetAmountUSD,
-      totalFees: totalFeesUSD,
-      availableAmount: availableAmountUSD,
-      pendingAmount: pendingAmountUSD
+      totalNetAmount: totalNetAmount,
+      totalFees: totalFees,
+      availableAmount: availableAmount,
+      pendingAmount: pendingAmount
     };
   } catch (error) {
     console.error('Error calculating fundraising revenue:', error);
@@ -190,10 +177,10 @@ export async function fetchCreatorEarnings(creatorId: string): Promise<CreatorEa
     // Get base earnings calculation from courses and events
     const earnings = await calculateCreatorEarningsFromOrders(creatorId);
     
-    // Calculate fundraising revenue separately with EXACT same conversion
+    // Calculate fundraising revenue with proper campaign base currency conversion
     const fundraisingRevenue = await calculateFundraisingRevenue(creatorId);
     
-    // Update earnings with properly converted fundraising revenue
+    // FIXED: All amounts are now properly converted to their respective base currencies
     const updatedEarnings = {
       ...earnings,
       fundraising_revenue: fundraisingRevenue.totalNetAmount,
@@ -203,7 +190,7 @@ export async function fetchCreatorEarnings(creatorId: string): Promise<CreatorEa
       total_platform_fees: earnings.total_platform_fees + fundraisingRevenue.totalFees
     };
     
-    console.log('Creator earnings calculated with proper conversion:', updatedEarnings);
+    console.log('Creator earnings calculated with proper campaign currency:', updatedEarnings);
     return updatedEarnings;
   } catch (error) {
     console.error('Error fetching creator earnings:', error);
@@ -270,9 +257,18 @@ export async function fetchCreatorPayouts(creatorId: string, limit: number = 10,
   }
 }
 
-// FIXED: Updated fundraising transactions with EXACT same conversion as fundraising page
+// FIXED: Updated fundraising transactions with campaign base currency
 export async function fetchFundraisingTransactions(campaignIds: string[]) {
   try {
+    // First get campaign currencies
+    const { data: campaigns, error: campaignsError } = await supabase
+      .from('fundraising_campaigns')
+      .select('id, currency as campaign_currency')
+      .in('id', campaignIds);
+
+    if (campaignsError) throw campaignsError;
+    const campaignCurrencyMap = new Map(campaigns?.map(camp => [camp.id, camp.campaign_currency || 'USD']) || []);
+
     const { data, error } = await supabase
       .from('campaign_contributions')
       .select(`
@@ -310,32 +306,23 @@ export async function fetchFundraisingTransactions(campaignIds: string[]) {
 
     if (error) throw error;
     
-    // CORRECTED: Use EXACT same conversion pattern as fundraising page
+    // FIXED: Use campaign base currency for conversion (same as fundraising page)
     const transactionsWithConvertedAmounts = await Promise.all(
       (data || []).map(async (transaction) => {
         const contributionCurrency = transaction.currency || 'USD';
-        const originalAmount = Number(transaction.amount || 0);
+        const campaignBaseCurrency = transaction.fundraising_campaigns?.currency || 'USD';
         const originalNetAmount = Number(transaction.net_amount || transaction.amount || 0);
-        const originalTransactionFee = Number(transaction.transaction_fee || 0);
 
-        // CORRECTED: Same conversion logic as fundraising page
-        let amountInUSD = originalAmount;
-        let netAmountInUSD = originalNetAmount;
-        let feeInUSD = originalTransactionFee;
+        // Convert to campaign base currency
+        let netAmountInBaseCurrency = originalNetAmount;
 
-        if (contributionCurrency !== 'USD') {
+        if (contributionCurrency !== campaignBaseCurrency) {
           try {
-            amountInUSD = await convertCurrency(originalAmount, contributionCurrency, 'USD');
-            netAmountInUSD = await convertCurrency(originalNetAmount, contributionCurrency, 'USD');
-            feeInUSD = await convertCurrency(originalTransactionFee, contributionCurrency, 'USD');
+            netAmountInBaseCurrency = await convertCurrency(originalNetAmount, contributionCurrency, campaignBaseCurrency);
           } catch (error) {
             console.warn(`Currency conversion failed for transaction ${transaction.id}:`, error);
           }
         }
-
-        // Apply fundraising platform fee (5%) on USD amount
-        const platformFee = netAmountInUSD * FUNDRAISING_PLATFORM_FEE_RATE;
-        const creatorEarning = netAmountInUSD - platformFee;
 
         // Determine payout eligible date based on campaign end date
         const campaignEndDate = transaction.fundraising_campaigns?.end_date;
@@ -346,14 +333,11 @@ export async function fetchFundraisingTransactions(campaignIds: string[]) {
 
         return {
           ...transaction,
-          converted_amount: netAmountInUSD,
+          converted_amount: netAmountInBaseCurrency,
           original_currency: contributionCurrency,
-          original_amount: originalAmount,
+          campaign_currency: campaignBaseCurrency,
           original_net_amount: originalNetAmount,
-          converted_gross_amount: amountInUSD,
-          converted_fee: feeInUSD,
-          platform_fee: platformFee,
-          creator_earning: creatorEarning,
+          creator_earning: netAmountInBaseCurrency, // net_amount is already the creator's earning
           payout_eligible_date: payoutEligibleDate
         };
       })
@@ -366,12 +350,12 @@ export async function fetchFundraisingTransactions(campaignIds: string[]) {
   }
 }
 
-// FIXED: Get fundraising stats with EXACT same conversion as fundraising page
+// FIXED: Get fundraising stats with campaign base currency
 export async function getCreatorFundraisingStats(creatorId: string) {
   try {
     const { data: campaigns, error: campaignsError } = await supabase
       .from('fundraising_campaigns')
-      .select('id, title, currency, goal_amount, status, created_at, end_date')
+      .select('id, title, currency as campaign_currency, goal_amount, status, created_at, end_date')
       .eq('creator_id', creatorId)
       .order('created_at', { ascending: false });
 
@@ -404,54 +388,51 @@ export async function getCreatorFundraisingStats(creatorId: string) {
 
     if (contributionsError) throw contributionsError;
 
-    let totalRaisedUSD = 0;
-    let totalNetAmountUSD = 0;
-    let totalTransactionFeesUSD = 0;
-    let totalPlatformFeesUSD = 0;
-    let availableFundsUSD = 0;
-    let pendingFundsUSD = 0;
+    let totalRaised = 0;
+    let totalNetAmount = 0;
+    let totalTransactionFees = 0;
+    let totalPlatformFees = 0;
+    let availableFunds = 0;
+    let pendingFunds = 0;
     const now = new Date();
 
-    // CORRECTED: Use EXACT same conversion logic as fundraising page
+    // FIXED: Use campaign base currency for each contribution
     for (const contribution of contributions || []) {
       const contributionCurrency = contribution.currency || 'USD';
+      const campaign = campaigns?.find(c => c.id === contribution.campaign_id);
+      const campaignBaseCurrency = campaign?.campaign_currency || 'USD';
+      
       const originalAmount = Number(contribution.amount || 0);
       const originalNetAmount = Number(contribution.net_amount || contribution.amount || 0);
       const originalFee = Number(contribution.transaction_fee || 0);
 
-      // Same conversion pattern as fundraising page
-      let amountInUSD = originalAmount;
-      let netAmountInUSD = originalNetAmount;
-      let feeInUSD = originalFee;
+      // Convert to campaign base currency
+      let amountInBaseCurrency = originalAmount;
+      let netAmountInBaseCurrency = originalNetAmount;
+      let feeInBaseCurrency = originalFee;
 
-      if (contributionCurrency !== 'USD') {
+      if (contributionCurrency !== campaignBaseCurrency) {
         try {
-          amountInUSD = await convertCurrency(originalAmount, contributionCurrency, 'USD');
-          netAmountInUSD = await convertCurrency(originalNetAmount, contributionCurrency, 'USD');
-          feeInUSD = await convertCurrency(originalFee, contributionCurrency, 'USD');
+          amountInBaseCurrency = await convertCurrency(originalAmount, contributionCurrency, campaignBaseCurrency);
+          netAmountInBaseCurrency = await convertCurrency(originalNetAmount, contributionCurrency, campaignBaseCurrency);
+          feeInBaseCurrency = await convertCurrency(originalFee, contributionCurrency, campaignBaseCurrency);
         } catch (error) {
           console.warn(`Currency conversion failed for contribution ${contribution.id}:`, error);
         }
       }
 
-      // Apply fundraising platform fee (5%) on USD amount
-      const platformFee = netAmountInUSD * FUNDRAISING_PLATFORM_FEE_RATE;
-      const creatorEarning = netAmountInUSD - platformFee;
-
-      totalRaisedUSD += amountInUSD;
-      totalNetAmountUSD += netAmountInUSD;
-      totalTransactionFeesUSD += feeInUSD;
-      totalPlatformFeesUSD += platformFee;
+      totalRaised += amountInBaseCurrency;
+      totalNetAmount += netAmountInBaseCurrency;
+      totalTransactionFees += feeInBaseCurrency;
 
       // Check if campaign has ended for this contribution
-      const campaign = campaigns?.find(c => c.id === contribution.campaign_id);
       const isCampaignEnded = campaign?.end_date ? new Date(campaign.end_date) <= now : false;
       const isCampaignCompleted = campaign?.status === 'completed';
 
       if (isCampaignEnded || isCampaignCompleted) {
-        availableFundsUSD += creatorEarning;
+        availableFunds += netAmountInBaseCurrency;
       } else {
-        pendingFundsUSD += creatorEarning;
+        pendingFunds += netAmountInBaseCurrency;
       }
     }
 
@@ -463,64 +444,61 @@ export async function getCreatorFundraisingStats(creatorId: string) {
       (campaigns || []).map(async (campaign) => {
         const campaignContributions = contributions?.filter(c => c.campaign_id === campaign.id) || [];
         
-        let campaignRaisedUSD = 0;
-        let campaignNetAmountUSD = 0;
-        let campaignTransactionFeesUSD = 0;
-        let campaignPlatformFeesUSD = 0;
-        let campaignAvailableUSD = 0;
-        let campaignPendingUSD = 0;
+        let campaignRaised = 0;
+        let campaignNetAmount = 0;
+        let campaignTransactionFees = 0;
+        let campaignPlatformFees = 0;
+        let campaignAvailable = 0;
+        let campaignPending = 0;
 
         const isCampaignEnded = campaign.end_date ? new Date(campaign.end_date) <= now : false;
         const isCampaignCompleted = campaign.status === 'completed';
 
         for (const contribution of campaignContributions) {
           const contributionCurrency = contribution.currency || 'USD';
+          const campaignBaseCurrency = campaign.campaign_currency || 'USD';
+          
           const originalAmount = Number(contribution.amount || 0);
           const originalNetAmount = Number(contribution.net_amount || contribution.amount || 0);
           const originalFee = Number(contribution.transaction_fee || 0);
 
-          // Same conversion pattern as fundraising page
-          let amountInUSD = originalAmount;
-          let netAmountInUSD = originalNetAmount;
-          let feeInUSD = originalFee;
+          // Convert to campaign base currency
+          let amountInBaseCurrency = originalAmount;
+          let netAmountInBaseCurrency = originalNetAmount;
+          let feeInBaseCurrency = originalFee;
 
-          if (contributionCurrency !== 'USD') {
+          if (contributionCurrency !== campaignBaseCurrency) {
             try {
-              amountInUSD = await convertCurrency(originalAmount, contributionCurrency, 'USD');
-              netAmountInUSD = await convertCurrency(originalNetAmount, contributionCurrency, 'USD');
-              feeInUSD = await convertCurrency(originalFee, contributionCurrency, 'USD');
+              amountInBaseCurrency = await convertCurrency(originalAmount, contributionCurrency, campaignBaseCurrency);
+              netAmountInBaseCurrency = await convertCurrency(originalNetAmount, contributionCurrency, campaignBaseCurrency);
+              feeInBaseCurrency = await convertCurrency(originalFee, contributionCurrency, campaignBaseCurrency);
             } catch (error) {
               console.warn(`Currency conversion failed for campaign ${campaign.id}:`, error);
             }
           }
 
-          // Apply fundraising platform fee (5%) on USD amount
-          const platformFee = netAmountInUSD * FUNDRAISING_PLATFORM_FEE_RATE;
-          const creatorEarning = netAmountInUSD - platformFee;
-
-          campaignRaisedUSD += amountInUSD;
-          campaignNetAmountUSD += netAmountInUSD;
-          campaignTransactionFeesUSD += feeInUSD;
-          campaignPlatformFeesUSD += platformFee;
+          campaignRaised += amountInBaseCurrency;
+          campaignNetAmount += netAmountInBaseCurrency;
+          campaignTransactionFees += feeInBaseCurrency;
 
           if (isCampaignEnded || isCampaignCompleted) {
-            campaignAvailableUSD += creatorEarning;
+            campaignAvailable += netAmountInBaseCurrency;
           } else {
-            campaignPendingUSD += creatorEarning;
+            campaignPending += netAmountInBaseCurrency;
           }
         }
 
         return {
           ...campaign,
-          total_raised: campaignRaisedUSD,
-          total_net_amount: campaignNetAmountUSD,
-          total_transaction_fees: campaignTransactionFeesUSD,
-          total_platform_fees: campaignPlatformFeesUSD,
-          available_funds: campaignAvailableUSD,
-          pending_funds: campaignPendingUSD,
+          total_raised: campaignRaised,
+          total_net_amount: campaignNetAmount,
+          total_transaction_fees: campaignTransactionFees,
+          total_platform_fees: campaignPlatformFees,
+          available_funds: campaignAvailable,
+          pending_funds: campaignPending,
           contributions_count: campaignContributions.length,
-          progress: campaign.goal_amount > 0 ? (campaignRaisedUSD / campaign.goal_amount) * 100 : 0,
-          creator_earnings: campaignNetAmountUSD - campaignPlatformFeesUSD
+          progress: campaign.goal_amount > 0 ? (campaignRaised / campaign.goal_amount) * 100 : 0,
+          creator_earnings: campaignNetAmount
         };
       })
     );
@@ -529,15 +507,15 @@ export async function getCreatorFundraisingStats(creatorId: string) {
       total_campaigns: campaigns?.length || 0,
       active_campaigns: activeCampaigns,
       completed_campaigns: completedCampaigns,
-      total_raised: totalRaisedUSD,
-      total_net_amount: totalNetAmountUSD,
-      total_transaction_fees: totalTransactionFeesUSD,
-      total_platform_fees: totalPlatformFeesUSD,
-      total_fees: totalTransactionFeesUSD + totalPlatformFeesUSD,
+      total_raised: totalRaised,
+      total_net_amount: totalNetAmount,
+      total_transaction_fees: totalTransactionFees,
+      total_platform_fees: totalPlatformFees,
+      total_fees: totalTransactionFees + totalPlatformFees,
       total_contributions: contributions?.length || 0,
-      available_funds: availableFundsUSD,
-      pending_funds: pendingFundsUSD,
-      creator_total_earnings: totalNetAmountUSD - totalPlatformFeesUSD,
+      available_funds: availableFunds,
+      pending_funds: pendingFunds,
+      creator_total_earnings: totalNetAmount,
       campaigns: campaignsWithStats
     };
   } catch (error) {
@@ -546,7 +524,7 @@ export async function getCreatorFundraisingStats(creatorId: string) {
   }
 }
 
-// FIXED: Debug function with EXACT same conversion as fundraising page
+// FIXED: Debug function with campaign base currency
 export async function debugContributionCalculation(contributionId: string) {
   try {
     const { data: contribution, error } = await supabase
@@ -557,7 +535,7 @@ export async function debugContributionCalculation(contributionId: string) {
           id,
           title,
           creator_id,
-          currency,
+          currency as campaign_currency,
           end_date,
           status
         )
@@ -571,28 +549,23 @@ export async function debugContributionCalculation(contributionId: string) {
     console.log('Contribution ID:', contribution.id);
     console.log('Gross amount:', contribution.amount);
     console.log('Currency:', contribution.currency);
-    console.log('Net amount:', contribution.net_amount);
+    console.log('Net amount:', contribution.net_amount); // This is the final amount after all fees
     console.log('Transaction fee:', contribution.transaction_fee);
     console.log('Status:', contribution.status);
-    console.log('Campaign currency:', contribution.fundraising_campaigns.currency);
+    console.log('Campaign currency:', contribution.fundraising_campaigns.campaign_currency);
     console.log('Campaign end date:', contribution.fundraising_campaigns.end_date);
     console.log('Campaign status:', contribution.fundraising_campaigns.status);
     
-    // CORRECTED: Use same conversion as fundraising page
+    // FIXED: Convert to campaign base currency
+    const campaignBaseCurrency = contribution.fundraising_campaigns.campaign_currency || 'USD';
     const convertedNetAmount = await convertCurrency(
       contribution.net_amount || contribution.amount,
       contribution.currency || 'USD',
-      'USD'
+      campaignBaseCurrency
     );
     
-    console.log('Converted to USD:', convertedNetAmount);
-    
-    // Calculate what the amount should be after platform fee (5% for fundraising)
-    const platformFee = convertedNetAmount * FUNDRAISING_PLATFORM_FEE_RATE;
-    const creatorEarning = convertedNetAmount - platformFee;
-    
-    console.log('Platform fee (5%):', platformFee);
-    console.log('Creator earning:', creatorEarning);
+    console.log(`Converted to campaign currency (${campaignBaseCurrency}):`, convertedNetAmount);
+    console.log('Creator earning (net_amount):', convertedNetAmount);
 
     // Check payout eligibility
     const now = new Date();
@@ -609,9 +582,9 @@ export async function debugContributionCalculation(contributionId: string) {
       gross_amount: contribution.amount,
       net_amount: contribution.net_amount,
       currency: contribution.currency,
-      converted_usd: convertedNetAmount,
-      platform_fee: platformFee,
-      creator_earning: creatorEarning,
+      campaign_currency: campaignBaseCurrency,
+      converted_amount: convertedNetAmount,
+      creator_earning: convertedNetAmount,
       campaign_end_date: campaignEndDate,
       campaign_status: contribution.fundraising_campaigns.status,
       funds_available: isCampaignEnded || isCampaignCompleted
@@ -621,8 +594,6 @@ export async function debugContributionCalculation(contributionId: string) {
     throw error;
   }
 }
-
-// ... rest of the functions remain the same (requestCreatorPayout, getPayoutStatus, cancelPayoutRequest, etc.)
 
 export async function requestCreatorPayout(
   creatorId: string, 
