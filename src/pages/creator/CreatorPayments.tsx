@@ -542,31 +542,37 @@ const CreatorPayments: React.FC = () => {
     return payoutDate && payoutDate <= now;
   };
 
-  // FIXED: Get correct amounts directly from database fields
+  // FIXED: Get correct transaction amount based on type
   const getTransactionAmount = (transaction: any) => {
-    // For all transaction types, use the total_amount which should be the gross amount
-    return transaction.total_amount;
-  };
-
-  // FIXED: Get platform fee directly from database
-  const getDisplayPlatformFee = (transaction: any) => {
     if (transaction.item_type === 'fundraising_contribution') {
-      // For fundraising, use transaction_fee from database
-      return transaction.transaction_fee || 0;
+      // For fundraising, the total_amount is the gross amount from the contribution
+      return transaction.total_amount;
     } else {
-      // For courses/events, use the platform_fee field
-      return transaction.platform_fee || 0;
+      // For courses/events, use the total_amount
+      return transaction.total_amount;
     }
   };
 
-  // FIXED: Get creator earning directly from database
+  // FIXED: Get correct platform fee calculation
+  const getDisplayPlatformFee = (transaction: any) => {
+    if (transaction.item_type === 'fundraising_contribution') {
+      // For fundraising, calculate 5% of the gross amount
+      const grossAmount = transaction.total_amount;
+      return grossAmount * 0.05;
+    } else {
+      // For courses/events, use the actual platform fee from transaction
+      return transaction.platform_fee;
+    }
+  };
+
+  // FIXED: Get correct creator earning
   const getCreatorEarning = (transaction: any) => {
     if (transaction.item_type === 'fundraising_contribution') {
-      // For fundraising, use net_amount from database
-      return transaction.net_amount || 0;
+      // For fundraising, creator_earning is net_amount (gross - 5% platform fee)
+      return transaction.creator_earning;
     } else {
       // For courses/events, use the creator_earning field
-      return transaction.creator_earning || 0;
+      return transaction.creator_earning;
     }
   };
 
@@ -816,7 +822,7 @@ const CreatorPayments: React.FC = () => {
             </div>
           </div>
           
-          {/* FIXED: Amount Display Section - Using direct database values */}
+          {/* FIXED: Amount Display Section */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <p className="text-sm text-white/80">Gross Amount</p>
