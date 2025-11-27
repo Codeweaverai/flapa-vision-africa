@@ -21,7 +21,7 @@ const exchangeRates: { [key: string]: number } = {
   SLL: 0.000048
 };
 
-// Currency conversion function
+// Currency conversion function (same as fundraising page)
 const convertCurrency = async (
   amount: number,
   fromCurrency: string,
@@ -100,10 +100,10 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
 
     const eventIds = creatorEvents?.map(e => e.id) || [];
 
-    // Get creator's fundraising campaigns with end dates
+    // FIXED: Get creator's fundraising campaigns with currencies
     const { data: creatorCampaigns, error: campaignsError } = await supabase
       .from('fundraising_campaigns')
-      .select('id, end_date, status')
+      .select('id, currency as campaign_currency, end_date, status')
       .eq('creator_id', creatorId);
 
     if (campaignsError) {
@@ -111,6 +111,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
     }
 
     const campaignIds = creatorCampaigns?.map(c => c.id) || [];
+    const campaignCurrencyMap = new Map(creatorCampaigns?.map(c => [c.id, c.campaign_currency || 'USD']) || []);
     const campaignEndDateMap = new Map(creatorCampaigns?.map(c => [c.id, c.end_date]) || []);
     const campaignStatusMap = new Map(creatorCampaigns?.map(c => [c.id, c.status]) || []);
 
@@ -141,7 +142,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
       };
     }
 
-    // Fetch order items for courses - FIXED: Simplified query without nested joins
+    // Fetch order items for courses
     let courseOrderItems: any[] = [];
     if (courseIds.length > 0) {
       const { data: courseItems, error: courseError } = await supabase
@@ -171,7 +172,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
       }
     }
 
-    // Fetch order items for event tickets - FIXED: Simplified query without nested joins
+    // Fetch order items for event tickets
     let eventOrderItems: any[] = [];
     if (eventTicketIds.length > 0) {
       const { data: eventItems, error: eventError } = await supabase
@@ -275,37 +276,34 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
       }
     });
 
-    // Process fundraising contributions with currency conversion and proper platform fee
+    // FIXED: Process fundraising contributions with campaign base currency and no double fee application
     for (const contribution of fundraisingContributions) {
       const contributionCurrency = contribution.currency || 'USD';
-      const originalAmount = Number(contribution.amount);
-      const originalNetAmount = Number(contribution.net_amount || contribution.amount);
-      const originalTransactionFee = originalAmount - originalNetAmount;
+      const campaignBaseCurrency = campaignCurrencyMap.get(contribution.campaign_id) || 'USD';
+      
+      // Use the pre-calculated net_amount from database (already has all fees deducted)
+      const originalNetAmount = Number(contribution.net_amount || 0);
 
-      let netAmountInUSD = originalNetAmount;
-      let feeInUSD = originalTransactionFee;
+      // Convert to campaign base currency (same as fundraising page)
+      let netAmountInBaseCurrency = originalNetAmount;
 
-      // Convert to USD if different currency
-      if (contributionCurrency !== 'USD') {
+      if (contributionCurrency !== campaignBaseCurrency) {
         try {
-          netAmountInUSD = await convertCurrency(originalNetAmount, contributionCurrency, 'USD');
-          feeInUSD = await convertCurrency(originalTransactionFee, contributionCurrency, 'USD');
+          netAmountInBaseCurrency = await convertCurrency(originalNetAmount, contributionCurrency, campaignBaseCurrency);
         } catch (error) {
           console.warn(`Currency conversion failed for contribution ${contribution.id}:`, error);
-          // Use original amounts if conversion fails
+          // Use original amount if conversion fails (same as fundraising page)
         }
       }
 
-      // Apply platform fee for fundraising (5%)
-      const platformFee = netAmountInUSD * FUNDRAISING_PLATFORM_FEE_RATE;
-      const creatorEarning = netAmountInUSD - platformFee;
+      // FIXED: No need to apply platform fees again - net_amount already has them deducted
+      const creatorEarning = netAmountInBaseCurrency;
 
       fundraisingRevenue += creatorEarning;
-      totalPlatformFees += (feeInUSD + platformFee);
       totalEarnings += creatorEarning;
 
-      const campaignEndDate = contribution.fundraising_campaigns?.end_date;
-      const campaignStatus = contribution.fundraising_campaigns?.status;
+      const campaignEndDate = campaignEndDateMap.get(contribution.campaign_id);
+      const campaignStatus = campaignStatusMap.get(contribution.campaign_id);
 
       // Check if campaign has ended
       if (campaignEndDate && new Date(campaignEndDate) <= now) {
@@ -369,16 +367,16 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
   }
 }
 
-// FIXED: fetchCreatorTransactions function with proper queries
+// FIXED: fetchCreatorTransactions function with proper campaign currency handling
 export async function fetchCreatorTransactions(creatorId: string, limit: number = 10, offset: number = 0): Promise<{ transactions: CreatorTransaction[], total: number }> {
   try {
     console.log('🔍 Fetching creator transactions for:', creatorId, 'limit:', limit, 'offset:', offset);
 
-    // Step 1: Get all creator content IDs
+    // Step 1: Get all creator content IDs with currencies
     const [coursesResult, eventsResult, campaignsResult] = await Promise.all([
       supabase.from('courses').select('id, title').eq('creator_id', creatorId),
       supabase.from('events').select('id, title').eq('creator_id', creatorId),
-      supabase.from('fundraising_campaigns').select('id, title, end_date, status').eq('creator_id', creatorId)
+      supabase.from('fundraising_campaigns').select('id, title, currency as campaign_currency, end_date, status').eq('creator_id', creatorId)
     ]);
 
     const courseIds = coursesResult.data?.map(c => c.id) || [];
@@ -401,7 +399,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
     // Step 3: Fetch transactions from all sources
     const allTransactions: CreatorTransaction[] = [];
 
-    // Fetch and process course transactions - FIXED: Simplified query
+    // Fetch and process course transactions
     if (courseIds.length > 0) {
       const { data: courseItems, error: courseError } = await supabase
         .from('order_items')
@@ -483,7 +481,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
       }
     }
 
-    // Fetch and process event transactions - FIXED: Simplified query
+    // Fetch and process event transactions
     if (eventTicketIds.length > 0) {
       const { data: eventItems, error: eventError } = await supabase
         .from('order_items')
@@ -565,7 +563,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
       }
     }
 
-    // Fetch and process fundraising transactions
+    // FIXED: Fetch and process fundraising transactions with campaign base currency
     if (campaignIds.length > 0) {
       const { data: contributions, error: contributionsError } = await supabase
         .from('campaign_contributions')
@@ -574,6 +572,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
           fundraising_campaigns!inner(
             id,
             title,
+            currency as campaign_currency,
             end_date,
             status
           ),
@@ -593,26 +592,24 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
 
         for (const contribution of contributions) {
           const contributionCurrency = contribution.currency || 'USD';
-          const originalAmount = Number(contribution.amount);
-          const originalNetAmount = Number(contribution.net_amount || contribution.amount);
-          const originalTransactionFee = originalAmount - originalNetAmount;
+          const campaignBaseCurrency = contribution.fundraising_campaigns?.currency || 'USD';
+          
+          // Use the pre-calculated net_amount from database (already has all fees deducted)
+          const originalNetAmount = Number(contribution.net_amount || 0);
 
-          let netAmountInUSD = originalNetAmount;
-          let feeInUSD = originalTransactionFee;
+          // Convert to campaign base currency
+          let netAmountInBaseCurrency = originalNetAmount;
 
-          // Convert to USD if different currency
-          if (contributionCurrency !== 'USD') {
+          if (contributionCurrency !== campaignBaseCurrency) {
             try {
-              netAmountInUSD = await convertCurrency(originalNetAmount, contributionCurrency, 'USD');
-              feeInUSD = await convertCurrency(originalTransactionFee, contributionCurrency, 'USD');
+              netAmountInBaseCurrency = await convertCurrency(originalNetAmount, contributionCurrency, campaignBaseCurrency);
             } catch (error) {
               console.warn(`Currency conversion failed for contribution ${contribution.id}:`, error);
             }
           }
 
-          // Apply platform fee for fundraising (5%)
-          const platformFee = netAmountInUSD * FUNDRAISING_PLATFORM_FEE_RATE;
-          const creatorEarning = netAmountInUSD - platformFee;
+          // FIXED: No need to apply platform fees again - net_amount already has them deducted
+          const creatorEarning = netAmountInBaseCurrency;
 
           const campaign = campaignMap.get(contribution.campaign_id);
           const campaignEndDate = campaign?.end_date;
@@ -636,13 +633,13 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
             item_name: `Campaign: ${campaign?.title || 'Unknown Campaign'}`,
             item_id: contribution.campaign_id,
             quantity: 1,
-            unit_price: originalAmount,
-            total_amount: originalAmount,
+            unit_price: Number(contribution.amount),
+            total_amount: Number(contribution.amount),
             creator_earning: Number(creatorEarning.toFixed(2)),
-            platform_fee: Number((feeInUSD + platformFee).toFixed(2)),
+            platform_fee: 0, // FIXED: Platform fee already included in net_amount calculation
             payment_status: contribution.status,
             created_at: contribution.created_at,
-            order_total: originalAmount,
+            order_total: Number(contribution.amount),
             payout_eligible_date: payoutEligibleDate,
             payment_method: contribution.payment_method || 'Unknown'
           });
