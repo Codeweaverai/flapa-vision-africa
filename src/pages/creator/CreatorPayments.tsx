@@ -519,12 +519,12 @@ const CreatorPayments: React.FC = () => {
     }
   };
 
-  // NEW: Get platform fee percentage based on transaction type
+  // Get platform fee percentage based on transaction type
   const getPlatformFeePercentage = (transaction: any) => {
     return transaction.item_type === 'fundraising_contribution' ? '5%' : '8%';
   };
 
-  // NEW: Get hold period description based on transaction type
+  // Get hold period description based on transaction type
   const getHoldPeriodDescription = (transaction: any) => {
     if (transaction.item_type === 'fundraising_contribution') {
       return 'Available after campaign ends';
@@ -532,7 +532,7 @@ const CreatorPayments: React.FC = () => {
     return 'Funds in 7-day hold period';
   };
 
-  // NEW: Check if transaction is fundraising and campaign has ended
+  // Check if transaction is fundraising and campaign has ended
   const isCampaignEnded = (transaction: any) => {
     if (transaction.item_type !== 'fundraising_contribution') return false;
     
@@ -542,22 +542,14 @@ const CreatorPayments: React.FC = () => {
     return payoutDate && payoutDate <= now;
   };
 
-  // NEW: Calculate correct fundraising amounts with platform fee
-  const getCorrectedFundraisingAmounts = (transaction: any) => {
-    if (transaction.item_type !== 'fundraising_contribution') {
-      return transaction;
+  // Get transaction currency - FIXED: Use dynamic currency from transaction
+  const getTransactionCurrency = (transaction: any) => {
+    // For fundraising transactions, use the campaign currency
+    if (transaction.item_type === 'fundraising_contribution') {
+      return transaction.currency || 'USD';
     }
-
-    const grossAmount = transaction.total_amount;
-    const platformFee = grossAmount * 0.05; // 5% platform fee for fundraising
-    const creatorEarning = grossAmount - platformFee;
-
-    return {
-      ...transaction,
-      total_amount: grossAmount,
-      creator_earning: creatorEarning,
-      platform_fee: platformFee
-    };
+    // For other transactions, default to USD (or use transaction.currency if available)
+    return transaction.currency || 'USD';
   };
 
   const hasBankTransferSetup = () => {
@@ -744,26 +736,24 @@ const CreatorPayments: React.FC = () => {
   };
 
   const renderTransactionCard = (transaction: any) => {
-    // CORRECTED: Apply proper platform fee calculation for fundraising transactions
-    const correctedTransaction = getCorrectedFundraisingAmounts(transaction);
+    const transactionCurrency = getTransactionCurrency(transaction);
+    const isFundraising = transaction.item_type === 'fundraising_contribution';
+    const campaignEnded = isCampaignEnded(transaction);
     
-    const gradientClass = correctedTransaction.item_type === 'course' 
+    const gradientClass = transaction.item_type === 'course' 
       ? 'bg-gradient-to-br from-orange-500 to-purple-600'
-      : correctedTransaction.item_type === 'event_ticket'
+      : transaction.item_type === 'event_ticket'
       ? 'bg-gradient-to-br from-purple-500 to-orange-600'
       : 'bg-gradient-to-br from-blue-500 to-blue-600';
     
-    const isFundraising = correctedTransaction.item_type === 'fundraising_contribution';
-    const campaignEnded = isCampaignEnded(correctedTransaction);
-    
     return (
-      <Card key={correctedTransaction.id} className={`mb-3 ${gradientClass} text-white shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 w-full`}>
+      <Card key={transaction.id} className={`mb-3 ${gradientClass} text-white shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 w-full`}>
         <CardHeader className="pb-2">
           <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
             <div>
-              <CardTitle className="text-lg line-clamp-1">{correctedTransaction.item_name}</CardTitle>
+              <CardTitle className="text-lg line-clamp-1">{transaction.item_name}</CardTitle>
               <CardDescription className="text-white/80">
-                {format(new Date(correctedTransaction.created_at), 'MMM dd, yyyy')}
+                {format(new Date(transaction.created_at), 'MMM dd, yyyy')}
                 {isFundraising && (
                   <span className="ml-2">
                     • {campaignEnded ? 'Campaign Ended' : 'Campaign Active'}
@@ -773,11 +763,11 @@ const CreatorPayments: React.FC = () => {
             </div>
             <div className="flex flex-col items-end gap-2">
               <Badge variant="secondary" className="bg-white/20 text-white backdrop-blur-sm border-white/30">
-                {getPaymentTypeLabel(correctedTransaction.item_type)}
+                {getPaymentTypeLabel(transaction.item_type)}
               </Badge>
               {isFundraising && (
                 <Badge variant="outline" className="bg-blue-500/20 text-blue-100 border-blue-300/30 text-xs">
-                  {getPlatformFeePercentage(correctedTransaction)} Platform Fee
+                  {getPlatformFeePercentage(transaction)} Platform Fee
                 </Badge>
               )}
             </div>
@@ -787,11 +777,11 @@ const CreatorPayments: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <p className="text-sm text-white/80">Customer</p>
-              <p className="font-medium line-clamp-1">{correctedTransaction.customer_name || 'Unknown'}</p>
+              <p className="font-medium line-clamp-1">{transaction.customer_name || 'Unknown'}</p>
             </div>
             <div>
               <p className="text-sm text-white/80">Order ID</p>
-              <p className="font-mono text-sm font-medium line-clamp-1">{correctedTransaction.order_id?.substring(0, 8) || 'N/A'}</p>
+              <p className="font-mono text-sm font-medium line-clamp-1">{transaction.order_id?.substring(0, 8) || 'N/A'}</p>
             </div>
           </div>
           
@@ -799,16 +789,18 @@ const CreatorPayments: React.FC = () => {
             <div>
               <p className="text-sm text-white/80">Amount</p>
               <PriceDisplay 
-                amount={correctedTransaction.total_amount} 
-                originalCurrency="USD" 
+                amount={transaction.total_amount} 
+                originalCurrency={transactionCurrency}  // ✅ Dynamic currency
+                showOriginal={false}
                 className="font-medium text-white"
               />
             </div>
             <div>
               <p className="text-sm text-white/80">Your Earning</p>
               <PriceDisplay 
-                amount={correctedTransaction.creator_earning} 
-                originalCurrency="USD" 
+                amount={transaction.creator_earning} 
+                originalCurrency={transactionCurrency}  // ✅ Dynamic currency
+                showOriginal={false}
                 className="font-bold text-white"
               />
             </div>
@@ -819,19 +811,20 @@ const CreatorPayments: React.FC = () => {
               <p className="text-sm text-white/80">Platform Fee</p>
               <div className="flex items-center gap-2">
                 <PriceDisplay 
-                  amount={correctedTransaction.platform_fee} 
-                  originalCurrency="USD" 
+                  amount={transaction.platform_fee} 
+                  originalCurrency={transactionCurrency}  // ✅ Dynamic currency
+                  showOriginal={false}
                   className="text-white/90"
                 />
                 <Badge variant="outline" className="bg-white/20 text-white text-xs border-white/30">
-                  {getPlatformFeePercentage(correctedTransaction)}
+                  {getPlatformFeePercentage(transaction)}
                 </Badge>
               </div>
             </div>
             <div>
               <p className="text-sm text-white/80">Status</p>
               <div className="mt-1">
-                {getStatusBadge(correctedTransaction.payment_status)}
+                {getStatusBadge(transaction.payment_status)}
               </div>
             </div>
           </div>
@@ -842,8 +835,8 @@ const CreatorPayments: React.FC = () => {
             </p>
             <div className="flex items-center gap-2">
               <p className="font-medium">
-                {correctedTransaction.payout_eligible_date ? 
-                  format(new Date(correctedTransaction.payout_eligible_date), 'MMM dd, yyyy') :
+                {transaction.payout_eligible_date ? 
+                  format(new Date(transaction.payout_eligible_date), 'MMM dd, yyyy') :
                   'N/A'
                 }
               </p>
@@ -859,7 +852,7 @@ const CreatorPayments: React.FC = () => {
               )}
             </div>
             <p className="text-xs text-white/70 mt-1">
-              {getHoldPeriodDescription(correctedTransaction)}
+              {getHoldPeriodDescription(transaction)}
             </p>
           </div>
         </CardContent>
@@ -921,7 +914,12 @@ const CreatorPayments: React.FC = () => {
           <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
             <div>
               <CardTitle className="text-lg">
-                {payout.currency?.toUpperCase() || 'USD'} {Number(payout.amount).toFixed(2)}
+                <PriceDisplay 
+                  amount={payout.amount} 
+                  originalCurrency={payout.currency || 'USD'}  // ✅ Dynamic currency
+                  showOriginal={false}
+                  className="text-white"
+                />
               </CardTitle>
               <CardDescription className="text-white/80">
                 {format(new Date(payout.created_at), 'MMM dd, yyyy')}
@@ -1030,7 +1028,11 @@ const CreatorPayments: React.FC = () => {
                   <Skeleton className="h-7 w-24 bg-orange-200" />
                 ) : (
                   <div className="text-base md:text-lg font-semibold text-orange-800">
-                    <PriceDisplay amount={earnings.available_balance} originalCurrency="USD" />
+                    <PriceDisplay 
+                      amount={earnings.available_balance} 
+                      originalCurrency="USD"  // ✅ Earnings are calculated in USD
+                      showOriginal={false}
+                    />
                   </div>
                 )}
                 <p className="text-xs text-orange-600/80 mt-1">
@@ -1058,7 +1060,11 @@ const CreatorPayments: React.FC = () => {
                   <Skeleton className="h-7 w-24 bg-purple-200" />
                 ) : (
                   <div className="text-base md:text-lg font-semibold text-purple-800">
-                    <PriceDisplay amount={earnings.pending_balance} originalCurrency="USD" />
+                    <PriceDisplay 
+                      amount={earnings.pending_balance} 
+                      originalCurrency="USD"  // ✅ Earnings are calculated in USD
+                      showOriginal={false}
+                    />
                   </div>
                 )}
                 <p className="text-xs text-purple-600/80 mt-1">
@@ -1077,7 +1083,11 @@ const CreatorPayments: React.FC = () => {
                   <Skeleton className="h-7 w-24 bg-gradient-to-r from-orange-200 to-purple-200" />
                 ) : (
                   <div className="text-base md:text-lg font-semibold bg-gradient-to-r from-orange-700 to-purple-700 bg-clip-text text-transparent">
-                    <PriceDisplay amount={earnings.total_earnings} originalCurrency="USD" />
+                    <PriceDisplay 
+                      amount={earnings.total_earnings} 
+                      originalCurrency="USD"  // ✅ Earnings are calculated in USD
+                      showOriginal={false}
+                    />
                   </div>
                 )}
                 <p className="text-xs text-orange-600/80 mt-1">
@@ -1096,7 +1106,11 @@ const CreatorPayments: React.FC = () => {
                   <Skeleton className="h-7 w-24 bg-gradient-to-r from-purple-200 to-orange-200" />
                 ) : (
                   <div className="text-base md:text-lg font-semibold bg-gradient-to-r from-purple-700 to-orange-700 bg-clip-text text-transparent">
-                    <PriceDisplay amount={earnings.total_platform_fees} originalCurrency="USD" />
+                    <PriceDisplay 
+                      amount={earnings.total_platform_fees} 
+                      originalCurrency="USD"  // ✅ Earnings are calculated in USD
+                      showOriginal={false}
+                    />
                   </div>
                 )}
                 <p className="text-xs text-purple-600/80 mt-1">
@@ -1117,7 +1131,11 @@ const CreatorPayments: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl sm:text-3xl font-bold text-white">
-                  <PriceDisplay amount={earnings.course_revenue} originalCurrency="USD" />
+                  <PriceDisplay 
+                    amount={earnings.course_revenue} 
+                    originalCurrency="USD"  // ✅ Earnings are calculated in USD
+                    showOriginal={false}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -1131,7 +1149,11 @@ const CreatorPayments: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl sm:text-3xl font-bold text-white">
-                  <PriceDisplay amount={earnings.event_revenue} originalCurrency="USD" />
+                  <PriceDisplay 
+                    amount={earnings.event_revenue} 
+                    originalCurrency="USD"  // ✅ Earnings are calculated in USD
+                    showOriginal={false}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -1145,7 +1167,11 @@ const CreatorPayments: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl sm:text-3xl font-bold text-white">
-                  <PriceDisplay amount={earnings.fundraising_revenue} originalCurrency="USD" />
+                  <PriceDisplay 
+                    amount={earnings.fundraising_revenue} 
+                    originalCurrency="USD"  // ✅ Earnings are calculated in USD
+                    showOriginal={false}
+                  />
                 </div>
               </CardContent>
             </Card>
