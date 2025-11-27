@@ -68,6 +68,8 @@ export interface CreatorTransaction {
   order_total: number;
   payout_eligible_date: string;
   payment_method: string;
+  original_currency?: string;
+  campaign_currency?: string;
 }
 
 // Platform fee rates
@@ -366,7 +368,7 @@ export async function calculateCreatorEarningsFromOrders(creatorId: string): Pro
   }
 }
 
-// FIXED: fetchCreatorTransactions function with proper field names
+// FIXED: fetchCreatorTransactions function with proper field names and amount handling
 export async function fetchCreatorTransactions(creatorId: string, limit: number = 10, offset: number = 0): Promise<{ transactions: CreatorTransaction[], total: number }> {
   try {
     console.log('🔍 Fetching creator transactions for:', creatorId, 'limit:', limit, 'offset:', offset);
@@ -563,7 +565,7 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
       }
     }
 
-    // FIXED: Fetch and process fundraising transactions with proper field names
+    // FIXED: Fetch and process fundraising transactions with proper amount handling
     if (campaignIds.length > 0) {
       const { data: contributions, error: contributionsError } = await supabase
         .from('campaign_contributions')
@@ -595,21 +597,25 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
           // FIXED: Use proper field access
           const campaignBaseCurrency = contribution.fundraising_campaigns?.currency || 'USD';
           
-          // Use the pre-calculated net_amount from database
-          const originalNetAmount = Number(contribution.net_amount || 0);
+          // FIXED: Use the correct amounts from database
+          const grossAmount = Number(contribution.amount || 0);
+          const netAmount = Number(contribution.net_amount || 0);
 
           // Convert to campaign base currency
-          let netAmountInBaseCurrency = originalNetAmount;
+          let grossAmountInBaseCurrency = grossAmount;
+          let netAmountInBaseCurrency = netAmount;
 
           if (contributionCurrency !== campaignBaseCurrency) {
             try {
-              netAmountInBaseCurrency = await convertCurrency(originalNetAmount, contributionCurrency, campaignBaseCurrency);
+              grossAmountInBaseCurrency = await convertCurrency(grossAmount, contributionCurrency, campaignBaseCurrency);
+              netAmountInBaseCurrency = await convertCurrency(netAmount, contributionCurrency, campaignBaseCurrency);
             } catch (error) {
               console.warn(`Currency conversion failed for contribution ${contribution.id}:`, error);
             }
           }
 
           const creatorEarning = netAmountInBaseCurrency;
+          const platformFee = grossAmountInBaseCurrency * 0.05; // 5% platform fee
 
           const campaign = campaignMap.get(contribution.campaign_id);
           const campaignEndDate = campaign?.end_date;
@@ -633,15 +639,18 @@ export async function fetchCreatorTransactions(creatorId: string, limit: number 
             item_name: `Campaign: ${campaign?.title || 'Unknown Campaign'}`,
             item_id: contribution.campaign_id,
             quantity: 1,
-            unit_price: Number(contribution.amount),
-            total_amount: Number(contribution.amount),
+            unit_price: grossAmountInBaseCurrency, // Show gross amount as unit price
+            total_amount: grossAmountInBaseCurrency, // Show gross amount as total
             creator_earning: Number(creatorEarning.toFixed(2)),
-            platform_fee: 0, // Platform fee already included in net_amount
+            platform_fee: Number(platformFee.toFixed(2)), // Show calculated platform fee
             payment_status: contribution.status,
             created_at: contribution.created_at,
-            order_total: Number(contribution.amount),
+            order_total: grossAmountInBaseCurrency,
             payout_eligible_date: payoutEligibleDate,
-            payment_method: contribution.payment_method || 'Unknown'
+            payment_method: contribution.payment_method || 'Unknown',
+            // FIXED: Add currency information
+            original_currency: contributionCurrency,
+            campaign_currency: campaignBaseCurrency
           });
         }
       }
