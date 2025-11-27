@@ -194,6 +194,46 @@ const AuthPage = () => {
     }
   };
 
+  const handleLinkedInSignIn = async () => {
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    setAuthSuccess(false);
+    
+    try {
+      // Determine the final destination after LinkedIn OAuth
+      const finalRedirectUrl = redirectParam === 'accept-invite' 
+        ? `${window.location.origin}/accept-invite`
+        : `${window.location.origin}/account`;
+
+      console.log('Initiating LinkedIn OAuth with redirect to:', finalRedirectUrl);
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'linkedin_oidc',
+        options: {
+          redirectTo: finalRedirectUrl,
+          // LinkedIn OIDC specific options if needed
+          queryParams: {
+            // Add any specific LinkedIn parameters if required
+          }
+        }
+      });
+      
+      if (error) {
+        console.error('LinkedIn OAuth error:', error);
+        throw error;
+      }
+      
+      // Note: User will be redirected away from the page for OAuth flow
+      // No need to set isSubmitting(false) here as the page will redirect
+      console.log('LinkedIn OAuth initiated successfully');
+      
+    } catch (error: any) {
+      console.error('LinkedIn sign in error:', error);
+      setErrorMessage(error.message || 'Failed to sign in with LinkedIn. Please try again.');
+      setIsSubmitting(false);
+    }
+  };
+
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
   };
@@ -245,7 +285,7 @@ const AuthPage = () => {
                 onClick={handleGoogleSignIn}
                 disabled={isSubmitting}
                 variant="outline"
-                className="w-full bg-white/90 hover:bg-white text-gray-700 border-0 shadow-lg rounded-xl h-12 font-medium mb-6 transition-all duration-200 hover:shadow-xl disabled:opacity-50"
+                className="w-full bg-white/90 hover:bg-white text-gray-700 border-0 shadow-lg rounded-xl h-12 font-medium mb-4 transition-all duration-200 hover:shadow-xl disabled:opacity-50"
               >
                 {isSubmitting ? (
                   <Loader2 className="w-5 h-5 mr-3 animate-spin" />
@@ -260,6 +300,23 @@ const AuthPage = () => {
                 {isSubmitting ? 'Connecting to Google...' : 'Continue with Google'}
               </Button>
 
+              {/* LinkedIn Sign In Button */}
+              <Button 
+                onClick={handleLinkedInSignIn}
+                disabled={isSubmitting}
+                variant="outline"
+                className="w-full bg-[#0077B5]/90 hover:bg-[#0077B5] text-white border-0 shadow-lg rounded-xl h-12 font-medium mb-6 transition-all duration-200 hover:shadow-xl disabled:opacity-50 hover:bg-[#0077B5]/100"
+              >
+                {isSubmitting ? (
+                  <Loader2 className="w-5 h-5 mr-3 animate-spin" />
+                ) : (
+                  <svg className="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                  </svg>
+                )}
+                {isSubmitting ? 'Connecting to LinkedIn...' : 'Continue with LinkedIn'}
+              </Button>
+
               <div className="relative mb-6">
                 <div className="absolute inset-0 flex items-center">
                   <span className="w-full border-t border-orange-200/50" />
@@ -271,6 +328,7 @@ const AuthPage = () => {
                 </div>
               </div>
 
+              {/* Rest of your existing code remains the same */}
               <Tabs defaultValue="login" className="w-full">
                 <TabsList className="grid w-full grid-cols-2 bg-white/20 backdrop-blur-sm border-0 rounded-xl mb-6">
                   <TabsTrigger 
