@@ -542,26 +542,48 @@ const CreatorPayments: React.FC = () => {
     return payoutDate && payoutDate <= now;
   };
 
-  // FIXED: Get transaction currency - use campaign currency for fundraising
-  const getTransactionCurrency = (transaction: any) => {
-    // For fundraising transactions, use the campaign currency (already converted in backend)
+  // FIXED: Get correct transaction amount based on type
+  const getTransactionAmount = (transaction: any) => {
     if (transaction.item_type === 'fundraising_contribution') {
-      return transaction.campaign_currency || 'USD';
+      // For fundraising, the total_amount is the gross amount from the contribution
+      return transaction.total_amount;
+    } else {
+      // For courses/events, use the total_amount
+      return transaction.total_amount;
     }
-    // For other transactions, use USD (already converted in backend)
-    return 'USD';
   };
 
-  // FIXED: Calculate correct platform fee for display
+  // FIXED: Get correct platform fee calculation
   const getDisplayPlatformFee = (transaction: any) => {
     if (transaction.item_type === 'fundraising_contribution') {
-      // For fundraising, calculate 5% of the gross amount for display
+      // For fundraising, calculate 5% of the gross amount
       const grossAmount = transaction.total_amount;
       return grossAmount * 0.05;
     } else {
       // For courses/events, use the actual platform fee from transaction
       return transaction.platform_fee;
     }
+  };
+
+  // FIXED: Get correct creator earning
+  const getCreatorEarning = (transaction: any) => {
+    if (transaction.item_type === 'fundraising_contribution') {
+      // For fundraising, creator_earning is net_amount (gross - 5% platform fee)
+      return transaction.creator_earning;
+    } else {
+      // For courses/events, use the creator_earning field
+      return transaction.creator_earning;
+    }
+  };
+
+  // FIXED: Get transaction currency - use campaign currency for fundraising
+  const getTransactionCurrency = (transaction: any) => {
+    // For fundraising transactions, use the campaign currency
+    if (transaction.item_type === 'fundraising_contribution') {
+      return transaction.campaign_currency || 'USD';
+    }
+    // For other transactions, use USD (already converted in backend)
+    return 'USD';
   };
 
   const hasBankTransferSetup = () => {
@@ -749,7 +771,9 @@ const CreatorPayments: React.FC = () => {
 
   const renderTransactionCard = (transaction: any) => {
     const transactionCurrency = getTransactionCurrency(transaction);
+    const transactionAmount = getTransactionAmount(transaction);
     const displayPlatformFee = getDisplayPlatformFee(transaction);
+    const creatorEarning = getCreatorEarning(transaction);
     const isFundraising = transaction.item_type === 'fundraising_contribution';
     const campaignEnded = isCampaignEnded(transaction);
     
@@ -798,28 +822,17 @@ const CreatorPayments: React.FC = () => {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* FIXED: Amount Display Section */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <p className="text-sm text-white/80">Amount</p>
+              <p className="text-sm text-white/80">Gross Amount</p>
               <PriceDisplay 
-                amount={transaction.total_amount} 
+                amount={transactionAmount} 
                 originalCurrency={transactionCurrency}
                 showOriginal={false}
                 className="font-medium text-white"
               />
             </div>
-            <div>
-              <p className="text-sm text-white/80">Your Earning</p>
-              <PriceDisplay 
-                amount={transaction.creator_earning} 
-                originalCurrency={transactionCurrency}
-                showOriginal={false}
-                className="font-bold text-white"
-              />
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <p className="text-sm text-white/80">Platform Fee</p>
               <div className="flex items-center gap-2">
@@ -835,10 +848,26 @@ const CreatorPayments: React.FC = () => {
               </div>
             </div>
             <div>
+              <p className="text-sm text-white/80">Your Earning</p>
+              <PriceDisplay 
+                amount={creatorEarning} 
+                originalCurrency={transactionCurrency}
+                showOriginal={false}
+                className="font-bold text-white"
+              />
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
               <p className="text-sm text-white/80">Status</p>
               <div className="mt-1">
                 {getStatusBadge(transaction.payment_status)}
               </div>
+            </div>
+            <div>
+              <p className="text-sm text-white/80">Payment Method</p>
+              <p className="font-medium capitalize">{transaction.payment_method || 'Unknown'}</p>
             </div>
           </div>
           
@@ -868,6 +897,20 @@ const CreatorPayments: React.FC = () => {
               {getHoldPeriodDescription(transaction)}
             </p>
           </div>
+
+          {/* FIXED: Show currency information */}
+          {isFundraising && (
+            <div className="bg-white/10 p-2 rounded-lg">
+              <div className="text-xs text-white/80">
+                <span className="font-medium">Currency:</span> {transactionCurrency}
+                {transaction.original_currency && transaction.original_currency !== transactionCurrency && (
+                  <span className="ml-2">
+                    (Converted from {transaction.original_currency})
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     );
