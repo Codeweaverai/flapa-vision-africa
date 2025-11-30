@@ -1,156 +1,136 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Rocket, Zap, Sparkles, Brain, FileText, Calendar, Users, Target, Globe } from 'lucide-react';
+import { Rocket, Zap, Brain, FileText, Calendar, Users, Clock, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const IntroducingLumoAI = () => {
   return (
-    <section className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-100 py-20 relative overflow-hidden">
-      {/* Animated Background Elements */}
+    <section className="bg-gradient-to-br from-orange-500 to-purple-600 py-20 relative overflow-hidden">
+      {/* Pulse Animation Background */}
       <div className="absolute inset-0">
-        <div className="absolute top-10 left-10 w-32 h-32 bg-gradient-to-r from-blue-400/20 to-purple-500/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute top-40 right-20 w-40 h-40 bg-gradient-to-r from-indigo-300/20 to-pink-400/20 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute bottom-20 left-1/4 w-28 h-28 bg-gradient-to-r from-blue-500/25 to-purple-600/25 rounded-full blur-xl animate-pulse" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute top-1/2 right-1/3 w-24 h-24 bg-gradient-to-r from-cyan-400/30 to-blue-500/30 rounded-full blur-lg animate-pulse" style={{ animationDelay: '1.5s' }}></div>
+        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-orange-400/30 to-purple-500/30 animate-pulse"></div>
+        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-white/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }}></div>
+        <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-white/15 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+        <div className="absolute top-1/2 left-1/2 w-32 h-32 bg-white/20 rounded-full blur-xl animate-pulse" style={{ animationDelay: '2s' }}></div>
       </div>
       
       <div className="section-container relative z-10">
-        {/* Header Section */}
+        {/* Header */}
         <div className="text-center mb-16">
-          <div className="relative inline-block mb-4">
-            <div className="absolute -inset-4 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full blur-lg opacity-20 animate-pulse"></div>
-            <span className="relative px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-sm font-semibold rounded-full inline-flex items-center">
-              <Rocket className="h-4 w-4 mr-2" />
-              NEW RELEASE
-            </span>
+          <div className="relative inline-block mb-6">
+            <div className="absolute -inset-4 bg-white/20 rounded-full blur-2xl animate-pulse"></div>
+            <Rocket className="h-16 w-16 text-white relative z-10 mx-auto" />
           </div>
-          <h2 className="text-5xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-purple-700 bg-clip-text text-transparent">
-            Introducing LumoAI v1
+          <h2 className="text-6xl font-bold mb-6 text-white">
+            LumoAI v1
           </h2>
-          <p className="text-xl text-gray-700 max-w-4xl mx-auto leading-relaxed">
-            Your AI-Powered Course & Event Creation Engine — Powered by SkillPulse
+          <p className="text-xl text-white/90 max-w-2xl mx-auto mb-4">
+            Create Professional Courses & Events in Minutes, Not Weeks
+          </p>
+          <p className="text-lg text-white/80 max-w-3xl mx-auto">
+            Reduce time to production with AI-powered workflows and better content quality
           </p>
         </div>
 
-        {/* Main Description */}
-        <div className="max-w-4xl mx-auto text-center mb-16">
-          <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-sm">
-            <CardContent className="p-8">
-              <p className="text-lg text-gray-700 leading-relaxed">
-                LumoAI is SkillPulse's breakthrough artificial intelligence tool designed to help creators build 
-                high-quality learning experiences effortlessly. Whether you're launching a course, hosting an event, 
-                or creating a full training program, LumoAI automatically generates everything you need — in minutes.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Features Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
+        {/* Benefits Grid */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
           {[
             {
-              icon: FileText,
-              title: "Generate Complete Course Structures",
-              description: "LumoAI builds full course outlines with modules, lessons, learning objectives, activities, and assessments — all tailored to your topic.",
-              color: "from-blue-500 to-cyan-500"
+              icon: Clock,
+              title: "Minutes vs Weeks",
+              description: "Go from idea to finished course in minutes instead of weeks of planning",
+              pulseDelay: '0s'
             },
             {
-              icon: Brain,
-              title: "Write High-Quality Lesson Content",
-              description: "From scripts and summaries to quizzes and assignments, LumoAI produces ready-to-use learning materials that match your tone and teaching style.",
-              color: "from-purple-500 to-pink-500"
-            },
-            {
-              icon: Calendar,
-              title: "Create Event Descriptions & Agendas",
-              description: "Hosting a workshop or seminar? LumoAI crafts polished event descriptions, speaker bios, schedules, and content sections instantly.",
-              color: "from-green-500 to-teal-500"
-            },
-            {
-              icon: Users,
-              title: "Personalized to Your Audience",
-              description: "Whether your audience is beginner or advanced, LumoAI adapts content difficulty, structure, and style to meet their needs.",
-              color: "from-orange-500 to-red-500"
+              icon: TrendingUp,
+              title: "Faster Production",
+              description: "Reduce time to production with automated content creation",
+              pulseDelay: '0.3s'
             },
             {
               icon: Zap,
-              title: "Instantly Publish on SkillPulse",
-              description: "With one click, creators can send generated content into their SkillPulse creator dashboard for editing or publishing.",
-              color: "from-indigo-500 to-purple-500"
+              title: "Improved Workflows",
+              description: "Streamline your creation process with intelligent automation",
+              pulseDelay: '0.6s'
             },
             {
-              icon: Target,
-              title: "Focus on What Matters",
-              description: "LumoAI removes the hardest part of teaching online: planning, writing, and structuring content.",
-              color: "from-cyan-500 to-blue-500"
+              icon: Brain,
+              title: "Better Content",
+              description: "Generate higher quality course materials with AI assistance",
+              pulseDelay: '0.9s'
             }
           ].map((feature, index) => (
-            <div key={index} className="group relative">
-              <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl blur opacity-25 group-hover:opacity-75 transition duration-1000 group-hover:duration-200 animate-pulse"></div>
-              <Card className="relative border-0 shadow-xl bg-white/90 backdrop-blur-sm h-full group-hover:scale-105 transition-transform duration-300">
-                <CardContent className="p-6">
-                  <div className={`bg-gradient-to-r ${feature.color} p-3 rounded-full w-12 h-12 flex items-center justify-center mb-4 shadow-lg`}>
-                    <feature.icon className="h-6 w-6 text-white" />
+            <div key={index} className="relative group">
+              <div 
+                className="absolute -inset-2 bg-white/20 rounded-2xl blur-lg animate-pulse opacity-60 group-hover:opacity-100 transition-opacity shadow-xl"
+                style={{ animationDelay: feature.pulseDelay }}
+              ></div>
+              <Card className="relative border-0 bg-white/10 backdrop-blur-sm text-center p-6 shadow-2xl hover:shadow-2xl transition-all duration-300">
+                <CardContent className="p-0">
+                  <div className="bg-white/20 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 shadow-lg">
+                    <feature.icon className="h-8 w-8 text-white" />
                   </div>
-                  <h3 className="text-xl font-bold mb-3 text-gray-800">{feature.title}</h3>
-                  <p className="text-gray-600 leading-relaxed">{feature.description}</p>
+                  <h3 className="text-lg font-semibold text-white mb-3">
+                    {feature.title}
+                  </h3>
+                  <p className="text-white/80 text-sm leading-relaxed">
+                    {feature.description}
+                  </p>
                 </CardContent>
               </Card>
             </div>
           ))}
         </div>
 
-        {/* Why LumoAI Matters */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-700 rounded-3xl p-8 text-white text-center mb-16 relative overflow-hidden">
-          <div className="absolute inset-0">
-            <div className="absolute top-0 left-0 w-20 h-20 bg-white/10 rounded-full blur-xl animate-pulse"></div>
-            <div className="absolute bottom-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-          </div>
-          <div className="relative z-10">
-            <Zap className="h-12 w-12 mx-auto mb-4 text-yellow-300" />
-            <h3 className="text-3xl font-bold mb-4">Why LumoAI Matters</h3>
-            <p className="text-lg text-blue-100 max-w-2xl mx-auto">
-              LumoAI removes the hardest part of teaching online: planning, writing, and structuring content.
-              This lets creators focus on what matters most — sharing expertise and growing their audience.
-            </p>
-          </div>
-        </div>
-
-        {/* Powered by SkillPulse */}
-        <div className="text-center">
-          <div className="bg-gradient-to-r from-gray-800 to-gray-900 rounded-2xl p-8 text-white inline-flex items-center space-x-4 shadow-2xl">
-            <Globe className="h-8 w-8 text-blue-400" />
-            <div className="text-left">
-              <p className="text-sm text-gray-400">Powered by</p>
-              <p className="text-xl font-bold">SkillPulse Ecosystem</p>
-            </div>
-          </div>
-          <p className="text-gray-600 mt-4 max-w-2xl mx-auto">
-            LumoAI is built natively into the SkillPulse ecosystem, giving creators an integrated AI assistant 
-            that transforms ideas into full, professional learning experiences.
-          </p>
-        </div>
-
-        {/* Call to Action */}
-        <div className="text-center mt-16">
-          <Card className="border-0 shadow-2xl bg-gradient-to-br from-white/95 to-blue-50/90 backdrop-blur-sm max-w-2xl mx-auto">
-            <CardContent className="p-8">
-              <h3 className="text-3xl font-bold mb-4">
-                Ready to Try <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">LumoAI v1</span>?
-              </h3>
-              <p className="text-gray-700 mb-6 text-lg">
-                Start creating professional courses and events in minutes with our breakthrough AI technology.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button asChild size="lg" className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold px-8 py-3 rounded-xl shadow-lg">
-                  <Link to="/lumoai">Get Started with LumoAI</Link>
-                </Button>
-                <Button asChild variant="outline" size="lg" className="border-2 border-blue-300 text-blue-600 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 font-semibold px-8 py-3 rounded-xl">
-                  <Link to="/auth">Become a Creator</Link>
-                </Button>
+        {/* Feature Highlights */}
+        <div className="grid md:grid-cols-3 gap-6 mb-12">
+          {[
+            {
+              icon: FileText,
+              title: "Course Structures",
+              description: "Complete outlines in minutes"
+            },
+            {
+              icon: Calendar,
+              title: "Event Planning",
+              description: "Agendas and schedules instantly"
+            },
+            {
+              icon: Users,
+              title: "Audience Focused",
+              description: "Tailored to your learners"
+            }
+          ].map((feature, index) => (
+            <div key={index} className="relative group">
+              <div className="absolute -inset-1 bg-white/15 rounded-xl blur-md animate-pulse" style={{ animationDelay: `${index * 0.4}s` }}></div>
+              <div className="relative bg-white/10 backdrop-blur-sm rounded-lg p-4 text-center shadow-lg hover:shadow-xl transition-shadow">
+                <feature.icon className="h-6 w-6 text-white mx-auto mb-2" />
+                <h4 className="text-white font-semibold text-sm">{feature.title}</h4>
+                <p className="text-white/70 text-xs">{feature.description}</p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          ))}
+        </div>
+
+        {/* Central CTA Card */}
+        <div className="max-w-lg mx-auto text-center">
+          <div className="relative">
+            <div className="absolute -inset-8 bg-white/25 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1.2s' }}></div>
+            <Card className="relative border-0 bg-white/15 backdrop-blur-sm shadow-2xl">
+              <CardContent className="p-8">
+                <Zap className="h-12 w-12 text-white mx-auto mb-4" />
+                <h3 className="text-2xl font-bold text-white mb-4">
+                  Start Creating Today
+                </h3>
+                <p className="text-white/80 mb-6">
+                  Transform your ideas into professional learning experiences in minutes
+                </p>
+                <Button asChild size="lg" className="bg-white text-orange-600 hover:bg-white/90 font-bold px-8 py-4 rounded-xl shadow-lg text-lg w-full">
+                  <Link to="/lumoai">Launch LumoAI</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </section>
