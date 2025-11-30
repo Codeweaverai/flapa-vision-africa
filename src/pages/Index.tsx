@@ -12,29 +12,27 @@ import BrowseCategoriesSection from '@/components/home/BrowseCategoriesSection';
 import CreatorsSection from '@/components/home/CreatorsSection';
 import TrendingNowSection from '@/components/home/TrendingNowSection';
 import LocalContentSection from '@/components/home/LocalContentSection';
+import MobileAppSection from '@/components/home/MobileAppSection';
 import LiveEventsSection from '@/components/home/LiveEventsSection';
-import IntroducingLumoAI from '@/components/home/IntroducingLumoAI';
 
-
-const HomePage = () => {
+const Index = () => {
   return (
     <Layout>
       <HeroSection />
       <BrowseCategoriesSection />
       <CoursesSection />
       <CommunityAISection />
-      <LocalContentSection />
       <MediaSection />
       <LearningSection />
       <TrendingNowSection />
       <EventsSection />
       <AboutSection />
-      <IntroducingLumoAI/>
       <CreatorsSection />
+      <MobileAppSection />
       <LiveEventsSection/>
       <CallToAction />
     </Layout>
   );
 };
 
-export default HomePage;
+export default Index;
