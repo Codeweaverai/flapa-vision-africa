@@ -13,6 +13,8 @@ import CreatorsSection from '@/components/home/CreatorsSection';
 import TrendingNowSection from '@/components/home/TrendingNowSection';
 import LocalContentSection from '@/components/home/LocalContentSection';
 import LiveEventsSection from '@/components/home/LiveEventsSection';
+import IntroducingLumoAI from '@/components/home/IntroducingLumoAI';
+
 
 const HomePage = () => {
   return (
@@ -27,6 +29,7 @@ const HomePage = () => {
       <TrendingNowSection />
       <EventsSection />
       <AboutSection />
+      <IntroducingLumoAI/>
       <CreatorsSection />
       <LiveEventsSection/>
       <CallToAction />
