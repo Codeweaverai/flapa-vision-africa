@@ -1,3 +1,5 @@
+// src/pages/CheckoutPage.tsx
+
 import React, { useState, useEffect } from 'react';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -33,12 +35,16 @@ import {
   AlertCircle,
   Info,
   Landmark,
-  Clock
+  Clock,
+  Globe,
+  Wallet,
+  Phone
 } from 'lucide-react';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import MobileMoneyPaymentDialog from '@/components/payment/MobileMoneyPaymentDialog';
 import LencoPaymentDialog from '@/components/payment/LencoPaymentDialog';
 import DirectCardPaymentDialog from '@/components/payment/DirectCardPaymentDialog';
+import LencoMobileMoneyDialog from '@/components/payment/LencoMobileMoneyDialog'; // New import
 
 // Gift card validation function
 const validateGiftCard = async (giftCardCode: string, orderAmount: number) => {
@@ -64,7 +70,8 @@ const CheckoutPage = () => {
   const { currentCurrency, convertPrice } = useCurrency();
   const navigate = useNavigate();
   
-  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'pawapay' | 'lenco' | 'direct_card' | 'free'>('stripe');
+  // Updated payment method state to include lenco_mobile_money
+  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'pawapay' | 'lenco' | 'direct_card' | 'free' | 'lenco_mobile_money'>('stripe');
   const [promoCode, setPromoCode] = useState('');
   const [giftCardCode, setGiftCardCode] = useState('');
   const [discount, setDiscount] = useState(0);
@@ -75,6 +82,7 @@ const CheckoutPage = () => {
   const [showMobileMoneyDialog, setShowMobileMoneyDialog] = useState(false);
   const [showLencoDialog, setShowLencoDialog] = useState(false);
   const [showDirectCardDialog, setShowDirectCardDialog] = useState(false);
+  const [showLencoMobileMoneyDialog, setShowLencoMobileMoneyDialog] = useState(false); // New state
   const [convertedAmounts, setConvertedAmounts] = useState<{
     total: number;
     tax: number;
@@ -108,7 +116,7 @@ const CheckoutPage = () => {
     if (finalAmountUSD <= 0) {
       setPaymentMethod('free');
     } else if (paymentMethod === 'free') {
-      setPaymentMethod('stripe');
+      setPaymentMethod('lenco_mobile_money'); // Default to Lenco Mobile Money
     }
   }, [finalAmountUSD, paymentMethod]);
 
@@ -331,14 +339,17 @@ const CheckoutPage = () => {
           throw new Error('No checkout URL returned');
         }
       } else if (paymentMethod === 'pawapay') {
-        // Mobile Money payment
+        // PawaPay Mobile Money payment
         setShowMobileMoneyDialog(true);
       } else if (paymentMethod === 'lenco') {
-        // Lenco payment
+        // Lenco card payment
         setShowLencoDialog(true);
       } else if (paymentMethod === 'direct_card') {
         // Direct Card payment
         setShowDirectCardDialog(true);
+      } else if (paymentMethod === 'lenco_mobile_money') {
+        // Lenco Mobile Money payment
+        setShowLencoMobileMoneyDialog(true);
       }
     } catch (error) {
       console.error('Checkout error:', error);
@@ -595,12 +606,48 @@ const CheckoutPage = () => {
                     <CardContent className="p-6">
                       <RadioGroup 
                         value={paymentMethod} 
-                        onValueChange={(value) => setPaymentMethod(value as 'stripe' | 'pawapay' | 'lenco' | 'direct_card')}
+                        onValueChange={(value) => setPaymentMethod(value as 'stripe' | 'pawapay' | 'lenco' | 'direct_card' | 'free' | 'lenco_mobile_money')}
                         className="space-y-4"
                       >
+                        {/* Mobile Money - Lenco Zambia (DEFAULT) */}
+                        <div className="flex items-center space-x-3 p-4 border-2 border-orange-500 rounded-xl bg-gradient-to-r from-orange-50 to-orange-50 transition-all duration-200 cursor-pointer">
+                          <RadioGroupItem value="lenco_mobile_money" id="lenco_mobile_money" className="text-orange-500 border-orange-300" checked />
+                          <Label htmlFor="lenco_mobile_money" className="flex items-center gap-3 cursor-pointer flex-1">
+                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center">
+                              <Phone className="h-5 w-5 text-white" />
+                            </div>
+                            <div>
+                              <div className="font-semibold text-slate-800 flex items-center gap-2">
+                                Mobile Money (Zambia)
+                                <Badge className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full">
+                                  Recommended
+                                </Badge>
+                              </div>
+                              <div className="text-sm text-slate-600 flex items-center gap-1">
+                                <Globe className="h-3 w-3" />
+                                Airtel Money & MTN Mobile Money
+                              </div>
+                            </div>
+                          </Label>
+                        </div>
+
+                        {/* Mobile Money - PawaPay */}
+                        <div className="flex items-center space-x-3 p-4 border border-slate-100 rounded-xl hover:border-purple-200 hover:bg-purple-50/50 transition-all duration-200 cursor-pointer">
+                          <RadioGroupItem value="pawapay" id="pawapay" className="text-purple-500 border-slate-300" />
+                          <Label htmlFor="pawapay" className="flex items-center gap-3 cursor-pointer flex-1">
+                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+                              <Smartphone className="h-5 w-5 text-white" />
+                            </div>
+                            <div>
+                              <div className="font-semibold text-slate-800">Mobile Money (PawaPay)</div>
+                              <div className="text-sm text-slate-600">Available in 19+ African countries</div>
+                            </div>
+                          </Label>
+                        </div>
+
                         {/* Stripe Card Payment */}
-                        <div className="flex items-center space-x-3 p-4 border border-slate-100 rounded-xl hover:border-orange-200 hover:bg-orange-50/50 transition-all duration-200 cursor-pointer">
-                          <RadioGroupItem value="stripe" id="stripe" className="text-orange-500 border-slate-300" />
+                        <div className="flex items-center space-x-3 p-4 border border-slate-100 rounded-xl hover:border-blue-200 hover:bg-blue-50/50 transition-all duration-200 cursor-pointer">
+                          <RadioGroupItem value="stripe" id="stripe" className="text-blue-500 border-slate-300" />
                           <Label htmlFor="stripe" className="flex items-center gap-3 cursor-pointer flex-1">
                             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                               <CreditCard className="h-5 w-5 text-white" />
@@ -613,8 +660,8 @@ const CheckoutPage = () => {
                         </div>
 
                         {/* Direct Card Payment (Lenco) */}
-                        <div className="flex items-center space-x-3 p-4 border border-slate-100 rounded-xl hover:border-blue-200 hover:bg-blue-50/50 transition-all duration-200 cursor-pointer">
-                          <RadioGroupItem value="direct_card" id="direct_card" className="text-blue-500 border-slate-300" />
+                        <div className="flex items-center space-x-3 p-4 border border-slate-100 rounded-xl hover:border-indigo-200 hover:bg-indigo-50/50 transition-all duration-200 cursor-pointer">
+                          <RadioGroupItem value="direct_card" id="direct_card" className="text-indigo-500 border-slate-300" />
                           <Label htmlFor="direct_card" className="flex items-center gap-3 cursor-pointer flex-1">
                             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center">
                               <CreditCard className="h-5 w-5 text-white" />
@@ -636,20 +683,6 @@ const CheckoutPage = () => {
                             <div>
                               <div className="font-semibold text-slate-800">Pay by Lenco</div>
                               <div className="text-sm text-slate-600">Card & Mobile Money (Zambia)</div>
-                            </div>
-                          </Label>
-                        </div>
-                        
-                        {/* Mobile Money */}
-                        <div className="flex items-center space-x-3 p-4 border border-slate-100 rounded-xl hover:border-purple-200 hover:bg-purple-50/50 transition-all duration-200 cursor-pointer">
-                          <RadioGroupItem value="pawapay" id="pawapay" className="text-purple-500 border-slate-300" />
-                          <Label htmlFor="pawapay" className="flex items-center gap-3 cursor-pointer flex-1">
-                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
-                              <Smartphone className="h-5 w-5 text-white" />
-                            </div>
-                            <div>
-                              <div className="font-semibold text-slate-800">Mobile Money</div>
-                              <div className="text-sm text-slate-600">Available in 19 African countries</div>
                             </div>
                           </Label>
                         </div>
@@ -779,6 +812,18 @@ const CheckoutPage = () => {
                       <CheckCircle className="h-5 w-5" />
                       Complete Purchase with Gift Card
                     </div>
+                  ) : paymentMethod === 'lenco_mobile_money' ? (
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-5 w-5" />
+                      Pay with Mobile Money
+                      <ArrowRight className="h-4 w-4 ml-1" />
+                    </div>
+                  ) : paymentMethod === 'pawapay' ? (
+                    <div className="flex items-center gap-2">
+                      <Smartphone className="h-5 w-5" />
+                      Pay with Mobile Money
+                      <ArrowRight className="h-4 w-4 ml-1" />
+                    </div>
                   ) : paymentMethod === 'stripe' ? (
                     <div className="flex items-center gap-2">
                       <CreditCard className="h-5 w-5" />
@@ -791,16 +836,10 @@ const CheckoutPage = () => {
                       Pay with Card
                       <ArrowRight className="h-4 w-4 ml-1" />
                     </div>
-                  ) : paymentMethod === 'lenco' ? (
+                  ) : (
                     <div className="flex items-center gap-2">
                       <Building className="h-5 w-5" />
                       Pay by Lenco
-                      <ArrowRight className="h-4 w-4 ml-1" />
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <Smartphone className="h-5 w-5" />
-                      Pay with Mobile Money
                       <ArrowRight className="h-4 w-4 ml-1" />
                     </div>
                   )}
@@ -812,6 +851,28 @@ const CheckoutPage = () => {
                     <Shield className="h-4 w-4 text-green-500" />
                     <span>Secure SSL Encryption • 256-bit Security</span>
                   </div>
+                </div>
+
+                {/* Payment Method Help */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-4 border border-blue-100">
+                  <h4 className="font-medium text-slate-800 mb-2 flex items-center gap-2">
+                    <Info className="h-4 w-4 text-blue-600" />
+                    Need help choosing a payment method?
+                  </h4>
+                  <ul className="text-sm text-slate-600 space-y-1">
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
+                      <span><strong>Zambia Mobile Money:</strong> For Zambian customers with Airtel/MTN</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
+                      <span><strong>PawaPay:</strong> For other African countries</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                      <span><strong>Card Payments:</strong> For international customers</span>
+                    </li>
+                  </ul>
                 </div>
               </div>
             </div>
@@ -850,9 +911,7 @@ const CheckoutPage = () => {
             }))}
             discount={convertedAmounts.discount + convertedAmounts.giftCardDiscount}
             taxAmount={convertedAmounts.tax}
-            processingFee={convertedAmounts.processingFee}
             promoCode={promoCode}
-            giftCardCode={appliedGiftCard?.code}
           />
 
           <LencoPaymentDialog
@@ -884,9 +943,7 @@ const CheckoutPage = () => {
             }))}
             discount={convertedAmounts.discount + convertedAmounts.giftCardDiscount}
             taxAmount={convertedAmounts.tax}
-            processingFee={convertedAmounts.processingFee}
             promoCode={promoCode}
-            giftCardCode={appliedGiftCard?.code}
           />
 
           <DirectCardPaymentDialog
@@ -918,9 +975,43 @@ const CheckoutPage = () => {
             }))}
             discount={convertedAmounts.discount + convertedAmounts.giftCardDiscount}
             taxAmount={convertedAmounts.tax}
-            processingFee={convertedAmounts.processingFee}
             promoCode={promoCode}
-            giftCardCode={appliedGiftCard?.code}
+          />
+
+          {/* New Lenco Mobile Money Dialog */}
+          <LencoMobileMoneyDialog
+            isOpen={showLencoMobileMoneyDialog}
+            onClose={() => setShowLencoMobileMoneyDialog(false)}
+            amount={convertedAmounts.final}
+            currency={currentCurrency}
+            items={items.map(item => ({
+              item_id: item.itemId,
+              item_type: item.itemType,
+              item_name: item.itemName,
+              quantity: item.quantity,
+              price: item.price,
+              metadata: item.giftMetadata ? {
+                sender_name: item.giftMetadata.senderName,
+                recipient_name: item.giftMetadata.recipientName,
+                recipient_email: item.giftMetadata.recipientEmail,
+                personal_message: item.giftMetadata.personalMessage,
+                amount: item.giftMetadata.amount,
+                ...(item.itemType === 'gift_course' || item.itemType === 'gift_event') && {
+                  original_item_id: item.itemId,
+                  original_item_name: item.itemName
+                },
+                ...(item.itemType === 'event_ticket' || item.itemType === 'gift_event') && {
+                  ticket_holder_names: item.ticketHolderNames || [],
+                  ticket_holder_emails: item.ticketHolderEmails || []
+                }
+              } : {}
+            }))}
+            discount={convertedAmounts.discount + convertedAmounts.giftCardDiscount}
+            taxAmount={convertedAmounts.tax}
+            promoCode={promoCode}
+            appliedGiftCardId={appliedGiftCard?.id}
+            giftCardDiscount={giftCardDiscount}
+            isGiftPurchase={items.some(item => item.itemType.startsWith('gift_'))}
           />
         </>
       )}
