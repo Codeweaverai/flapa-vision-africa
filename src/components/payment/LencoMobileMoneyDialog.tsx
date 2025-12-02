@@ -105,7 +105,7 @@ const LencoMobileMoneyDialog: React.FC<LencoMobileMoneyDialogProps> = ({
     setIsPolling(true);
     const interval = setInterval(async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('lenco-payment-status', {
+        const { data, error } = await supabase.functions.invoke('lenco-payment--mobile-status', {
           body: { reference }
         });
 
