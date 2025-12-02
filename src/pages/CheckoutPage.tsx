@@ -1,3 +1,5 @@
+// src/pages/CheckoutPage.tsx - Updated to fix Lenco Mobile Money functionality
+
 import React, { useState, useEffect } from 'react';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -307,10 +309,18 @@ const CheckoutPage = () => {
     }
 
     // For non-zero amounts, show the appropriate dialog
-    if (paymentMethod === 'pawapay') {
-      setShowMobileMoneyDialog(true);
-    } else if (paymentMethod === 'lenco_mobile_money') {
-      setShowLencoMobileMoneyDialog(true);
+    setLoading(true);
+    try {
+      if (paymentMethod === 'pawapay') {
+        setShowMobileMoneyDialog(true);
+      } else if (paymentMethod === 'lenco_mobile_money') {
+        setShowLencoMobileMoneyDialog(true);
+      }
+    } catch (error) {
+      console.error('Error initiating payment:', error);
+      toast.error('Failed to initiate payment');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -559,37 +569,65 @@ const CheckoutPage = () => {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-6">
-                      <RadioGroup 
-                        value={paymentMethod} 
-                        onValueChange={(value) => setPaymentMethod(value as 'pawapay' | 'lenco_mobile_money')}
-                        className="space-y-4"
-                      >
+                      <div className="space-y-4">
                         {/* Mobile Money - Lenco Zambia (DEFAULT) */}
-                        <div className="flex items-center space-x-3 p-4 border-2 border-orange-500 rounded-xl bg-gradient-to-r from-orange-50 to-orange-50 transition-all duration-200 cursor-pointer">
-                          <RadioGroupItem value="lenco_mobile_money" id="lenco_mobile_money" className="text-orange-500 border-orange-300" checked />
-                          <Label htmlFor="lenco_mobile_money" className="flex items-center gap-3 cursor-pointer flex-1">
+                        <div 
+                          onClick={() => setPaymentMethod('lenco_mobile_money')}
+                          className={`flex items-center space-x-3 p-4 rounded-xl transition-all duration-200 cursor-pointer ${
+                            paymentMethod === 'lenco_mobile_money' 
+                              ? 'border-2 border-orange-500 bg-gradient-to-r from-orange-50 to-orange-50' 
+                              : 'border border-slate-100 hover:border-orange-200 hover:bg-orange-50/50'
+                          }`}
+                        >
+                          <div className={`flex items-center justify-center w-5 h-5 rounded-full border ${
+                            paymentMethod === 'lenco_mobile_money' 
+                              ? 'border-orange-500 bg-orange-500' 
+                              : 'border-slate-300'
+                          }`}>
+                            {paymentMethod === 'lenco_mobile_money' && (
+                              <div className="w-2 h-2 rounded-full bg-white"></div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 cursor-pointer flex-1">
                             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center">
                               <Phone className="h-5 w-5 text-white" />
                             </div>
                             <div>
                               <div className="font-semibold text-slate-800 flex items-center gap-2">
                                 Mobile Money (Zambia)
-                                <Badge className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full">
-                                  Recommended
-                                </Badge>
+                                {paymentMethod === 'lenco_mobile_money' && (
+                                  <Badge className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full">
+                                    Recommended
+                                  </Badge>
+                                )}
                               </div>
                               <div className="text-sm text-slate-600 flex items-center gap-1">
                                 <Globe className="h-3 w-3" />
                                 Airtel Money & MTN Mobile Money via Lenco
                               </div>
                             </div>
-                          </Label>
+                          </div>
                         </div>
 
                         {/* Mobile Money - PawaPay */}
-                        <div className="flex items-center space-x-3 p-4 border border-slate-100 rounded-xl hover:border-purple-200 hover:bg-purple-50/50 transition-all duration-200 cursor-pointer">
-                          <RadioGroupItem value="pawapay" id="pawapay" className="text-purple-500 border-slate-300" />
-                          <Label htmlFor="pawapay" className="flex items-center gap-3 cursor-pointer flex-1">
+                        <div 
+                          onClick={() => setPaymentMethod('pawapay')}
+                          className={`flex items-center space-x-3 p-4 rounded-xl transition-all duration-200 cursor-pointer ${
+                            paymentMethod === 'pawapay' 
+                              ? 'border-2 border-purple-500 bg-gradient-to-r from-purple-50 to-purple-50' 
+                              : 'border border-slate-100 hover:border-purple-200 hover:bg-purple-50/50'
+                          }`}
+                        >
+                          <div className={`flex items-center justify-center w-5 h-5 rounded-full border ${
+                            paymentMethod === 'pawapay' 
+                              ? 'border-purple-500 bg-purple-500' 
+                              : 'border-slate-300'
+                          }`}>
+                            {paymentMethod === 'pawapay' && (
+                              <div className="w-2 h-2 rounded-full bg-white"></div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 cursor-pointer flex-1">
                             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
                               <Smartphone className="h-5 w-5 text-white" />
                             </div>
@@ -597,9 +635,9 @@ const CheckoutPage = () => {
                               <div className="font-semibold text-slate-800">Mobile Money (PawaPay)</div>
                               <div className="text-sm text-slate-600">Available in 19+ African countries</div>
                             </div>
-                          </Label>
+                          </div>
                         </div>
-                      </RadioGroup>
+                      </div>
                       
                       {/* Payment Method Help */}
                       <div className="mt-4 pt-4 border-t border-slate-100">
@@ -812,7 +850,10 @@ const CheckoutPage = () => {
           {/* Lenco Mobile Money Dialog */}
           <LencoMobileMoneyDialog
             isOpen={showLencoMobileMoneyDialog}
-            onClose={() => setShowLencoMobileMoneyDialog(false)}
+            onClose={() => {
+              setShowLencoMobileMoneyDialog(false);
+              setLoading(false);
+            }}
             amount={convertedAmounts.final}
             currency={currentCurrency}
             items={items.map(item => ({
