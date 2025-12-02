@@ -1,5 +1,3 @@
-// src/pages/CheckoutPage.tsx
-
 import React, { useState, useEffect } from 'react';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,20 +29,15 @@ import {
   Shield,
   Lock,
   ArrowRight,
-  Building,
   AlertCircle,
   Info,
-  Landmark,
   Clock,
   Globe,
-  Wallet,
   Phone
 } from 'lucide-react';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import MobileMoneyPaymentDialog from '@/components/payment/MobileMoneyPaymentDialog';
-import LencoPaymentDialog from '@/components/payment/LencoPaymentDialog';
-import DirectCardPaymentDialog from '@/components/payment/DirectCardPaymentDialog';
-import LencoMobileMoneyDialog from '@/components/payment/LencoMobileMoneyDialog'; // New import
+import LencoMobileMoneyDialog from '@/components/payment/LencoMobileMoneyDialog';
 
 // Gift card validation function
 const validateGiftCard = async (giftCardCode: string, orderAmount: number) => {
@@ -70,8 +63,8 @@ const CheckoutPage = () => {
   const { currentCurrency, convertPrice } = useCurrency();
   const navigate = useNavigate();
   
-  // Updated payment method state to include lenco_mobile_money
-  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'pawapay' | 'lenco' | 'direct_card' | 'free' | 'lenco_mobile_money'>('stripe');
+  // Only show two payment methods: pawapay and lenco_mobile_money
+  const [paymentMethod, setPaymentMethod] = useState<'pawapay' | 'lenco_mobile_money'>('lenco_mobile_money');
   const [promoCode, setPromoCode] = useState('');
   const [giftCardCode, setGiftCardCode] = useState('');
   const [discount, setDiscount] = useState(0);
@@ -80,9 +73,7 @@ const CheckoutPage = () => {
   const [loading, setLoading] = useState(false);
   const [giftCardLoading, setGiftCardLoading] = useState(false);
   const [showMobileMoneyDialog, setShowMobileMoneyDialog] = useState(false);
-  const [showLencoDialog, setShowLencoDialog] = useState(false);
-  const [showDirectCardDialog, setShowDirectCardDialog] = useState(false);
-  const [showLencoMobileMoneyDialog, setShowLencoMobileMoneyDialog] = useState(false); // New state
+  const [showLencoMobileMoneyDialog, setShowLencoMobileMoneyDialog] = useState(false);
   const [convertedAmounts, setConvertedAmounts] = useState<{
     total: number;
     tax: number;
@@ -114,11 +105,9 @@ const CheckoutPage = () => {
   // Automatically set payment method to 'free' when amount is 0
   useEffect(() => {
     if (finalAmountUSD <= 0) {
-      setPaymentMethod('free');
-    } else if (paymentMethod === 'free') {
-      setPaymentMethod('lenco_mobile_money'); // Default to Lenco Mobile Money
+      // If amount is 0 (gift card covers all), we don't need payment method
     }
-  }, [finalAmountUSD, paymentMethod]);
+  }, [finalAmountUSD]);
 
   useEffect(() => {
     if (items.length === 0) {
@@ -252,57 +241,44 @@ const CheckoutPage = () => {
       return;
     }
 
-    setLoading(true);
-    try {
-      // Prepare common checkout data with metadata
-      const checkoutData: any = {
-        items: items.map(item => ({
-          item_id: item.itemId,
-          item_type: item.itemType,
-          item_name: item.itemName,
-          quantity: item.quantity,
-          price: item.price,
-          // Add metadata for gift items
-          metadata: item.giftMetadata ? {
-            sender_name: item.giftMetadata.senderName,
-            recipient_name: item.giftMetadata.recipientName,
-            recipient_email: item.giftMetadata.recipientEmail,
-            personal_message: item.giftMetadata.personalMessage,
-            amount: item.giftMetadata.amount,
-            // For gift events/courses, include the original item details
-            ...(item.itemType === 'gift_course' || item.itemType === 'gift_event') && {
-              original_item_id: item.itemId,
-              original_item_name: item.itemName
-            },
-            // For event tickets, include ticket holder info
-            ...(item.itemType === 'event_ticket' || item.itemType === 'gift_event') && {
-              ticket_holder_names: item.ticketHolderNames || [],
-              ticket_holder_emails: item.ticketHolderEmails || []
-            }
-          } : {}
-        }))
-      };
+    // If amount is 0 (fully covered by gift card), handle free purchase
+    if (finalAmountUSD <= 0) {
+      setLoading(true);
+      try {
+        const checkoutData: any = {
+          items: items.map(item => ({
+            item_id: item.itemId,
+            item_type: item.itemType,
+            item_name: item.itemName,
+            quantity: item.quantity,
+            price: item.price,
+            metadata: item.giftMetadata ? {
+              sender_name: item.giftMetadata.senderName,
+              recipient_name: item.giftMetadata.recipientName,
+              recipient_email: item.giftMetadata.recipientEmail,
+              personal_message: item.giftMetadata.personalMessage,
+              amount: item.giftMetadata.amount,
+              ...(item.itemType === 'gift_course' || item.itemType === 'gift_event') && {
+                original_item_id: item.itemId,
+                original_item_name: item.itemName
+              },
+              ...(item.itemType === 'event_ticket' || item.itemType === 'gift_event') && {
+                ticket_holder_names: item.ticketHolderNames || [],
+                ticket_holder_emails: item.ticketHolderEmails || []
+              }
+            } : {}
+          })),
+          payment_method: 'free',
+          success_url: `${window.location.origin}/checkout/success`,
+          gift_card_id: appliedGiftCard?.id,
+          gift_card_code: appliedGiftCard?.code,
+          gift_card_discount: giftCardDiscount
+        };
 
-      // Add gift card info if applied
-      if (appliedGiftCard) {
-        checkoutData.gift_card_id = appliedGiftCard.id;
-        checkoutData.gift_card_code = appliedGiftCard.code;
-        checkoutData.gift_card_discount = giftCardDiscount;
-      }
-
-      // Add promo code if applied
-      if (promoCode && discount > 0) {
-        checkoutData.promo_code = promoCode;
-        checkoutData.promo_discount = discount;
-      }
-
-      // Add processing fee info
-      checkoutData.processing_fee = processingFeeUSD;
-
-      if (paymentMethod === 'free') {
-        // Handle free purchase (gift card covers full amount)
-        checkoutData.payment_method = 'free';
-        checkoutData.success_url = `${window.location.origin}/checkout/success`;
+        if (promoCode && discount > 0) {
+          checkoutData.promo_code = promoCode;
+          checkoutData.promo_discount = discount;
+        }
 
         const { data, error } = await supabase.functions.invoke('create-free-order', {
           body: checkoutData
@@ -321,41 +297,20 @@ const CheckoutPage = () => {
         } else {
           throw new Error('Failed to create free order');
         }
-      } else if (paymentMethod === 'stripe') {
-        // Stripe payment
-        checkoutData.payment_method = 'stripe';
-        checkoutData.success_url = `${window.location.origin}/checkout/success`;
-        checkoutData.cancel_url = `${window.location.origin}/checkout`;
-
-        const { data: stripeData, error } = await supabase.functions.invoke('create-checkout-session', {
-          body: checkoutData
-        });
-
-        if (error) throw error;
-
-        if (stripeData?.url) {
-          window.location.href = stripeData.url;
-        } else {
-          throw new Error('No checkout URL returned');
-        }
-      } else if (paymentMethod === 'pawapay') {
-        // PawaPay Mobile Money payment
-        setShowMobileMoneyDialog(true);
-      } else if (paymentMethod === 'lenco') {
-        // Lenco card payment
-        setShowLencoDialog(true);
-      } else if (paymentMethod === 'direct_card') {
-        // Direct Card payment
-        setShowDirectCardDialog(true);
-      } else if (paymentMethod === 'lenco_mobile_money') {
-        // Lenco Mobile Money payment
-        setShowLencoMobileMoneyDialog(true);
+      } catch (error) {
+        console.error('Checkout error:', error);
+        toast.error('Failed to complete purchase');
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Checkout error:', error);
-      toast.error('Failed to initialize payment');
-    } finally {
-      setLoading(false);
+      return;
+    }
+
+    // For non-zero amounts, show the appropriate dialog
+    if (paymentMethod === 'pawapay') {
+      setShowMobileMoneyDialog(true);
+    } else if (paymentMethod === 'lenco_mobile_money') {
+      setShowLencoMobileMoneyDialog(true);
     }
   };
 
@@ -592,7 +547,7 @@ const CheckoutPage = () => {
                   </CardContent>
                 </Card>
 
-                {/* Enhanced Payment Method */}
+                {/* Enhanced Payment Method - Only showing two mobile money options */}
                 {finalAmountUSD > 0 ? (
                   <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-2xl rounded-3xl overflow-hidden">
                     <CardHeader className="bg-gradient-to-r from-orange-500/5 to-purple-600/5 border-b border-slate-100">
@@ -606,7 +561,7 @@ const CheckoutPage = () => {
                     <CardContent className="p-6">
                       <RadioGroup 
                         value={paymentMethod} 
-                        onValueChange={(value) => setPaymentMethod(value as 'stripe' | 'pawapay' | 'lenco' | 'direct_card' | 'free' | 'lenco_mobile_money')}
+                        onValueChange={(value) => setPaymentMethod(value as 'pawapay' | 'lenco_mobile_money')}
                         className="space-y-4"
                       >
                         {/* Mobile Money - Lenco Zambia (DEFAULT) */}
@@ -625,7 +580,7 @@ const CheckoutPage = () => {
                               </div>
                               <div className="text-sm text-slate-600 flex items-center gap-1">
                                 <Globe className="h-3 w-3" />
-                                Airtel Money & MTN Mobile Money
+                                Airtel Money & MTN Mobile Money via Lenco
                               </div>
                             </div>
                           </Label>
@@ -644,49 +599,29 @@ const CheckoutPage = () => {
                             </div>
                           </Label>
                         </div>
-
-                        {/* Stripe Card Payment */}
-                        <div className="flex items-center space-x-3 p-4 border border-slate-100 rounded-xl hover:border-blue-200 hover:bg-blue-50/50 transition-all duration-200 cursor-pointer">
-                          <RadioGroupItem value="stripe" id="stripe" className="text-blue-500 border-slate-300" />
-                          <Label htmlFor="stripe" className="flex items-center gap-3 cursor-pointer flex-1">
-                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                              <CreditCard className="h-5 w-5 text-white" />
-                            </div>
-                            <div>
-                              <div className="font-semibold text-slate-800">Credit/Debit Card (Stripe)</div>
-                              <div className="text-sm text-slate-600">Visa, Mastercard, American Express</div>
-                            </div>
-                          </Label>
-                        </div>
-
-                        {/* Direct Card Payment (Lenco) */}
-                        <div className="flex items-center space-x-3 p-4 border border-slate-100 rounded-xl hover:border-indigo-200 hover:bg-indigo-50/50 transition-all duration-200 cursor-pointer">
-                          <RadioGroupItem value="direct_card" id="direct_card" className="text-indigo-500 border-slate-300" />
-                          <Label htmlFor="direct_card" className="flex items-center gap-3 cursor-pointer flex-1">
-                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center">
-                              <CreditCard className="h-5 w-5 text-white" />
-                            </div>
-                            <div>
-                              <div className="font-semibold text-slate-800">Direct Card Payment</div>
-                              <div className="text-sm text-slate-600">Instant processing with 3D Secure</div>
-                            </div>
-                          </Label>
-                        </div>
-                        
-                        {/* Lenco Platform */}
-                        <div className="flex items-center space-x-3 p-4 border border-slate-100 rounded-xl hover:border-green-200 hover:bg-green-50/50 transition-all duration-200 cursor-pointer">
-                          <RadioGroupItem value="lenco" id="lenco" className="text-green-500 border-slate-300" />
-                          <Label htmlFor="lenco" className="flex items-center gap-3 cursor-pointer flex-1">
-                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
-                              <Building className="h-5 w-5 text-white" />
-                            </div>
-                            <div>
-                              <div className="font-semibold text-slate-800">Pay by Lenco</div>
-                              <div className="text-sm text-slate-600">Card & Mobile Money (Zambia)</div>
-                            </div>
-                          </Label>
-                        </div>
                       </RadioGroup>
+                      
+                      {/* Payment Method Help */}
+                      <div className="mt-4 pt-4 border-t border-slate-100">
+                        <div className="flex items-center gap-2 text-sm text-slate-600 mb-2">
+                          <Info className="h-4 w-4 text-blue-500" />
+                          <span className="font-medium">Need help choosing?</span>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                            <span className="text-xs text-slate-600">
+                              <strong>Zambia Mobile Money:</strong> For customers in Zambia with Airtel or MTN
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                            <span className="text-xs text-slate-600">
+                              <strong>PawaPay Mobile Money:</strong> For customers in other African countries
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </CardContent>
                   </Card>
                 ) : (
@@ -815,31 +750,13 @@ const CheckoutPage = () => {
                   ) : paymentMethod === 'lenco_mobile_money' ? (
                     <div className="flex items-center gap-2">
                       <Phone className="h-5 w-5" />
-                      Pay with Mobile Money
-                      <ArrowRight className="h-4 w-4 ml-1" />
-                    </div>
-                  ) : paymentMethod === 'pawapay' ? (
-                    <div className="flex items-center gap-2">
-                      <Smartphone className="h-5 w-5" />
-                      Pay with Mobile Money
-                      <ArrowRight className="h-4 w-4 ml-1" />
-                    </div>
-                  ) : paymentMethod === 'stripe' ? (
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="h-5 w-5" />
-                      Pay with Stripe
-                      <ArrowRight className="h-4 w-4 ml-1" />
-                    </div>
-                  ) : paymentMethod === 'direct_card' ? (
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="h-5 w-5" />
-                      Pay with Card
+                      Pay with Zambia Mobile Money
                       <ArrowRight className="h-4 w-4 ml-1" />
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <Building className="h-5 w-5" />
-                      Pay by Lenco
+                      <Smartphone className="h-5 w-5" />
+                      Pay with PawaPay Mobile Money
                       <ArrowRight className="h-4 w-4 ml-1" />
                     </div>
                   )}
@@ -851,28 +768,6 @@ const CheckoutPage = () => {
                     <Shield className="h-4 w-4 text-green-500" />
                     <span>Secure SSL Encryption • 256-bit Security</span>
                   </div>
-                </div>
-
-                {/* Payment Method Help */}
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-4 border border-blue-100">
-                  <h4 className="font-medium text-slate-800 mb-2 flex items-center gap-2">
-                    <Info className="h-4 w-4 text-blue-600" />
-                    Need help choosing a payment method?
-                  </h4>
-                  <ul className="text-sm text-slate-600 space-y-1">
-                    <li className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
-                      <span><strong>Zambia Mobile Money:</strong> For Zambian customers with Airtel/MTN</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
-                      <span><strong>PawaPay:</strong> For other African countries</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
-                      <span><strong>Card Payments:</strong> For international customers</span>
-                    </li>
-                  </ul>
                 </div>
               </div>
             </div>
@@ -914,71 +809,7 @@ const CheckoutPage = () => {
             promoCode={promoCode}
           />
 
-          <LencoPaymentDialog
-            isOpen={showLencoDialog}
-            onClose={() => setShowLencoDialog(false)}
-            amount={convertedAmounts.final}
-            currency={currentCurrency}
-            items={items.map(item => ({
-              item_id: item.itemId,
-              item_type: item.itemType,
-              item_name: item.itemName,
-              quantity: item.quantity,
-              price: item.price,
-              metadata: item.giftMetadata ? {
-                sender_name: item.giftMetadata.senderName,
-                recipient_name: item.giftMetadata.recipientName,
-                recipient_email: item.giftMetadata.recipientEmail,
-                personal_message: item.giftMetadata.personalMessage,
-                amount: item.giftMetadata.amount,
-                ...(item.itemType === 'gift_course' || item.itemType === 'gift_event') && {
-                  original_item_id: item.itemId,
-                  original_item_name: item.itemName
-                },
-                ...(item.itemType === 'event_ticket' || item.itemType === 'gift_event') && {
-                  ticket_holder_names: item.ticketHolderNames || [],
-                  ticket_holder_emails: item.ticketHolderEmails || []
-                }
-              } : {}
-            }))}
-            discount={convertedAmounts.discount + convertedAmounts.giftCardDiscount}
-            taxAmount={convertedAmounts.tax}
-            promoCode={promoCode}
-          />
-
-          <DirectCardPaymentDialog
-            isOpen={showDirectCardDialog}
-            onClose={() => setShowDirectCardDialog(false)}
-            amount={convertedAmounts.final}
-            currency={currentCurrency}
-            items={items.map(item => ({
-              item_id: item.itemId,
-              item_type: item.itemType,
-              item_name: item.itemName,
-              quantity: item.quantity,
-              price: item.price,
-              metadata: item.giftMetadata ? {
-                sender_name: item.giftMetadata.senderName,
-                recipient_name: item.giftMetadata.recipientName,
-                recipient_email: item.giftMetadata.recipientEmail,
-                personal_message: item.giftMetadata.personalMessage,
-                amount: item.giftMetadata.amount,
-                ...(item.itemType === 'gift_course' || item.itemType === 'gift_event') && {
-                  original_item_id: item.itemId,
-                  original_item_name: item.itemName
-                },
-                ...(item.itemType === 'event_ticket' || item.itemType === 'gift_event') && {
-                  ticket_holder_names: item.ticketHolderNames || [],
-                  ticket_holder_emails: item.ticketHolderEmails || []
-                }
-              } : {}
-            }))}
-            discount={convertedAmounts.discount + convertedAmounts.giftCardDiscount}
-            taxAmount={convertedAmounts.tax}
-            promoCode={promoCode}
-          />
-
-          {/* New Lenco Mobile Money Dialog */}
+          {/* Lenco Mobile Money Dialog */}
           <LencoMobileMoneyDialog
             isOpen={showLencoMobileMoneyDialog}
             onClose={() => setShowLencoMobileMoneyDialog(false)}
