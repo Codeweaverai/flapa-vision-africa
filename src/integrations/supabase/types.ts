@@ -92,6 +92,44 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_assistant_interactions: {
+        Row: {
+          ai_response: string
+          course_id: string | null
+          created_at: string | null
+          id: string
+          relevant_content_used: boolean | null
+          user_id: string | null
+          user_message: string
+        }
+        Insert: {
+          ai_response: string
+          course_id?: string | null
+          created_at?: string | null
+          id?: string
+          relevant_content_used?: boolean | null
+          user_id?: string | null
+          user_message: string
+        }
+        Update: {
+          ai_response?: string
+          course_id?: string | null
+          created_at?: string | null
+          id?: string
+          relevant_content_used?: boolean | null
+          user_id?: string | null
+          user_message?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_assistant_interactions_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_chat_history: {
         Row: {
           action_ids: Json | null
@@ -1780,6 +1818,54 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      document_embeddings: {
+        Row: {
+          content: string
+          course_id: string | null
+          created_at: string | null
+          embedding: string | null
+          id: string
+          lesson_id: string | null
+          metadata: Json
+          updated_at: string | null
+        }
+        Insert: {
+          content: string
+          course_id?: string | null
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          lesson_id?: string | null
+          metadata: Json
+          updated_at?: string | null
+        }
+        Update: {
+          content?: string
+          course_id?: string | null
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          lesson_id?: string | null
+          metadata?: Json
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_embeddings_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_embeddings_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       event_agenda: {
         Row: {
@@ -5324,6 +5410,19 @@ export type Database = {
         Returns: boolean
       }
       is_workspace_owner: { Args: { workspace_uuid: string }; Returns: boolean }
+      match_documents: {
+        Args: {
+          filter_course_id?: string
+          match_count?: number
+          query_embedding: string
+        }
+        Returns: {
+          content: string
+          id: string
+          metadata: Json
+          similarity: number
+        }[]
+      }
       match_event_embeddings_ai: {
         Args: {
           match_count?: number
@@ -5348,25 +5447,40 @@ export type Database = {
         }
         Returns: boolean
       }
-      search_courses_by_embedding: {
-        Args: {
-          match_count: number
-          match_threshold: number
-          query_embedding: string
-        }
-        Returns: {
-          category: string
-          creator_id: string
-          difficulty_level: string
-          duration_minutes: number
-          id: string
-          is_free: boolean
-          price: number
-          similarity: number
-          thumbnail_url: string
-          title: string
-        }[]
-      }
+      search_courses_by_embedding:
+        | {
+            Args: {
+              embedding_vector: string
+              match_count?: number
+              match_threshold?: number
+              query_embedding_model?: string
+            }
+            Returns: {
+              description: string
+              id: number
+              similarity: number
+              title: string
+            }[]
+          }
+        | {
+            Args: {
+              match_count: number
+              match_threshold: number
+              query_embedding: string
+            }
+            Returns: {
+              category: string
+              creator_id: string
+              difficulty_level: string
+              duration_minutes: number
+              id: string
+              is_free: boolean
+              price: number
+              similarity: number
+              thumbnail_url: string
+              title: string
+            }[]
+          }
       search_events_by_embedding: {
         Args: {
           match_count: number
