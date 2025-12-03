@@ -592,16 +592,16 @@ const CheckoutPage = () => {
                             </div>
                             <div>
                               <div className="font-semibold text-slate-800 flex items-center gap-2">
-                                Mobile Money (Zambia)
+                                Mobile Money
                                 {paymentMethod === 'lenco_mobile_money' && (
                                   <Badge className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full">
-                                    Only
-                                  </Badge>
+                                  
+                               </Badge>
                                 )}
                               </div>
                               <div className="text-sm text-slate-600 flex items-center gap-1">
                                 <Globe className="h-3 w-3" />
-                                Airtel Money & MTN Mobile Money 
+                                Available in Zambia Only
                               </div>
                             </div>
                           </div>
