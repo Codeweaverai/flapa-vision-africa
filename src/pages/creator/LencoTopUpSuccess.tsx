@@ -1,4 +1,3 @@
-// src/pages/creator/lenco-token/success.tsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,7 @@ import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
 import { useTokens } from '@/hooks/useTokens';
 
-const LencoTokenSuccess = () => {
+const LencoTopUpSuccess = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { refetch: refetchTokens } = useTokens();
