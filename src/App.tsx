@@ -81,6 +81,7 @@ import CreatorCourseCreateWithAI from '@/pages/creator/CreatorCourseCreateWithAI
 import CreatorEventCreateWithAI from '@/pages/creator/CreatorEventCreateWithAI';
 import TokenTopUpPage from '@/pages/creator/TokenTopUpPage';
 import TokenTopUpSuccess from '@/pages/creator/TokenTopUpSuccess';
+import LencoTopUpSuccess from '@/pages/creator/LencoTopUpSuccess';
 import CoursePreviewPage from '@/pages/creator/CoursePreviewPage';
 
 // Import fundraising pages
@@ -295,6 +296,7 @@ function App() {
                   <Route path="/creator/activities" element={<ProtectedRoute><CreatorRecentActivities /></ProtectedRoute>} />
                   <Route path="/creator/tokens" element={<ProtectedRoute><TokenTopUpPage /></ProtectedRoute>} />
                   <Route path="/creator/tokens/success" element={<ProtectedRoute><TokenTopUpSuccess /></ProtectedRoute>} />
+                  <Route path="/creator/lenco-token/success" element={<ProtectedRoute><LencoTopUpSuccess  /></ProtectedRoute>} />
                   <Route path="/creator/courses/:id/preview" element={<ProtectedRoute><CoursePreviewPage /></ProtectedRoute>} />
 
                   {/* Fundraising Routes */}
