@@ -187,7 +187,7 @@ const TokenTopUpPage = () => {
           operator: selectedOperator,
           country: selectedCountryData.lencoCode,
           bearer: 'customer',
-          returnUrl: `${window.location.origin}/creator/tokens/success`
+          returnUrl: `${window.location.origin}/creator/lenco-token/success`
         }
       });
 
