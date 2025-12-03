@@ -180,7 +180,7 @@ const TokenTopUpPage = () => {
       // Show payment initiation message
       toast.loading('Initiating mobile money payment...');
 
-      const { data, error } = await supabase.functions.invoke('lenco-token-purchase', {
+      const { data, error } = await supabase.functions.invoke('token-topup-lenco', {
         body: {
           tokenAmount: tokenAmount,
           phone: formattedPhone,
