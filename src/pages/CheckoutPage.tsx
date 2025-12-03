@@ -1,5 +1,3 @@
-// src/pages/CheckoutPage.tsx - Updated to fix Lenco Mobile Money functionality
-
 import React, { useState, useEffect } from 'react';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -597,13 +595,13 @@ const CheckoutPage = () => {
                                 Mobile Money (Zambia)
                                 {paymentMethod === 'lenco_mobile_money' && (
                                   <Badge className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full">
-                                    Recommended
+                                    Only
                                   </Badge>
                                 )}
                               </div>
                               <div className="text-sm text-slate-600 flex items-center gap-1">
                                 <Globe className="h-3 w-3" />
-                                Airtel Money & MTN Mobile Money via Lenco
+                                Airtel Money & MTN Mobile Money 
                               </div>
                             </div>
                           </div>
@@ -632,7 +630,7 @@ const CheckoutPage = () => {
                               <Smartphone className="h-5 w-5 text-white" />
                             </div>
                             <div>
-                              <div className="font-semibold text-slate-800">Mobile Money (PawaPay)</div>
+                              <div className="font-semibold text-slate-800">Mobile Money</div>
                               <div className="text-sm text-slate-600">Available in 19+ African countries</div>
                             </div>
                           </div>
@@ -655,7 +653,7 @@ const CheckoutPage = () => {
                           <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full bg-purple-500"></div>
                             <span className="text-xs text-slate-600">
-                              <strong>PawaPay Mobile Money:</strong> For customers in other African countries
+                              <strong> Mobile Money Africa:</strong> For customers in other African countries
                             </span>
                           </div>
                         </div>
