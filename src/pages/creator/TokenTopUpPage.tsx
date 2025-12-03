@@ -250,7 +250,7 @@ const TokenTopUpPage = () => {
             localStorage.removeItem('lastTokenPayment');
             
             // Navigate to success page
-            navigate('/creator/tokens/success', {
+            navigate('/creator/lenco-token/success', {
               state: {
                 tokensAdded: data.transaction?.amount,
                 amountPaid: data.transaction?.amount_paid,
