@@ -134,7 +134,7 @@ const LencoMobileMoneyDialog: React.FC<LencoMobileMoneyDialogProps> = ({
               // Redirect to success page
               const hasEventTickets = items.some(item => item.item_type === 'event_ticket');
               const redirectUrl = hasEventTickets 
-                ? `/account/orders?payment=success&order_id=${data.order?.id}`
+                ? `/my-orders?payment=success&order_id=${data.order?.id}`
                 : `/payment/success?reference=${reference}&order_id=${data.order?.id}`;
               window.location.href = redirectUrl;
             }, 2000);
