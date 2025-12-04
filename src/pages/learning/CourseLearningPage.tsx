@@ -37,7 +37,6 @@ import RecommendedCourses from '@/components/course/RecommendedCourses';
 import Layout from '@/components/layout/Layout';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { cn } from '@/lib/utils';
-import UniversalVideoPlayer from '@/components/video/UniversalVideoPlayer';
 
 // ==================== INTERFACES ====================
 
@@ -259,6 +258,192 @@ interface Certificate {
   created_at: string;
   updated_at: string;
 }
+
+// ==================== CUSTOM VIDEO PLAYER ====================
+
+interface CustomVideoPlayerProps {
+  videoUrl: string;
+  onProgress?: (progress: { played: number, playedSeconds: number }) => void;
+  onError?: (error: any) => void;
+  onEnd?: () => void;
+  onReady?: () => void;
+  thumbnail?: string;
+  playing?: boolean;
+  controls?: boolean;
+}
+
+const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({ 
+  videoUrl, 
+  onProgress, 
+  onError, 
+  onEnd, 
+  onReady,
+  thumbnail,
+  playing = false,
+  controls = true
+}) => {
+  const [isBuffering, setIsBuffering] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [volume, setVolume] = useState(0.8);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [hasSubtitles, setHasSubtitles] = useState(false);
+  const playerRef = useRef<any>(null);
+
+  // Check if subtitles exist
+  useEffect(() => {
+    const checkSubtitles = async () => {
+      if (!videoUrl) {
+        setHasSubtitles(false);
+        return;
+      }
+      
+      try {
+        // Try to load the VTT file
+        const vttUrl = `${videoUrl}.vtt`;
+        const response = await fetch(vttUrl, { method: 'HEAD' });
+        setHasSubtitles(response.ok);
+      } catch (error) {
+        console.log('Subtitles not available:', error);
+        setHasSubtitles(false);
+      }
+    };
+    
+    checkSubtitles();
+  }, [videoUrl]);
+
+  const handleReady = () => {
+    console.log('Video ready to play');
+    if (onReady) onReady();
+  };
+
+  const handleBuffer = () => {
+    setIsBuffering(true);
+  };
+
+  const handleBufferEnd = () => {
+    setIsBuffering(false);
+  };
+
+  const handlePlaybackRateChange = (rate: number) => {
+    setPlaybackRate(rate);
+  };
+
+  const handleVolumeChange = (vol: number) => {
+    setVolume(vol);
+  };
+
+  const toggleFullscreen = () => {
+    if (!playerRef.current) return;
+    
+    const playerWrapper = playerRef.current.getInternalPlayer()?.parentElement;
+    if (!playerWrapper) return;
+    
+    if (!isFullscreen && playerWrapper.requestFullscreen) {
+      playerWrapper.requestFullscreen();
+    } else if (document.exitFullscreen) {
+      document.exitFullscreen();
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  const config = {
+    file: {
+      attributes: {
+        controlsList: 'nodownload noremoteplayback',
+        preload: 'auto',
+        crossOrigin: 'anonymous',
+      },
+      forceVideo: true,
+      forceAudio: true,
+      tracks: hasSubtitles ? [
+        {
+          kind: 'subtitles',
+          src: `${videoUrl}.vtt`,
+          srcLang: 'en',
+          label: 'English',
+          default: true,
+        },
+      ] : [],
+    },
+  };
+
+  return (
+    <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden">
+      {isBuffering && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+          <div className="text-white">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+            <p className="text-sm">Buffering...</p>
+          </div>
+        </div>
+      )}
+      
+      <ReactPlayer
+        ref={playerRef}
+        url={videoUrl}
+        width="100%"
+        height="100%"
+        playing={playing}
+        controls={controls}
+        playsinline
+        light={thumbnail}
+        playbackRate={playbackRate}
+        volume={volume}
+        onReady={handleReady}
+        onBuffer={handleBuffer}
+        onBufferEnd={handleBufferEnd}
+        onProgress={onProgress}
+        onError={onError}
+        onEnded={onEnd}
+        config={config}
+      />
+
+      {/* Custom Controls Overlay */}
+      {controls && (
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
+          <div className="flex items-center justify-between pointer-events-auto">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => handlePlaybackRateChange(playbackRate === 1 ? 1.5 : 1)}
+                className="text-white text-sm bg-white/10 hover:bg-white/20 rounded px-2 py-1"
+              >
+                {playbackRate}x
+              </button>
+              <div className="flex items-center gap-2">
+                <Volume2 className="h-4 w-4 text-white" />
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={volume}
+                  onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                  className="w-20 accent-white"
+                />
+              </div>
+            </div>
+            <button
+              onClick={toggleFullscreen}
+              className="text-white hover:bg-white/10 p-2 rounded"
+            >
+              <Maximize2 className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ==================== QUIZ ITEM COMPONENT ====================
 
@@ -1472,7 +1657,7 @@ const CourseLearningPage = () => {
     }
   };
 
-  // ==================== OPTIMIZED DATA LOADING FUNCTIONS ====================
+  // ==================== DATA LOADING FUNCTIONS ====================
 
   const syncCourseProgress = async () => {
     if (!user || !courseId || !enrollment || completionInProgress.current) return;
@@ -1609,13 +1794,19 @@ const CourseLearningPage = () => {
     }
   };
 
-  // Optimized discussion loading with separate profile fetches
   const loadDiscussions = async (lessonId: string) => {
     try {
-      // First fetch discussions without profiles
       const { data: discussionsData, error: discussionsError } = await supabase
         .from('lesson_discussions')
-        .select('*')
+        .select(`
+          *,
+          profile:profiles!user_id (
+            id,
+            full_name,
+            avatar_url,
+            is_instructor
+          )
+        `)
         .eq('lesson_id', lessonId)
         .is('parent_id', null)
         .order('created_at', { ascending: false });
@@ -1631,47 +1822,27 @@ const CourseLearningPage = () => {
         return;
       }
 
-      // Fetch profiles for all users in one query
-      const userIds = [...new Set(discussionsData.map(d => d.user_id))];
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url, is_instructor')
-        .in('id', userIds);
-
-      const profileMap = profilesData?.reduce((map: Record<string, Profile>, profile) => {
-        map[profile.id] = profile;
-        return map;
-      }, {}) || {};
-
-      // Process discussions with profiles
+      // Fetch replies for each discussion
       const discussionsWithReplies = await Promise.all(
         discussionsData.map(async (discussion) => {
-          // Fetch replies
-          const { data: repliesData } = await supabase
+          const { data: repliesData, error: repliesError } = await supabase
             .from('lesson_discussions')
-            .select('*')
+            .select(`
+              *,
+              profile:profiles!user_id (
+                id,
+                full_name,
+                avatar_url,
+                is_instructor
+              )
+            `)
             .eq('parent_id', discussion.id)
             .order('created_at', { ascending: true });
 
-          // Fetch profiles for replies if any
-          let replyProfileMap = {};
-          if (repliesData && repliesData.length > 0) {
-            const replyUserIds = [...new Set(repliesData.map(r => r.user_id))];
-            const { data: replyProfiles } = await supabase
-              .from('profiles')
-              .select('id, full_name, avatar_url, is_instructor')
-              .in('id', replyUserIds);
-
-            replyProfileMap = replyProfiles?.reduce((map: Record<string, Profile>, profile) => {
-              map[profile.id] = profile;
-              return map;
-            }, {}) || {};
+          let replies = [];
+          if (!repliesError && repliesData) {
+            replies = repliesData;
           }
-
-          const replies = repliesData?.map(reply => ({
-            ...reply,
-            profile: replyProfileMap[reply.user_id as keyof typeof replyProfileMap]
-          })) || [];
 
           // Fetch likes count
           const { data: likesData } = await supabase
@@ -1680,23 +1851,18 @@ const CourseLearningPage = () => {
             .eq('discussion_id', discussion.id);
 
           // Check if current user liked
-          let isLiked = false;
-          if (user) {
-            const { data: userLikeData } = await supabase
-              .from('discussion_likes')
-              .select('*')
-              .eq('discussion_id', discussion.id)
-              .eq('user_id', user.id)
-              .maybeSingle();
-            isLiked = !!userLikeData;
-          }
+          const { data: userLikeData } = await supabase
+            .from('discussion_likes')
+            .select('*')
+            .eq('discussion_id', discussion.id)
+            .eq('user_id', user?.id)
+            .maybeSingle();
 
           return {
             ...discussion,
-            profile: profileMap[discussion.user_id],
             replies,
             likes_count: likesData?.length || 0,
-            is_liked: isLiked
+            is_liked: !!userLikeData
           };
         })
       );
@@ -1712,34 +1878,25 @@ const CourseLearningPage = () => {
     if (!user) return;
 
     try {
-      // Load notes with separate profile fetch
+      // Load notes
       const { data: notesData, error: notesError } = await supabase
         .from('lesson_notes')
-        .select('*')
+        .select(`
+          *,
+          profile:profiles!user_id (
+            id,
+            full_name,
+            avatar_url
+          )
+        `)
         .eq('user_id', user.id)
         .eq('lesson_id', lessonId)
         .order('created_at', { ascending: false });
 
       if (notesError) {
         console.error('Error loading notes:', notesError);
-        setNotes([]);
       } else {
-        // Fetch profile for the notes
-        if (notesData && notesData.length > 0) {
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('id, full_name, avatar_url')
-            .eq('id', user.id)
-            .single();
-
-          const notesWithProfile = notesData.map(note => ({
-            ...note,
-            profile: profileData
-          }));
-          setNotes(notesWithProfile);
-        } else {
-          setNotes([]);
-        }
+        setNotes(notesData || []);
       }
 
       // Load discussions
@@ -1942,12 +2099,10 @@ const CourseLearningPage = () => {
     }
   };
 
-  // Optimized note handling with separate profile fetch
   const handleAddNote = async () => {
     if (!newNote.trim() || !selectedLesson || !user) return;
 
     try {
-      // First insert the note
       const { data, error } = await supabase
         .from('lesson_notes')
         .insert({
@@ -1955,24 +2110,19 @@ const CourseLearningPage = () => {
           lesson_id: selectedLesson.id,
           content: newNote.trim()
         })
-        .select('*')
+        .select(`
+          *,
+          profile:profiles!user_id (
+            id,
+            full_name,
+            avatar_url
+          )
+        `)
         .single();
 
       if (error) throw error;
 
-      // Then fetch profile separately
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url')
-        .eq('id', user.id)
-        .single();
-
-      const noteWithProfile = {
-        ...data,
-        profile: profileData
-      };
-
-      setNotes(prev => [noteWithProfile, ...prev]);
+      setNotes(prev => [data, ...prev]);
       setNewNote('');
       toast.success('Note added successfully');
     } catch (error) {
@@ -1992,24 +2142,19 @@ const CourseLearningPage = () => {
           updated_at: new Date().toISOString()
         })
         .eq('id', noteId)
-        .select('*')
+        .select(`
+          *,
+          profile:profiles!user_id (
+            id,
+            full_name,
+            avatar_url
+          )
+        `)
         .single();
 
       if (error) throw error;
 
-      // Fetch profile separately
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url')
-        .eq('id', data.user_id)
-        .single();
-
-      const noteWithProfile = {
-        ...data,
-        profile: profileData
-      };
-
-      setNotes(prev => prev.map(note => note.id === noteId ? noteWithProfile : note));
+      setNotes(prev => prev.map(note => note.id === noteId ? data : note));
       setEditingNote(null);
       setEditNoteContent('');
       toast.success('Note updated successfully');
@@ -2036,12 +2181,10 @@ const CourseLearningPage = () => {
     }
   };
 
-  // Optimized discussion handling
   const handleAddDiscussion = async () => {
     if (!newDiscussion.trim() || !selectedLesson || !user) return;
 
     try {
-      // Insert discussion
       const { data, error } = await supabase
         .from('lesson_discussions')
         .insert({
@@ -2050,30 +2193,23 @@ const CourseLearningPage = () => {
           content: newDiscussion.trim(),
           is_instructor_reply: false
         })
-        .select('*')
+        .select(`
+          *,
+          profile:profiles!user_id (
+            id,
+            full_name,
+            avatar_url,
+            is_instructor
+          )
+        `)
         .single();
 
       if (error) throw error;
 
-      // Fetch profile separately
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url, is_instructor')
-        .eq('id', user.id)
-        .single();
-
-      const discussionWithProfile = {
-        ...data,
-        profile: profileData,
-        replies: [],
-        likes_count: 0,
-        is_liked: false
-      };
-
-      // Update local state
-      setDiscussions(prev => [discussionWithProfile, ...prev]);
       setNewDiscussion('');
       toast.success('Discussion added successfully');
+      
+      // Realtime subscription will update the list
     } catch (error) {
       console.error('Error adding discussion:', error);
       toast.error('Failed to add discussion. Please try again.');
@@ -2084,7 +2220,6 @@ const CourseLearningPage = () => {
     if (!replyContent.trim() || !selectedLesson || !user) return;
 
     try {
-      // Insert reply
       const { data, error } = await supabase
         .from('lesson_discussions')
         .insert({
@@ -2094,34 +2229,18 @@ const CourseLearningPage = () => {
           content: replyContent.trim(),
           is_instructor_reply: false
         })
-        .select('*')
+        .select(`
+          *,
+          profile:profiles!user_id (
+            id,
+            full_name,
+            avatar_url,
+            is_instructor
+          )
+        `)
         .single();
 
       if (error) throw error;
-
-      // Fetch profile separately
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url, is_instructor')
-        .eq('id', user.id)
-        .single();
-
-      const replyWithProfile = {
-        ...data,
-        profile: profileData
-      };
-
-      // Update local state
-      setDiscussions(prev => prev.map(discussion => {
-        if (discussion.id === parentId) {
-          const updatedReplies = [...(discussion.replies || []), replyWithProfile];
-          return {
-            ...discussion,
-            replies: updatedReplies
-          };
-        }
-        return discussion;
-      }));
 
       setReplyContent('');
       setReplyingTo(null);
@@ -2326,129 +2445,6 @@ const CourseLearningPage = () => {
     navigate(`/course/${courseId}/results`);
   };
 
-  // ==================== OPTIMIZED QUIZ FETCHING ====================
-
-  const fetchLessonQuiz = async (lessonId: string) => {
-    try {
-      // Fetch basic quiz info
-      const { data: quizData, error } = await supabase
-        .from('quizzes')
-        .select('id, title, description, passing_score')
-        .eq('lesson_id', lessonId)
-        .maybeSingle();
-
-      if (error) throw error;
-      if (!quizData) return null;
-
-      // Fetch questions separately
-      const { data: questionsData } = await supabase
-        .from('quiz_questions')
-        .select('id, question, order_index, explanation')
-        .eq('quiz_id', quizData.id)
-        .order('order_index');
-
-      let questionsWithAnswers = [];
-      if (questionsData && questionsData.length > 0) {
-        // Fetch answers for all questions in one query
-        const questionIds = questionsData.map(q => q.id);
-        const { data: answersData } = await supabase
-          .from('quiz_answers')
-          .select('*')
-          .in('question_id', questionIds)
-          .order('order_index');
-
-        // Group answers by question_id
-        const answersByQuestion = answersData?.reduce((acc: Record<string, any[]>, answer) => {
-          if (!acc[answer.question_id]) acc[answer.question_id] = [];
-          acc[answer.question_id].push(answer);
-          return acc;
-        }, {}) || {};
-
-        // Combine questions with answers
-        questionsWithAnswers = questionsData.map(question => ({
-          ...question,
-          answers: answersByQuestion[question.id] || []
-        }));
-      }
-
-      return {
-        ...quizData,
-        questions: questionsWithAnswers,
-        question_count: questionsWithAnswers.length
-      };
-    } catch (error) {
-      console.error('Error fetching lesson quiz:', error);
-      return null;
-    }
-  };
-
-  const fetchModuleQuizzes = async (moduleId: string) => {
-    try {
-      // Fetch basic module quizzes
-      const { data: quizList, error } = await supabase
-        .from('quizzes')
-        .select('id, title, description, passing_score')
-        .eq('module_id', moduleId)
-        .is('lesson_id', null);
-
-      if (error) throw error;
-      if (!quizList || quizList.length === 0) return [];
-
-      // Fetch all questions for these quizzes
-      const quizIds = quizList.map(q => q.id);
-      const { data: questionsData } = await supabase
-        .from('quiz_questions')
-        .select('id, quiz_id, question, order_index, explanation')
-        .in('quiz_id', quizIds)
-        .order('order_index');
-
-      // Fetch all answers for these questions
-      let answersData: any[] = [];
-      if (questionsData && questionsData.length > 0) {
-        const questionIds = questionsData.map(q => q.id);
-        const { data: answers } = await supabase
-          .from('quiz_answers')
-          .select('*')
-          .in('question_id', questionIds)
-          .order('order_index');
-        
-        answersData = answers || [];
-      }
-
-      // Group questions by quiz_id
-      const questionsByQuiz = questionsData?.reduce((acc: Record<string, any[]>, question) => {
-        if (!acc[question.quiz_id]) acc[question.quiz_id] = [];
-        acc[question.quiz_id].push(question);
-        return acc;
-      }, {}) || {};
-
-      // Group answers by question_id
-      const answersByQuestion = answersData.reduce((acc: Record<string, any[]>, answer) => {
-        if (!acc[answer.question_id]) acc[answer.question_id] = [];
-        acc[answer.question_id].push(answer);
-        return acc;
-      }, {});
-
-      // Combine everything
-      return quizList.map(quiz => {
-        const questions = questionsByQuiz[quiz.id] || [];
-        const questionsWithAnswers = questions.map(question => ({
-          ...question,
-          answers: answersByQuestion[question.id] || []
-        }));
-
-        return {
-          ...quiz,
-          questions: questionsWithAnswers,
-          question_count: questionsWithAnswers.length
-        };
-      });
-    } catch (error) {
-      console.error('Error fetching module quizzes:', error);
-      return [];
-    }
-  };
-
   // ==================== USE EFFECTS ====================
 
   useEffect(() => {
@@ -2461,7 +2457,6 @@ const CourseLearningPage = () => {
       setLoading(true);
       
       try {
-        // Fetch course data
         const { data: courseData, error: courseError } = await supabase
           .from('courses')
           .select('*')
@@ -2477,7 +2472,6 @@ const CourseLearningPage = () => {
 
         setCourse(courseData);
 
-        // Fetch modules
         const { data: modulesData, error: modulesError } = await supabase
           .from('course_modules')
           .select('*')
@@ -2486,10 +2480,8 @@ const CourseLearningPage = () => {
 
         if (modulesError) throw modulesError;
 
-        // Fetch lessons and quizzes for each module
         const modulesWithLessons = await Promise.all(
           (modulesData as CourseModule[]).map(async (module) => {
-            // Fetch lessons
             const { data: lessonsData, error: lessonsError } = await supabase
               .from('lessons')
               .select('*')
@@ -2498,19 +2490,43 @@ const CourseLearningPage = () => {
 
             if (lessonsError) return { ...module, lessons: [], quizzes: [] };
             
-            // Fetch quizzes for lessons
             const lessonsWithQuizInfo = await Promise.all(
               (lessonsData as CourseLesson[]).map(async (lesson) => {
-                const quiz = await fetchLessonQuiz(lesson.id);
+                const { data: quizData } = await supabase
+                  .from('quizzes')
+                  .select(`
+                    *,
+                    questions:quiz_questions(
+                      *,
+                      answers:quiz_answers(*)
+                    )
+                  `)
+                  .eq('lesson_id', lesson.id)
+                  .maybeSingle();
+
                 return {
                   ...lesson,
-                  quiz: quiz || undefined
+                  quiz: quizData || undefined
                 };
               })
             );
 
             // Fetch module-level quizzes
-            const moduleQuizzes = await fetchModuleQuizzes(module.id);
+            const { data: moduleQuizzes, error: moduleQuizzesError } = await supabase
+              .from('quizzes')
+              .select(`
+                *,
+                questions:quiz_questions(
+                  *,
+                  answers:quiz_answers(*)
+                )
+              `)
+              .eq('module_id', module.id)
+              .is('lesson_id', null);
+
+            if (moduleQuizzesError) {
+              console.error('Error fetching module quizzes:', moduleQuizzesError);
+            }
 
             return { 
               ...module, 
@@ -2522,7 +2538,6 @@ const CourseLearningPage = () => {
         
         setModules(modulesWithLessons);
 
-        // Fetch exam and instructor data in parallel
         const [examData, instructorData] = await Promise.all([
           supabase
             .from('final_exams')
@@ -2540,7 +2555,6 @@ const CourseLearningPage = () => {
 
         if (examData.data) setFinalExam(examData.data);
 
-        // Fetch user-specific data if logged in
         if (user?.id) {
           const [enrollmentData, progressData] = await Promise.all([
             supabase
@@ -2933,7 +2947,7 @@ const CourseLearningPage = () => {
                             {/* Video Player */}
                             {(selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url) && (
                               <div className="space-y-6 w-full">
-                                <UniversalVideoPlayer
+                                <CustomVideoPlayer
                                   videoUrl={selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url || ''}
                                   thumbnail={course.thumbnail_url}
                                   onProgress={handleVideoProgress}
