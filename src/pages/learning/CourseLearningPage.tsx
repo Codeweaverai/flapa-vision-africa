@@ -46,7 +46,7 @@ interface Profile {
   full_name?: string;
   avatar_url?: string;
   bio?: string;
-  is_instructor?: boolean;
+  is_creator?: boolean;
 }
 
 interface Course {
@@ -229,7 +229,7 @@ interface LessonDiscussion {
   lesson_id: string;
   parent_id?: string;
   content: string;
-  is_instructor_reply?: boolean;
+  is_creator_reply?: boolean;
   created_at: string;
   updated_at: string;
   profile?: Profile;
@@ -573,7 +573,7 @@ const DiscussionThread: React.FC<DiscussionThreadProps> = ({
     }
   };
 
-  const canDelete = currentUserId === discussion.user_id || discussion.profile?.is_instructor;
+  const canDelete = currentUserId === discussion.user_id || discussion.profile?.is_creator;
 
   return (
     <div className="space-y-3">
@@ -591,7 +591,7 @@ const DiscussionThread: React.FC<DiscussionThreadProps> = ({
                 <span className="font-medium text-gray-900">
                   {discussion.profile?.full_name || 'Anonymous'}
                 </span>
-                {discussion.profile?.is_instructor && (
+                {discussion.profile?.is_creator && (
                   <Badge className="bg-purple-500 text-white text-xs">Instructor</Badge>
                 )}
                 <span className="text-xs text-gray-500">
@@ -702,7 +702,7 @@ const DiscussionThread: React.FC<DiscussionThreadProps> = ({
                       <span className="text-sm font-medium text-gray-900">
                         {reply.profile?.full_name || 'Anonymous'}
                       </span>
-                      {reply.profile?.is_instructor && (
+                      {reply.profile?.is_creator && (
                         <Badge className="bg-purple-500 text-white text-xs">Instructor</Badge>
                       )}
                     </div>
@@ -936,7 +936,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, avatar_url, bio, is_instructor')
+        .select('id, full_name, avatar_url, bio, is_creator')
         .eq('id', creatorId)
         .single();
 
@@ -1804,7 +1804,7 @@ const CourseLearningPage = () => {
             id,
             full_name,
             avatar_url,
-            is_instructor
+            is_creator
           )
         `)
         .eq('lesson_id', lessonId)
@@ -1833,7 +1833,7 @@ const CourseLearningPage = () => {
                 id,
                 full_name,
                 avatar_url,
-                is_instructor
+                is_creator
               )
             `)
             .eq('parent_id', discussion.id)
@@ -2191,7 +2191,7 @@ const CourseLearningPage = () => {
           user_id: user.id,
           lesson_id: selectedLesson.id,
           content: newDiscussion.trim(),
-          is_instructor_reply: false
+          is_creator_reply: false
         })
         .select(`
           *,
@@ -2199,7 +2199,7 @@ const CourseLearningPage = () => {
             id,
             full_name,
             avatar_url,
-            is_instructor
+            is_creator
           )
         `)
         .single();
@@ -2227,7 +2227,7 @@ const CourseLearningPage = () => {
           lesson_id: selectedLesson.id,
           parent_id: parentId,
           content: replyContent.trim(),
-          is_instructor_reply: false
+          is_creator_reply: false
         })
         .select(`
           *,
@@ -2235,7 +2235,7 @@ const CourseLearningPage = () => {
             id,
             full_name,
             avatar_url,
-            is_instructor
+            is_creator
           )
         `)
         .single();
