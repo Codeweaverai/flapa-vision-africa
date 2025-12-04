@@ -11,7 +11,6 @@ import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import ReactPlayer from 'react-player';
 import { 
@@ -21,9 +20,8 @@ import {
   Zap, Bookmark, Share, Download, Crown, Rocket, Trophy, Sparkles,
   Menu, X, HelpCircle, AlertCircle, RotateCcw,
   ChevronLeft, ChevronRight, FileQuestion, Video,
-  Send, Edit2, Trash2, Loader2, Maximize2, Volume2, Settings,
-  ThumbsUp, ThumbsDown, Flag, MoreVertical, Reply,
-  Battery, Wifi, Bell
+  Send, Edit2, Trash2, Loader2, Maximize2, Volume2,
+  ThumbsUp, Reply
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CourseReviewsTab from '@/components/course/CourseReviewsTab';
@@ -39,7 +37,6 @@ import RecommendedCourses from '@/components/course/RecommendedCourses';
 import Layout from '@/components/layout/Layout';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { cn } from '@/lib/utils';
-import { Skeleton } from '@/components/ui/skeleton';
 
 // ==================== INTERFACES ====================
 
@@ -106,7 +103,11 @@ interface QuizAttempt {
   score: number;
   passed: boolean;
   attempt_number: number;
+  started_at: string;
   completed_at?: string;
+  answers: any;
+  created_at: string;
+  updated_at: string;
 }
 
 interface CourseLesson {
@@ -212,14 +213,6 @@ interface ExamResult {
   attempts: number;
 }
 
-interface QuizResult {
-  id: string;
-  quiz_id: string;
-  score: number;
-  passed: boolean;
-  completed_at: string;
-}
-
 interface LessonNote {
   id: string;
   user_id: string;
@@ -293,7 +286,30 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
   const [playbackRate, setPlaybackRate] = useState(1);
   const [volume, setVolume] = useState(0.8);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [hasSubtitles, setHasSubtitles] = useState(false);
   const playerRef = useRef<any>(null);
+
+  // Check if subtitles exist
+  useEffect(() => {
+    const checkSubtitles = async () => {
+      if (!videoUrl) {
+        setHasSubtitles(false);
+        return;
+      }
+      
+      try {
+        // Try to load the VTT file
+        const vttUrl = `${videoUrl}.vtt`;
+        const response = await fetch(vttUrl, { method: 'HEAD' });
+        setHasSubtitles(response.ok);
+      } catch (error) {
+        console.log('Subtitles not available:', error);
+        setHasSubtitles(false);
+      }
+    };
+    
+    checkSubtitles();
+  }, [videoUrl]);
 
   const handleReady = () => {
     console.log('Video ready to play');
@@ -319,17 +335,14 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
   const toggleFullscreen = () => {
     if (!playerRef.current) return;
     
-    if (!isFullscreen) {
-      const playerWrapper = playerRef.current.getInternalPlayer()?.parentElement;
-      if (playerWrapper && playerWrapper.requestFullscreen) {
-        playerWrapper.requestFullscreen();
-      }
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      }
+    const playerWrapper = playerRef.current.getInternalPlayer()?.parentElement;
+    if (!playerWrapper) return;
+    
+    if (!isFullscreen && playerWrapper.requestFullscreen) {
+      playerWrapper.requestFullscreen();
+    } else if (document.exitFullscreen) {
+      document.exitFullscreen();
     }
-    setIsFullscreen(!isFullscreen);
   };
 
   useEffect(() => {
@@ -342,6 +355,27 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
   }, []);
+
+  const config = {
+    file: {
+      attributes: {
+        controlsList: 'nodownload noremoteplayback',
+        preload: 'auto',
+        crossOrigin: 'anonymous',
+      },
+      forceVideo: true,
+      forceAudio: true,
+      tracks: hasSubtitles ? [
+        {
+          kind: 'subtitles',
+          src: `${videoUrl}.vtt`,
+          srcLang: 'en',
+          label: 'English',
+          default: true,
+        },
+      ] : [],
+    },
+  };
 
   return (
     <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden">
@@ -371,32 +405,13 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
         onProgress={onProgress}
         onError={onError}
         onEnded={onEnd}
-        config={{
-          file: {
-            attributes: {
-              controlsList: 'nodownload noremoteplayback',
-              preload: 'auto',
-              crossOrigin: 'anonymous',
-            },
-            forceVideo: true,
-            forceAudio: true,
-            tracks: [
-              {
-                kind: 'subtitles',
-                src: `${videoUrl}.vtt`,
-                srcLang: 'en',
-                label: 'English',
-                default: true,
-              },
-            ],
-          },
-        }}
+        config={config}
       />
 
       {/* Custom Controls Overlay */}
       {controls && (
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 opacity-0 hover:opacity-100 transition-opacity">
-          <div className="flex items-center justify-between">
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
+          <div className="flex items-center justify-between pointer-events-auto">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => handlePlaybackRateChange(playbackRate === 1 ? 1.5 : 1)}
@@ -413,7 +428,7 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
                   step="0.1"
                   value={volume}
                   onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                  className="w-20"
+                  className="w-20 accent-white"
                 />
               </div>
             </div>
@@ -878,7 +893,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
   const [creatorProfile, setCreatorProfile] = useState<Profile | null>(null);
   const [courseProgress, setCourseProgress] = useState(0);
   const [isNavigating, setIsNavigating] = useState(false);
-  const [quizResults, setQuizResults] = useState<{[key: string]: QuizResult}>({});
+  const [quizAttempts, setQuizAttempts] = useState<{[key: string]: QuizAttempt}>({});
 
   useEffect(() => {
     if (courseId) {
@@ -895,7 +910,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
 
   useEffect(() => {
     if (user && courseId) {
-      fetchQuizResults();
+      fetchQuizAttempts();
     }
   }, [user, courseId, modules]);
 
@@ -932,10 +947,11 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
     }
   };
 
-  const fetchQuizResults = async () => {
+  const fetchQuizAttempts = async () => {
     if (!user) return;
 
     try {
+      // Get enrollment
       const { data: enrollment } = await supabase
         .from('course_enrollments')
         .select('id')
@@ -945,21 +961,26 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
 
       if (!enrollment) return;
 
-      const { data: results, error } = await supabase
-        .from('quiz_results')
+      // Get all quiz attempts for this enrollment
+      const { data: attempts, error } = await supabase
+        .from('quiz_attempts')
         .select('*')
         .eq('enrollment_id', enrollment.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching quiz attempts:', error);
+        return;
+      }
 
-      const resultsMap: {[key: string]: QuizResult} = {};
-      results?.forEach(result => {
-        resultsMap[result.quiz_id] = result;
+      // Convert to lookup object
+      const attemptsMap: {[key: string]: QuizAttempt} = {};
+      attempts?.forEach(attempt => {
+        attemptsMap[attempt.quiz_id] = attempt;
       });
 
-      setQuizResults(resultsMap);
+      setQuizAttempts(attemptsMap);
     } catch (error) {
-      console.error('Error fetching quiz results:', error);
+      console.error('Error fetching quiz attempts:', error);
     }
   };
 
@@ -1092,18 +1113,18 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
     return completedLessons.includes(lessonId);
   };
 
-  const getQuizResult = (quizId: string) => {
-    return quizResults[quizId];
+  const getQuizAttempt = (quizId: string) => {
+    return quizAttempts[quizId];
   };
 
   const hasPassedQuiz = (quizId: string) => {
-    const result = getQuizResult(quizId);
-    return result?.passed || false;
+    const attempt = getQuizAttempt(quizId);
+    return attempt?.passed || false;
   };
 
   const getQuizScore = (quizId: string) => {
-    const result = getQuizResult(quizId);
-    return result?.score || 0;
+    const attempt = getQuizAttempt(quizId);
+    return attempt?.score || 0;
   };
 
   const hasPassedExam = examResult?.passed;
@@ -1427,8 +1448,6 @@ const CourseLearningPage = () => {
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [resumeLesson, setResumeLesson] = useState<CourseLesson | null>(null);
-  const [showTranscript, setShowTranscript] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('content');
   const [dataLoaded, setDataLoaded] = useState(false);
@@ -1739,14 +1758,19 @@ const CourseLearningPage = () => {
     if (!user || !enrollment) return;
 
     try {
+      // Load quiz attempts
       const { data: quizAttempts, error } = await supabase
         .from('quiz_attempts')
         .select('quiz_id, score, passed')
         .eq('user_id', user.id)
         .eq('enrollment_id', enrollment.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading quiz attempts:', error);
+        return;
+      }
 
+      // Update modules with quiz completion status
       setModules(prevModules => 
         prevModules.map(module => ({
           ...module,
@@ -2929,8 +2953,8 @@ const CourseLearningPage = () => {
                                   onProgress={handleVideoProgress}
                                   onEnd={handleVideoEnd}
                                   onError={(error) => {
-                                    console.error('Video error:', error);
-                                    toast.error('There was a problem playing this video. Please try again.');
+                                    console.error('Video playback error:', error);
+                                    toast.error('There was an issue loading the video. Please try again.');
                                   }}
                                 />
                                 
