@@ -2183,7 +2183,7 @@ const CourseLearningPage = () => {
           user_id: user.id,
           lesson_id: selectedLesson.id,
           content: newDiscussion.trim(),
-          is_creator_reply: false
+          is_instructor_reply: false
         });
 
       if (error) throw error;
@@ -2212,7 +2212,7 @@ const CourseLearningPage = () => {
           lesson_id: selectedLesson.id,
           parent_id: parentId,
           content: replyContent.trim(),
-          is_creator_reply: false
+          is_instructor_reply: false
         });
 
       if (error) throw error;
