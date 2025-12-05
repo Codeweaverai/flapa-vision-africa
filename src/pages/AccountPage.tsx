@@ -478,8 +478,7 @@ const AccountPage = () => {
             
             console.log('✅ Pusher Beams subscribed', { 
               deviceId, 
-              authenticated: tokenSuccess,
-              deviceId 
+              authenticated: tokenSuccess
             });
 
             if (!tokenSuccess) {
