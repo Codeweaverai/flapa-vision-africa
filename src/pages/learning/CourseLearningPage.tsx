@@ -1796,10 +1796,17 @@ const CourseLearningPage = () => {
 
   const loadDiscussions = async (lessonId: string) => {
     try {
-      // Fetch discussions without profile join
       const { data: discussionsData, error: discussionsError } = await supabase
         .from('lesson_discussions')
-        .select('*')
+        .select(`
+          *,
+          profile:profiles!user_id (
+            id,
+            full_name,
+            avatar_url,
+            is_creator
+          )
+        `)
         .eq('lesson_id', lessonId)
         .is('parent_id', null)
         .order('created_at', { ascending: false });
@@ -1815,45 +1822,26 @@ const CourseLearningPage = () => {
         return;
       }
 
-      // Fetch profiles separately
-      const userIds = discussionsData.map(d => d.user_id);
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url, is_creator')
-        .in('id', userIds);
-
-      const profilesMap = (profilesData || []).reduce((acc: Record<string, any>, profile) => {
-        acc[profile.id] = profile;
-        return acc;
-      }, {});
-
       // Fetch replies for each discussion
       const discussionsWithReplies = await Promise.all(
         discussionsData.map(async (discussion) => {
           const { data: repliesData, error: repliesError } = await supabase
             .from('lesson_discussions')
-            .select('*')
+            .select(`
+              *,
+              profile:profiles!user_id (
+                id,
+                full_name,
+                avatar_url,
+                is_creator
+              )
+            `)
             .eq('parent_id', discussion.id)
             .order('created_at', { ascending: true });
 
-          let replies: any[] = [];
+          let replies = [];
           if (!repliesError && repliesData) {
-            // Fetch profiles for replies
-            const replyUserIds = repliesData.map(r => r.user_id);
-            const { data: replyProfilesData } = await supabase
-              .from('profiles')
-              .select('id, full_name, avatar_url, is_creator')
-              .in('id', replyUserIds);
-
-            const replyProfilesMap = (replyProfilesData || []).reduce((acc: Record<string, any>, profile) => {
-              acc[profile.id] = profile;
-              return acc;
-            }, {});
-
-            replies = repliesData.map(reply => ({
-              ...reply,
-              profile: replyProfilesMap[reply.user_id] || null
-            }));
+            replies = repliesData;
           }
 
           // Fetch likes count
@@ -1872,7 +1860,6 @@ const CourseLearningPage = () => {
 
           return {
             ...discussion,
-            profile: profilesMap[discussion.user_id] || null,
             replies,
             likes_count: likesData?.length || 0,
             is_liked: !!userLikeData
@@ -1891,10 +1878,17 @@ const CourseLearningPage = () => {
     if (!user) return;
 
     try {
-      // Load notes (without profile join since user sees their own notes)
+      // Load notes
       const { data: notesData, error: notesError } = await supabase
         .from('lesson_notes')
-        .select('*')
+        .select(`
+          *,
+          profile:profiles!user_id (
+            id,
+            full_name,
+            avatar_url
+          )
+        `)
         .eq('user_id', user.id)
         .eq('lesson_id', lessonId)
         .order('created_at', { ascending: false });
@@ -2116,7 +2110,14 @@ const CourseLearningPage = () => {
           lesson_id: selectedLesson.id,
           content: newNote.trim()
         })
-        .select('*')
+        .select(`
+          *,
+          profile:profiles!user_id (
+            id,
+            full_name,
+            avatar_url
+          )
+        `)
         .single();
 
       if (error) throw error;
@@ -2141,7 +2142,14 @@ const CourseLearningPage = () => {
           updated_at: new Date().toISOString()
         })
         .eq('id', noteId)
-        .select('*')
+        .select(`
+          *,
+          profile:profiles!user_id (
+            id,
+            full_name,
+            avatar_url
+          )
+        `)
         .single();
 
       if (error) throw error;
@@ -2177,24 +2185,31 @@ const CourseLearningPage = () => {
     if (!newDiscussion.trim() || !selectedLesson || !user) return;
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('lesson_discussions')
         .insert({
           user_id: user.id,
           lesson_id: selectedLesson.id,
           content: newDiscussion.trim(),
-          is_instructor_reply: false
-        });
+          is_creator_reply: false
+        })
+        .select(`
+          *,
+          profile:profiles!user_id (
+            id,
+            full_name,
+            avatar_url,
+            is_creator
+          )
+        `)
+        .single();
 
       if (error) throw error;
 
       setNewDiscussion('');
       toast.success('Discussion added successfully');
       
-      // Reload discussions to get the updated list
-      if (selectedLesson) {
-        await loadDiscussions(selectedLesson.id);
-      }
+      // Realtime subscription will update the list
     } catch (error) {
       console.error('Error adding discussion:', error);
       toast.error('Failed to add discussion. Please try again.');
@@ -2205,26 +2220,31 @@ const CourseLearningPage = () => {
     if (!replyContent.trim() || !selectedLesson || !user) return;
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('lesson_discussions')
         .insert({
           user_id: user.id,
           lesson_id: selectedLesson.id,
           parent_id: parentId,
           content: replyContent.trim(),
-          is_instructor_reply: false
-        });
+          is_creator_reply: false
+        })
+        .select(`
+          *,
+          profile:profiles!user_id (
+            id,
+            full_name,
+            avatar_url,
+            is_creator
+          )
+        `)
+        .single();
 
       if (error) throw error;
 
       setReplyContent('');
       setReplyingTo(null);
       toast.success('Reply added successfully');
-      
-      // Reload discussions to get the updated list
-      if (selectedLesson) {
-        await loadDiscussions(selectedLesson.id);
-      }
     } catch (error) {
       console.error('Error adding reply:', error);
       toast.error('Failed to add reply. Please try again.');

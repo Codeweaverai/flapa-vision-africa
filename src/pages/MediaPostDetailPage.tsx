@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Calendar, Clock, Play, FileText, Headphones, Eye, Share2, BookOpen, Facebook, MessageCircle, Linkedin } from 'lucide-react';
 import { toast } from 'sonner';
-import ReactPlayer from 'react-player';
+import ReactPlayer from 'react-player/lazy';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 
 interface MediaPost {
