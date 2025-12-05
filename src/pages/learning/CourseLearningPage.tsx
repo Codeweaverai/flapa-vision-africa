@@ -229,7 +229,7 @@ interface LessonDiscussion {
   lesson_id: string;
   parent_id?: string;
   content: string;
-  is_instructor_reply?: boolean;
+  is_creator_reply?: boolean;
   created_at: string;
   updated_at: string;
   profile?: Profile;
@@ -2183,7 +2183,7 @@ const CourseLearningPage = () => {
           user_id: user.id,
           lesson_id: selectedLesson.id,
           content: newDiscussion.trim(),
-          is_instructor_reply: false
+          is_creator_reply: false
         });
 
       if (error) throw error;
@@ -2212,7 +2212,7 @@ const CourseLearningPage = () => {
           lesson_id: selectedLesson.id,
           parent_id: parentId,
           content: replyContent.trim(),
-          is_instructor_reply: false
+          is_creator_reply: false
         });
 
       if (error) throw error;
