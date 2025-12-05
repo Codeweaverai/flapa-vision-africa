@@ -229,7 +229,7 @@ interface LessonDiscussion {
   lesson_id: string;
   parent_id?: string;
   content: string;
-  is_creator_reply?: boolean;
+  is_instructor_reply?: boolean;
   created_at: string;
   updated_at: string;
   profile?: Profile;
