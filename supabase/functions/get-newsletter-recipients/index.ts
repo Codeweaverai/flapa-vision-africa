@@ -7,11 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-);
-
 const handler = async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -31,21 +26,65 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Create Supabase client with service role for admin operations
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Verify authentication - require admin role
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Authentication required' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
+    // Create client with user's token to verify their identity
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Invalid authentication' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
+    // Check if user is admin
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || profile?.role !== 'admin') {
+      return new Response(JSON.stringify({ error: 'Admin access required' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
     console.log('Starting to fetch newsletter recipients...');
     
     // Fetch all users from auth.users using admin listUsers
-    const { data: authUsersResponse, error: authError } = await supabase.auth.admin.listUsers();
+    const { data: authUsersResponse, error: authUsersError } = await supabaseAdmin.auth.admin.listUsers();
 
-    if (authError) {
-      console.error('Error fetching auth users:', authError);
-      throw authError;
+    if (authUsersError) {
+      console.error('Error fetching auth users:', authUsersError);
+      throw authUsersError;
     }
 
     const authUsers = authUsersResponse?.users || [];
     console.log(`Found ${authUsers.length} auth users`);
 
     // Fetch all profiles to get additional user info
-    const { data: profiles, error: profilesError } = await supabase
+    const { data: profiles, error: profilesError } = await supabaseAdmin
       .from('profiles')
       .select('id, full_name, display_name, username');
 
@@ -63,26 +102,26 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Combine auth users with profile data
-    const recipients = authUsers.map((user: any) => {
-      const profile = profilesMap.get(user.id);
+    const recipients = authUsers.map((authUser: any) => {
+      const userProfile = profilesMap.get(authUser.id);
       
       // Get the best available name from various sources
-      const fullName = profile?.full_name || 
-                      profile?.display_name || 
-                      profile?.username ||
-                      user.raw_user_meta_data?.full_name || 
-                      user.raw_user_meta_data?.display_name || 
-                      user.raw_user_meta_data?.username || 
-                      user.raw_user_meta_data?.name ||
+      const fullName = userProfile?.full_name || 
+                      userProfile?.display_name || 
+                      userProfile?.username ||
+                      authUser.raw_user_meta_data?.full_name || 
+                      authUser.raw_user_meta_data?.display_name || 
+                      authUser.raw_user_meta_data?.username || 
+                      authUser.raw_user_meta_data?.name ||
                       'User';
 
       return {
-        id: user.id,
-        email: user.email,
+        id: authUser.id,
+        email: authUser.email,
         full_name: fullName,
-        email_confirmed_at: user.email_confirmed_at,
-        created_at: user.created_at,
-        role: user.raw_user_meta_data?.role || profile?.role || 'user'
+        email_confirmed_at: authUser.email_confirmed_at,
+        created_at: authUser.created_at,
+        role: authUser.raw_user_meta_data?.role || userProfile?.role || 'user'
       };
     });
 

@@ -8,13 +8,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-);
-
-const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
-
 interface Newsletter {
   id: string;
   subject: string;
@@ -22,16 +15,6 @@ interface Newsletter {
   scheduled_at: string;
   status: string;
   created_by: string;
-}
-
-interface User {
-  id: string;
-  email: string;
-  raw_user_meta_data: {
-    full_name?: string;
-    display_name?: string;
-    username?: string;
-  };
 }
 
 interface Course {
@@ -50,6 +33,60 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Create Supabase client with service role
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Verify this is being called by a cron job or admin
+    // Check for Authorization header for manual calls
+    const authHeader = req.headers.get('Authorization');
+    
+    // If there's an auth header, verify admin access
+    if (authHeader) {
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { global: { headers: { Authorization: authHeader } } }
+      );
+
+      const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: 'Invalid authentication' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        });
+      }
+
+      // Check if user is admin
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || profile?.role !== 'admin') {
+        return new Response(JSON.stringify({ error: 'Admin access required' }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        });
+      }
+    } else {
+      // No auth header - only allow if called from internal Supabase cron
+      // Check for specific cron headers or internal service indicators
+      const userAgent = req.headers.get('User-Agent') || '';
+      const isInternalCall = userAgent.includes('Supabase') || 
+                            req.headers.get('X-Supabase-Cron') === 'true';
+      
+      if (!isInternalCall) {
+        return new Response(JSON.stringify({ error: 'Authentication required' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        });
+      }
+    }
+
     console.log('Newsletter cron job started...');
 
     // Fetch newsletters that are scheduled and ready to send
@@ -73,6 +110,9 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     console.log(`Found ${newsletters.length} newsletters to send`);
+
+    // Initialize Resend
+    const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 
     // Process each newsletter
     for (const newsletter of newsletters as Newsletter[]) {
@@ -134,6 +174,16 @@ const handler = async (req: Request): Promise<Response> => {
         let successCount = 0;
         let failureCount = 0;
 
+        const secretKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+        const encoder = new TextEncoder();
+        const key = await crypto.subtle.importKey(
+          'raw',
+          encoder.encode(secretKey),
+          { name: 'HMAC', hash: 'SHA-256' },
+          false,
+          ['sign']
+        );
+
         for (let i = 0; i < allUsers.length; i += batchSize) {
           const batch = allUsers.slice(i, i + batchSize);
           
@@ -158,8 +208,16 @@ const handler = async (req: Request): Promise<Response> => {
                 .replace(/\{\{full_name\}\}/g, fullName)
                 .replace(/\{\{display_name\}\}/g, fullName);
 
-              // Create unsubscribe link with skillpulse.cloud domain
-              const unsubscribeUrl = `https://skillpulse.cloud/unsubscribe?token=${btoa(user.id)}`;
+              // Generate secure unsubscribe token using HMAC
+              const timestamp = Date.now();
+              const data = encoder.encode(`${user.id}:${timestamp}`);
+              const signature = await crypto.subtle.sign('HMAC', key, data);
+              const signatureHex = Array.from(new Uint8Array(signature))
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('');
+              const token = btoa(`${user.id}:${timestamp}:${signatureHex}`);
+
+              const unsubscribeUrl = `https://skillpulse.cloud/unsubscribe?token=${encodeURIComponent(token)}`;
               
               // Add unsubscribe link to HTML body
               const emailBody = personalizedContent + `

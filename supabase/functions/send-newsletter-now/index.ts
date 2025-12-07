@@ -8,13 +8,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-);
-
-const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
-
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -25,6 +18,50 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Create Supabase client with service role for admin operations
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Verify authentication - require admin role
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Authentication required' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
+    // Create client with user's token to verify their identity
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Invalid authentication' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
+    // Check if user is admin
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || profile?.role !== 'admin') {
+      return new Response(JSON.stringify({ error: 'Admin access required' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
     const { newsletterId } = await req.json();
 
     if (!newsletterId) {
@@ -35,7 +72,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Fetch the newsletter
-    const { data: newsletter, error: newsletterError } = await supabase
+    const { data: newsletter, error: newsletterError } = await supabaseAdmin
       .from('newsletters')
       .select('*')
       .eq('id', newsletterId)
@@ -49,13 +86,13 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Update newsletter status to sending
-    await supabase
+    await supabaseAdmin
       .from('newsletters')
       .update({ status: 'sending' })
       .eq('id', newsletterId);
 
     // Fetch all users (both verified and unverified)
-    const { data: authUsers, error: usersError } = await supabase.auth.admin.listUsers();
+    const { data: authUsers, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
 
     if (usersError) {
       throw usersError;
@@ -64,12 +101,12 @@ const handler = async (req: Request): Promise<Response> => {
     const allUsers = authUsers?.users || [];
 
     // Fetch dynamic content
-    const { data: courses } = await supabase
+    const { data: courses } = await supabaseAdmin
       .from('courses')
       .select('id, title')
       .eq('is_published', true);
 
-    const { data: events } = await supabase
+    const { data: events } = await supabaseAdmin
       .from('events')
       .select('id, title')
       .gte('start_time', new Date().toISOString());
@@ -82,7 +119,10 @@ const handler = async (req: Request): Promise<Response> => {
       status: 'pending'
     }));
 
-    await supabase.from('newsletter_logs').insert(logs);
+    await supabaseAdmin.from('newsletter_logs').insert(logs);
+
+    // Initialize Resend
+    const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 
     // Send emails
     let successCount = 0;
@@ -108,7 +148,25 @@ const handler = async (req: Request): Promise<Response> => {
           .replace(/\{\{full_name\}\}/g, fullName)
           .replace(/\{\{display_name\}\}/g, fullName);
 
-        const unsubscribeUrl = `https://skillpulse.cloud/unsubscribe?token=${btoa(user.id)}`;
+        // Generate secure unsubscribe token using HMAC
+        const encoder = new TextEncoder();
+        const secretKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+        const key = await crypto.subtle.importKey(
+          'raw',
+          encoder.encode(secretKey),
+          { name: 'HMAC', hash: 'SHA-256' },
+          false,
+          ['sign']
+        );
+        const timestamp = Date.now();
+        const data = encoder.encode(`${user.id}:${timestamp}`);
+        const signature = await crypto.subtle.sign('HMAC', key, data);
+        const signatureHex = Array.from(new Uint8Array(signature))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+        const token = btoa(`${user.id}:${timestamp}:${signatureHex}`);
+
+        const unsubscribeUrl = `https://skillpulse.cloud/unsubscribe?token=${encodeURIComponent(token)}`;
         
         const emailBody = personalizedContent + `
           <br><br>
@@ -125,7 +183,7 @@ const handler = async (req: Request): Promise<Response> => {
           html: emailBody,
         });
 
-        await supabase
+        await supabaseAdmin
           .from('newsletter_logs')
           .update({ status: 'sent', sent_at: new Date().toISOString() })
           .eq('newsletter_id', newsletterId)
@@ -133,7 +191,7 @@ const handler = async (req: Request): Promise<Response> => {
 
         successCount++;
       } catch (error) {
-        await supabase
+        await supabaseAdmin
           .from('newsletter_logs')
           .update({ status: 'failed', error_message: error.message })
           .eq('newsletter_id', newsletterId)
@@ -144,7 +202,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Update newsletter
-    await supabase
+    await supabaseAdmin
       .from('newsletters')
       .update({
         status: 'sent',
