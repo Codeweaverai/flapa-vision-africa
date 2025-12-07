@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, BookOpen, CheckCircle, Clock, FileText } from 'lucide-react';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 // Create a simplified CourseModuleList component to avoid type conflicts
 const SimplifiedCourseModuleList: React.FC<{
@@ -433,7 +434,7 @@ const CoursePlayerPage: React.FC = () => {
                   
                   <TabsContent value="content" className="min-h-[300px] bg-card p-6 rounded-md border">
                     {currentLesson.content ? (
-                      <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: typeof currentLesson.content === 'string' ? currentLesson.content : JSON.stringify(currentLesson.content) }} />
+                      <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: sanitizeHtml(typeof currentLesson.content === 'string' ? currentLesson.content : JSON.stringify(currentLesson.content)) }} />
                     ) : (
                       <div className="flex flex-col items-center justify-center h-full py-12">
                         <BookOpen className="h-12 w-12 mb-4 text-muted-foreground/40" />

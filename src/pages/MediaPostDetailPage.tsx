@@ -9,6 +9,7 @@ import { ArrowLeft, Calendar, Clock, Play, FileText, Headphones, Eye, Share2, Bo
 import { toast } from 'sonner';
 import ReactPlayer from 'react-player/lazy';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 interface MediaPost {
   id: string;
@@ -394,7 +395,7 @@ const MediaPostDetailPage = () => {
                       <div 
                         className="text-gray-700 leading-relaxed tracking-wide"
                         dangerouslySetInnerHTML={{ 
-                          __html: processContent(post.content)
+                          __html: sanitizeHtml(processContent(post.content))
                         }} 
                       />
                     </div>

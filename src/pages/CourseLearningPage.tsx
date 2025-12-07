@@ -25,6 +25,7 @@ import VideoPlayer from '@/components/video/VideoPlayer';
 import VideoTranscripts from '@/components/course/VideoTranscripts';
 import FinalExamModal from '@/components/course/FinalExamModal';
 import FinalExamResultsModal from '@/components/course/FinalExamResultsModal';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 interface Course {
   id: string;
@@ -736,7 +737,7 @@ const CourseLearningPage: React.FC = () => {
                         {currentLesson.content ? (
                           <div 
                             className="prose max-w-none" 
-                            dangerouslySetInnerHTML={{ __html: currentLesson.content }} 
+                            dangerouslySetInnerHTML={{ __html: sanitizeHtml(currentLesson.content) }} 
                           />
                         ) : (
                           <div className="flex flex-col items-center justify-center h-full py-12">
