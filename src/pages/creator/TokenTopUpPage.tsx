@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Coins, Smartphone, Zap, CheckCircle, ArrowLeft, Gift, Shield, Globe, Loader2 } from 'lucide-react';
+import { Coins, Smartphone, Zap, CheckCircle, ArrowLeft, Gift, Shield, Globe, Loader2, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import { supabase } from '@/lib/supabaseClient';
@@ -14,7 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTokens } from '@/hooks/useTokens';
 import ReactCountryFlag from "react-country-flag";
 
-// Currency Converter
+// Currency Converter - Updated with more accurate rates if needed
 class CurrencyConverter {
   static EXCHANGE_RATES = {
     USD: {
@@ -65,6 +65,42 @@ class CurrencyConverter {
   }
 }
 
+// Phone number validation helper
+const validatePhoneNumber = (phone: string, countryCode: string): { isValid: boolean; message?: string } => {
+  const phoneDigits = phone.replace(/\D/g, '');
+  
+  // Country-specific validation
+  const validationRules: Record<string, { length: number; pattern: RegExp }> = {
+    'ZMB': { length: 9, pattern: /^[0-9]{9}$/ }, // Zambia: 9 digits
+    'MWI': { length: 9, pattern: /^[0-9]{9}$/ }, // Malawi: 9 digits
+    'KEN': { length: 9, pattern: /^[0-9]{9}$/ }, // Kenya: 9 digits
+    'GHA': { length: 9, pattern: /^[0-9]{9}$/ }, // Ghana: 9 digits
+    'NGA': { length: 10, pattern: /^[0-9]{10}$/ }, // Nigeria: 10 digits
+    'UGA': { length: 9, pattern: /^[0-9]{9}$/ }, // Uganda: 9 digits
+    'TZA': { length: 9, pattern: /^[0-9]{9}$/ }, // Tanzania: 9 digits
+  };
+
+  const rule = validationRules[countryCode];
+  
+  if (!rule) {
+    return { isValid: true, message: 'Phone validation not available for this country' };
+  }
+
+  if (!phoneDigits) {
+    return { isValid: false, message: 'Phone number is required' };
+  }
+
+  if (phoneDigits.length !== rule.length) {
+    return { isValid: false, message: `Phone number must be ${rule.length} digits` };
+  }
+
+  if (!rule.pattern.test(phoneDigits)) {
+    return { isValid: false, message: 'Invalid phone number format' };
+  }
+
+  return { isValid: true };
+};
+
 const TokenTopUpPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -75,23 +111,23 @@ const TokenTopUpPage = () => {
   const [customAmount, setCustomAmount] = useState<number | ''>('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [selectedCountry, setSelectedCountry] = useState('ZMB');
-  const [selectedOperator, setSelectedOperator] = useState('');
-  const [paymentPolling, setPaymentPolling] = useState<NodeJS.Timeout | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'mobile_money' | 'card'>('mobile_money');
+  const [phoneValidation, setPhoneValidation] = useState<{ isValid: boolean; message?: string }>({ isValid: true });
 
   const availableTokens = getAvailableTokens();
 
-  // Lenco supported countries
-  const LENCO_COUNTRIES = {
+  // PawaPay supported countries (expanded list)
+  const PAWAPAY_COUNTRIES = {
     'ZMB': { 
       name: 'Zambia', 
       code: 'ZMB', 
       flag: 'ZM', 
       dialCode: '+260', 
       currency: 'ZMW',
-      lencoCode: 'zm',
-      operators: [
-        { code: 'mtn', name: 'MTN Mobile Money Zambia' },
-        { code: 'airtel', name: 'Airtel Money Zambia' }
+      mobileMoneyProviders: [
+        'mtn_zambia',
+        'airtel_zambia',
+        'zamtel'
       ]
     },
     'MWI': { 
@@ -100,10 +136,68 @@ const TokenTopUpPage = () => {
       flag: 'MW', 
       dialCode: '+265', 
       currency: 'MWK',
-      lencoCode: 'mw',
-      operators: [
-        { code: 'airtel', name: 'Airtel Money Malawi' },
-        { code: 'tnm', name: 'TNM Mpamba Malawi' }
+      mobileMoneyProviders: [
+        'airtel_malawi',
+        'tnm_mpamba'
+      ]
+    },
+    'KEN': { 
+      name: 'Kenya', 
+      code: 'KEN', 
+      flag: 'KE', 
+      dialCode: '+254', 
+      currency: 'KES',
+      mobileMoneyProviders: [
+        'mpesa',
+        'airtel_kenya'
+      ]
+    },
+    'GHA': { 
+      name: 'Ghana', 
+      code: 'GHA', 
+      flag: 'GH', 
+      dialCode: '+233', 
+      currency: 'GHS',
+      mobileMoneyProviders: [
+        'mtn_momo',
+        'vodafone_cash',
+        'airteltigo'
+      ]
+    },
+    'NGA': { 
+      name: 'Nigeria', 
+      code: 'NGA', 
+      flag: 'NG', 
+      dialCode: '+234', 
+      currency: 'NGN',
+      mobileMoneyProviders: [
+        'opay',
+        'palmpay',
+        'mtn_momo',
+        'airtel_money'
+      ]
+    },
+    'UGA': { 
+      name: 'Uganda', 
+      code: 'UGA', 
+      flag: 'UG', 
+      dialCode: '+256', 
+      currency: 'UGX',
+      mobileMoneyProviders: [
+        'mtn_momo',
+        'airtel_money'
+      ]
+    },
+    'TZA': { 
+      name: 'Tanzania', 
+      code: 'TZA', 
+      flag: 'TZ', 
+      dialCode: '+255', 
+      currency: 'TZS',
+      mobileMoneyProviders: [
+        'mpesa',
+        'tigo_pesa',
+        'airtel_money'
       ]
     }
   };
@@ -137,7 +231,13 @@ const TokenTopUpPage = () => {
     return formatted;
   };
 
-  const handleMobilePayment = async () => {
+  const handlePhoneNumberChange = (value: string) => {
+    setPhoneNumber(value);
+    const validation = validatePhoneNumber(value, selectedCountry);
+    setPhoneValidation(validation);
+  };
+
+  const handlePawaPayPayment = async () => {
     if (!tokenAmount || tokenAmount <= 0) {
       toast.error('Please select a token amount');
       return;
@@ -148,8 +248,8 @@ const TokenTopUpPage = () => {
       return;
     }
 
-    if (!selectedOperator) {
-      toast.error('Please select a mobile money provider');
+    if (!phoneValidation.isValid) {
+      toast.error(phoneValidation.message || 'Invalid phone number');
       return;
     }
 
@@ -161,7 +261,7 @@ const TokenTopUpPage = () => {
     setLoading(true);
 
     try {
-      const selectedCountryData = LENCO_COUNTRIES[selectedCountry as keyof typeof LENCO_COUNTRIES];
+      const selectedCountryData = PAWAPAY_COUNTRIES[selectedCountry as keyof typeof PAWAPAY_COUNTRIES];
       
       if (!selectedCountryData) {
         throw new Error('Invalid country selected');
@@ -170,24 +270,39 @@ const TokenTopUpPage = () => {
       // Format phone number
       const formattedPhone = formatPhoneNumber(phoneNumber, selectedCountryData.dialCode);
       
-      if (!formattedPhone.match(/^\d{9,12}$/)) {
-        throw new Error('Please enter a valid phone number (9-12 digits)');
-      }
-
       // Calculate USD amount
       const usdAmount = calculateCost(tokenAmount);
       
+      // Convert to local currency (in cents for PawaPay)
+      const localAmount = CurrencyConverter.usdToLocal(usdAmount, selectedCountryData.currency as 'ZMW' | 'MWK');
+      const amountInCents = Math.round(localAmount * 100); // PawaPay expects amount in cents
+      
       // Show payment initiation message
-      toast.loading('Initiating mobile money payment...');
+      toast.loading('Initiating PawaPay payment...');
 
-      const { data, error } = await supabase.functions.invoke('token-topup-lenco', {
+      // Store payment attempt in localStorage for fallback
+      const depositId = crypto.randomUUID().replace(/-/g, '').slice(0, 20);
+      const paymentAttempt = {
+        depositId,
+        tokenAmount,
+        amountPaid: amountInCents,
+        currency: selectedCountryData.currency,
+        country: selectedCountry,
+        phoneNumber: formattedPhone,
+        timestamp: Date.now()
+      };
+      
+      localStorage.setItem('lastPaymentAttempt', JSON.stringify(paymentAttempt));
+
+      // Call PawaPay function
+      const { data, error } = await supabase.functions.invoke('token-topup-pawapay', {
         body: {
           tokenAmount: tokenAmount,
-          phone: formattedPhone,
-          operator: selectedOperator,
-          country: selectedCountryData.lencoCode,
-          bearer: 'customer',
-          returnUrl: `${window.location.origin}/creator/lenco-token/success`
+          amountPaid: amountInCents, // Pass amount in cents
+          currency: selectedCountryData.currency,
+          phoneNumber: formattedPhone,
+          country: selectedCountry,
+          returnUrl: `${window.location.origin}/creator/tokens/success`
         }
       });
 
@@ -195,25 +310,15 @@ const TokenTopUpPage = () => {
         throw new Error(error.message || 'Failed to initiate payment');
       }
 
-      if (data?.success) {
+      if (data?.success && data.redirectUrl) {
         toast.dismiss();
-        toast.success(data.message || 'Payment initiated successfully!');
+        toast.success('Redirecting to PawaPay payment page...');
         
-        // Store for status checking
-        localStorage.setItem('lastTokenPayment', JSON.stringify({
-          reference: data.data.reference,
-          transactionId: data.data.transaction_id,
-          depositId: data.data.deposit_id,
-          tokenAmount: tokenAmount,
-          amount: data.data.local_amount,
-          currency: data.data.currency,
-          timestamp: Date.now(),
-          lencoReference: data.data.lenco_reference
-        }));
-
-        // Start polling for payment status
-        startPaymentPolling(data.data.reference);
+        // Redirect to PawaPay payment page
+        window.location.href = data.redirectUrl;
         
+      } else if (data?.error) {
+        throw new Error(data.error);
       } else {
         throw new Error('Invalid response from payment service');
       }
@@ -222,143 +327,37 @@ const TokenTopUpPage = () => {
       toast.dismiss();
       toast.error(error.message || 'Failed to initiate payment. Please try again.');
       setLoading(false);
-    }
-  };
-
-  const startPaymentPolling = (reference: string) => {
-    // Clear any existing polling
-    if (paymentPolling) {
-      clearInterval(paymentPolling);
-    }
-
-    const pollInterval = setInterval(async () => {
-      try {
-        const { data } = await supabase.functions.invoke('lenco-token-status', {
-          body: { reference: reference }
-        });
-
-        if (data?.success) {
-          if (data.payment_status === 'completed') {
-            clearInterval(pollInterval);
-            setPaymentPolling(null);
-            setLoading(false);
-            
-            toast.dismiss();
-            toast.success(`Payment successful! ${data.transaction?.amount} tokens added to your account.`);
-            
-            await refetchTokens();
-            localStorage.removeItem('lastTokenPayment');
-            
-            // Navigate to success page
-            navigate('/creator/lenco-token/success', {
-              state: {
-                tokensAdded: data.transaction?.amount,
-                amountPaid: data.transaction?.amount_paid,
-                currency: data.transaction?.currency,
-                transactionId: data.transaction?.id
-              }
-            });
-            
-          } else if (data.payment_status === 'failed') {
-            clearInterval(pollInterval);
-            setPaymentPolling(null);
-            setLoading(false);
-            
-            toast.dismiss();
-            toast.error('Payment failed. Please try again.');
-            
-            localStorage.removeItem('lastTokenPayment');
-          } else if (data.payment_status === 'pending_authorization') {
-            // Show authorization reminder
-            if (!document.hidden) {
-              toast.info('Please check your phone to authorize the payment...', {
-                duration: 5000,
-              });
-            }
-          }
-          // If still pending, continue polling
-        }
-      } catch (error) {
-        console.error('Error polling payment status:', error);
-      }
-    }, 3000); // Poll every 3 seconds
-
-    setPaymentPolling(pollInterval);
-
-    // Stop polling after 10 minutes
-    setTimeout(() => {
-      if (paymentPolling) {
-        clearInterval(pollInterval);
-        setPaymentPolling(null);
-        setLoading(false);
-        
-        toast.dismiss();
-        toast.info('Payment verification timeout. Please check your payment status manually.', {
-          action: {
-            label: 'Check Status',
-            onClick: () => checkPaymentStatusManually(reference)
-          }
-        });
-      }
-    }, 600000); // 10 minutes
-  };
-
-  const checkPaymentStatusManually = async (reference: string) => {
-    try {
-      toast.loading('Checking payment status...');
-      const { data } = await supabase.functions.invoke('lenco-token-status', {
-        body: { reference: reference }
-      });
-
-      if (data?.success) {
-        toast.dismiss();
-        if (data.payment_status === 'completed') {
-          toast.success('Payment completed!');
-          await refetchTokens();
-          localStorage.removeItem('lastTokenPayment');
-          navigate('/creator/tokens/success');
-        } else {
-          toast.info(`Payment status: ${data.payment_status}`);
-        }
-      }
-    } catch (error) {
-      toast.dismiss();
-      toast.error('Failed to check payment status');
+      
+      // Clear localStorage on error
+      localStorage.removeItem('lastPaymentAttempt');
     }
   };
 
   // Check for pending payments on page load
   useEffect(() => {
     const checkPendingPayments = async () => {
-      const lastPayment = localStorage.getItem('lastTokenPayment');
+      const lastPayment = localStorage.getItem('lastPaymentAttempt');
       if (lastPayment) {
         const paymentData = JSON.parse(lastPayment);
         const timeSincePayment = Date.now() - paymentData.timestamp;
         
-        // If payment was attempted in the last 30 minutes
+        // If payment was attempted in the last 30 minutes, show info
         if (timeSincePayment < 30 * 60 * 1000) {
-          toast.info('Checking status of previous payment...');
-          startPaymentPolling(paymentData.reference);
+          toast.info('You have a recent payment attempt. Check your payment status?', {
+            action: {
+              label: 'Check Status',
+              onClick: () => navigate(`/creator/tokens/success?deposit_id=${paymentData.depositId}`)
+            },
+            duration: 10000,
+          });
         } else {
-          localStorage.removeItem('lastTokenPayment');
+          localStorage.removeItem('lastPaymentAttempt');
         }
       }
     };
 
     checkPendingPayments();
-
-    // Cleanup polling on unmount
-    return () => {
-      if (paymentPolling) {
-        clearInterval(paymentPolling);
-      }
-    };
   }, []);
-
-  // Reset operator when country changes
-  useEffect(() => {
-    setSelectedOperator('');
-  }, [selectedCountry]);
 
   const features = [
     {
@@ -368,13 +367,13 @@ const TokenTopUpPage = () => {
     },
     {
       icon: <Shield className="h-5 w-5" />,
-      title: "Secure & Fast",
-      description: "Powered by Lenco's secure mobile money payments"
+      title: "Secure Payments",
+      description: "Powered by PawaPay's secure payment infrastructure"
     },
     {
       icon: <Globe className="h-5 w-5" />,
-      title: "Local Payments",
-      description: "Pay in your local currency with mobile money"
+      title: "Multiple Countries",
+      description: "Available in 7+ African countries"
     },
     {
       icon: <Gift className="h-5 w-5" />,
@@ -386,9 +385,8 @@ const TokenTopUpPage = () => {
   const gradientClass = "bg-gradient-to-r from-orange-500 to-purple-600";
   const gradientTextClass = "bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent";
 
-  const selectedCountryData = LENCO_COUNTRIES[selectedCountry as keyof typeof LENCO_COUNTRIES];
-  const currentOperators = selectedCountryData?.operators || [];
-
+  const selectedCountryData = PAWAPAY_COUNTRIES[selectedCountry as keyof typeof PAWAPAY_COUNTRIES];
+  
   const usdAmount = tokenAmount ? calculateCost(tokenAmount) : 0;
   const localAmount = selectedCountryData 
     ? CurrencyConverter.usdToLocal(usdAmount, selectedCountryData.currency as 'ZMW' | 'MWK')
@@ -408,7 +406,7 @@ const TokenTopUpPage = () => {
             Top Up Your Tokens
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Purchase tokens with mobile money to unlock AI-powered course creation
+            Purchase tokens with mobile money or card to unlock AI-powered course creation
           </p>
         </div>
 
@@ -458,248 +456,243 @@ const TokenTopUpPage = () => {
               Purchase Tokens
             </CardTitle>
             <CardDescription className="text-lg">
-              Pay with mobile money via Lenco
+              Pay with mobile money via PawaPay
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Token Amount Selection */}
+            {/* Payment Method Tabs */}
             <div className="space-y-4">
-              <Label className="text-base font-semibold">Select Token Amount</Label>
-              
-              {/* Preset Amounts */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {topUpConfig?.default_amounts?.map((amount) => (
-                  <Button
-                    key={amount}
-                    variant={tokenAmount === amount ? "default" : "outline"}
-                    onClick={() => handlePresetSelect(amount)}
-                    className={`h-16 ${tokenAmount === amount ? gradientClass + ' text-white' : ''}`}
-                  >
-                    <div className="text-center">
-                      <div className="font-semibold">{amount} tokens</div>
-                      <div className="text-xs opacity-75">
-                        ${calculatePrice(amount).toFixed(2)}
-                      </div>
-                    </div>
-                  </Button>
-                ))}
-              </div>
-
-              {/* Custom Amount */}
-              <div className="space-y-2">
-                <Label htmlFor="customAmount">Custom Amount</Label>
-                <div className="flex space-x-2">
-                  <Input
-                    id="customAmount"
-                    type="number"
-                    placeholder="Enter custom token amount"
-                    value={customAmount}
-                    onChange={(e) => handleCustomAmountChange(e.target.value)}
-                    min={topUpConfig?.min_amount || 10}
-                    max={topUpConfig?.max_amount || 10000}
-                    className="flex-1"
-                  />
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      if (customAmount && customAmount > 0) {
-                        handlePresetSelect(customAmount);
-                      }
-                    }}
-                  >
-                    Apply
-                  </Button>
-                </div>
-                <p className="text-sm text-gray-500">
-                  Min: {topUpConfig?.min_amount || 10} tokens, Max: {topUpConfig?.max_amount || 10000} tokens
-                </p>
-              </div>
-
-              {/* Cost Summary */}
-              {tokenAmount > 0 && (
-                <Card className="bg-green-50 border-green-200">
-                  <CardContent className="pt-4">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <div className="font-semibold text-green-800">Total Cost</div>
-                        <div className="text-sm text-green-600">
-                          {tokenAmount} tokens × ${(topUpConfig?.token_price || 0.01).toFixed(4)} per token
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xl font-bold text-green-800">
-                          ${usdAmount.toFixed(2)} USD
-                        </div>
-                        {selectedCountryData && (
-                          <div className="text-sm text-green-600">
-                            ≈ {localAmount.toFixed(2)} {selectedCountryData.currency}
+              <Label className="text-base font-semibold">Payment Method</Label>
+              <Tabs defaultValue="mobile_money" value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as any)}>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="mobile_money" className="flex items-center space-x-2">
+                    <Smartphone className="h-4 w-4" />
+                    <span>Mobile Money</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="card" disabled className="flex items-center space-x-2">
+                    <CreditCard className="h-4 w-4" />
+                    <span>Card (Coming Soon)</span>
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="mobile_money" className="space-y-6 mt-6">
+                  {/* Token Amount Selection */}
+                  <div className="space-y-4">
+                    <Label className="text-base font-semibold">Select Token Amount</Label>
+                    
+                    {/* Preset Amounts */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {topUpConfig?.default_amounts?.map((amount) => (
+                        <Button
+                          key={amount}
+                          variant={tokenAmount === amount ? "default" : "outline"}
+                          onClick={() => handlePresetSelect(amount)}
+                          className={`h-16 ${tokenAmount === amount ? gradientClass + ' text-white' : ''}`}
+                        >
+                          <div className="text-center">
+                            <div className="font-semibold">{amount} tokens</div>
+                            <div className="text-xs opacity-75">
+                              ${calculatePrice(amount).toFixed(2)}
+                            </div>
                           </div>
-                        )}
-                      </div>
+                        </Button>
+                      ))}
                     </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
 
-            {/* Mobile Money Payment Form */}
-            <div className="space-y-4">
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Country Selection */}
-                  <div className="space-y-2">
-                    <Label htmlFor="country">Country *</Label>
-                    <Select value={selectedCountry} onValueChange={setSelectedCountry}>
-                      <SelectTrigger className="border-gray-300 focus:border-orange-500 focus:ring-orange-500">
-                        <SelectValue placeholder="Select country" />
-                      </SelectTrigger>
-                      <SelectContent className="min-w-[300px] max-h-[300px]">
-                        {Object.values(LENCO_COUNTRIES).map((country) => (
-                          <SelectItem key={country.code} value={country.code}>
-                            <div className="flex items-center gap-3 py-1">
-                              <ReactCountryFlag
-                                countryCode={country.flag}
-                                svg
-                                style={{
-                                  width: '20px',
-                                  height: '15px',
-                                  borderRadius: '3px',
-                                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                                }}
-                                title={country.name}
-                              />
-                              <div className="flex flex-col">
-                                <span className="font-medium text-gray-800 text-sm">{country.name}</span>
-                                <span className="text-xs text-gray-500">{country.dialCode} • {country.currency}</span>
+                    {/* Custom Amount */}
+                    <div className="space-y-2">
+                      <Label htmlFor="customAmount">Custom Amount</Label>
+                      <div className="flex space-x-2">
+                        <Input
+                          id="customAmount"
+                          type="number"
+                          placeholder="Enter custom token amount"
+                          value={customAmount}
+                          onChange={(e) => handleCustomAmountChange(e.target.value)}
+                          min={topUpConfig?.min_amount || 10}
+                          max={topUpConfig?.max_amount || 10000}
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            if (customAmount && customAmount > 0) {
+                              handlePresetSelect(customAmount);
+                            }
+                          }}
+                        >
+                          Apply
+                        </Button>
+                      </div>
+                      <p className="text-sm text-gray-500">
+                        Min: {topUpConfig?.min_amount || 10} tokens, Max: {topUpConfig?.max_amount || 10000} tokens
+                      </p>
+                    </div>
+
+                    {/* Cost Summary */}
+                    {tokenAmount > 0 && (
+                      <Card className="bg-green-50 border-green-200">
+                        <CardContent className="pt-4">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <div className="font-semibold text-green-800">Total Cost</div>
+                              <div className="text-sm text-green-600">
+                                {tokenAmount} tokens × ${(topUpConfig?.token_price || 0.01).toFixed(4)} per token
                               </div>
                             </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Mobile Operator */}
-                  <div className="space-y-2">
-                    <Label htmlFor="operator">Mobile Money Provider *</Label>
-                    <Select 
-                      value={selectedOperator} 
-                      onValueChange={setSelectedOperator}
-                      disabled={!selectedCountry}
-                    >
-                      <SelectTrigger className="border-gray-300 focus:border-orange-500 focus:ring-orange-500">
-                        <SelectValue placeholder={selectedCountry ? "Select operator" : "Select country first"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {currentOperators.map((operator) => (
-                          <SelectItem key={operator.code} value={operator.code}>
-                            <div className="flex items-center gap-2 py-1">
-                              <div className="w-2 h-2 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full"></div>
-                              <span className="text-sm">{operator.name}</span>
+                            <div className="text-right">
+                              <div className="text-xl font-bold text-green-800">
+                                ${usdAmount.toFixed(2)} USD
+                              </div>
+                              {selectedCountryData && (
+                                <div className="text-sm text-green-600">
+                                  ≈ {localAmount.toFixed(2)} {selectedCountryData.currency}
+                                </div>
+                              )}
                             </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
                   </div>
 
-                  {/* Phone Number */}
-                  <div className="md:col-span-2 space-y-2">
-                    <Label htmlFor="phoneNumber">Phone Number *</Label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <span className="text-gray-500 text-sm font-medium">
-                          {selectedCountryData?.dialCode || '+xxx'}
-                        </span>
+                  {/* Mobile Money Payment Form */}
+                  <div className="space-y-4">
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Country Selection */}
+                        <div className="space-y-2">
+                          <Label htmlFor="country">Country *</Label>
+                          <Select value={selectedCountry} onValueChange={setSelectedCountry}>
+                            <SelectTrigger className="border-gray-300 focus:border-orange-500 focus:ring-orange-500">
+                              <SelectValue placeholder="Select country" />
+                            </SelectTrigger>
+                            <SelectContent className="min-w-[300px] max-h-[300px]">
+                              {Object.values(PAWAPAY_COUNTRIES).map((country) => (
+                                <SelectItem key={country.code} value={country.code}>
+                                  <div className="flex items-center gap-3 py-1">
+                                    <ReactCountryFlag
+                                      countryCode={country.flag}
+                                      svg
+                                      style={{
+                                        width: '20px',
+                                        height: '15px',
+                                        borderRadius: '3px',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                      }}
+                                      title={country.name}
+                                    />
+                                    <div className="flex flex-col">
+                                      <span className="font-medium text-gray-800 text-sm">{country.name}</span>
+                                      <span className="text-xs text-gray-500">{country.dialCode} • {country.currency}</span>
+                                    </div>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Phone Number */}
+                        <div className="space-y-2">
+                          <Label htmlFor="phoneNumber">Phone Number *</Label>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                              <span className="text-gray-500 text-sm font-medium">
+                                {selectedCountryData?.dialCode || '+xxx'}
+                              </span>
+                            </div>
+                            <Input
+                              id="phoneNumber"
+                              type="tel"
+                              placeholder={selectedCountryData ? `Enter your ${selectedCountryData.name} mobile number` : 'Select country first'}
+                              value={phoneNumber}
+                              onChange={(e) => handlePhoneNumberChange(e.target.value)}
+                              disabled={!selectedCountry}
+                              className="pl-20 border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                            />
+                          </div>
+                          {!phoneValidation.isValid && (
+                            <p className="text-sm text-red-600">{phoneValidation.message}</p>
+                          )}
+                          <p className="text-sm text-gray-500">
+                            Enter the mobile number registered with your mobile money account
+                          </p>
+                        </div>
                       </div>
-                      <Input
-                        id="phoneNumber"
-                        type="tel"
-                        placeholder={selectedCountryData ? `Enter your ${selectedCountryData.name} mobile number` : 'Select country first'}
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
-                        disabled={!selectedCountry}
-                        className="pl-20 border-gray-300 focus:border-orange-500 focus:ring-orange-500"
-                      />
+
+                      {/* Payment Summary */}
+                      {selectedCountry && tokenAmount > 0 && phoneValidation.isValid && (
+                        <Card className="bg-blue-50 border-blue-200">
+                          <CardContent className="pt-4">
+                            <div className="flex items-center space-x-2 text-blue-800 mb-3">
+                              <CheckCircle className="h-4 w-4" />
+                              <span className="font-semibold">Payment Summary</span>
+                            </div>
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span className="text-gray-700">Tokens:</span>
+                                <span className="font-semibold">{tokenAmount} tokens</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-700">Country:</span>
+                                <span className="font-semibold">{selectedCountryData?.name}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-700">Phone Number:</span>
+                                <span className="font-semibold">
+                                  {selectedCountryData?.dialCode} {formatPhoneNumber(phoneNumber, selectedCountryData?.dialCode || '')}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-700">Amount in USD:</span>
+                                <span className="font-semibold">
+                                  ${usdAmount.toFixed(2)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-700">Amount to pay:</span>
+                                <span className="font-semibold text-green-700">
+                                  {localAmount.toFixed(2)} {selectedCountryData?.currency}
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-xs">
+                                <span className="text-gray-500">Exchange rate:</span>
+                                <span className="text-gray-500">
+                                  1 USD = {CurrencyConverter.EXCHANGE_RATES.USD[selectedCountryData.currency] || 'N/A'} {selectedCountryData?.currency}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="mt-3 pt-3 border-t border-blue-200">
+                              <p className="text-xs text-blue-600">
+                                💡 You'll be redirected to PawaPay's secure payment page to complete your transaction.
+                              </p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      <Button
+                        onClick={handlePawaPayPayment}
+                        disabled={loading || !tokenAmount || tokenAmount <= 0 || !phoneNumber || !phoneValidation.isValid || !selectedCountry}
+                        className={`w-full ${gradientClass} text-white font-semibold py-3 rounded-lg hover:from-orange-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        {loading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Initiating Payment...
+                          </>
+                        ) : (
+                          <>
+                            <Smartphone className="h-4 w-4 mr-2" />
+                            Proceed to PawaPay
+                          </>
+                        )}
+                      </Button>
                     </div>
-                    <p className="text-sm text-gray-500">
-                      {selectedOperator && selectedCountryData ? 
-                        `Enter the mobile number registered with your ${currentOperators.find(op => op.code === selectedOperator)?.name} account` :
-                        'Enter your mobile number without the country code'
-                      }
-                    </p>
                   </div>
-                </div>
-
-                {/* Payment Summary */}
-                {selectedCountry && selectedOperator && tokenAmount > 0 && (
-                  <Card className="bg-blue-50 border-blue-200">
-                    <CardContent className="pt-4">
-                      <div className="flex items-center space-x-2 text-blue-800 mb-3">
-                        <CheckCircle className="h-4 w-4" />
-                        <span className="font-semibold">Payment Summary</span>
-                      </div>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-700">Tokens:</span>
-                          <span className="font-semibold">{tokenAmount} tokens</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-700">Provider:</span>
-                          <span className="font-semibold">
-                            {currentOperators.find(op => op.code === selectedOperator)?.name}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-700">Country:</span>
-                          <span className="font-semibold">{selectedCountryData?.name}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-700">Amount in USD:</span>
-                          <span className="font-semibold">
-                            ${usdAmount.toFixed(2)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-700">Amount to pay:</span>
-                          <span className="font-semibold text-green-700">
-                            {localAmount.toFixed(2)} {selectedCountryData?.currency}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-xs">
-                          <span className="text-gray-500">Exchange rate:</span>
-                          <span className="text-gray-500">
-                            1 USD = {CurrencyConverter.EXCHANGE_RATES.USD[selectedCountryData.currency]} {selectedCountryData?.currency}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="mt-3 pt-3 border-t border-blue-200">
-                        <p className="text-xs text-blue-600">
-                          💡 You'll receive a payment prompt on your phone. Please authorize the payment to complete your token purchase.
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                <Button
-                  onClick={handleMobilePayment}
-                  disabled={loading || !tokenAmount || tokenAmount <= 0 || !phoneNumber || !selectedOperator || !selectedCountry}
-                  className={`w-full ${gradientClass} text-white font-semibold py-3 rounded-lg hover:from-orange-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Initiating Payment...
-                    </>
-                  ) : (
-                    <>
-                      <Smartphone className="h-4 w-4 mr-2" />
-                      Pay with Mobile Money
-                    </>
-                  )}
-                </Button>
-              </div>
+                </TabsContent>
+              </Tabs>
             </div>
 
             {/* Additional Info */}
@@ -712,10 +705,11 @@ const TokenTopUpPage = () => {
                   <div>
                     <p className="font-semibold text-orange-800">Secure Payment Process</p>
                     <p className="text-sm text-orange-600 mt-1">
-                      • Powered by Lenco's secure mobile money infrastructure<br />
+                      • Powered by PawaPay's secure payment infrastructure<br />
                       • Real-time payment verification<br />
                       • Tokens delivered instantly upon confirmation<br />
-                      • 100% secure - no card details required
+                      • Available in 7+ African countries<br />
+                      • 100% secure - processed on PawaPay's platform
                     </p>
                   </div>
                 </div>
