@@ -368,7 +368,7 @@ const TokenTopUpPage = () => {
     {
       icon: <Shield className="h-5 w-5" />,
       title: "Secure Payments",
-      description: "Powered by PawaPay's secure payment infrastructure"
+      description: "Powered by our secure payment infrastructure"
     },
     {
       icon: <Globe className="h-5 w-5" />,
