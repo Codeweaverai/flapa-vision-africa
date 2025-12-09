@@ -14,18 +14,38 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTokens } from '@/hooks/useTokens';
 import ReactCountryFlag from "react-country-flag";
 
-// Currency Converter - Updated with more accurate rates if needed
+// Currency Converter - Updated with accurate rates
 class CurrencyConverter {
   static EXCHANGE_RATES = {
     USD: {
       ZMW: 22.50,  // 1 USD = 22.50 ZMW
       MWK: 1700.00, // 1 USD = 1700 MWK
+      XOF: 600.00,  // 1 USD = 600 XOF (Benin, Burkina Faso, Cote d'Ivoire, Senegal)
+      XAF: 600.00,  // 1 USD = 600 XAF (Cameroon, Gabon)
+      KES: 150.00,  // 1 USD = 150 KES
+      SLE: 22500.00, // 1 USD = 22,500 SLE (Sierra Leone)
+      UGX: 3700.00, // 1 USD = 3,700 UGX
     },
     ZMW: {
       USD: 0.0444,  // 1 ZMW = 0.0444 USD
     },
     MWK: {
       USD: 0.000588, // 1 MWK = 0.000588 USD
+    },
+    XOF: {
+      USD: 0.001667, // 1 XOF = 0.001667 USD
+    },
+    XAF: {
+      USD: 0.001667, // 1 XAF = 0.001667 USD
+    },
+    KES: {
+      USD: 0.006667, // 1 KES = 0.006667 USD
+    },
+    SLE: {
+      USD: 0.000044, // 1 SLE = 0.000044 USD
+    },
+    UGX: {
+      USD: 0.000270, // 1 UGX = 0.000270 USD
     }
   };
 
@@ -34,17 +54,22 @@ class CurrencyConverter {
     
     const rate = this.EXCHANGE_RATES[fromCurrency]?.[toCurrency];
     if (!rate) {
+      // Try reverse rate calculation
+      const reverseRate = this.EXCHANGE_RATES[toCurrency]?.[fromCurrency];
+      if (reverseRate) {
+        return parseFloat((amount / reverseRate).toFixed(2));
+      }
       throw new Error(`No exchange rate available for ${fromCurrency} to ${toCurrency}`);
     }
     
     return parseFloat((amount * rate).toFixed(2));
   }
 
-  static usdToLocal(usdAmount: number, localCurrency: 'ZMW' | 'MWK'): number {
+  static usdToLocal(usdAmount: number, localCurrency: string): number {
     return this.convert(usdAmount, 'USD', localCurrency);
   }
 
-  static localToUsd(localAmount: number, localCurrency: 'ZMW' | 'MWK'): number {
+  static localToUsd(localAmount: number, localCurrency: string): number {
     return this.convert(localAmount, localCurrency, 'USD');
   }
 
@@ -65,40 +90,38 @@ class CurrencyConverter {
   }
 }
 
-// Phone number validation helper
+// Phone number validation helper - Updated for PawaPay requirements
 const validatePhoneNumber = (phone: string, countryCode: string): { isValid: boolean; message?: string } => {
   const phoneDigits = phone.replace(/\D/g, '');
   
-  // Country-specific validation
-  const validationRules: Record<string, { length: number; pattern: RegExp }> = {
-    'ZMB': { length: 9, pattern: /^[0-9]{9}$/ }, // Zambia: 9 digits
-    'MWI': { length: 9, pattern: /^[0-9]{9}$/ }, // Malawi: 9 digits
-    'KEN': { length: 9, pattern: /^[0-9]{9}$/ }, // Kenya: 9 digits
-    'GHA': { length: 9, pattern: /^[0-9]{9}$/ }, // Ghana: 9 digits
-    'NGA': { length: 10, pattern: /^[0-9]{10}$/ }, // Nigeria: 10 digits
-    'UGA': { length: 9, pattern: /^[0-9]{9}$/ }, // Uganda: 9 digits
-    'TZA': { length: 9, pattern: /^[0-9]{9}$/ }, // Tanzania: 9 digits
-  };
-
-  const rule = validationRules[countryCode];
-  
-  if (!rule) {
-    return { isValid: true, message: 'Phone validation not available for this country' };
-  }
-
   if (!phoneDigits) {
     return { isValid: false, message: 'Phone number is required' };
   }
 
-  if (phoneDigits.length !== rule.length) {
-    return { isValid: false, message: `Phone number must be ${rule.length} digits` };
+  // PawaPay accepts phone numbers with country code
+  // Just ensure it's a valid number with reasonable length
+  if (phoneDigits.length < 9 || phoneDigits.length > 15) {
+    return { isValid: false, message: 'Phone number should be between 9-15 digits including country code' };
   }
 
-  if (!rule.pattern.test(phoneDigits)) {
-    return { isValid: false, message: 'Invalid phone number format' };
+  // Ensure it starts with a valid digit (not 0 if country code is included)
+  if (phoneDigits.startsWith('0')) {
+    return { isValid: false, message: 'Please include country code (e.g., +260 for Zambia)' };
+  }
+
+  // Basic digit validation
+  if (!/^[0-9]+$/.test(phoneDigits)) {
+    return { isValid: false, message: 'Phone number should contain only digits' };
   }
 
   return { isValid: true };
+};
+
+// Format phone number for display (adds + sign)
+const formatPhoneForDisplay = (phone: string): string => {
+  const digits = phone.replace(/\D/g, '');
+  if (!digits) return '';
+  return `+${digits}`;
 };
 
 const TokenTopUpPage = () => {
@@ -116,7 +139,7 @@ const TokenTopUpPage = () => {
 
   const availableTokens = getAvailableTokens();
 
-  // PawaPay supported countries (expanded list)
+  // PawaPay supported countries with providers
   const PAWAPAY_COUNTRIES = {
     'ZMB': { 
       name: 'Zambia', 
@@ -125,20 +148,61 @@ const TokenTopUpPage = () => {
       dialCode: '+260', 
       currency: 'ZMW',
       mobileMoneyProviders: [
-        'mtn_zambia',
-        'airtel_zambia',
-        'zamtel'
+        'MTN Zambia',
+        'Airtel Zambia'
       ]
     },
-    'MWI': { 
-      name: 'Malawi', 
-      code: 'MWI', 
-      flag: 'MW', 
-      dialCode: '+265', 
-      currency: 'MWK',
+    'BEN': { 
+      name: 'Benin', 
+      code: 'BEN', 
+      flag: 'BJ', 
+      dialCode: '+229', 
+      currency: 'XOF',
       mobileMoneyProviders: [
-        'airtel_malawi',
-        'tnm_mpamba'
+        'Moov',
+        'MTN'
+      ]
+    },
+    'BFA': { 
+      name: 'Burkina Faso', 
+      code: 'BFA', 
+      flag: 'BF', 
+      dialCode: '+226', 
+      currency: 'XOF',
+      mobileMoneyProviders: [
+        'Moov',
+        'Orange'
+      ]
+    },
+    'CMR': { 
+      name: 'Cameroon', 
+      code: 'CMR', 
+      flag: 'CM', 
+      dialCode: '+237', 
+      currency: 'XAF',
+      mobileMoneyProviders: [
+        'MTN'
+      ]
+    },
+    'CIV': { 
+      name: 'Cote d\'Ivoire', 
+      code: 'CIV', 
+      flag: 'CI', 
+      dialCode: '+225', 
+      currency: 'XOF',
+      mobileMoneyProviders: [
+        'MTN',
+        'Orange'
+      ]
+    },
+    'GAB': { 
+      name: 'Gabon', 
+      code: 'GAB', 
+      flag: 'GA', 
+      dialCode: '+241', 
+      currency: 'XAF',
+      mobileMoneyProviders: [
+        'Airtel'
       ]
     },
     'KEN': { 
@@ -148,33 +212,28 @@ const TokenTopUpPage = () => {
       dialCode: '+254', 
       currency: 'KES',
       mobileMoneyProviders: [
-        'mpesa',
-        'airtel_kenya'
+        'Safaricom (M-Pesa)'
       ]
     },
-    'GHA': { 
-      name: 'Ghana', 
-      code: 'GHA', 
-      flag: 'GH', 
-      dialCode: '+233', 
-      currency: 'GHS',
+    'SEN': { 
+      name: 'Senegal', 
+      code: 'SEN', 
+      flag: 'SN', 
+      dialCode: '+221', 
+      currency: 'XOF',
       mobileMoneyProviders: [
-        'mtn_momo',
-        'vodafone_cash',
-        'airteltigo'
+        'Free',
+        'Orange'
       ]
     },
-    'NGA': { 
-      name: 'Nigeria', 
-      code: 'NGA', 
-      flag: 'NG', 
-      dialCode: '+234', 
-      currency: 'NGN',
+    'SLE': { 
+      name: 'Sierra Leone', 
+      code: 'SLE', 
+      flag: 'SL', 
+      dialCode: '+232', 
+      currency: 'SLE',
       mobileMoneyProviders: [
-        'opay',
-        'palmpay',
-        'mtn_momo',
-        'airtel_money'
+        'Orange'
       ]
     },
     'UGA': { 
@@ -184,20 +243,8 @@ const TokenTopUpPage = () => {
       dialCode: '+256', 
       currency: 'UGX',
       mobileMoneyProviders: [
-        'mtn_momo',
-        'airtel_money'
-      ]
-    },
-    'TZA': { 
-      name: 'Tanzania', 
-      code: 'TZA', 
-      flag: 'TZ', 
-      dialCode: '+255', 
-      currency: 'TZS',
-      mobileMoneyProviders: [
-        'mpesa',
-        'tigo_pesa',
-        'airtel_money'
+        'Airtel',
+        'MTN'
       ]
     }
   };
@@ -220,12 +267,20 @@ const TokenTopUpPage = () => {
     return calculatePrice(tokens);
   };
 
-  const formatPhoneNumber = (phone: string, countryDialCode: string) => {
+  // For PawaPay, we send the phone number AS-IS (with country code)
+  // The user should enter it with country code
+  const formatPhoneNumberForAPI = (phone: string): string => {
+    // Remove any non-digit characters and ensure it starts with country code
     let formatted = phone.replace(/\D/g, '');
     
-    // Remove country code if it's already included
-    if (formatted.startsWith(countryDialCode.replace('+', ''))) {
-      formatted = formatted.substring(countryDialCode.replace('+', '').length);
+    // If the user entered without +, ensure we have the country code
+    const selectedCountryData = PAWAPAY_COUNTRIES[selectedCountry as keyof typeof PAWAPAY_COUNTRIES];
+    if (selectedCountryData) {
+      const countryCodeDigits = selectedCountryData.dialCode.replace('+', '');
+      // If phone doesn't start with country code, add it
+      if (!formatted.startsWith(countryCodeDigits)) {
+        formatted = countryCodeDigits + formatted;
+      }
     }
     
     return formatted;
@@ -267,14 +322,14 @@ const TokenTopUpPage = () => {
         throw new Error('Invalid country selected');
       }
 
-      // Format phone number
-      const formattedPhone = formatPhoneNumber(phoneNumber, selectedCountryData.dialCode);
+      // Format phone number for PawaPay (with country code)
+      const formattedPhone = formatPhoneNumberForAPI(phoneNumber);
       
       // Calculate USD amount
       const usdAmount = calculateCost(tokenAmount);
       
       // Convert to local currency (in cents for PawaPay)
-      const localAmount = CurrencyConverter.usdToLocal(usdAmount, selectedCountryData.currency as 'ZMW' | 'MWK');
+      const localAmount = CurrencyConverter.usdToLocal(usdAmount, selectedCountryData.currency);
       const amountInCents = Math.round(localAmount * 100); // PawaPay expects amount in cents
       
       // Show payment initiation message
@@ -312,7 +367,7 @@ const TokenTopUpPage = () => {
 
       if (data?.success && data.redirectUrl) {
         toast.dismiss();
-        toast.success('Redirecting to PawaPay payment page...');
+        toast.success('Redirecting to payment page...');
         
         // Redirect to PawaPay payment page
         window.location.href = data.redirectUrl;
@@ -359,6 +414,14 @@ const TokenTopUpPage = () => {
     checkPendingPayments();
   }, []);
 
+  // Update phone validation when country changes
+  useEffect(() => {
+    if (phoneNumber) {
+      const validation = validatePhoneNumber(phoneNumber, selectedCountry);
+      setPhoneValidation(validation);
+    }
+  }, [selectedCountry]);
+
   const features = [
     {
       icon: <Zap className="h-5 w-5" />,
@@ -368,12 +431,12 @@ const TokenTopUpPage = () => {
     {
       icon: <Shield className="h-5 w-5" />,
       title: "Secure Payments",
-      description: "Powered by our secure payment infrastructure"
+      description: "Powered by secure payment infrastructure"
     },
     {
       icon: <Globe className="h-5 w-5" />,
       title: "Multiple Countries",
-      description: "Available in 7+ African countries"
+      description: "Available in 10+ African countries"
     },
     {
       icon: <Gift className="h-5 w-5" />,
@@ -389,7 +452,7 @@ const TokenTopUpPage = () => {
   
   const usdAmount = tokenAmount ? calculateCost(tokenAmount) : 0;
   const localAmount = selectedCountryData 
-    ? CurrencyConverter.usdToLocal(usdAmount, selectedCountryData.currency as 'ZMW' | 'MWK')
+    ? CurrencyConverter.usdToLocal(usdAmount, selectedCountryData.currency)
     : 0;
 
   return (
@@ -456,7 +519,7 @@ const TokenTopUpPage = () => {
               Purchase Tokens
             </CardTitle>
             <CardDescription className="text-lg">
-              Pay with mobile money 
+              Pay with mobile money across 10+ African countries
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -567,7 +630,7 @@ const TokenTopUpPage = () => {
                             <SelectTrigger className="border-gray-300 focus:border-orange-500 focus:ring-orange-500">
                               <SelectValue placeholder="Select country" />
                             </SelectTrigger>
-                            <SelectContent className="min-w-[300px] max-h-[300px]">
+                            <SelectContent className="min-w-[300px] max-h-[400px]">
                               {Object.values(PAWAPAY_COUNTRIES).map((country) => (
                                 <SelectItem key={country.code} value={country.code}>
                                   <div className="flex items-center gap-3 py-1">
@@ -584,13 +647,24 @@ const TokenTopUpPage = () => {
                                     />
                                     <div className="flex flex-col">
                                       <span className="font-medium text-gray-800 text-sm">{country.name}</span>
-                                      <span className="text-xs text-gray-500">{country.dialCode} • {country.currency}</span>
+                                      <div className="flex items-center gap-1 text-xs text-gray-500">
+                                        <span>{country.dialCode}</span>
+                                        <span>•</span>
+                                        <span>{country.currency}</span>
+                                        <span>•</span>
+                                        <span className="text-green-600">{country.mobileMoneyProviders.length} providers</span>
+                                      </div>
                                     </div>
                                   </div>
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
+                          {selectedCountryData && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              Available providers: {selectedCountryData.mobileMoneyProviders.join(', ')}
+                            </div>
+                          )}
                         </div>
 
                         {/* Phone Number */}
@@ -605,19 +679,25 @@ const TokenTopUpPage = () => {
                             <Input
                               id="phoneNumber"
                               type="tel"
-                              placeholder={selectedCountryData ? `Enter your ${selectedCountryData.name} mobile number` : 'Select country first'}
+                              placeholder={selectedCountryData ? `${selectedCountryData.dialCode} 96 123 4567` : 'Select country first'}
                               value={phoneNumber}
                               onChange={(e) => handlePhoneNumberChange(e.target.value)}
                               disabled={!selectedCountry}
                               className="pl-20 border-gray-300 focus:border-orange-500 focus:ring-orange-500"
                             />
                           </div>
-                          {!phoneValidation.isValid && (
+                          {!phoneValidation.isValid ? (
                             <p className="text-sm text-red-600">{phoneValidation.message}</p>
+                          ) : (
+                            <p className="text-sm text-gray-500">
+                              Enter your phone number with country code (e.g., {selectedCountryData?.dialCode} 96 123 4567)
+                            </p>
                           )}
-                          <p className="text-sm text-gray-500">
-                            Enter the mobile number registered with your mobile money account
-                          </p>
+                          {phoneNumber && phoneValidation.isValid && (
+                            <div className="text-xs text-green-600">
+                              ✓ Format valid: {formatPhoneForDisplay(phoneNumber)}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -641,7 +721,7 @@ const TokenTopUpPage = () => {
                               <div className="flex justify-between">
                                 <span className="text-gray-700">Phone Number:</span>
                                 <span className="font-semibold">
-                                  {selectedCountryData?.dialCode} {formatPhoneNumber(phoneNumber, selectedCountryData?.dialCode || '')}
+                                  {formatPhoneForDisplay(phoneNumber)}
                                 </span>
                               </div>
                               <div className="flex justify-between">
@@ -666,6 +746,7 @@ const TokenTopUpPage = () => {
                             <div className="mt-3 pt-3 border-t border-blue-200">
                               <p className="text-xs text-blue-600">
                                 💡 You'll be redirected to our secure payment page to complete your transaction.
+                                Please ensure you enter the correct phone number registered with your mobile money account.
                               </p>
                             </div>
                           </CardContent>
@@ -685,7 +766,7 @@ const TokenTopUpPage = () => {
                         ) : (
                           <>
                             <Smartphone className="h-4 w-4 mr-2" />
-                            Proceed to with Mobile Money
+                            Proceed with Mobile Money
                           </>
                         )}
                       </Button>
@@ -708,8 +789,8 @@ const TokenTopUpPage = () => {
                       • Powered by secure payment infrastructure<br />
                       • Real-time payment verification<br />
                       • Tokens delivered instantly upon confirmation<br />
-                      • Available in 7+ African countries<br />
-                      • 100% secure 
+                      • Available in 10+ African countries<br />
+                      • 100% secure - no sensitive data stored
                     </p>
                   </div>
                 </div>
