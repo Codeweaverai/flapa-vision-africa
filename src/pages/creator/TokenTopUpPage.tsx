@@ -456,7 +456,7 @@ const TokenTopUpPage = () => {
               Purchase Tokens
             </CardTitle>
             <CardDescription className="text-lg">
-              Pay with mobile money via PawaPay
+              Pay with mobile money 
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -665,7 +665,7 @@ const TokenTopUpPage = () => {
                             </div>
                             <div className="mt-3 pt-3 border-t border-blue-200">
                               <p className="text-xs text-blue-600">
-                                💡 You'll be redirected to PawaPay's secure payment page to complete your transaction.
+                                💡 You'll be redirected to our secure payment page to complete your transaction.
                               </p>
                             </div>
                           </CardContent>
@@ -685,7 +685,7 @@ const TokenTopUpPage = () => {
                         ) : (
                           <>
                             <Smartphone className="h-4 w-4 mr-2" />
-                            Proceed to PawaPay
+                            Proceed to with Mobile Money
                           </>
                         )}
                       </Button>
