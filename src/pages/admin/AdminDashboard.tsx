@@ -18,7 +18,11 @@ import {
   RefreshCw,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Cpu,
+  Database,
+  Zap,
+  Server
 } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -70,11 +74,17 @@ const AdminDashboard = () => {
   const [generatingCourseEmbeddings, setGeneratingCourseEmbeddings] = useState(false);
   const [generatingEventEmbeddings, setGeneratingEventEmbeddings] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(false);
+  const [operationLogs, setOperationLogs] = useState<string[]>([]);
 
   useEffect(() => {
     fetchDashboardStats();
     checkEmbeddingsStatus();
   }, []);
+
+  const addLog = (message: string) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setOperationLogs(prev => [`[${timestamp}] ${message}`, ...prev.slice(0, 9)]);
+  };
 
   const fetchDashboardStats = async () => {
     try {
@@ -143,17 +153,23 @@ const AdminDashboard = () => {
   const checkEmbeddingsStatus = async () => {
     try {
       setCheckingStatus(true);
+      addLog('Checking embeddings status...');
+      
+      // Add authentication headers
+      const { data: { session } } = await supabase.auth.getSession();
       
       const response = await fetch(EMBEDDINGS_ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`,
         },
         body: JSON.stringify({ action: 'check_status' }),
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
       const result = await response.json();
@@ -161,12 +177,15 @@ const AdminDashboard = () => {
       if (result.success) {
         setEmbeddingsStatus(result.data);
         toast.success('Embeddings status updated');
+        addLog(`Status updated: ${result.data.courses.with_embeddings} course embeddings, ${result.data.events.with_embeddings} event embeddings`);
       } else {
         toast.error(result.error || 'Failed to check embeddings status');
+        addLog(`Error: ${result.error || 'Failed to check status'}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error checking embeddings status:', error);
       toast.error('Failed to check embeddings status');
+      addLog(`Error: ${error.message}`);
     } finally {
       setCheckingStatus(false);
     }
@@ -175,36 +194,45 @@ const AdminDashboard = () => {
   const generateCourseEmbeddings = async () => {
     try {
       setGeneratingCourseEmbeddings(true);
+      addLog('Starting course embeddings generation...');
       
       toast.info('Starting course embeddings generation...');
+      
+      // Add authentication headers
+      const { data: { session } } = await supabase.auth.getSession();
       
       const response = await fetch(EMBEDDINGS_ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`,
         },
         body: JSON.stringify({ 
           action: 'generate_course_embeddings',
-          batchSize: 20 
+          batchSize: 10 // Reduced for safety
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
       const result = await response.json();
       
       if (result.success) {
         toast.success(`Successfully processed ${result.processed} course embeddings`);
+        addLog(`Generated ${result.processed} course embeddings, ${result.errors} errors`);
         // Refresh status after generation
         await checkEmbeddingsStatus();
       } else {
         toast.error(result.error || 'Failed to generate course embeddings');
+        addLog(`Error: ${result.error || 'Failed to generate'}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating course embeddings:', error);
       toast.error('Failed to generate course embeddings');
+      addLog(`Error: ${error.message}`);
     } finally {
       setGeneratingCourseEmbeddings(false);
     }
@@ -213,38 +241,67 @@ const AdminDashboard = () => {
   const generateEventEmbeddings = async () => {
     try {
       setGeneratingEventEmbeddings(true);
+      addLog('Starting event embeddings generation...');
       
       toast.info('Starting event embeddings generation...');
+      
+      // Add authentication headers
+      const { data: { session } } = await supabase.auth.getSession();
       
       const response = await fetch(EMBEDDINGS_ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`,
         },
         body: JSON.stringify({ 
           action: 'generate_event_embeddings',
-          batchSize: 20 
+          batchSize: 10 // Reduced for safety
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
       const result = await response.json();
       
       if (result.success) {
         toast.success(`Successfully processed ${result.processed} event embeddings`);
+        addLog(`Generated ${result.processed} event embeddings, ${result.errors} errors`);
         // Refresh status after generation
         await checkEmbeddingsStatus();
       } else {
         toast.error(result.error || 'Failed to generate event embeddings');
+        addLog(`Error: ${result.error || 'Failed to generate'}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating event embeddings:', error);
       toast.error('Failed to generate event embeddings');
+      addLog(`Error: ${error.message}`);
     } finally {
       setGeneratingEventEmbeddings(false);
+    }
+  };
+
+  const generateAllEmbeddings = async () => {
+    try {
+      addLog('Starting all embeddings generation...');
+      toast.info('Starting all embeddings generation...');
+      
+      // Generate course embeddings first
+      await generateCourseEmbeddings();
+      
+      // Then generate event embeddings
+      await generateEventEmbeddings();
+      
+      toast.success('All embeddings generation completed');
+      addLog('All embeddings generation completed');
+    } catch (error: any) {
+      console.error('Error generating all embeddings:', error);
+      toast.error('Failed to generate all embeddings');
+      addLog(`Error: ${error.message}`);
     }
   };
 
@@ -283,405 +340,404 @@ const AdminDashboard = () => {
 
   return (
     <AdminLayout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50">
-        <div className="space-y-8 p-8">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
+        <div className="space-y-8 p-6">
           {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent mb-2">
-              Admin Dashboard
-            </h1>
-            <p className="text-gray-600 text-lg">Monitor and manage your learning platform</p>
+          <div className="mb-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-2">
+                  Admin Dashboard
+                </h1>
+                <p className="text-gray-600">Monitor and manage your learning platform</p>
+              </div>
+              <Button
+                onClick={checkEmbeddingsStatus}
+                disabled={checkingStatus}
+                variant="outline"
+                className="border-gray-300 hover:bg-gray-50"
+              >
+                {checkingStatus ? (
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                Refresh All
+              </Button>
+            </div>
           </div>
 
           {/* Stats Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white border-0 shadow-xl">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium opacity-90">Total Users</CardTitle>
-                <Users className="h-5 w-5 opacity-80" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{stats.totalUsers}</div>
-                <p className="text-xs opacity-80 mt-1">
-                  +{stats.recentRegistrations} this week
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0 shadow-xl">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium opacity-90">Active Courses</CardTitle>
-                <BookOpen className="h-5 w-5 opacity-80" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{stats.totalCourses}</div>
-                <p className="text-xs opacity-80 mt-1">
-                  {stats.activeEnrollments} active enrollments
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-orange-400 to-purple-500 text-white border-0 shadow-xl">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium opacity-90">Total Events</CardTitle>
-                <Calendar className="h-5 w-5 opacity-80" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{stats.totalEvents}</div>
-                <p className="text-xs opacity-80 mt-1">
-                  Learning opportunities
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-purple-400 to-orange-500 text-white border-0 shadow-xl">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium opacity-90">Revenue</CardTitle>
-                <DollarSign className="h-5 w-5 opacity-80" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">${stats.totalRevenue}</div>
-                <p className="text-xs opacity-80 mt-1">
-                  Total platform revenue
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* AI Embeddings Section */}
-          <Card className="bg-gradient-to-br from-indigo-50 to-purple-50 border-0 shadow-xl">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                <Sparkles className="h-5 w-5" />
-                AI Embeddings Management
-              </CardTitle>
-              <p className="text-sm text-gray-600">
-                Generate AI embeddings for semantic search and recommendations
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {/* Course Embeddings Status */}
-                <div className="space-y-4 p-4 bg-white rounded-lg shadow-sm border border-gray-100">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <BookOpen className="h-5 w-5 text-indigo-600" />
-                      <h3 className="font-semibold text-gray-900">Course Embeddings</h3>
-                    </div>
-                    {embeddingsStatus.courses.remaining === 0 ? (
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <AlertCircle className="h-5 w-5 text-amber-500" />
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Total Courses:</span>
-                      <span className="font-medium">{embeddingsStatus.courses.total}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">With Embeddings:</span>
-                      <span className="font-medium text-green-600">{embeddingsStatus.courses.with_embeddings}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Remaining:</span>
-                      <span className={`font-medium ${embeddingsStatus.courses.remaining > 0 ? 'text-amber-600' : 'text-green-600'}`}>
-                        {embeddingsStatus.courses.remaining}
-                      </span>
-                    </div>
-                  </div>
-                  <Progress 
-                    value={(embeddingsStatus.courses.with_embeddings / Math.max(embeddingsStatus.courses.total, 1)) * 100} 
-                    className="h-2"
-                  />
-                  <Button
-                    onClick={generateCourseEmbeddings}
-                    disabled={generatingCourseEmbeddings || embeddingsStatus.courses.remaining === 0}
-                    className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
-                  >
-                    {generatingCourseEmbeddings ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        Generate Course Embeddings
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                {/* Event Embeddings Status */}
-                <div className="space-y-4 p-4 bg-white rounded-lg shadow-sm border border-gray-100">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-5 w-5 text-purple-600" />
-                      <h3 className="font-semibold text-gray-900">Event Embeddings</h3>
-                    </div>
-                    {embeddingsStatus.events.remaining === 0 ? (
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <AlertCircle className="h-5 w-5 text-amber-500" />
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Total Events:</span>
-                      <span className="font-medium">{embeddingsStatus.events.total}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">With Embeddings:</span>
-                      <span className="font-medium text-green-600">{embeddingsStatus.events.with_embeddings}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Remaining:</span>
-                      <span className={`font-medium ${embeddingsStatus.events.remaining > 0 ? 'text-amber-600' : 'text-green-600'}`}>
-                        {embeddingsStatus.events.remaining}
-                      </span>
-                    </div>
-                  </div>
-                  <Progress 
-                    value={(embeddingsStatus.events.with_embeddings / Math.max(embeddingsStatus.events.total, 1)) * 100} 
-                    className="h-2"
-                  />
-                  <Button
-                    onClick={generateEventEmbeddings}
-                    disabled={generatingEventEmbeddings || embeddingsStatus.events.remaining === 0}
-                    className="w-full bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700"
-                  >
-                    {generatingEventEmbeddings ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        Generate Event Embeddings
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                {/* Status Summary Card */}
-                <div className="lg:col-span-2 space-y-4 p-6 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg shadow-lg">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { icon: Users, label: 'Total Users', value: stats.totalUsers, color: 'bg-blue-500', trend: `+${stats.recentRegistrations} this week` },
+              { icon: BookOpen, label: 'Active Courses', value: stats.totalCourses, color: 'bg-emerald-500', trend: `${stats.activeEnrollments} enrollments` },
+              { icon: Calendar, label: 'Total Events', value: stats.totalEvents, color: 'bg-violet-500', trend: 'Learning opportunities' },
+              { icon: DollarSign, label: 'Revenue', value: `$${stats.totalRevenue}`, color: 'bg-amber-500', trend: 'Total revenue' },
+            ].map((stat, idx) => (
+              <Card key={idx} className="border-0 shadow-sm hover:shadow-md transition-shadow duration-300">
+                <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-semibold text-white text-lg">Embeddings Summary</h3>
-                      <p className="text-indigo-100 text-sm mt-1">
-                        AI-powered semantic search readiness
-                      </p>
+                      <p className="text-sm font-medium text-gray-600">{stat.label}</p>
+                      <p className="text-2xl font-bold text-gray-900 mt-2">{stat.value}</p>
+                      <p className="text-xs text-gray-500 mt-1">{stat.trend}</p>
                     </div>
-                    <Button
-                      onClick={checkEmbeddingsStatus}
-                      disabled={checkingStatus}
-                      variant="secondary"
-                      className="bg-white/20 hover:bg-white/30 text-white border-0"
-                    >
-                      {checkingStatus ? (
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-4 w-4" />
-                      )}
-                    </Button>
+                    <div className={`${stat.color} p-3 rounded-xl text-white`}>
+                      <stat.icon className="h-6 w-6" />
+                    </div>
                   </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-3 bg-white/10 rounded-lg">
-                      <div className="text-2xl font-bold text-white">
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* AI Embeddings Management - Modern Redesign */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-lg">
+                    <Cpu className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl font-bold text-gray-900">AI Embeddings Management</CardTitle>
+                    <p className="text-sm text-gray-600 mt-1">Generate embeddings for semantic search and recommendations</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium px-2 py-1 rounded-full bg-gray-100 text-gray-700">
+                    OpenAI API
+                  </span>
+                  <span className="text-xs font-medium px-2 py-1 rounded-full bg-blue-100 text-blue-700">
+                    text-embedding-3-small
+                  </span>
+                </div>
+              </div>
+            </CardHeader>
+            
+            <CardContent className="space-y-6">
+              {/* Status Overview */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Database className="h-5 w-5 text-blue-600" />
+                      <h3 className="font-semibold text-gray-900">Courses</h3>
+                    </div>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      embeddingsStatus.courses.remaining === 0 
+                        ? 'bg-green-100 text-green-700' 
+                        : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {embeddingsStatus.courses.remaining === 0 ? 'Complete' : 'Pending'}
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Coverage</span>
+                      <span className="font-bold text-gray-900">
                         {embeddingsStatus.courses.total > 0 
                           ? ((embeddingsStatus.courses.with_embeddings / embeddingsStatus.courses.total) * 100).toFixed(0)
                           : '0'}%
-                      </div>
-                      <div className="text-sm text-indigo-200">Course Coverage</div>
+                      </span>
                     </div>
-                    <div className="text-center p-3 bg-white/10 rounded-lg">
-                      <div className="text-2xl font-bold text-white">
+                    <Progress 
+                      value={(embeddingsStatus.courses.with_embeddings / Math.max(embeddingsStatus.courses.total, 1)) * 100} 
+                      className="h-2"
+                    />
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="text-center p-2 bg-white rounded-lg">
+                        <div className="font-bold text-blue-600">{embeddingsStatus.courses.with_embeddings}</div>
+                        <div className="text-xs text-gray-500">Processed</div>
+                      </div>
+                      <div className="text-center p-2 bg-white rounded-lg">
+                        <div className={`font-bold ${
+                          embeddingsStatus.courses.remaining > 0 ? 'text-amber-600' : 'text-green-600'
+                        }`}>
+                          {embeddingsStatus.courses.remaining}
+                        </div>
+                        <div className="text-xs text-gray-500">Remaining</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-5 w-5 text-purple-600" />
+                      <h3 className="font-semibold text-gray-900">Events</h3>
+                    </div>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      embeddingsStatus.events.remaining === 0 
+                        ? 'bg-green-100 text-green-700' 
+                        : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {embeddingsStatus.events.remaining === 0 ? 'Complete' : 'Pending'}
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Coverage</span>
+                      <span className="font-bold text-gray-900">
                         {embeddingsStatus.events.total > 0 
                           ? ((embeddingsStatus.events.with_embeddings / embeddingsStatus.events.total) * 100).toFixed(0)
                           : '0'}%
+                      </span>
+                    </div>
+                    <Progress 
+                      value={(embeddingsStatus.events.with_embeddings / Math.max(embeddingsStatus.events.total, 1)) * 100} 
+                      className="h-2"
+                    />
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="text-center p-2 bg-white rounded-lg">
+                        <div className="font-bold text-purple-600">{embeddingsStatus.events.with_embeddings}</div>
+                        <div className="text-xs text-gray-500">Processed</div>
                       </div>
-                      <div className="text-sm text-indigo-200">Event Coverage</div>
+                      <div className="text-center p-2 bg-white rounded-lg">
+                        <div className={`font-bold ${
+                          embeddingsStatus.events.remaining > 0 ? 'text-amber-600' : 'text-green-600'
+                        }`}>
+                          {embeddingsStatus.events.remaining}
+                        </div>
+                        <div className="text-xs text-gray-500">Remaining</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200 md:col-span-2 lg:col-span-2">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Server className="h-5 w-5 text-gray-600" />
+                      <h3 className="font-semibold text-gray-900">Operations</h3>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={checkEmbeddingsStatus}
+                        disabled={checkingStatus}
+                        size="sm"
+                        variant="outline"
+                        className="border-gray-300"
+                      >
+                        {checkingStatus ? (
+                          <RefreshCw className="h-3 w-3 mr-2 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3 w-3 mr-2" />
+                        )}
+                        Status
+                      </Button>
+                      <Button
+                        onClick={generateAllEmbeddings}
+                        disabled={generatingCourseEmbeddings || generatingEventEmbeddings}
+                        size="sm"
+                        className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
+                      >
+                        <Zap className="h-3 w-3 mr-2" />
+                        Generate All
+                      </Button>
                     </div>
                   </div>
                   
-                  <div className="pt-4 border-t border-white/20">
-                    <p className="text-sm text-indigo-200">
-                      Total Items to Process: <span className="font-semibold text-white">
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button
+                        onClick={generateCourseEmbeddings}
+                        disabled={generatingCourseEmbeddings || embeddingsStatus.courses.remaining === 0}
+                        size="sm"
+                        className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
+                      >
+                        {generatingCourseEmbeddings ? (
+                          <>
+                            <RefreshCw className="h-3 w-3 mr-2 animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <BookOpen className="h-3 w-3 mr-2" />
+                            Generate Courses
+                          </>
+                        )}
+                      </Button>
+                      
+                      <Button
+                        onClick={generateEventEmbeddings}
+                        disabled={generatingEventEmbeddings || embeddingsStatus.events.remaining === 0}
+                        size="sm"
+                        className="w-full bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700"
+                      >
+                        {generatingEventEmbeddings ? (
+                          <>
+                            <RefreshCw className="h-3 w-3 mr-2 animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <Calendar className="h-3 w-3 mr-2" />
+                            Generate Events
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                    
+                    {/* Operation Logs */}
+                    <div className="bg-gray-50 rounded-lg p-3 max-h-32 overflow-y-auto">
+                      <p className="text-xs font-medium text-gray-700 mb-2">Recent Operations</p>
+                      <div className="space-y-1">
+                        {operationLogs.length > 0 ? (
+                          operationLogs.map((log, idx) => (
+                            <div key={idx} className="text-xs text-gray-600 font-mono">
+                              {log}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-xs text-gray-400 italic">No operations yet</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-3 bg-white border border-gray-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Total Items</p>
+                      <p className="text-xl font-bold text-gray-900">
+                        {embeddingsStatus.courses.total + embeddingsStatus.events.total}
+                      </p>
+                    </div>
+                    <Database className="h-5 w-5 text-gray-400" />
+                  </div>
+                </div>
+                
+                <div className="p-3 bg-white border border-gray-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">With Embeddings</p>
+                      <p className="text-xl font-bold text-green-600">
+                        {embeddingsStatus.courses.with_embeddings + embeddingsStatus.events.with_embeddings}
+                      </p>
+                    </div>
+                    <CheckCircle className="h-5 w-5 text-green-400" />
+                  </div>
+                </div>
+                
+                <div className="p-3 bg-white border border-gray-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">To Process</p>
+                      <p className={`text-xl font-bold ${
+                        (embeddingsStatus.courses.remaining + embeddingsStatus.events.remaining) > 0 
+                          ? 'text-amber-600' 
+                          : 'text-green-600'
+                      }`}>
                         {embeddingsStatus.courses.remaining + embeddingsStatus.events.remaining}
-                      </span>
-                    </p>
-                    <p className="text-xs text-indigo-200 mt-1">
-                      Endpoint: {EMBEDDINGS_ENDPOINT}
-                    </p>
+                      </p>
+                    </div>
+                    <AlertCircle className="h-5 w-5 text-amber-400" />
                   </div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Secondary Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Course Completions</CardTitle>
-                <Award className="h-5 w-5 text-orange-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-gray-900">{stats.completedCourses}</div>
-                <Progress value={stats.activeEnrollments > 0 ? (stats.completedCourses / stats.activeEnrollments) * 100 : 0} className="mt-2" />
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Certificates Issued</CardTitle>
-                <UserCheck className="h-5 w-5 text-purple-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-gray-900">{stats.certificatesIssued}</div>
-                <Progress value={stats.completedCourses > 0 ? (stats.certificatesIssued / stats.completedCourses) * 100 : 0} className="mt-2" />
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Engagement Rate</CardTitle>
-                <TrendingUp className="h-5 w-5 text-orange-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-gray-900">
-                  {stats.totalUsers > 0 ? ((stats.activeEnrollments / stats.totalUsers) * 100).toFixed(1) : '0'}%
-                </div>
-                <Progress value={stats.totalUsers > 0 ? (stats.activeEnrollments / stats.totalUsers) * 100 : 0} className="mt-2" />
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Success Rate</CardTitle>
-                <Play className="h-5 w-5 text-purple-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-gray-900">
-                  {stats.activeEnrollments > 0 ? ((stats.completedCourses / stats.activeEnrollments) * 100).toFixed(1) : '0'}%
-                </div>
-                <Progress value={stats.activeEnrollments > 0 ? (stats.completedCourses / stats.activeEnrollments) * 100 : 0} className="mt-2" />
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Charts */}
+          {/* Charts Section */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+            <Card className="border-0 shadow-lg">
               <CardHeader>
-                <CardTitle className="text-lg font-semibold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                  Enrollment Trends
-                </CardTitle>
+                <CardTitle className="text-lg font-semibold text-gray-900">Enrollment Trends</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={enrollmentData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="enrollments" stroke="#f97316" strokeWidth={2} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="name" stroke="#666" />
+                    <YAxis stroke="#666" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'white', 
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '6px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="enrollments" 
+                      stroke="#3b82f6" 
+                      strokeWidth={3}
+                      dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
 
-            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+            <Card className="border-0 shadow-lg">
               <CardHeader>
-                <CardTitle className="text-lg font-semibold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                  Course Completions by Category
-                </CardTitle>
+                <CardTitle className="text-lg font-semibold text-gray-900">Course Completions by Category</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={courseCompletionData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="category" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="completions" fill="#a855f7" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="category" stroke="#666" />
+                    <YAxis stroke="#666" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'white', 
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '6px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}
+                    />
+                    <Bar 
+                      dataKey="completions" 
+                      fill="#8b5cf6" 
+                      radius={[4, 4, 0, 0]}
+                      activeBar={{ fill: '#7c3aed', stroke: '#7c3aed', strokeWidth: 1 }}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
           </div>
 
-          {/* User Engagement Chart */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-1 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                  User Engagement
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={userEngagementData}
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {userEngagementData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card className="lg:col-span-2 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                  Quick Actions
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <Badge variant="outline" className="p-4 cursor-pointer hover:bg-orange-50 border-orange-200">
-                    <Users className="h-4 w-4 mr-2 text-orange-600" />
-                    Manage Users
-                  </Badge>
-                  <Badge variant="outline" className="p-4 cursor-pointer hover:bg-purple-50 border-purple-200">
-                    <BookOpen className="h-4 w-4 mr-2 text-purple-600" />
-                    Review Courses
-                  </Badge>
-                  <Badge variant="outline" className="p-4 cursor-pointer hover:bg-orange-50 border-orange-200">
-                    <Calendar className="h-4 w-4 mr-2 text-orange-600" />
-                    Event Management
-                  </Badge>
-                  <Badge variant="outline" className="p-4 cursor-pointer hover:bg-purple-50 border-purple-200">
-                    <DollarSign className="h-4 w-4 mr-2 text-purple-600" />
-                    Revenue Reports
-                  </Badge>
-                  <Badge variant="outline" className="p-4 cursor-pointer hover:bg-orange-50 border-orange-200">
-                    <Award className="h-4 w-4 mr-2 text-orange-600" />
-                    Certificates
-                  </Badge>
-                  <Badge variant="outline" className="p-4 cursor-pointer hover:bg-purple-50 border-purple-200">
-                    <TrendingUp className="h-4 w-4 mr-2 text-purple-600" />
-                    Analytics
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          {/* Quick Actions */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold text-gray-900">Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {[
+                  { icon: Users, label: 'Manage Users', color: 'bg-blue-500' },
+                  { icon: BookOpen, label: 'Courses', color: 'bg-emerald-500' },
+                  { icon: Calendar, label: 'Events', color: 'bg-violet-500' },
+                  { icon: DollarSign, label: 'Revenue', color: 'bg-amber-500' },
+                  { icon: Award, label: 'Certificates', color: 'bg-rose-500' },
+                  { icon: TrendingUp, label: 'Analytics', color: 'bg-indigo-500' },
+                ].map((action, idx) => (
+                  <button
+                    key={idx}
+                    className="group p-4 bg-white border border-gray-200 rounded-xl hover:border-gray-300 hover:shadow-md transition-all duration-200"
+                  >
+                    <div className="flex flex-col items-center gap-3">
+                      <div className={`${action.color} p-3 rounded-lg text-white group-hover:scale-110 transition-transform duration-200`}>
+                        <action.icon className="h-5 w-5" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-700">{action.label}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </AdminLayout>
