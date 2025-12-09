@@ -47,6 +47,8 @@ interface EmbeddingsStatus {
   };
 }
 
+const EMBEDDINGS_ENDPOINT = 'https://rxqoczksnddbxcdwobnw.supabase.co/functions/v1/generate-embeddings-';
+
 const AdminDashboard = () => {
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
@@ -142,11 +144,9 @@ const AdminDashboard = () => {
     try {
       setCheckingStatus(true);
       
-      // Call your edge function to check embeddings status
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-embeddings-`, {
+      const response = await fetch(EMBEDDINGS_ENDPOINT, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ action: 'check_status' }),
@@ -178,10 +178,9 @@ const AdminDashboard = () => {
       
       toast.info('Starting course embeddings generation...');
       
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-embeddings`, {
+      const response = await fetch(EMBEDDINGS_ENDPOINT, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
@@ -217,10 +216,9 @@ const AdminDashboard = () => {
       
       toast.info('Starting event embeddings generation...');
       
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-embeddings`, {
+      const response = await fetch(EMBEDDINGS_ENDPOINT, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
@@ -393,7 +391,7 @@ const AdminDashboard = () => {
                     </div>
                   </div>
                   <Progress 
-                    value={(embeddingsStatus.courses.with_embeddings / embeddingsStatus.courses.total) * 100} 
+                    value={(embeddingsStatus.courses.with_embeddings / Math.max(embeddingsStatus.courses.total, 1)) * 100} 
                     className="h-2"
                   />
                   <Button
@@ -445,7 +443,7 @@ const AdminDashboard = () => {
                     </div>
                   </div>
                   <Progress 
-                    value={(embeddingsStatus.events.with_embeddings / embeddingsStatus.events.total) * 100} 
+                    value={(embeddingsStatus.events.with_embeddings / Math.max(embeddingsStatus.events.total, 1)) * 100} 
                     className="h-2"
                   />
                   <Button
@@ -493,13 +491,17 @@ const AdminDashboard = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center p-3 bg-white/10 rounded-lg">
                       <div className="text-2xl font-bold text-white">
-                        {((embeddingsStatus.courses.with_embeddings / embeddingsStatus.courses.total) * 100).toFixed(0)}%
+                        {embeddingsStatus.courses.total > 0 
+                          ? ((embeddingsStatus.courses.with_embeddings / embeddingsStatus.courses.total) * 100).toFixed(0)
+                          : '0'}%
                       </div>
                       <div className="text-sm text-indigo-200">Course Coverage</div>
                     </div>
                     <div className="text-center p-3 bg-white/10 rounded-lg">
                       <div className="text-2xl font-bold text-white">
-                        {((embeddingsStatus.events.with_embeddings / embeddingsStatus.events.total) * 100).toFixed(0)}%
+                        {embeddingsStatus.events.total > 0 
+                          ? ((embeddingsStatus.events.with_embeddings / embeddingsStatus.events.total) * 100).toFixed(0)
+                          : '0'}%
                       </div>
                       <div className="text-sm text-indigo-200">Event Coverage</div>
                     </div>
@@ -510,6 +512,9 @@ const AdminDashboard = () => {
                       Total Items to Process: <span className="font-semibold text-white">
                         {embeddingsStatus.courses.remaining + embeddingsStatus.events.remaining}
                       </span>
+                    </p>
+                    <p className="text-xs text-indigo-200 mt-1">
+                      Endpoint: {EMBEDDINGS_ENDPOINT}
                     </p>
                   </div>
                 </div>
@@ -526,7 +531,7 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-gray-900">{stats.completedCourses}</div>
-                <Progress value={(stats.completedCourses / stats.activeEnrollments) * 100} className="mt-2" />
+                <Progress value={stats.activeEnrollments > 0 ? (stats.completedCourses / stats.activeEnrollments) * 100 : 0} className="mt-2" />
               </CardContent>
             </Card>
 
@@ -537,7 +542,7 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-gray-900">{stats.certificatesIssued}</div>
-                <Progress value={(stats.certificatesIssued / stats.completedCourses) * 100} className="mt-2" />
+                <Progress value={stats.completedCourses > 0 ? (stats.certificatesIssued / stats.completedCourses) * 100 : 0} className="mt-2" />
               </CardContent>
             </Card>
 
@@ -548,9 +553,9 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-gray-900">
-                  {((stats.activeEnrollments / stats.totalUsers) * 100).toFixed(1)}%
+                  {stats.totalUsers > 0 ? ((stats.activeEnrollments / stats.totalUsers) * 100).toFixed(1) : '0'}%
                 </div>
-                <Progress value={(stats.activeEnrollments / stats.totalUsers) * 100} className="mt-2" />
+                <Progress value={stats.totalUsers > 0 ? (stats.activeEnrollments / stats.totalUsers) * 100 : 0} className="mt-2" />
               </CardContent>
             </Card>
 
@@ -561,9 +566,9 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-gray-900">
-                  {((stats.completedCourses / stats.activeEnrollments) * 100).toFixed(1)}%
+                  {stats.activeEnrollments > 0 ? ((stats.completedCourses / stats.activeEnrollments) * 100).toFixed(1) : '0'}%
                 </div>
-                <Progress value={(stats.completedCourses / stats.activeEnrollments) * 100} className="mt-2" />
+                <Progress value={stats.activeEnrollments > 0 ? (stats.completedCourses / stats.activeEnrollments) * 100 : 0} className="mt-2" />
               </CardContent>
             </Card>
           </div>
