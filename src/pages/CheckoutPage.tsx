@@ -37,7 +37,6 @@ import {
 } from 'lucide-react';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import MobileMoneyPaymentDialog from '@/components/payment/MobileMoneyPaymentDialog';
-import LencoMobileMoneyDialog from '@/components/payment/LencoMobileMoneyDialog';
 
 // Gift card validation function
 const validateGiftCard = async (giftCardCode: string, orderAmount: number) => {
@@ -63,8 +62,8 @@ const CheckoutPage = () => {
   const { currentCurrency, convertPrice } = useCurrency();
   const navigate = useNavigate();
   
-  // Only show two payment methods: pawapay and lenco_mobile_money
-  const [paymentMethod, setPaymentMethod] = useState<'pawapay' | 'lenco_mobile_money'>('lenco_mobile_money');
+  // Only show PawaPay payment method
+  const [paymentMethod, setPaymentMethod] = useState<'pawapay'>('pawapay');
   const [promoCode, setPromoCode] = useState('');
   const [giftCardCode, setGiftCardCode] = useState('');
   const [discount, setDiscount] = useState(0);
@@ -73,7 +72,6 @@ const CheckoutPage = () => {
   const [loading, setLoading] = useState(false);
   const [giftCardLoading, setGiftCardLoading] = useState(false);
   const [showMobileMoneyDialog, setShowMobileMoneyDialog] = useState(false);
-  const [showLencoMobileMoneyDialog, setShowLencoMobileMoneyDialog] = useState(false);
   const [convertedAmounts, setConvertedAmounts] = useState<{
     total: number;
     tax: number;
@@ -306,14 +304,10 @@ const CheckoutPage = () => {
       return;
     }
 
-    // For non-zero amounts, show the appropriate dialog
+    // For non-zero amounts with PawaPay
     setLoading(true);
     try {
-      if (paymentMethod === 'pawapay') {
-        setShowMobileMoneyDialog(true);
-      } else if (paymentMethod === 'lenco_mobile_money') {
-        setShowLencoMobileMoneyDialog(true);
-      }
+      setShowMobileMoneyDialog(true);
     } catch (error) {
       console.error('Error initiating payment:', error);
       toast.error('Failed to initiate payment');
@@ -555,106 +549,97 @@ const CheckoutPage = () => {
                   </CardContent>
                 </Card>
 
-                {/* Enhanced Payment Method - Only showing two mobile money options */}
+                {/* Enhanced Payment Method - Only PawaPay Mobile Money */}
                 {finalAmountUSD > 0 ? (
                   <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-2xl rounded-3xl overflow-hidden">
                     <CardHeader className="bg-gradient-to-r from-orange-500/5 to-purple-600/5 border-b border-slate-100">
                       <CardTitle className="flex items-center gap-3 text-slate-800">
                         <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-orange-500 to-purple-600 flex items-center justify-center">
-                          <CreditCard className="h-3 w-3 text-white" />
+                          <Smartphone className="h-3 w-3 text-white" />
                         </div>
                         Payment Method
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-6">
-                      <div className="space-y-4">
-                        {/* Mobile Money - Lenco Zambia (DEFAULT) */}
-                        <div 
-                          onClick={() => setPaymentMethod('lenco_mobile_money')}
-                          className={`flex items-center space-x-3 p-4 rounded-xl transition-all duration-200 cursor-pointer ${
-                            paymentMethod === 'lenco_mobile_money' 
-                              ? 'border-2 border-orange-500 bg-gradient-to-r from-orange-50 to-orange-50' 
-                              : 'border border-slate-100 hover:border-orange-200 hover:bg-orange-50/50'
-                          }`}
-                        >
-                          <div className={`flex items-center justify-center w-5 h-5 rounded-full border ${
-                            paymentMethod === 'lenco_mobile_money' 
-                              ? 'border-orange-500 bg-orange-500' 
-                              : 'border-slate-300'
-                          }`}>
-                            {paymentMethod === 'lenco_mobile_money' && (
-                              <div className="w-2 h-2 rounded-full bg-white"></div>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3 cursor-pointer flex-1">
-                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center">
-                              <Phone className="h-5 w-5 text-white" />
-                            </div>
-                            <div>
-                              <div className="font-semibold text-slate-800 flex items-center gap-2">
-                                Mobile Money
-                                {paymentMethod === 'lenco_mobile_money' && (
-                                  <Badge className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full">
-                                  
-                               </Badge>
-                                )}
+                      {/* PawaPay Mobile Money Option with Orange-Purple Gradient */}
+                      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 via-orange-400 to-purple-600 p-px">
+                        <div className="relative bg-white rounded-[15px] p-6">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-purple-600 flex items-center justify-center shadow-lg">
+                                <Smartphone className="h-6 w-6 text-white" />
                               </div>
-                              <div className="text-sm text-slate-600 flex items-center gap-1">
-                                <Globe className="h-3 w-3" />
-                                Available in Zambia Only
+                              <div>
+                                <h3 className="font-bold text-lg text-slate-800">
+                                  Mobile Money
+                                </h3>
+                                <p className="text-sm text-slate-600 flex items-center gap-1 mt-1">
+                                  <Globe className="h-3 w-3" />
+                                  Available in 19+ African countries via PawaPay
+                                </p>
                               </div>
                             </div>
-                          </div>
-                        </div>
-
-                        {/* Mobile Money - PawaPay */}
-                        <div 
-                          onClick={() => setPaymentMethod('pawapay')}
-                          className={`flex items-center space-x-3 p-4 rounded-xl transition-all duration-200 cursor-pointer ${
-                            paymentMethod === 'pawapay' 
-                              ? 'border-2 border-purple-500 bg-gradient-to-r from-purple-50 to-purple-50' 
-                              : 'border border-slate-100 hover:border-purple-200 hover:bg-purple-50/50'
-                          }`}
-                        >
-                          <div className={`flex items-center justify-center w-5 h-5 rounded-full border ${
-                            paymentMethod === 'pawapay' 
-                              ? 'border-purple-500 bg-purple-500' 
-                              : 'border-slate-300'
-                          }`}>
-                            {paymentMethod === 'pawapay' && (
-                              <div className="w-2 h-2 rounded-full bg-white"></div>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3 cursor-pointer flex-1">
-                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
-                              <Smartphone className="h-5 w-5 text-white" />
+                            <div className={`flex items-center justify-center w-6 h-6 rounded-full border-2 ${
+                              paymentMethod === 'pawapay' 
+                                ? 'border-orange-500 bg-orange-500' 
+                                : 'border-slate-300'
+                            }`}>
+                              {paymentMethod === 'pawapay' && (
+                                <div className="w-2 h-2 rounded-full bg-white"></div>
+                              )}
                             </div>
-                            <div>
-                              <div className="font-semibold text-slate-800">Mobile Money</div>
-                              <div className="text-sm text-slate-600">Available in 19+ African countries</div>
+                          </div>
+                          
+                          {/* PawaPay Features */}
+                          <div className="mt-6 grid grid-cols-2 gap-3">
+                            <div className="flex items-center gap-2 p-3 bg-orange-50 rounded-xl">
+                              <Shield className="h-4 w-4 text-orange-500" />
+                              <span className="text-xs font-medium text-slate-700">Secure Payment</span>
+                            </div>
+                            <div className="flex items-center gap-2 p-3 bg-purple-50 rounded-xl">
+                              <Zap className="h-4 w-4 text-purple-500" />
+                              <span className="text-xs font-medium text-slate-700">Instant Processing</span>
+                            </div>
+                            <div className="flex items-center gap-2 p-3 bg-orange-50 rounded-xl">
+                              <Globe className="h-4 w-4 text-orange-500" />
+                              <span className="text-xs font-medium text-slate-700">Multi-Country</span>
+                            </div>
+                            <div className="flex items-center gap-2 p-3 bg-purple-50 rounded-xl">
+                              <CheckCircle className="h-4 w-4 text-purple-500" />
+                              <span className="text-xs font-medium text-slate-700">Verified</span>
+                            </div>
+                          </div>
+                          
+                          {/* Country Info */}
+                          <div className="mt-4 pt-4 border-t border-slate-100">
+                            <div className="flex items-center gap-2 text-sm text-slate-600">
+                              <Info className="h-4 w-4 text-orange-500" />
+                              <span>Supports: Zambia, Kenya, Uganda, Ghana, Nigeria, Tanzania, Rwanda, Senegal, Cote d'Ivoire, Cameroon, and more</span>
                             </div>
                           </div>
                         </div>
                       </div>
                       
-                      {/* Payment Method Help */}
-                      <div className="mt-4 pt-4 border-t border-slate-100">
-                        <div className="flex items-center gap-2 text-sm text-slate-600 mb-2">
-                          <Info className="h-4 w-4 text-blue-500" />
-                          <span className="font-medium">Need help choosing?</span>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-                            <span className="text-xs text-slate-600">
-                              <strong>Zambia Mobile Money:</strong> For customers in Zambia with Airtel or MTN
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                            <span className="text-xs text-slate-600">
-                              <strong> Mobile Money Africa:</strong> For customers in other African countries
-                            </span>
+                      {/* Payment Method Info */}
+                      <div className="mt-6 p-4 bg-gradient-to-r from-orange-50/50 to-purple-50/50 rounded-2xl border border-orange-100">
+                        <div className="flex items-start gap-3">
+                          <Clock className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
+                          <div className="text-sm">
+                            <p className="font-medium text-slate-800 mb-1">Mobile Money Process</p>
+                            <ul className="space-y-1 text-slate-600">
+                              <li className="flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
+                                <span>You'll enter your phone number on the next screen</span>
+                              </li>
+                              <li className="flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
+                                <span>Redirect to PawaPay's secure payment page</span>
+                              </li>
+                              <li className="flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
+                                <span>Enter your mobile money PIN to complete payment</span>
+                              </li>
+                            </ul>
                           </div>
                         </div>
                       </div>
@@ -766,43 +751,46 @@ const CheckoutPage = () => {
                   </div>
                 )}
 
-                {/* Enhanced Checkout Button */}
+                {/* Enhanced Checkout Button with Orange-Purple Gradient */}
                 <Button
                   onClick={handleCheckout}
                   disabled={loading}
-                  className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white py-4 text-lg font-semibold shadow-2xl hover:shadow-3xl transform hover:-translate-y-1 transition-all duration-300 rounded-2xl border-0"
+                  className="w-full bg-gradient-to-r from-orange-500 via-orange-400 to-purple-600 hover:from-orange-600 hover:via-orange-500 hover:to-purple-700 text-white py-4 text-lg font-semibold shadow-2xl hover:shadow-3xl transform hover:-translate-y-1 transition-all duration-300 rounded-2xl border-0 relative overflow-hidden group"
                   size="lg"
                 >
-                  {loading ? (
-                    <div className="flex items-center gap-2">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                      Processing...
-                    </div>
-                  ) : finalAmountUSD <= 0 ? (
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-5 w-5" />
-                      Complete Purchase with Gift Card
-                    </div>
-                  ) : paymentMethod === 'lenco_mobile_money' ? (
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-5 w-5" />
-                      Pay with Zambia Mobile Money
-                      <ArrowRight className="h-4 w-4 ml-1" />
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <Smartphone className="h-5 w-5" />
-                      Pay with PawaPay Mobile Money
-                      <ArrowRight className="h-4 w-4 ml-1" />
-                    </div>
-                  )}
+                  {/* Animated background effect */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-orange-500 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  
+                  <div className="relative flex items-center justify-center gap-3">
+                    {loading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        <span>Processing...</span>
+                      </>
+                    ) : finalAmountUSD <= 0 ? (
+                      <>
+                        <CheckCircle className="h-5 w-5" />
+                        <span>Complete Purchase with Gift Card</span>
+                      </>
+                    ) : (
+                      <>
+                        <Smartphone className="h-5 w-5" />
+                        <span>Pay with Mobile Money</span>
+                        <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform duration-200" />
+                      </>
+                    )}
+                  </div>
                 </Button>
 
                 {/* Security Badge */}
-                <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                  <div className="flex items-center justify-center gap-2 text-sm text-slate-600">
+                <div className="text-center p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-2xl border border-slate-200">
+                  <div className="flex items-center justify-center gap-2 text-sm text-slate-700">
                     <Shield className="h-4 w-4 text-green-500" />
-                    <span>Secure SSL Encryption • 256-bit Security</span>
+                    <span className="font-medium">Secure SSL Encryption</span>
+                    <span className="text-slate-400">•</span>
+                    <span>256-bit Security</span>
+                    <span className="text-slate-400">•</span>
+                    <span>PCI Compliant</span>
                   </div>
                 </div>
               </div>
@@ -812,78 +800,37 @@ const CheckoutPage = () => {
       </div>
 
       {finalAmountUSD > 0 && (
-        <>
-          <MobileMoneyPaymentDialog
-            isOpen={showMobileMoneyDialog}
-            onClose={() => setShowMobileMoneyDialog(false)}
-            amount={convertedAmounts.final}
-            currency={currentCurrency}
-            items={items.map(item => ({
-              item_id: item.itemId,
-              item_type: item.itemType,
-              item_name: item.itemName,
-              quantity: item.quantity,
-              price: item.price,
-              metadata: item.giftMetadata ? {
-                sender_name: item.giftMetadata.senderName,
-                recipient_name: item.giftMetadata.recipientName,
-                recipient_email: item.giftMetadata.recipientEmail,
-                personal_message: item.giftMetadata.personalMessage,
-                amount: item.giftMetadata.amount,
-                ...(item.itemType === 'gift_course' || item.itemType === 'gift_event') && {
-                  original_item_id: item.itemId,
-                  original_item_name: item.itemName
-                },
-                ...(item.itemType === 'event_ticket' || item.itemType === 'gift_event') && {
-                  ticket_holder_names: item.ticketHolderNames || [],
-                  ticket_holder_emails: item.ticketHolderEmails || []
-                }
-              } : {}
-            }))}
-            discount={convertedAmounts.discount + convertedAmounts.giftCardDiscount}
-            taxAmount={convertedAmounts.tax}
-            promoCode={promoCode}
-          />
-
-          {/* Lenco Mobile Money Dialog */}
-          <LencoMobileMoneyDialog
-            isOpen={showLencoMobileMoneyDialog}
-            onClose={() => {
-              setShowLencoMobileMoneyDialog(false);
-              setLoading(false);
-            }}
-            amount={convertedAmounts.final}
-            currency={currentCurrency}
-            items={items.map(item => ({
-              item_id: item.itemId,
-              item_type: item.itemType,
-              item_name: item.itemName,
-              quantity: item.quantity,
-              price: item.price,
-              metadata: item.giftMetadata ? {
-                sender_name: item.giftMetadata.senderName,
-                recipient_name: item.giftMetadata.recipientName,
-                recipient_email: item.giftMetadata.recipientEmail,
-                personal_message: item.giftMetadata.personalMessage,
-                amount: item.giftMetadata.amount,
-                ...(item.itemType === 'gift_course' || item.itemType === 'gift_event') && {
-                  original_item_id: item.itemId,
-                  original_item_name: item.itemName
-                },
-                ...(item.itemType === 'event_ticket' || item.itemType === 'gift_event') && {
-                  ticket_holder_names: item.ticketHolderNames || [],
-                  ticket_holder_emails: item.ticketHolderEmails || []
-                }
-              } : {}
-            }))}
-            discount={convertedAmounts.discount + convertedAmounts.giftCardDiscount}
-            taxAmount={convertedAmounts.tax}
-            promoCode={promoCode}
-            appliedGiftCardId={appliedGiftCard?.id}
-            giftCardDiscount={giftCardDiscount}
-            isGiftPurchase={items.some(item => item.itemType.startsWith('gift_'))}
-          />
-        </>
+        <MobileMoneyPaymentDialog
+          isOpen={showMobileMoneyDialog}
+          onClose={() => setShowMobileMoneyDialog(false)}
+          amount={convertedAmounts.final}
+          currency={currentCurrency}
+          items={items.map(item => ({
+            item_id: item.itemId,
+            item_type: item.itemType,
+            item_name: item.itemName,
+            quantity: item.quantity,
+            price: item.price,
+            metadata: item.giftMetadata ? {
+              sender_name: item.giftMetadata.senderName,
+              recipient_name: item.giftMetadata.recipientName,
+              recipient_email: item.giftMetadata.recipientEmail,
+              personal_message: item.giftMetadata.personalMessage,
+              amount: item.giftMetadata.amount,
+              ...(item.itemType === 'gift_course' || item.itemType === 'gift_event') && {
+                original_item_id: item.itemId,
+                original_item_name: item.itemName
+              },
+              ...(item.itemType === 'event_ticket' || item.itemType === 'gift_event') && {
+                ticket_holder_names: item.ticketHolderNames || [],
+                ticket_holder_emails: item.ticketHolderEmails || []
+              }
+            } : {}
+          }))}
+          discount={convertedAmounts.discount + convertedAmounts.giftCardDiscount}
+          taxAmount={convertedAmounts.tax}
+          promoCode={promoCode}
+        />
       )}
     </Layout>
   );
