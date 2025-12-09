@@ -339,7 +339,7 @@ const MobileMoneyPaymentDialog: React.FC<MobileMoneyPaymentDialogProps> = ({
                 />
               </div>
               <p className="text-xs text-gray-500 leading-relaxed">
-                Enter your number without the country code (e.g., 968554225 for {selectedCountryInfo.dialCode}968554225)
+                Enter your number with the country code (e.g., 260968554225 for {selectedCountryInfo.dialCode}968554225)
               </p>
             </div>
 
