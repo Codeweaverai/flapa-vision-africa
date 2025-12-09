@@ -705,11 +705,11 @@ const TokenTopUpPage = () => {
                   <div>
                     <p className="font-semibold text-orange-800">Secure Payment Process</p>
                     <p className="text-sm text-orange-600 mt-1">
-                      • Powered by PawaPay's secure payment infrastructure<br />
+                      • Powered by secure payment infrastructure<br />
                       • Real-time payment verification<br />
                       • Tokens delivered instantly upon confirmation<br />
                       • Available in 7+ African countries<br />
-                      • 100% secure - processed on PawaPay's platform
+                      • 100% secure 
                     </p>
                   </div>
                 </div>
