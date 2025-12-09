@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, MapPin, Users, Eye, Download, Clock, Ticket, Star, TrendingUp } from 'lucide-react';
+import { Calendar, MapPin, Users, Eye, Download, Clock, Ticket, Star, TrendingUp, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
@@ -90,11 +90,26 @@ const MyEventsPage = () => {
   const [ticketDialogOpen, setTicketDialogOpen] = useState(false);
   const [tickets, setTickets] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('upcoming');
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     if (user) {
       fetchMyEvents();
     }
+    
+    // Check if mobile on initial render
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    
+    // Add resize listener
+    window.addEventListener('resize', checkMobile);
+    
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
   }, [user]);
 
   const fetchMyEvents = async () => {
@@ -306,6 +321,35 @@ const MyEventsPage = () => {
   ).length;
   const completedEvents = events.filter(event => new Date(event.end_time) < new Date()).length;
 
+  // Mobile Tab Button Component
+  const MobileTabButton = ({ value, label, count, icon, colorClass }) => (
+    <button
+      onClick={() => setActiveTab(value)}
+      className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all duration-300 ${
+        activeTab === value 
+          ? 'bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-lg' 
+          : 'bg-white/80 text-gray-700 border border-gray-200'
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <div className={`p-2 rounded-lg ${
+          activeTab === value ? 'bg-white/20' : colorClass
+        }`}>
+          {icon}
+        </div>
+        <div className="text-left">
+          <div className="font-semibold text-lg">{label}</div>
+          <div className={`text-sm ${activeTab === value ? 'text-white/90' : 'text-gray-500'}`}>
+            {count} {count === 1 ? 'event' : 'events'}
+          </div>
+        </div>
+      </div>
+      <ChevronRight className={`h-5 w-5 transition-transform ${
+        activeTab === value ? 'rotate-90 text-white' : 'text-gray-400'
+      }`} />
+    </button>
+  );
+
   // Use the PulseLoading component
   if (loading) {
     return <PulseLoading />;
@@ -399,43 +443,72 @@ const MyEventsPage = () => {
               </Card>
             ) : (
               <div className="space-y-8">
-                {/* Enhanced Tabs Navigation - Wider and more prominent */}
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                  <TabsList className="grid w-full grid-cols-3 bg-white/80 backdrop-blur-sm p-2 rounded-2xl border border-gray-200 shadow-lg h-16">
-                    <TabsTrigger 
+                {/* Mobile Tabs Navigation - Vertically Stacked */}
+                {isMobile ? (
+                  <div className="space-y-4 mb-8">
+                    <MobileTabButton
                       value="upcoming"
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-xl transition-all duration-300 text-base font-semibold h-12"
-                    >
-                      <Clock className="h-5 w-5 mr-3" />
-                      Upcoming
-                      <span className="ml-2 bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-sm font-medium min-w-8">
-                        {upcomingEvents}
-                      </span>
-                    </TabsTrigger>
-                    <TabsTrigger 
+                      label="Upcoming"
+                      count={upcomingEvents}
+                      icon={<Clock className="h-5 w-5" />}
+                      colorClass="bg-orange-100 text-orange-600"
+                    />
+                    <MobileTabButton
                       value="live"
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-xl transition-all duration-300 text-base font-semibold h-12"
-                    >
-                      <div className="w-3 h-3 bg-red-500 rounded-full mr-3 animate-pulse" />
-                      Live Now
-                      <span className="ml-2 bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm font-medium min-w-8">
-                        {liveEvents}
-                      </span>
-                    </TabsTrigger>
-                    <TabsTrigger 
+                      label="Live Now"
+                      count={liveEvents}
+                      icon={<div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />}
+                      colorClass="bg-green-100 text-green-600"
+                    />
+                    <MobileTabButton
                       value="completed"
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-xl transition-all duration-300 text-base font-semibold h-12"
-                    >
-                      <Ticket className="h-5 w-5 mr-3" />
-                      Completed
-                      <span className="ml-2 bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-sm font-medium min-w-8">
-                        {completedEvents}
-                      </span>
-                    </TabsTrigger>
-                  </TabsList>
+                      label="Completed"
+                      count={completedEvents}
+                      icon={<Ticket className="h-5 w-5" />}
+                      colorClass="bg-purple-100 text-purple-600"
+                    />
+                  </div>
+                ) : (
+                  // Desktop Tabs Navigation - Original Horizontal Layout
+                  <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                    <TabsList className="grid w-full grid-cols-3 bg-white/80 backdrop-blur-sm p-2 rounded-2xl border border-gray-200 shadow-lg h-16">
+                      <TabsTrigger 
+                        value="upcoming"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-xl transition-all duration-300 text-base font-semibold h-12"
+                      >
+                        <Clock className="h-5 w-5 mr-3" />
+                        Upcoming
+                        <span className="ml-2 bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-sm font-medium min-w-8">
+                          {upcomingEvents}
+                        </span>
+                      </TabsTrigger>
+                      <TabsTrigger 
+                        value="live"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-xl transition-all duration-300 text-base font-semibold h-12"
+                      >
+                        <div className="w-3 h-3 bg-red-500 rounded-full mr-3 animate-pulse" />
+                        Live Now
+                        <span className="ml-2 bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm font-medium min-w-8">
+                          {liveEvents}
+                        </span>
+                      </TabsTrigger>
+                      <TabsTrigger 
+                        value="completed"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-xl transition-all duration-300 text-base font-semibold h-12"
+                      >
+                        <Ticket className="h-5 w-5 mr-3" />
+                        Completed
+                        <span className="ml-2 bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-sm font-medium min-w-8">
+                          {completedEvents}
+                        </span>
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                )}
 
-                  {/* Upcoming Events Tab */}
-                  <TabsContent value="upcoming" className="mt-8">
+                {/* Events Content - Same for both mobile and desktop */}
+                {activeTab === 'upcoming' && (
+                  <div className="mt-8">
                     {filteredEvents.length === 0 ? (
                       <div className="text-center py-16">
                         <div className="bg-gradient-to-r from-orange-100 to-purple-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
@@ -536,10 +609,11 @@ const MyEventsPage = () => {
                         })}
                       </div>
                     )}
-                  </TabsContent>
+                  </div>
+                )}
 
-                  {/* Live Events Tab */}
-                  <TabsContent value="live" className="mt-8">
+                {activeTab === 'live' && (
+                  <div className="mt-8">
                     {filteredEvents.length === 0 ? (
                       <div className="text-center py-16">
                         <div className="bg-gradient-to-r from-green-100 to-purple-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
@@ -632,10 +706,11 @@ const MyEventsPage = () => {
                         })}
                       </div>
                     )}
-                  </TabsContent>
+                  </div>
+                )}
 
-                  {/* Completed Events Tab */}
-                  <TabsContent value="completed" className="mt-8">
+                {activeTab === 'completed' && (
+                  <div className="mt-8">
                     {filteredEvents.length === 0 ? (
                       <div className="text-center py-16">
                         <div className="bg-gradient-to-r from-purple-100 to-orange-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
@@ -728,8 +803,8 @@ const MyEventsPage = () => {
                         })}
                       </div>
                     )}
-                  </TabsContent>
-                </Tabs>
+                  </div>
+                )}
               </div>
             )}
           </div>
