@@ -1,9 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import { 
   Users, 
   BookOpen, 
@@ -12,7 +13,12 @@ import {
   TrendingUp,
   Award,
   Play,
-  UserCheck
+  UserCheck,
+  Sparkles,
+  RefreshCw,
+  CheckCircle,
+  XCircle,
+  AlertCircle
 } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -28,6 +34,19 @@ interface DashboardStats {
   certificatesIssued: number;
 }
 
+interface EmbeddingsStatus {
+  courses: {
+    total: number;
+    with_embeddings: number;
+    remaining: number;
+  };
+  events: {
+    total: number;
+    with_embeddings: number;
+    remaining: number;
+  };
+}
+
 const AdminDashboard = () => {
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
@@ -39,10 +58,20 @@ const AdminDashboard = () => {
     recentRegistrations: 0,
     certificatesIssued: 0,
   });
+  
+  const [embeddingsStatus, setEmbeddingsStatus] = useState<EmbeddingsStatus>({
+    courses: { total: 0, with_embeddings: 0, remaining: 0 },
+    events: { total: 0, with_embeddings: 0, remaining: 0 }
+  });
+  
   const [loading, setLoading] = useState(true);
+  const [generatingCourseEmbeddings, setGeneratingCourseEmbeddings] = useState(false);
+  const [generatingEventEmbeddings, setGeneratingEventEmbeddings] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(false);
 
   useEffect(() => {
     fetchDashboardStats();
+    checkEmbeddingsStatus();
   }, []);
 
   const fetchDashboardStats = async () => {
@@ -103,8 +132,121 @@ const AdminDashboard = () => {
       });
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
+      toast.error('Failed to load dashboard statistics');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkEmbeddingsStatus = async () => {
+    try {
+      setCheckingStatus(true);
+      
+      // Call your edge function to check embeddings status
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-embeddings`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'check_status' }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setEmbeddingsStatus(result.data);
+        toast.success('Embeddings status updated');
+      } else {
+        toast.error(result.error || 'Failed to check embeddings status');
+      }
+    } catch (error) {
+      console.error('Error checking embeddings status:', error);
+      toast.error('Failed to check embeddings status');
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
+
+  const generateCourseEmbeddings = async () => {
+    try {
+      setGeneratingCourseEmbeddings(true);
+      
+      toast.info('Starting course embeddings generation...');
+      
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-embeddings`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          action: 'generate_course_embeddings',
+          batchSize: 20 
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        toast.success(`Successfully processed ${result.processed} course embeddings`);
+        // Refresh status after generation
+        await checkEmbeddingsStatus();
+      } else {
+        toast.error(result.error || 'Failed to generate course embeddings');
+      }
+    } catch (error) {
+      console.error('Error generating course embeddings:', error);
+      toast.error('Failed to generate course embeddings');
+    } finally {
+      setGeneratingCourseEmbeddings(false);
+    }
+  };
+
+  const generateEventEmbeddings = async () => {
+    try {
+      setGeneratingEventEmbeddings(true);
+      
+      toast.info('Starting event embeddings generation...');
+      
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-embeddings`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          action: 'generate_event_embeddings',
+          batchSize: 20 
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        toast.success(`Successfully processed ${result.processed} event embeddings`);
+        // Refresh status after generation
+        await checkEmbeddingsStatus();
+      } else {
+        toast.error(result.error || 'Failed to generate event embeddings');
+      }
+    } catch (error) {
+      console.error('Error generating event embeddings:', error);
+      toast.error('Failed to generate event embeddings');
+    } finally {
+      setGeneratingEventEmbeddings(false);
     }
   };
 
@@ -207,6 +349,173 @@ const AdminDashboard = () => {
               </CardContent>
             </Card>
           </div>
+
+          {/* AI Embeddings Section */}
+          <Card className="bg-gradient-to-br from-indigo-50 to-purple-50 border-0 shadow-xl">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                <Sparkles className="h-5 w-5" />
+                AI Embeddings Management
+              </CardTitle>
+              <p className="text-sm text-gray-600">
+                Generate AI embeddings for semantic search and recommendations
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* Course Embeddings Status */}
+                <div className="space-y-4 p-4 bg-white rounded-lg shadow-sm border border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="h-5 w-5 text-indigo-600" />
+                      <h3 className="font-semibold text-gray-900">Course Embeddings</h3>
+                    </div>
+                    {embeddingsStatus.courses.remaining === 0 ? (
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                    ) : (
+                      <AlertCircle className="h-5 w-5 text-amber-500" />
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Total Courses:</span>
+                      <span className="font-medium">{embeddingsStatus.courses.total}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">With Embeddings:</span>
+                      <span className="font-medium text-green-600">{embeddingsStatus.courses.with_embeddings}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Remaining:</span>
+                      <span className={`font-medium ${embeddingsStatus.courses.remaining > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                        {embeddingsStatus.courses.remaining}
+                      </span>
+                    </div>
+                  </div>
+                  <Progress 
+                    value={(embeddingsStatus.courses.with_embeddings / embeddingsStatus.courses.total) * 100} 
+                    className="h-2"
+                  />
+                  <Button
+                    onClick={generateCourseEmbeddings}
+                    disabled={generatingCourseEmbeddings || embeddingsStatus.courses.remaining === 0}
+                    className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
+                  >
+                    {generatingCourseEmbeddings ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Generate Course Embeddings
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {/* Event Embeddings Status */}
+                <div className="space-y-4 p-4 bg-white rounded-lg shadow-sm border border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-5 w-5 text-purple-600" />
+                      <h3 className="font-semibold text-gray-900">Event Embeddings</h3>
+                    </div>
+                    {embeddingsStatus.events.remaining === 0 ? (
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                    ) : (
+                      <AlertCircle className="h-5 w-5 text-amber-500" />
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Total Events:</span>
+                      <span className="font-medium">{embeddingsStatus.events.total}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">With Embeddings:</span>
+                      <span className="font-medium text-green-600">{embeddingsStatus.events.with_embeddings}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Remaining:</span>
+                      <span className={`font-medium ${embeddingsStatus.events.remaining > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                        {embeddingsStatus.events.remaining}
+                      </span>
+                    </div>
+                  </div>
+                  <Progress 
+                    value={(embeddingsStatus.events.with_embeddings / embeddingsStatus.events.total) * 100} 
+                    className="h-2"
+                  />
+                  <Button
+                    onClick={generateEventEmbeddings}
+                    disabled={generatingEventEmbeddings || embeddingsStatus.events.remaining === 0}
+                    className="w-full bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700"
+                  >
+                    {generatingEventEmbeddings ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Generate Event Embeddings
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {/* Status Summary Card */}
+                <div className="lg:col-span-2 space-y-4 p-6 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold text-white text-lg">Embeddings Summary</h3>
+                      <p className="text-indigo-100 text-sm mt-1">
+                        AI-powered semantic search readiness
+                      </p>
+                    </div>
+                    <Button
+                      onClick={checkEmbeddingsStatus}
+                      disabled={checkingStatus}
+                      variant="secondary"
+                      className="bg-white/20 hover:bg-white/30 text-white border-0"
+                    >
+                      {checkingStatus ? (
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-3 bg-white/10 rounded-lg">
+                      <div className="text-2xl font-bold text-white">
+                        {((embeddingsStatus.courses.with_embeddings / embeddingsStatus.courses.total) * 100).toFixed(0)}%
+                      </div>
+                      <div className="text-sm text-indigo-200">Course Coverage</div>
+                    </div>
+                    <div className="text-center p-3 bg-white/10 rounded-lg">
+                      <div className="text-2xl font-bold text-white">
+                        {((embeddingsStatus.events.with_embeddings / embeddingsStatus.events.total) * 100).toFixed(0)}%
+                      </div>
+                      <div className="text-sm text-indigo-200">Event Coverage</div>
+                    </div>
+                  </div>
+                  
+                  <div className="pt-4 border-t border-white/20">
+                    <p className="text-sm text-indigo-200">
+                      Total Items to Process: <span className="font-semibold text-white">
+                        {embeddingsStatus.courses.remaining + embeddingsStatus.events.remaining}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Secondary Stats */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
