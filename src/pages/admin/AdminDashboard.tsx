@@ -143,7 +143,7 @@ const AdminDashboard = () => {
       setCheckingStatus(true);
       
       // Call your edge function to check embeddings status
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-embeddings`, {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-embeddings-`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
