@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageCircle, X, Send, Bot, User, Sparkles, Trash2, Brain } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, User, Sparkles, Trash2, Brain, Lightbulb, Target, TrendingUp, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,13 +11,16 @@ import {
   loadChatHistory, 
   clearChatHistory, 
   callLumoAI,
-  type AIChatMessage 
+  parseMessageContent,
+  type AIChatMessage,
+  type LumoAIResponse
 } from '@/services/aiChatService';
 
 interface Message {
   id: string;
   type: 'user' | 'assistant';
   content: string;
+  structuredResponse?: LumoAIResponse;
   timestamp: Date;
   isError?: boolean;
 }
@@ -43,14 +46,12 @@ const FloatingAILearningAssistant: React.FC<FloatingAILearningAssistantProps> = 
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  // Load chat history when component opens or context changes
   useEffect(() => {
     if (user && isOpen) {
       loadExistingChatHistory();
     }
   }, [user, isOpen, lessonId, courseId]);
 
-  // Auto-scroll to bottom
   useEffect(() => {
     if (scrollAreaRef.current && messages.length > 0) {
       scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
@@ -62,21 +63,24 @@ const FloatingAILearningAssistant: React.FC<FloatingAILearningAssistantProps> = 
     
     setIsLoadingHistory(true);
     try {
-      // Load messages in chronological order
       const history = await loadChatHistory(lessonId, courseId, 50, true);
       
       if (history.length > 0) {
-        // Convert database messages to component format
-        const convertedMessages: Message[] = history.map(msg => ({
-          id: msg.id,
-          type: msg.message_type,
-          content: msg.content,
-          timestamp: new Date(msg.created_at),
-          isError: msg.context_data?.isError || false
-        }));
+        const convertedMessages: Message[] = history.map(msg => {
+          const parsedContent = parseMessageContent(msg);
+          const isStructured = typeof parsedContent !== 'string';
+          
+          return {
+            id: msg.id,
+            type: msg.message_type,
+            content: isStructured ? (parsedContent as LumoAIResponse).response : parsedContent as string,
+            structuredResponse: isStructured ? (parsedContent as LumoAIResponse) : undefined,
+            timestamp: new Date(msg.created_at),
+            isError: msg.context_data?.isError || false
+          };
+        });
         setMessages(convertedMessages);
       } else {
-        // Set initial welcome message
         setInitialWelcomeMessage();
       }
     } catch (error) {
@@ -89,14 +93,32 @@ const FloatingAILearningAssistant: React.FC<FloatingAILearningAssistantProps> = 
   };
 
   const setInitialWelcomeMessage = () => {
+    const welcomeResponse: LumoAIResponse = {
+      response: `Hello! I'm **LumoAI**, your intelligent learning companion. I'm here to help you master ${
+        lessonTitle ? `"${lessonTitle}"` : 'your course material'
+      }.`,
+      explanation: "I can help explain concepts, answer questions, provide examples, and guide your learning journey.",
+      key_points: [
+        "Ask questions about the lesson content",
+        "Request explanations of complex topics",
+        "Get practical examples and applications",
+        "Explore related concepts and connections"
+      ],
+      suggestions: [
+        "Start with specific questions about the material",
+        "Ask for clarification on confusing topics",
+        "Request real-world applications",
+        "Explore connections to previous lessons"
+      ],
+      next_steps: "Type your question below to get started!",
+      confidence: 0.95
+    };
+
     const welcomeMessage: Message = {
       id: 'welcome-' + Date.now(),
       type: 'assistant',
-      content: `👋 Hello! I'm **LumoAI**, your intelligent learning companion. I'm here to help you master ${
-        lessonTitle 
-          ? `"${lessonTitle}"`
-          : 'your course material'
-      }. Feel free to ask me questions, request explanations, or explore concepts in depth!`,
+      content: welcomeResponse.response,
+      structuredResponse: welcomeResponse,
       timestamp: new Date()
     };
     setMessages([welcomeMessage]);
@@ -106,7 +128,6 @@ const FloatingAILearningAssistant: React.FC<FloatingAILearningAssistantProps> = 
     const message = inputMessage.trim();
     if (!message || !user || isLoading) return;
 
-    // Create user message
     const userMessage: Message = {
       id: 'user-' + Date.now(),
       type: 'user',
@@ -114,13 +135,12 @@ const FloatingAILearningAssistant: React.FC<FloatingAILearningAssistantProps> = 
       timestamp: new Date()
     };
 
-    // Add to UI immediately
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
     setIsLoading(true);
 
-    // Save user message to database
-    const savedUserMessage = await saveChatMessage(
+    // Save user message
+    await saveChatMessage(
       'user', 
       message, 
       lessonId, 
@@ -134,20 +154,7 @@ const FloatingAILearningAssistant: React.FC<FloatingAILearningAssistantProps> = 
       }
     );
 
-    if (!savedUserMessage) {
-      console.warn('Failed to save user message, continuing with LumoAI call...');
-    }
-
     try {
-      console.log('Sending to LumoAI:', {
-        message,
-        lessonTitle,
-        courseId,
-        lessonId,
-        userId: user.id
-      });
-
-      // Call LumoAI Edge Function
       const result = await callLumoAI(
         message,
         lessonTitle,
@@ -160,15 +167,14 @@ const FloatingAILearningAssistant: React.FC<FloatingAILearningAssistantProps> = 
         throw new Error(result.error || 'LumoAI request failed');
       }
 
-      // Create assistant message
       const assistantMessage: Message = {
         id: 'assistant-' + Date.now(),
         type: 'assistant',
-        content: result.response!,
+        content: result.response!.response,
+        structuredResponse: result.response!,
         timestamp: new Date()
       };
 
-      // Add to UI
       setMessages(prev => [...prev, assistantMessage]);
 
       // Save assistant response
@@ -180,31 +186,47 @@ const FloatingAILearningAssistant: React.FC<FloatingAILearningAssistantProps> = 
         { 
           lessonTitle: lessonTitle || '',
           timestamp: new Date().toISOString(),
-          model: 'gpt-4.1-2025-04-14',
+          model: 'gpt-4',
           source: 'learning-assistant',
-          responseLength: result.response!.length
+          response_structure: 'json'
         }
       );
 
     } catch (error: any) {
       console.error('LumoAI error:', error);
       
-      // Create error message
+      const errorResponse: LumoAIResponse = {
+        response: "⚠️ I apologize, but I'm experiencing connection issues with LumoAI.",
+        explanation: "This could be a temporary network issue or service interruption.",
+        key_points: [
+          "Try again in a few moments",
+          "Check your internet connection",
+          "Verify you're properly authenticated"
+        ],
+        suggestions: [
+          "Re-phrase your question",
+          "Try a simpler version of your query",
+          "Contact support if issue persists"
+        ],
+        next_steps: "Wait a moment and try your question again",
+        confidence: 0.3,
+        error: true
+      };
+
       const errorMessage: Message = {
         id: 'error-' + Date.now(),
         type: 'assistant',
-        content: "⚠️ I apologize, but I'm experiencing connection issues with LumoAI. This could be temporary. Please try again shortly or check your internet connection.",
+        content: errorResponse.response,
+        structuredResponse: errorResponse,
         timestamp: new Date(),
         isError: true
       };
       
-      // Add error to UI
       setMessages(prev => [...prev, errorMessage]);
       
-      // Save error message
       await saveChatMessage(
         'assistant', 
-        errorMessage.content, 
+        errorResponse, 
         lessonId, 
         courseId, 
         { 
@@ -223,7 +245,7 @@ const FloatingAILearningAssistant: React.FC<FloatingAILearningAssistantProps> = 
   };
 
   const handleClearHistory = async () => {
-    if (!user || messages.length <= 1) return; // Don't clear welcome message
+    if (!user || messages.length <= 1) return;
     
     try {
       const success = await clearChatHistory(lessonId, courseId);
@@ -254,10 +276,106 @@ const FloatingAILearningAssistant: React.FC<FloatingAILearningAssistantProps> = 
     });
   };
 
-  // Don't render if user is not logged in
-  if (!user) {
-    return null;
-  }
+  const renderStructuredResponse = (response: LumoAIResponse) => {
+    return (
+      <div className="space-y-4">
+        {/* Main Response */}
+        <div className="text-sm leading-relaxed">
+          {response.response}
+        </div>
+        
+        {/* Explanation */}
+        {response.explanation && (
+          <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+            <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 mb-1">
+              <BookOpen className="h-3 w-3" />
+              Detailed Explanation
+            </div>
+            <div className="text-sm text-gray-700 mt-1">
+              {response.explanation}
+            </div>
+          </div>
+        )}
+        
+        {/* Key Points */}
+        {response.key_points && response.key_points.length > 0 && (
+          <div className="mt-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-green-700 mb-2">
+              <Target className="h-3 w-3" />
+              Key Points
+            </div>
+            <ul className="space-y-2">
+              {response.key_points.map((point, index) => (
+                <li key={index} className="text-sm text-gray-700 flex items-start gap-2">
+                  <div className="flex-shrink-0 w-5 h-5 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-xs mt-0.5">
+                    {index + 1}
+                  </div>
+                  <span>{point}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        
+        {/* Suggestions */}
+        {response.suggestions && response.suggestions.length > 0 && (
+          <div className="mt-3 p-3 bg-purple-50 rounded-lg border border-purple-100">
+            <div className="flex items-center gap-2 text-xs font-semibold text-purple-700 mb-2">
+              <Lightbulb className="h-3 w-3" />
+              Helpful Suggestions
+            </div>
+            <ul className="space-y-2">
+              {response.suggestions.map((suggestion, index) => (
+                <li key={index} className="text-sm text-gray-700 flex items-start gap-2">
+                  <div className="flex-shrink-0 w-4 h-4 bg-purple-100 text-purple-600 rounded flex items-center justify-center text-xs mt-0.5">
+                    ✓
+                  </div>
+                  <span>{suggestion}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        
+        {/* Next Steps */}
+        {response.next_steps && (
+          <div className="mt-3 p-3 bg-orange-50 rounded-lg border border-orange-100">
+            <div className="flex items-center gap-2 text-xs font-semibold text-orange-700 mb-1">
+              <TrendingUp className="h-3 w-3" />
+              Recommended Next Steps
+            </div>
+            <div className="text-sm text-gray-700 mt-1">
+              {response.next_steps}
+            </div>
+          </div>
+        )}
+        
+        {/* Confidence Indicator */}
+        {response.confidence !== undefined && !response.error && (
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-gray-500">Confidence Level</span>
+              <span className="font-medium text-gray-700">
+                {(response.confidence * 100).toFixed(0)}%
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+              <div 
+                className={`h-1.5 rounded-full ${
+                  response.confidence > 0.8 ? 'bg-green-500' :
+                  response.confidence > 0.6 ? 'bg-yellow-500' :
+                  'bg-orange-500'
+                }`}
+                style={{ width: `${response.confidence * 100}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  if (!user) return null;
 
   return (
     <>
@@ -286,7 +404,7 @@ const FloatingAILearningAssistant: React.FC<FloatingAILearningAssistantProps> = 
                   </div>
                   <div>
                     <CardTitle className="text-lg font-bold">LumoAI Learning Assistant</CardTitle>
-                    <p className="text-xs text-blue-100 font-medium">Powered by AI intelligence</p>
+                    <p className="text-xs text-blue-100 font-medium">Structured AI-powered learning</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
@@ -335,7 +453,7 @@ const FloatingAILearningAssistant: React.FC<FloatingAILearningAssistantProps> = 
                   <div className="flex flex-col items-center justify-center h-48">
                     <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-4"></div>
                     <p className="text-sm text-gray-600">Loading your learning conversation...</p>
-                    <p className="text-xs text-gray-400 mt-1">Fetching messages from LumoAI</p>
+                    <p className="text-xs text-gray-400 mt-1">Fetching structured responses from LumoAI</p>
                   </div>
                 ) : (
                   <div className="space-y-5">
@@ -370,7 +488,10 @@ const FloatingAILearningAssistant: React.FC<FloatingAILearningAssistantProps> = 
                                 ? 'bg-gradient-to-r from-red-50/80 to-orange-50/80 border border-red-100 text-red-700'
                                 : 'bg-gradient-to-r from-blue-50/80 to-purple-50/80 border border-blue-100 text-gray-800'
                           }`}>
-                            {message.content}
+                            {message.type === 'assistant' && message.structuredResponse 
+                              ? renderStructuredResponse(message.structuredResponse)
+                              : message.content
+                            }
                           </div>
                           <div className={`text-xs mt-2 px-1 flex items-center gap-1 ${
                             message.type === 'user' ? 'justify-end' : 'justify-start'
@@ -404,7 +525,7 @@ const FloatingAILearningAssistant: React.FC<FloatingAILearningAssistantProps> = 
                             <span className="text-xs text-gray-600 font-medium">LumoAI is processing your question...</span>
                           </div>
                           <p className="text-[11px] text-gray-400 mt-2">
-                            Analyzing lesson context and previous conversation
+                            Generating structured learning response
                           </p>
                         </div>
                       </div>
@@ -441,29 +562,16 @@ const FloatingAILearningAssistant: React.FC<FloatingAILearningAssistantProps> = 
                 <div className="text-xs text-gray-400 mt-3 text-center flex items-center justify-center gap-4">
                   <span className="flex items-center gap-1">
                     <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                    LumoAI is online
+                    LumoAI Structured Responses
                   </span>
                   <span>•</span>
                   <span>Press Enter to send</span>
-                  <span>•</span>
-                  <span>Shift+Enter for new line</span>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
       )}
-
-      {/* Add custom animation for subtle bounce */}
-      <style jsx global>{`
-        @keyframes bounce-slow {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-10px); }
-        }
-        .animate-bounce-slow {
-          animation: bounce-slow 2s infinite;
-        }
-      `}</style>
     </>
   );
 };
