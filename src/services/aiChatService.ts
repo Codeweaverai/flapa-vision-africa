@@ -12,15 +12,24 @@ export interface AIChatMessage {
   updated_at: string;
 }
 
+export interface LumoAIResponse {
+  response: string;
+  explanation?: string;
+  key_points?: string[];
+  suggestions?: string[];
+  next_steps?: string;
+  confidence?: number;
+  error?: boolean;
+}
+
 export const saveChatMessage = async (
   messageType: 'user' | 'assistant',
-  content: string,
+  content: string | LumoAIResponse,
   lessonId?: string,
   courseId?: string,
   contextData: Record<string, any> = {}
 ): Promise<AIChatMessage | null> => {
   try {
-    // Get the current user
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
@@ -28,15 +37,23 @@ export const saveChatMessage = async (
       return null;
     }
 
+    // Stringify if it's a structured response
+    const contentToSave = typeof content === 'string' 
+      ? content 
+      : JSON.stringify(content);
+
     const { data, error } = await supabase
       .from('ai_chat_history')
       .insert({
         user_id: user.id,
         message_type: messageType,
-        content,
+        content: contentToSave,
         lesson_id: lessonId || null,
         course_id: courseId || null,
-        context_data: contextData
+        context_data: {
+          ...contextData,
+          is_structured_response: typeof content !== 'string'
+        }
       })
       .select()
       .single();
@@ -56,7 +73,6 @@ export const loadChatHistory = async (
   ascending: boolean = true
 ): Promise<AIChatMessage[]> => {
   try {
-    // Get the current user
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
@@ -76,7 +92,6 @@ export const loadChatHistory = async (
     } else if (courseId) {
       query = query.eq('course_id', courseId);
     } else {
-      // Load messages without specific context
       query = query.or(`lesson_id.is.null,course_id.is.null`);
     }
 
@@ -95,7 +110,6 @@ export const clearChatHistory = async (
   courseId?: string
 ): Promise<boolean> => {
   try {
-    // Get the current user
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
@@ -113,7 +127,6 @@ export const clearChatHistory = async (
     } else if (courseId) {
       query = query.eq('course_id', courseId);
     } else {
-      // Only clear messages without context if no IDs provided
       query = query.or(`lesson_id.is.null,course_id.is.null`);
     }
 
@@ -126,14 +139,13 @@ export const clearChatHistory = async (
   }
 };
 
-// New function to call LumoAI assistant
 export const callLumoAI = async (
   message: string,
   lessonTitle?: string,
   lessonContent?: string,
   courseId?: string,
   lessonId?: string
-): Promise<{ success: boolean; response?: string; error?: string }> => {
+): Promise<{ success: boolean; response?: LumoAIResponse; error?: string }> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     
@@ -170,9 +182,42 @@ export const callLumoAI = async (
       };
     }
 
+    // Parse the structured response
+    let structuredResponse: LumoAIResponse;
+    try {
+      if (typeof data.response === 'string') {
+        structuredResponse = JSON.parse(data.response);
+      } else {
+        structuredResponse = data.response;
+      }
+      
+      // Ensure it has the required structure
+      if (!structuredResponse.response) {
+        structuredResponse = {
+          response: structuredResponse as any || 'No response generated',
+          explanation: "AI provided response in unexpected format",
+          key_points: [],
+          suggestions: [],
+          next_steps: "Continue exploring the topic",
+          confidence: 0.8
+        };
+      }
+    } catch (parseError) {
+      console.error('Error parsing LumoAI response:', parseError);
+      structuredResponse = {
+        response: typeof data.response === 'string' ? data.response : 'Invalid response format',
+        explanation: "I've analyzed your question and here's what I found.",
+        key_points: ["Response provided in text format"],
+        suggestions: ["Ask follow-up questions for more details"],
+        next_steps: "Review the response and ask for clarification if needed",
+        confidence: 0.9,
+        error: true
+      };
+    }
+
     return {
       success: true,
-      response: data.response
+      response: structuredResponse
     };
   } catch (error: any) {
     console.error('Error calling LumoAI:', error);
@@ -183,25 +228,48 @@ export const callLumoAI = async (
   }
 };
 
-// Get conversation summary for context
 export const getConversationSummary = async (
   lessonId?: string,
   courseId?: string
 ): Promise<string> => {
   try {
-    const messages = await loadChatHistory(lessonId, courseId, 10, false); // Get last 10 messages
+    const messages = await loadChatHistory(lessonId, courseId, 10, false);
     
     if (messages.length === 0) {
       return '';
     }
 
-    const recentMessages = messages.slice(0, 5).reverse(); // Get most recent 5 messages
+    const recentMessages = messages.slice(0, 5).reverse();
     
     return recentMessages
-      .map(msg => `${msg.message_type}: ${msg.content.substring(0, 100)}${msg.content.length > 100 ? '...' : ''}`)
+      .map(msg => {
+        let content = msg.content;
+        try {
+          const parsed = JSON.parse(msg.content);
+          if (parsed && parsed.response) {
+            content = parsed.response;
+          }
+        } catch {
+          // Keep as-is if not JSON
+        }
+        return `${msg.message_type}: ${content.substring(0, 100)}${content.length > 100 ? '...' : ''}`;
+      })
       .join('\n');
   } catch (error) {
     console.error('Error getting conversation summary:', error);
     return '';
+  }
+};
+
+// Helper to parse message content
+export const parseMessageContent = (message: AIChatMessage): string | LumoAIResponse => {
+  try {
+    const parsed = JSON.parse(message.content);
+    if (parsed && typeof parsed === 'object' && 'response' in parsed) {
+      return parsed as LumoAIResponse;
+    }
+    return message.content;
+  } catch {
+    return message.content;
   }
 };
