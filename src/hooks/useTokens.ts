@@ -75,7 +75,7 @@ export const useTokens = () => {
           .upsert({ 
             user_id: user.id, 
             balance: 0,
-            free_tokens_available: 30,
+            free_tokens_available: 100,
             free_tokens_used: 0,
             has_used_free_trial: false
           }, {
