@@ -21,16 +21,16 @@ import {
   Menu, X, HelpCircle, AlertCircle, RotateCcw,
   ChevronLeft, ChevronRight, FileQuestion, Video,
   Send, Edit2, Trash2, Loader2, Maximize2, Volume2,
-  ThumbsUp, Reply
+  ThumbsUp, Reply, Heart, MoreVertical, Calendar,
+  MessageSquare, TrendingUp, Globe, Hash, Paperclip,
+  Smile, Image, Code, Link as LinkIcon, AtSign,
+  Filter, Search, SortAsc, Pin, Flag, EyeOff
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CourseReviewsTab from '@/components/course/CourseReviewsTab';
-import LessonDiscussionTab from '@/components/course/LessonDiscussionTab';
 import AddToCartButton from '@/components/cart/AddToCartButton';
-import LessonNotesTab from '@/components/course/LessonNotesTab';
 import FinalExamModal from '@/components/course/FinalExamModal';
 import QuizModal from '@/components/course/QuizModal';
-import VideoTranscripts from '@/components/course/VideoTranscripts';
 import QuizResultsModal from '@/components/course/QuizResultsModal';
 import FloatingAILearningAssistant from '@/components/learning/FloatingAILearningAssistant';
 import RecommendedCourses from '@/components/course/RecommendedCourses';
@@ -229,13 +229,14 @@ interface LessonDiscussion {
   lesson_id: string;
   parent_id?: string;
   content: string;
-  is_creator_reply?: boolean;
+  is_instructor_reply?: boolean;
   created_at: string;
   updated_at: string;
   profile?: Profile;
   replies?: LessonDiscussion[];
   likes_count?: number;
   is_liked?: boolean;
+  reply_count?: number;
 }
 
 interface LessonTranscript {
@@ -258,6 +259,686 @@ interface Certificate {
   created_at: string;
   updated_at: string;
 }
+
+// ==================== ENHANCED DISCUSSION COMPONENTS ====================
+
+interface DiscussionThreadProps {
+  discussion: LessonDiscussion;
+  onReply: (parentId: string) => void;
+  onLike: (discussionId: string) => void;
+  onDelete?: (discussionId: string) => void;
+  currentUserId?: string;
+}
+
+const DiscussionThread: React.FC<DiscussionThreadProps> = ({ 
+  discussion, 
+  onReply, 
+  onLike,
+  onDelete,
+  currentUserId 
+}) => {
+  const [showReplies, setShowReplies] = useState(false);
+  const [showReplyInput, setShowReplyInput] = useState(false);
+  const [replyContent, setReplyContent] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showOptions, setShowOptions] = useState(false);
+
+  const handleSubmitReply = () => {
+    if (replyContent.trim()) {
+      onReply(discussion.id);
+      setReplyContent('');
+      setShowReplyInput(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (onDelete && window.confirm('Are you sure you want to delete this comment?')) {
+      setIsDeleting(true);
+      try {
+        await onDelete(discussion.id);
+      } finally {
+        setIsDeleting(false);
+        setShowOptions(false);
+      }
+    }
+  };
+
+  const canDelete = currentUserId === discussion.user_id || discussion.profile?.is_creator;
+  const isInstructor = discussion.profile?.is_creator;
+  const hasReplies = discussion.replies && discussion.replies.length > 0;
+  const replyCount = discussion.reply_count || (discussion.replies ? discussion.replies.length : 0);
+
+  const getTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    if (diffInSeconds < 60) return 'just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Main Comment */}
+      <div className={`relative group p-4 rounded-2xl transition-all duration-300 hover:shadow-lg ${
+        isInstructor 
+          ? 'bg-gradient-to-br from-blue-50/80 to-indigo-50/80 border-l-4 border-blue-500' 
+          : 'bg-gradient-to-br from-gray-50/80 to-slate-50/80 border-l-4 border-gray-300'
+      }`}>
+        {/* Avatar and Header */}
+        <div className="flex items-start gap-3 mb-3">
+          <div className="relative">
+            <Avatar className={`h-12 w-12 ring-2 ${isInstructor ? 'ring-blue-200' : 'ring-gray-200'} shadow-sm`}>
+              <AvatarImage src={discussion.profile?.avatar_url} />
+              <AvatarFallback className={`${isInstructor ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}>
+                {discussion.profile?.full_name?.charAt(0) || 'U'}
+              </AvatarFallback>
+            </Avatar>
+            {isInstructor && (
+              <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
+                <Crown className="h-3 w-3 text-white" />
+              </div>
+            )}
+          </div>
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`font-semibold ${isInstructor ? 'text-blue-700' : 'text-gray-900'}`}>
+                    {discussion.profile?.full_name || 'Anonymous'}
+                  </span>
+                  {isInstructor && (
+                    <Badge className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs px-2 py-0.5 rounded-full">
+                      Instructor
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <Calendar className="h-3 w-3" />
+                  {getTimeAgo(discussion.created_at)}
+                  {discussion.is_instructor_reply && (
+                    <span className="flex items-center gap-1 text-blue-500">
+                      <MessageSquare className="h-3 w-3" />
+                      Official reply
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              <div className="relative">
+                <button 
+                  onClick={() => setShowOptions(!showOptions)}
+                  className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </button>
+                
+                {showOptions && (
+                  <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border z-10">
+                    <div className="py-1">
+                      {canDelete && (
+                        <button
+                          onClick={handleDelete}
+                          disabled={isDeleting}
+                          className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                        >
+                          {isDeleting ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                          Delete Comment
+                        </button>
+                      )}
+                      <button className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-600 hover:bg-gray-100">
+                        <Flag className="h-4 w-4" />
+                        Report
+                      </button>
+                      <button className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-600 hover:bg-gray-100">
+                        <EyeOff className="h-4 w-4" />
+                        Hide
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="mb-4">
+          <p className="text-gray-800 whitespace-pre-wrap leading-relaxed">
+            {discussion.content}
+          </p>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => onLike(discussion.id)}
+              className={cn(
+                "flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-200",
+                discussion.is_liked 
+                  ? "bg-gradient-to-r from-pink-50 to-rose-50 text-pink-600 border border-pink-200" 
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              )}
+            >
+              <Heart className={cn("h-4 w-4", discussion.is_liked && "fill-pink-500")} />
+              <span className="text-sm font-medium">{discussion.likes_count || 0}</span>
+            </button>
+            
+            <button 
+              onClick={() => {
+                setShowReplyInput(true);
+                setShowReplies(true);
+              }}
+              className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-full transition-all duration-200"
+            >
+              <Reply className="h-4 w-4" />
+              <span className="text-sm font-medium">Reply</span>
+            </button>
+            
+            {hasReplies && (
+              <button 
+                onClick={() => setShowReplies(!showReplies)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-full transition-all duration-200"
+              >
+                <MessageSquare className="h-4 w-4" />
+                <span className="text-sm font-medium">
+                  {showReplies ? 'Hide' : 'Show'} {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
+                </span>
+              </button>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button className="p-1.5 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
+              <Share className="h-4 w-4" />
+            </button>
+            <button className="p-1.5 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
+              <Bookmark className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Reply Input */}
+        {showReplyInput && (
+          <div className="mt-4 pl-4 border-l-2 border-blue-300">
+            <div className="flex gap-3">
+              <Avatar className="h-8 w-8 ring-1 ring-gray-300">
+                <AvatarFallback className="bg-gray-100 text-gray-600">
+                  {currentUserId?.charAt(0) || 'U'}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <Textarea
+                  placeholder={`Reply to ${discussion.profile?.full_name || 'this comment'}...`}
+                  value={replyContent}
+                  onChange={(e) => setReplyContent(e.target.value)}
+                  rows={2}
+                  className="resize-none border-gray-300 focus:border-blue-400 focus:ring-blue-300 rounded-xl"
+                />
+                <div className="flex items-center justify-between mt-2">
+                  <div className="flex items-center gap-2">
+                    <button className="p-1.5 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
+                      <Smile className="h-4 w-4" />
+                    </button>
+                    <button className="p-1.5 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
+                      <Image className="h-4 w-4" />
+                    </button>
+                    <button className="p-1.5 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
+                      <Paperclip className="h-4 w-4" />
+                    </button>
+                    <button className="p-1.5 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
+                      <Code className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowReplyInput(false)}
+                      className="border-gray-300 hover:bg-gray-100"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleSubmitReply}
+                      disabled={!replyContent.trim()}
+                      className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
+                    >
+                      <Send className="h-4 w-4 mr-1" />
+                      Reply
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Nested Replies */}
+      {showReplies && discussion.replies && discussion.replies.length > 0 && (
+        <div className="ml-8 space-y-4 border-l-2 border-gray-200 pl-4">
+          {discussion.replies.map((reply) => (
+            <div key={reply.id} className="relative">
+              {/* Reply Connector Line */}
+              <div className="absolute -left-4 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-300 to-purple-300" />
+              
+              <div className={`p-3 rounded-xl transition-all duration-300 hover:shadow-md ${
+                reply.profile?.is_creator
+                  ? 'bg-gradient-to-br from-purple-50/80 to-pink-50/80 border-l-2 border-purple-400'
+                  : 'bg-gradient-to-br from-slate-50/80 to-gray-50/80 border-l-2 border-gray-300'
+              }`}>
+                <div className="flex items-start gap-3">
+                  <Avatar className={`h-8 w-8 ring-1 ${reply.profile?.is_creator ? 'ring-purple-200' : 'ring-gray-200'}`}>
+                    <AvatarImage src={reply.profile?.avatar_url} />
+                    <AvatarFallback className={`${reply.profile?.is_creator ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'}`}>
+                      {reply.profile?.full_name?.charAt(0) || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-sm font-medium ${reply.profile?.is_creator ? 'text-purple-700' : 'text-gray-900'}`}>
+                        {reply.profile?.full_name || 'Anonymous'}
+                      </span>
+                      {reply.profile?.is_creator && (
+                        <Badge className="bg-gradient-to-r from-purple-500 to-pink-600 text-white text-xs px-1.5 py-0 rounded-full">
+                          Instructor
+                        </Badge>
+                      )}
+                      <span className="text-xs text-gray-500">
+                        {getTimeAgo(reply.created_at)}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                      {reply.content}
+                    </p>
+                    
+                    <div className="flex items-center gap-3 mt-2">
+                      <button 
+                        onClick={() => onLike(reply.id)}
+                        className={cn(
+                          "flex items-center gap-1 text-xs",
+                          reply.is_liked ? "text-pink-600" : "text-gray-500 hover:text-gray-700"
+                        )}
+                      >
+                        <Heart className={cn("h-3 w-3", reply.is_liked && "fill-pink-500")} />
+                        <span>{reply.likes_count || 0}</span>
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setShowReplyInput(true);
+                        }}
+                        className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                      >
+                        <Reply className="h-3 w-3" />
+                        Reply
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==================== DISCUSSION FILTERS ====================
+
+interface DiscussionFiltersProps {
+  activeFilter: string;
+  onFilterChange: (filter: string) => void;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+}
+
+const DiscussionFilters: React.FC<DiscussionFiltersProps> = ({
+  activeFilter,
+  onFilterChange,
+  searchQuery,
+  onSearchChange
+}) => {
+  const filters = [
+    { id: 'all', label: 'All Comments', icon: <MessageSquare className="h-4 w-4" /> },
+    { id: 'instructor', label: 'Instructor Replies', icon: <Crown className="h-4 w-4" /> },
+    { id: 'popular', label: 'Most Liked', icon: <TrendingUp className="h-4 w-4" /> },
+    { id: 'recent', label: 'Recent', icon: <Calendar className="h-4 w-4" /> },
+  ];
+
+  return (
+    <div className="space-y-4">
+      {/* Search Bar */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search discussions..."
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => onSearchChange('')}
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Filter Chips */}
+      <div className="flex flex-wrap gap-2">
+        {filters.map((filter) => (
+          <button
+            key={filter.id}
+            onClick={() => onFilterChange(filter.id)}
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200",
+              activeFilter === filter.id
+                ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            )}
+          >
+            {filter.icon}
+            {filter.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Sort Options */}
+      <div className="flex items-center gap-2 text-sm text-gray-600">
+        <SortAsc className="h-4 w-4" />
+        <span>Sort by:</span>
+        <select className="bg-transparent border-none focus:ring-0 text-gray-700 font-medium">
+          <option>Newest First</option>
+          <option>Most Liked</option>
+          <option>Oldest First</option>
+        </select>
+      </div>
+    </div>
+  );
+};
+
+// ==================== ENHANCED DISCUSSION SECTION ====================
+
+interface EnhancedDiscussionSectionProps {
+  discussions: LessonDiscussion[];
+  onAddDiscussion: (content: string) => void;
+  onReply: (parentId: string, content: string) => void;
+  onLike: (discussionId: string) => void;
+  onDelete: (discussionId: string) => void;
+  currentUserId?: string;
+  isLoading?: boolean;
+}
+
+const EnhancedDiscussionSection: React.FC<EnhancedDiscussionSectionProps> = ({
+  discussions,
+  onAddDiscussion,
+  onReply,
+  onLike,
+  onDelete,
+  currentUserId,
+  isLoading = false
+}) => {
+  const [newDiscussion, setNewDiscussion] = useState('');
+  const [activeFilter, setActiveFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyContent, setReplyContent] = useState('');
+
+  const filteredDiscussions = discussions.filter(discussion => {
+    if (activeFilter === 'instructor' && !discussion.profile?.is_creator) return false;
+    if (searchQuery && !discussion.content.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    return true;
+  });
+
+  const handleAddDiscussion = () => {
+    if (newDiscussion.trim()) {
+      onAddDiscussion(newDiscussion.trim());
+      setNewDiscussion('');
+    }
+  };
+
+  const handleAddReply = (parentId: string) => {
+    if (replyContent.trim()) {
+      onReply(parentId, replyContent.trim());
+      setReplyContent('');
+      setReplyingTo(null);
+    }
+  };
+
+  const handleReplyClick = (discussionId: string) => {
+    setReplyingTo(discussionId);
+  };
+
+  const stats = {
+    total: discussions.length,
+    instructorReplies: discussions.filter(d => d.profile?.is_creator).length,
+    popular: discussions.filter(d => (d.likes_count || 0) > 5).length,
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+        <p className="text-gray-600">Loading discussions...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Discussion Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-2xl border border-blue-100">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <MessageSquare className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Total Comments</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-4 rounded-2xl border border-purple-100">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <Crown className="h-5 w-5 text-purple-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Instructor Replies</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.instructorReplies}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-gradient-to-br from-orange-50 to-red-50 p-4 rounded-2xl border border-orange-100">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-orange-100 rounded-lg">
+              <TrendingUp className="h-5 w-5 text-orange-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Popular Discussions</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.popular}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Add Discussion Card */}
+      <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl border border-gray-200 p-6 shadow-sm">
+        <div className="flex gap-3">
+          <Avatar className="h-10 w-10 ring-2 ring-blue-100">
+            <AvatarFallback className="bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-600">
+              {currentUserId?.charAt(0) || 'U'}
+            </AvatarFallback>
+          </Avatar>
+          
+          <div className="flex-1">
+            <div className="mb-3">
+              <h3 className="font-semibold text-gray-900 mb-1">Start a Discussion</h3>
+              <p className="text-sm text-gray-600">
+                Ask questions, share insights, or help other learners
+              </p>
+            </div>
+            
+            <Textarea
+              placeholder="What would you like to discuss?"
+              value={newDiscussion}
+              onChange={(e) => setNewDiscussion(e.target.value)}
+              rows={3}
+              className="resize-none border-gray-300 focus:border-blue-400 focus:ring-blue-300 rounded-xl"
+            />
+            
+            <div className="flex items-center justify-between mt-3">
+              <div className="flex items-center gap-2">
+                <button className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
+                  <Smile className="h-5 w-5" />
+                </button>
+                <button className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
+                  <Image className="h-5 w-5" />
+                </button>
+                <button className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
+                  <Paperclip className="h-5 w-5" />
+                </button>
+                <button className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
+                  <Code className="h-5 w-5" />
+                </button>
+                <button className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
+                  <LinkIcon className="h-5 w-5" />
+                </button>
+              </div>
+              
+              <Button
+                onClick={handleAddDiscussion}
+                disabled={!newDiscussion.trim()}
+                className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 px-6 shadow-md hover:shadow-lg transition-all duration-200"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Post Discussion
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <DiscussionFilters
+        activeFilter={activeFilter}
+        onFilterChange={setActiveFilter}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
+
+      {/* Discussions List */}
+      <div className="space-y-4">
+        {filteredDiscussions.length > 0 ? (
+          filteredDiscussions.map((discussion) => (
+            <DiscussionThread
+              key={discussion.id}
+              discussion={discussion}
+              onReply={(parentId) => handleReplyClick(parentId)}
+              onLike={onLike}
+              onDelete={onDelete}
+              currentUserId={currentUserId}
+            />
+          ))
+        ) : (
+          <div className="text-center py-12">
+            <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full flex items-center justify-center">
+              <MessageSquare className="h-10 w-10 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              {searchQuery ? 'No matching discussions found' : 'No discussions yet'}
+            </h3>
+            <p className="text-gray-600 mb-6 max-w-md mx-auto">
+              {searchQuery 
+                ? 'Try different search terms or clear the search'
+                : 'Be the first to start a discussion! Share your thoughts or ask a question.'
+              }
+            </p>
+            {!searchQuery && (
+              <Button
+                onClick={() => document.querySelector('textarea')?.focus()}
+                className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
+              >
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Start First Discussion
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Floating Reply Input */}
+      {replyingTo && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-2xl z-50 animate-in slide-in-from-bottom duration-300">
+          <div className="container mx-auto max-w-4xl px-4 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Reply className="h-4 w-4 text-blue-500" />
+                <span className="text-sm font-medium text-gray-900">Replying to discussion</span>
+              </div>
+              <button
+                onClick={() => setReplyingTo(null)}
+                className="p-1 text-gray-400 hover:text-gray-600 rounded-full"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <Textarea
+                  placeholder="Write your reply..."
+                  value={replyContent}
+                  onChange={(e) => setReplyContent(e.target.value)}
+                  rows={2}
+                  className="resize-none border-gray-300 focus:border-blue-400 focus:ring-blue-300 rounded-xl"
+                  autoFocus
+                />
+                <div className="flex justify-end gap-2 mt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setReplyingTo(null)}
+                    className="border-gray-300 hover:bg-gray-100"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => handleAddReply(replyingTo)}
+                    disabled={!replyContent.trim()}
+                    className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
+                  >
+                    <Send className="h-4 w-4 mr-1" />
+                    Reply
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ==================== CUSTOM VIDEO PLAYER ====================
 
@@ -378,7 +1059,7 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
   };
 
   return (
-    <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden">
+    <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-xl">
       {isBuffering && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
           <div className="text-white">
@@ -459,18 +1140,18 @@ const QuizItem: React.FC<QuizItemProps> = ({ quiz, onStart, isModuleQuiz = false
   return (
     <div 
       className={cn(
-        "flex items-center justify-between p-4 rounded-lg border transition-all hover:shadow-md cursor-pointer",
+        "flex items-center justify-between p-4 rounded-xl border transition-all hover:shadow-md cursor-pointer",
         passed 
-          ? "bg-green-50 border-green-200 hover:bg-green-100" 
+          ? "bg-gradient-to-r from-green-50/80 to-emerald-50/80 border-green-200 hover:bg-green-100" 
           : quiz.is_completed 
-            ? "bg-red-50 border-red-200 hover:bg-red-100"
-            : "bg-blue-50 border-blue-200 hover:bg-blue-100"
+            ? "bg-gradient-to-r from-red-50/80 to-orange-50/80 border-red-200 hover:bg-red-100"
+            : "bg-gradient-to-r from-blue-50/80 to-indigo-50/80 border-blue-200 hover:bg-blue-100"
       )}
       onClick={onStart}
     >
       <div className="flex items-center gap-3">
         <div className={cn(
-          "p-2 rounded-full",
+          "p-2 rounded-full shadow-sm",
           passed 
             ? "bg-green-100 text-green-600" 
             : quiz.is_completed 
@@ -523,200 +1204,11 @@ const QuizItem: React.FC<QuizItemProps> = ({ quiz, onStart, isModuleQuiz = false
             )}
           </div>
         ) : (
-          <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+          <Button size="sm" className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700">
             Start Quiz
           </Button>
         )}
       </div>
-    </div>
-  );
-};
-
-// ==================== DISCUSSION COMPONENTS ====================
-
-interface DiscussionThreadProps {
-  discussion: LessonDiscussion;
-  onReply: (parentId: string) => void;
-  onLike: (discussionId: string) => void;
-  onDelete?: (discussionId: string) => void;
-  currentUserId?: string;
-}
-
-const DiscussionThread: React.FC<DiscussionThreadProps> = ({ 
-  discussion, 
-  onReply, 
-  onLike,
-  onDelete,
-  currentUserId 
-}) => {
-  const [showReplies, setShowReplies] = useState(false);
-  const [replying, setReplying] = useState(false);
-  const [replyContent, setReplyContent] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const handleSubmitReply = () => {
-    if (replyContent.trim()) {
-      onReply(discussion.id);
-      setReplyContent('');
-      setReplying(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (onDelete && window.confirm('Are you sure you want to delete this comment?')) {
-      setIsDeleting(true);
-      try {
-        await onDelete(discussion.id);
-      } finally {
-        setIsDeleting(false);
-      }
-    }
-  };
-
-  const canDelete = currentUserId === discussion.user_id || discussion.profile?.is_creator;
-
-  return (
-    <div className="space-y-3">
-      <div className="flex gap-3">
-        <Avatar className="h-10 w-10">
-          <AvatarImage src={discussion.profile?.avatar_url} />
-          <AvatarFallback>
-            {discussion.profile?.full_name?.charAt(0) || 'U'}
-          </AvatarFallback>
-        </Avatar>
-        <div className="flex-1">
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="flex justify-between items-start mb-2">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-gray-900">
-                  {discussion.profile?.full_name || 'Anonymous'}
-                </span>
-                {discussion.profile?.is_creator && (
-                  <Badge className="bg-purple-500 text-white text-xs">Instructor</Badge>
-                )}
-                <span className="text-xs text-gray-500">
-                  {new Date(discussion.created_at).toLocaleDateString()}
-                </span>
-              </div>
-              {canDelete && (
-                <button 
-                  onClick={handleDelete}
-                  disabled={isDeleting}
-                  className="text-gray-400 hover:text-red-500 p-1 rounded"
-                >
-                  {isDeleting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4" />
-                  )}
-                </button>
-              )}
-            </div>
-            <p className="text-gray-800 whitespace-pre-wrap">{discussion.content}</p>
-            
-            <div className="flex items-center gap-4 mt-3">
-              <button 
-                onClick={() => onLike(discussion.id)}
-                className={cn(
-                  "flex items-center gap-1 text-sm",
-                  discussion.is_liked ? "text-blue-600" : "text-gray-500 hover:text-gray-700"
-                )}
-              >
-                <ThumbsUp className="h-4 w-4" />
-                <span>{discussion.likes_count || 0}</span>
-              </button>
-              
-              <button 
-                onClick={() => {
-                  setReplying(!replying);
-                  if (!replying) setShowReplies(true);
-                }}
-                className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
-              >
-                <Reply className="h-4 w-4" />
-                Reply
-              </button>
-              
-              {discussion.replies && discussion.replies.length > 0 && (
-                <button 
-                  onClick={() => setShowReplies(!showReplies)}
-                  className="text-sm text-gray-600 hover:text-gray-800"
-                >
-                  {showReplies ? 'Hide' : 'Show'} {discussion.replies.length} replies
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Reply Input */}
-      {replying && (
-        <div className="ml-12">
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <Textarea
-                placeholder="Write a reply..."
-                value={replyContent}
-                onChange={(e) => setReplyContent(e.target.value)}
-                rows={2}
-                className="resize-none"
-              />
-              <div className="flex justify-end gap-2 mt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setReplying(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleSubmitReply}
-                  disabled={!replyContent.trim()}
-                >
-                  <Send className="h-4 w-4 mr-1" />
-                  Reply
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Nested Replies */}
-      {showReplies && discussion.replies && discussion.replies.length > 0 && (
-        <div className="ml-12 space-y-3">
-          {discussion.replies.map((reply) => (
-            <div key={reply.id} className="flex gap-3">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={reply.profile?.avatar_url} />
-                <AvatarFallback>
-                  {reply.profile?.full_name?.charAt(0) || 'U'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <div className="flex justify-between items-start mb-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900">
-                        {reply.profile?.full_name || 'Anonymous'}
-                      </span>
-                      {reply.profile?.is_creator && (
-                        <Badge className="bg-purple-500 text-white text-xs">Instructor</Badge>
-                      )}
-                    </div>
-                    <span className="text-xs text-gray-500">
-                      {new Date(reply.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{reply.content}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 };
@@ -750,9 +1242,9 @@ const CourseCompletionCard: React.FC<CourseCompletionCardProps> = ({
   const showExamInfo = finalExam && examResult;
 
   return (
-    <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-6 mb-6">
+    <div className="bg-gradient-to-r from-green-50/80 to-emerald-50/80 border-2 border-green-200 rounded-2xl p-6 mb-6 shadow-lg">
       <div className="flex items-center gap-4 mb-4">
-        <div className="bg-green-500 text-white p-3 rounded-full">
+        <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white p-3 rounded-full shadow-md">
           <CheckCircle className="h-8 w-8" />
         </div>
         <div className="flex-1">
@@ -809,48 +1301,12 @@ const CourseCompletionCard: React.FC<CourseCompletionCardProps> = ({
       {hasCertificate && (
         <Button 
           onClick={onViewCertificate}
-          className="w-full mt-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+          className="w-full mt-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-md hover:shadow-lg"
         >
           <Award className="h-5 w-5 mr-2" />
           View Certificate
         </Button>
       )}
-    </div>
-  );
-};
-
-// ==================== PULSE LOADING COMPONENT ====================
-
-const PulseLoading = () => {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-orange-50">
-      <Layout>
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex flex-col items-center justify-center min-h-96">
-            <div className="relative w-40 h-40 flex items-center justify-center mb-8">
-              <div className="absolute w-40 h-40 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 animate-ping" />
-              <div className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-orange-500/30 to-purple-600/30 animate-pulse" />
-              <div className="absolute w-24 h-24 rounded-full bg-gradient-to-r from-orange-500/40 to-purple-600/40 animate-pulse" />
-              <div className="absolute w-16 h-16 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center shadow-lg">
-                <BookOpen className="h-8 w-8 text-white" />
-              </div>
-            </div>
-            <div className="text-center space-y-2">
-              <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
-                Loading Your Course
-              </h3>
-              <p className="text-muted-foreground text-lg">
-                Preparing your learning experience...
-              </p>
-            </div>
-            <div className="flex space-x-2 mt-6">
-              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-3 h-3 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
-          </div>
-        </div>
-      </Layout>
     </div>
   );
 };
@@ -1134,12 +1590,12 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
 
   return (
     <div className="space-y-4 w-full">
-      <div className="bg-gradient-to-r from-orange-100 to-purple-100 p-3 rounded-lg">
+      <div className="bg-gradient-to-r from-blue-50/80 to-indigo-50/80 p-3 rounded-xl border border-blue-200">
         <div className="flex items-center justify-between mb-1">
           <span className="text-sm sm:text-base font-medium text-gray-800">Course Progress</span>
-          <span className="text-xs sm:text-sm font-bold text-orange-600">{courseProgress}%</span>
+          <span className="text-xs sm:text-sm font-bold text-blue-600">{courseProgress}%</span>
         </div>
-        <Progress value={courseProgress} className="h-1.5 sm:h-2" />
+        <Progress value={courseProgress} className="h-1.5 sm:h-2 bg-blue-100" />
       </div>
 
       {currentLessonId && (
@@ -1149,7 +1605,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
             size="sm"
             onClick={handlePreviousLesson}
             disabled={!getPreviousLesson() || isNavigating}
-            className="px-3 w-full sm:w-auto"
+            className="px-3 w-full sm:w-auto border-gray-300 hover:bg-gray-100"
           >
             <ChevronLeft className="h-4 w-4 mr-1" />
             Previous
@@ -1158,7 +1614,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
             size="sm"
             onClick={handleNextLesson}
             disabled={!getNextLesson() || isNavigating}
-            className="px-3 w-full sm:w-auto bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+            className="px-3 w-full sm:w-auto bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-md hover:shadow-lg"
           >
             Next
             <ChevronRight className="h-4 w-4 ml-1" />
@@ -1176,14 +1632,14 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
           <AccordionItem 
             key={module.id} 
             value={module.id}
-            className="border rounded-lg bg-gradient-to-r from-orange-50 to-purple-50"
+            className="border rounded-xl bg-gradient-to-r from-blue-50/50 to-indigo-50/50"
           >
             <AccordionTrigger className="px-3 sm:px-4 py-2 sm:py-3 hover:no-underline">
               <div className="flex items-center justify-between w-full">
                 <div className="flex items-center space-x-2 sm:space-x-3 text-left">
-                  <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
+                  <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
                   <span className="text-sm sm:text-base font-medium">{module.title}</span>
-                  <Badge variant="outline" className="bg-white text-xs">
+                  <Badge variant="outline" className="bg-white/80 text-xs">
                     {module.lessons?.length || 0} lessons
                   </Badge>
                 </div>
@@ -1202,10 +1658,10 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
                     <div key={lesson.id} className="space-y-2">
                       <div 
                         className={cn(
-                          "flex flex-col items-start justify-between p-3 border rounded-lg cursor-pointer transition-all",
+                          "flex flex-col items-start justify-between p-3 border rounded-lg cursor-pointer transition-all hover:shadow-sm",
                           currentLessonId === lesson.id 
-                            ? 'bg-gradient-to-r from-orange-100 to-purple-100 border-orange-300 shadow-sm' 
-                            : 'hover:bg-gray-50 hover:shadow-sm'
+                            ? 'bg-gradient-to-r from-blue-100/80 to-indigo-100/80 border-blue-300 shadow-sm' 
+                            : 'hover:bg-gray-50/80'
                         )}
                         onClick={() => onLessonSelect(lesson)}
                       >
@@ -1238,7 +1694,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
                           size="sm"
                           className={cn(
                             "w-full mt-2",
-                            currentLessonId === lesson.id && "bg-gradient-to-r from-orange-500 to-purple-600"
+                            currentLessonId === lesson.id && "bg-gradient-to-r from-blue-500 to-indigo-600"
                           )}
                         >
                           <Play className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
@@ -1248,7 +1704,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
 
                       {/* Lesson Quizzes */}
                       {lesson.quiz && (
-                        <div className="ml-4 space-y-2 border-l-2 border-orange-200 pl-3">
+                        <div className="ml-4 space-y-2 border-l-2 border-blue-200 pl-3">
                           <QuizItem
                             quiz={lesson.quiz}
                             onStart={() => onQuizStart?.(lesson.quiz!.id, lesson.id)}
@@ -1268,7 +1724,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
               {module.quizzes && module.quizzes.length > 0 && (
                 <div className="mt-4 pt-4 border-t">
                   <div className="flex items-center gap-2 mb-3">
-                    <Award className="h-4 w-4 text-purple-600" />
+                    <Award className="h-4 w-4 text-indigo-600" />
                     <span className="font-medium text-sm text-gray-700">Module Quizzes</span>
                   </div>
                   <div className="space-y-2">
@@ -1289,7 +1745,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
       </Accordion>
 
       {showFinalExamButton && (
-        <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-orange-200 rounded-lg p-3 sm:p-4">
+        <div className="bg-gradient-to-r from-orange-50/80 to-yellow-50/80 border-2 border-orange-200 rounded-xl p-3 sm:p-4">
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2 sm:gap-3">
               <Award className="h-5 w-5 sm:h-6 sm:w-6 text-orange-600" />
@@ -1320,7 +1776,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
               </div>
             </div>
             <Button 
-              className="w-full bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600"
+              className="w-full bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 shadow-md hover:shadow-lg"
               onClick={() => onFinalExamStart?.(finalExam.id)}
             >
               <Award className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
@@ -1331,7 +1787,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
       )}
 
       {showRestartCourseButton && (
-        <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-lg p-3 sm:p-4">
+        <div className="bg-gradient-to-r from-red-50/80 to-orange-50/80 border-2 border-red-200 rounded-xl p-3 sm:p-4">
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2 sm:gap-3">
               <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6 text-red-600" />
@@ -1353,7 +1809,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
               </div>
             </div>
             <Button 
-              className="w-full bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600"
+              className="w-full bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 shadow-md hover:shadow-lg"
               onClick={onRestartCourse}
             >
               <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
@@ -1364,7 +1820,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
       )}
 
       {courseProgress === 100 && (!finalExam || hasPassedExam) && (
-        <div className="bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-200 rounded-lg p-3 sm:p-4">
+        <div className="bg-gradient-to-r from-green-50/80 to-emerald-50/80 border-2 border-green-200 rounded-xl p-3 sm:p-4">
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2 sm:gap-3">
               <Trophy className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
@@ -1374,7 +1830,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
               </div>
             </div>
             <Button 
-              className="w-full bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600"
+              className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-md hover:shadow-lg"
               onClick={() => navigate(`/course/${courseId}/results`)}
             >
               <Trophy className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
@@ -1385,27 +1841,27 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
       )}
 
       {creatorProfile && (
-        <div className="bg-gradient-to-r from-orange-50 to-purple-50 border-2 border-orange-200 rounded-lg p-3 sm:p-4">
+        <div className="bg-gradient-to-r from-blue-50/80 to-indigo-50/80 border-2 border-blue-200 rounded-xl p-3 sm:p-4">
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2 sm:gap-3">
-              <Avatar className="h-10 w-10 sm:h-12 sm:w-12">
+              <Avatar className="h-10 w-10 sm:h-12 sm:w-12 ring-2 ring-blue-200">
                 <AvatarImage src={creatorProfile.avatar_url || undefined} />
-                <AvatarFallback>
+                <AvatarFallback className="bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-600">
                   {creatorProfile.full_name?.charAt(0) || 'I'}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <h4 className="text-sm sm:text-base font-semibold text-orange-800">Your Instructor</h4>
-                <p className="text-xs sm:text-sm font-medium text-orange-700 truncate">{creatorProfile.full_name}</p>
+                <h4 className="text-sm sm:text-base font-semibold text-blue-800">Your Instructor</h4>
+                <p className="text-xs sm:text-sm font-medium text-blue-700 truncate">{creatorProfile.full_name}</p>
                 {creatorProfile.bio && (
-                  <p className="text-xs text-orange-600 mt-1 line-clamp-2">{creatorProfile.bio}</p>
+                  <p className="text-xs text-blue-600 mt-1 line-clamp-2">{creatorProfile.bio}</p>
                 )}
               </div>
             </div>
             <Button 
               variant="outline"
               size="sm"
-              className="w-full border-orange-300 text-orange-600 hover:bg-orange-100"
+              className="w-full border-blue-300 text-blue-600 hover:bg-blue-100"
               onClick={() => navigate(`/creator/profile/${creatorProfile.id}`)}
             >
               <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
@@ -1414,6 +1870,42 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+// ==================== PULSE LOADING COMPONENT ====================
+
+const PulseLoading = () => {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
+      <Layout>
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex flex-col items-center justify-center min-h-96">
+            <div className="relative w-40 h-40 flex items-center justify-center mb-8">
+              <div className="absolute w-40 h-40 rounded-full bg-gradient-to-r from-blue-500/20 to-indigo-600/20 animate-ping" />
+              <div className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-blue-500/30 to-indigo-600/30 animate-pulse" />
+              <div className="absolute w-24 h-24 rounded-full bg-gradient-to-r from-blue-500/40 to-indigo-600/40 animate-pulse" />
+              <div className="absolute w-16 h-16 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                <BookOpen className="h-8 w-8 text-white" />
+              </div>
+            </div>
+            <div className="text-center space-y-2">
+              <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-500 to-indigo-600 bg-clip-text text-transparent">
+                Loading Your Course
+              </h3>
+              <p className="text-muted-foreground text-lg">
+                Preparing your learning experience...
+              </p>
+            </div>
+            <div className="flex space-x-2 mt-6">
+              <div className="w-3 h-3 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-3 h-3 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-3 h-3 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      </Layout>
     </div>
   );
 };
@@ -1434,7 +1926,6 @@ const CourseLearningPage = () => {
   const [finalExam, setFinalExam] = useState<FinalExam | null>(null);
   const [examResult, setExamResult] = useState<FinalExamAttempt | null>(null);
   const [certificate, setCertificate] = useState<Certificate | null>(null);
-  const [markingComplete, setMarkingComplete] = useState(false);
   const [showExamModal, setShowExamModal] = useState(false);
   const [showQuizModal, setShowQuizModal] = useState(false);
   const [currentQuizId, setCurrentQuizId] = useState<string>('');
@@ -1456,13 +1947,15 @@ const CourseLearningPage = () => {
   const [showNextLessonDialog, setShowNextLessonDialog] = useState(false);
   const [currentLessonProgress, setCurrentLessonProgress] = useState(0);
   
-  // Discussion & Notes State
+  // Enhanced Discussion & Notes State
   const [notes, setNotes] = useState<LessonNote[]>([]);
   const [newNote, setNewNote] = useState('');
   const [editingNote, setEditingNote] = useState<string | null>(null);
   const [editNoteContent, setEditNoteContent] = useState('');
   const [discussions, setDiscussions] = useState<LessonDiscussion[]>([]);
   const [newDiscussion, setNewDiscussion] = useState('');
+  const [discussionFilter, setDiscussionFilter] = useState('all');
+  const [discussionSearch, setDiscussionSearch] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState('');
   const [transcripts, setTranscripts] = useState<LessonTranscript[]>([]);
@@ -1862,7 +2355,8 @@ const CourseLearningPage = () => {
             ...discussion,
             replies,
             likes_count: likesData?.length || 0,
-            is_liked: !!userLikeData
+            is_liked: !!userLikeData,
+            reply_count: replies.length
           };
         })
       );
@@ -2181,8 +2675,8 @@ const CourseLearningPage = () => {
     }
   };
 
-  const handleAddDiscussion = async () => {
-    if (!newDiscussion.trim() || !selectedLesson || !user) return;
+  const handleAddDiscussion = async (content: string) => {
+    if (!content.trim() || !selectedLesson || !user) return;
 
     try {
       const { data, error } = await supabase
@@ -2190,8 +2684,8 @@ const CourseLearningPage = () => {
         .insert({
           user_id: user.id,
           lesson_id: selectedLesson.id,
-          content: newDiscussion.trim(),
-          is_creator_reply: false
+          content: content.trim(),
+          is_instructor_reply: false  // Fixed: using correct column name
         })
         .select(`
           *,
@@ -2216,8 +2710,8 @@ const CourseLearningPage = () => {
     }
   };
 
-  const handleAddReply = async (parentId: string) => {
-    if (!replyContent.trim() || !selectedLesson || !user) return;
+  const handleAddReply = async (parentId: string, content: string) => {
+    if (!content.trim() || !selectedLesson || !user) return;
 
     try {
       const { data, error } = await supabase
@@ -2226,8 +2720,8 @@ const CourseLearningPage = () => {
           user_id: user.id,
           lesson_id: selectedLesson.id,
           parent_id: parentId,
-          content: replyContent.trim(),
-          is_creator_reply: false
+          content: content.trim(),
+          is_instructor_reply: false  // Fixed: using correct column name
         })
         .select(`
           *,
@@ -2344,42 +2838,6 @@ const CourseLearningPage = () => {
       setSelectedLesson(firstLesson);
       setCurrentLessonId(firstLesson.id);
       setShowResumeModal(false);
-    }
-  };
-
-  const markAllLessonsComplete = async () => {
-    if (!user || !courseId || !modules.length || !enrollment) {
-      toast.error('Unable to mark lessons complete');
-      return;
-    }
-
-    setMarkingComplete(true);
-    try {
-      const allLessonIds = modules.flatMap(module => 
-        module.lessons.map(lesson => lesson.id)
-      );
-
-      const { error } = await supabase
-        .from('lesson_progress')
-        .upsert(
-          allLessonIds.map(lessonId => ({
-            enrollment_id: enrollment.id,
-            lesson_id: lessonId,
-            is_completed: true,
-            completion_date: new Date().toISOString()
-          })), {
-            onConflict: 'enrollment_id,lesson_id'
-          }
-        );
-
-      if (error) throw error;
-      await syncCourseProgress();
-      toast.success('All lessons marked as complete!');
-    } catch (error) {
-      console.error('Error marking lessons complete:', error);
-      toast.error('Failed to mark lessons complete');
-    } finally {
-      setMarkingComplete(false);
     }
   };
 
@@ -2672,7 +3130,7 @@ const CourseLearningPage = () => {
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Invalid course URL</h1>
             <p className="text-gray-600 mb-4">The course ID is missing from the URL.</p>
             <Link to="/explore-courses">
-              <Button className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
+              <Button className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700">
                 Browse Courses
               </Button>
             </Link>
@@ -2689,7 +3147,7 @@ const CourseLearningPage = () => {
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Course not found</h1>
             <Link to="/explore-courses">
-              <Button className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700">
+              <Button className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700">
                 Browse Courses
               </Button>
             </Link>
@@ -2701,15 +3159,15 @@ const CourseLearningPage = () => {
 
   return (
     <Layout>
-      <main className="flex-grow bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 min-h-screen">
+      <main className="flex-grow bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 min-h-screen">
         <div className="container mx-auto px-4 py-6">
           {/* Header */}
           <div className="mb-8">
             <div className="flex flex-wrap items-center gap-2 mb-4">
-              <Badge variant="secondary" className="text-sm bg-blue-100 text-blue-700">{course.category}</Badge>
-              <Badge variant="outline" className="text-sm border-orange-200 text-orange-600">{course.difficulty_level}</Badge>
-              {course.is_free && <Badge className="bg-green-500 text-sm">Free</Badge>}
-              {course.certificate_enabled && <Badge className="bg-purple-500 text-sm flex items-center gap-1"><Award className="h-3 w-3" /> Certificate</Badge>}
+              <Badge variant="secondary" className="text-sm bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700">{course.category}</Badge>
+              <Badge variant="outline" className="text-sm border-blue-200 text-blue-600">{course.difficulty_level}</Badge>
+              {course.is_free && <Badge className="bg-gradient-to-r from-green-500 to-emerald-600 text-sm">Free</Badge>}
+              {course.certificate_enabled && <Badge className="bg-gradient-to-r from-purple-500 to-pink-600 text-sm flex items-center gap-1"><Award className="h-3 w-3" /> Certificate</Badge>}
             </div>
             
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 leading-tight">{course.title}</h1>
@@ -2729,42 +3187,28 @@ const CourseLearningPage = () => {
                     </p>
                   </div>
                   <div className="text-right">
-                    <span className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                    <span className="text-2xl font-bold bg-gradient-to-r from-blue-500 to-indigo-600 bg-clip-text text-transparent">
                       {progressPercentage}%
                     </span>
                     <p className="text-sm text-gray-600">Complete</p>
                   </div>
                 </div>
                 
-                <Progress value={progressPercentage} className="h-3 bg-gray-200">
+                <Progress value={progressPercentage} className="h-3 bg-blue-100">
                   <div 
-                    className="h-full bg-gradient-to-r from-orange-500 to-purple-600 rounded-full transition-all duration-500 ease-out"
+                    className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-500 ease-out"
                     style={{ width: `${progressPercentage}%` }}
                   />
                 </Progress>
 
                 <div className="flex flex-col gap-3 mt-4">
-                  {isNotComplete && hasLessons && (
-                    <Button
-                      onClick={markAllLessonsComplete}
-                      disabled={markingComplete}
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto"
-                    >
-                      {markingComplete ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                      )}
-                      {markingComplete ? 'Processing...' : 'Mark All Complete'}
-                    </Button>
-                  )}
+                  {/* REMOVED: Mark All Complete button */}
                   
                   {showTakeExamButton && (
                     <Button
                       onClick={handleTakeExam}
                       size="sm"
-                      className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white w-full sm:w-auto"
+                      className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white w-full sm:w-auto shadow-md hover:shadow-lg"
                     >
                       <GraduationCap className="h-4 w-4 mr-2" />
                       Take Final Exam
@@ -2776,7 +3220,7 @@ const CourseLearningPage = () => {
                       <Button
                         onClick={handleTakeExam}
                         size="sm"
-                        className="bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 text-white w-full sm:w-auto"
+                        className="bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 text-white w-full sm:w-auto shadow-md hover:shadow-lg"
                       >
                         <GraduationCap className="h-4 w-4 mr-2" />
                         Retake Final Exam (Attempt {examResult?.attempt_number || 1}/{maxExamAttempts})
@@ -2791,7 +3235,7 @@ const CourseLearningPage = () => {
 
                   {showRestartCourseButton && (
                     <div className="space-y-2">
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                      <div className="bg-gradient-to-r from-yellow-50/80 to-orange-50/80 border border-yellow-200 rounded-xl p-3">
                         <div className="flex items-center gap-2 text-yellow-800 mb-2">
                           <AlertCircle className="h-4 w-4" />
                           <span className="text-sm font-medium">Maximum exam attempts reached</span>
@@ -2802,7 +3246,7 @@ const CourseLearningPage = () => {
                         <Button
                           onClick={resetCourseProgress}
                           size="sm"
-                          className="bg-yellow-600 hover:bg-yellow-700 text-white w-full"
+                          className="bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white w-full shadow-md hover:shadow-lg"
                         >
                           <RotateCcw className="h-4 w-4 mr-2" />
                           Restart Course & Review Materials
@@ -2815,7 +3259,7 @@ const CourseLearningPage = () => {
                     <Button
                       onClick={navigateToCourseResults}
                       size="sm"
-                      className="bg-purple-600 hover:bg-purple-700 text-white w-full sm:w-auto"
+                      className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white w-full sm:w-auto shadow-md hover:shadow-lg"
                     >
                       <Trophy className="h-4 w-4 mr-2" />
                       View Certificate
@@ -2842,7 +3286,7 @@ const CourseLearningPage = () => {
           <div className="lg:hidden mb-4">
             <Button
               onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-              className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
+              className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl"
             >
               {isMobileSidebarOpen ? (
                 <X className="h-4 w-4 mr-2" />
@@ -2858,10 +3302,10 @@ const CourseLearningPage = () => {
             {/* Sidebar */}
             <div className={`xl:col-span-1 ${isMobileSidebarOpen ? 'block' : 'hidden'} xl:block`}>
               <Card className="sticky top-8 shadow-xl border-0 h-fit max-w-full overflow-hidden">
-                <CardHeader className="p-6 border-b bg-gradient-to-r from-slate-50 to-blue-50 rounded-t-lg">
+                <CardHeader className="p-6 border-b bg-gradient-to-r from-slate-50 to-blue-50 rounded-t-xl">
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-3 text-lg font-bold text-gray-900">
-                      <BookOpen className="h-5 w-5 text-orange-500" />
+                      <BookOpen className="h-5 w-5 text-blue-500" />
                       Course Content
                     </CardTitle>
                     <Button
@@ -2902,10 +3346,10 @@ const CourseLearningPage = () => {
               <Card className="shadow-xl border-0 w-full">
                 <CardContent className="p-0 w-full">
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="w-full h-12 bg-slate-50/50 p-1 rounded-t-lg">
+                    <TabsList className="w-full h-12 bg-slate-50/50 p-1 rounded-t-xl">
                       <TabsTrigger 
                         value="content" 
-                        className="w-full text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-orange-600 transition-all duration-200"
+                        className="w-full text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600 transition-all duration-200"
                       >
                         <Play className="h-4 w-4 mr-2" />
                         Content
@@ -2930,13 +3374,13 @@ const CourseLearningPage = () => {
                               </div>
                               <div className="flex items-center gap-2 flex-shrink-0">
                                 {selectedLesson && completedLessons.includes(selectedLesson.id) && (
-                                  <Badge className="bg-green-500 text-white flex items-center gap-1">
+                                  <Badge className="bg-gradient-to-r from-green-500 to-emerald-600 text-white flex items-center gap-1 shadow-sm">
                                     <CheckCircle2 className="h-3 w-3" />
                                     Completed
                                   </Badge>
                                 )}
                                 {selectedLesson?.quiz && (
-                                  <Badge className="bg-blue-500 text-white flex items-center gap-1">
+                                  <Badge className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white flex items-center gap-1 shadow-sm">
                                     <HelpCircle className="h-3 w-3" />
                                     Quiz Available
                                   </Badge>
@@ -2960,15 +3404,15 @@ const CourseLearningPage = () => {
                                 
                                 {/* Video Controls */}
                                 <div className="flex flex-wrap gap-3 w-full">
-                                  <Button variant="outline" size="sm">
+                                  <Button variant="outline" size="sm" className="border-gray-300 hover:bg-gray-100">
                                     <Bookmark className="h-4 w-4 mr-2" />
                                     Bookmark
                                   </Button>
-                                  <Button variant="outline" size="sm">
+                                  <Button variant="outline" size="sm" className="border-gray-300 hover:bg-gray-100">
                                     <Download className="h-4 w-4 mr-2" />
                                     Download
                                   </Button>
-                                  <Button variant="outline" size="sm">
+                                  <Button variant="outline" size="sm" className="border-gray-300 hover:bg-gray-100">
                                     <Share className="h-4 w-4 mr-2" />
                                     Share
                                   </Button>
@@ -2976,7 +3420,7 @@ const CourseLearningPage = () => {
                                     <Button 
                                       onClick={() => handleQuizStart(selectedLesson.quiz!.id, selectedLesson.id)}
                                       size="sm"
-                                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                                      className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-md hover:shadow-lg"
                                     >
                                       <HelpCircle className="h-4 w-4 mr-2" />
                                       Take Quiz
@@ -2984,55 +3428,67 @@ const CourseLearningPage = () => {
                                   )}
                                 </div>
 
-                                {/* Secondary Tabs */}
-                                <div className="border border-gray-200 rounded-lg mt-6 w-full">
+                                {/* Secondary Tabs - Enhanced Design */}
+                                <div className="border border-gray-200 rounded-2xl mt-6 w-full overflow-hidden">
                                   <Tabs value={secondaryTab} onValueChange={setSecondaryTab} className="w-full">
-                                    <TabsList className="w-full grid grid-cols-4 h-12 bg-gray-50/50 p-1">
-                                      <TabsTrigger value="transcripts" className="text-sm">
+                                    <TabsList className="w-full grid grid-cols-4 h-14 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 p-1 border-b">
+                                      <TabsTrigger 
+                                        value="transcripts" 
+                                        className="text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600 rounded-lg transition-all duration-200"
+                                      >
                                         <FileText className="h-4 w-4 mr-2" />
                                         Transcript
                                       </TabsTrigger>
-                                      <TabsTrigger value="notes" className="text-sm">
+                                      <TabsTrigger 
+                                        value="notes" 
+                                        className="text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600 rounded-lg transition-all duration-200"
+                                      >
                                         <StickyNote className="h-4 w-4 mr-2" />
                                         Notes
                                       </TabsTrigger>
-                                      <TabsTrigger value="reviews" className="text-sm">
+                                      <TabsTrigger 
+                                        value="reviews" 
+                                        className="text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600 rounded-lg transition-all duration-200"
+                                      >
                                         <Star className="h-4 w-4 mr-2" />
                                         Reviews
                                       </TabsTrigger>
-                                      <TabsTrigger value="discussion" className="text-sm">
+                                      <TabsTrigger 
+                                        value="discussion" 
+                                        className="text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600 rounded-lg transition-all duration-200"
+                                      >
                                         <Users className="h-4 w-4 mr-2" />
                                         Discussion
                                       </TabsTrigger>
                                     </TabsList>
                                     
-                                    <TabsContent value="transcripts" className="p-4">
+                                    <TabsContent value="transcripts" className="p-6">
                                       {transcripts.length > 0 ? (
                                         <div className="space-y-3">
                                           <p className="text-sm text-gray-500 text-center">
                                             {transcripts.length} transcript segments
                                           </p>
                                           {transcripts.map((transcript) => (
-                                            <div key={transcript.id} className="bg-gradient-to-r from-orange-50 to-purple-50 p-3 rounded-lg">
+                                            <div key={transcript.id} className="bg-gradient-to-r from-blue-50/80 to-indigo-50/80 p-4 rounded-xl border border-blue-100 hover:border-blue-200 transition-all duration-200">
                                               <div className="flex items-center gap-3">
-                                                <span className="text-xs font-medium bg-orange-500 text-white px-2 py-1 rounded">
+                                                <span className="text-xs font-medium bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-2 py-1 rounded">
                                                   {Math.floor(transcript.start_time / 60)}:{String(Math.floor(transcript.start_time % 60)).padStart(2, '0')}
                                                 </span>
-                                                <p className="text-sm">{transcript.text}</p>
+                                                <p className="text-sm text-gray-700">{transcript.text}</p>
                                               </div>
                                             </div>
                                           ))}
                                         </div>
                                       ) : (
-                                        <div className="text-center py-8">
+                                        <div className="text-center py-12">
                                           <FileText className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                                           <p className="text-gray-500">No transcripts available for this lesson.</p>
                                         </div>
                                       )}
                                     </TabsContent>
                                     
-                                    <TabsContent value="notes" className="p-4">
-                                      <div className="space-y-4">
+                                    <TabsContent value="notes" className="p-6">
+                                      <div className="space-y-6">
                                         {/* Add Note */}
                                         <div className="space-y-3">
                                           <h4 className="font-medium text-gray-900">Add a Note</h4>
@@ -3041,12 +3497,14 @@ const CourseLearningPage = () => {
                                             value={newNote}
                                             onChange={(e) => setNewNote(e.target.value)}
                                             rows={3}
+                                            className="border-gray-300 focus:border-blue-400 focus:ring-blue-300 rounded-xl"
                                           />
                                           <div className="flex justify-end">
                                             <Button
                                               onClick={handleAddNote}
                                               disabled={!newNote.trim()}
                                               size="sm"
+                                              className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-md hover:shadow-lg"
                                             >
                                               <Send className="h-4 w-4 mr-2" />
                                               Add Note
@@ -3059,13 +3517,14 @@ const CourseLearningPage = () => {
                                           <h4 className="font-medium text-gray-900">Your Notes</h4>
                                           {notes.length > 0 ? (
                                             notes.map((note) => (
-                                              <div key={note.id} className="bg-white border rounded-lg p-4">
+                                              <div key={note.id} className="bg-gradient-to-r from-gray-50/80 to-slate-50/80 border border-gray-200 rounded-xl p-4 hover:shadow-sm transition-all duration-200">
                                                 {editingNote === note.id ? (
                                                   <div className="space-y-3">
                                                     <Textarea
                                                       value={editNoteContent}
                                                       onChange={(e) => setEditNoteContent(e.target.value)}
                                                       rows={3}
+                                                      className="border-gray-300 focus:border-blue-400 focus:ring-blue-300 rounded-xl"
                                                     />
                                                     <div className="flex justify-end gap-2">
                                                       <Button
@@ -3075,12 +3534,14 @@ const CourseLearningPage = () => {
                                                           setEditingNote(null);
                                                           setEditNoteContent('');
                                                         }}
+                                                        className="border-gray-300 hover:bg-gray-100"
                                                       >
                                                         Cancel
                                                       </Button>
                                                       <Button
                                                         size="sm"
                                                         onClick={() => handleUpdateNote(note.id)}
+                                                        className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
                                                       >
                                                         Save
                                                       </Button>
@@ -3101,6 +3562,7 @@ const CourseLearningPage = () => {
                                                             setEditingNote(note.id);
                                                             setEditNoteContent(note.content);
                                                           }}
+                                                          className="text-gray-500 hover:text-blue-600 hover:bg-blue-50"
                                                         >
                                                           <Edit2 className="h-4 w-4" />
                                                         </Button>
@@ -3108,6 +3570,7 @@ const CourseLearningPage = () => {
                                                           variant="ghost"
                                                           size="sm"
                                                           onClick={() => handleDeleteNote(note.id)}
+                                                          className="text-gray-500 hover:text-red-600 hover:bg-red-50"
                                                         >
                                                           <Trash2 className="h-4 w-4" />
                                                         </Button>
@@ -3118,99 +3581,28 @@ const CourseLearningPage = () => {
                                               </div>
                                             ))
                                           ) : (
-                                            <p className="text-gray-500 text-center py-4">No notes yet. Add your first note above!</p>
+                                            <div className="text-center py-12">
+                                              <StickyNote className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                                              <p className="text-gray-500">No notes yet. Add your first note above!</p>
+                                            </div>
                                           )}
                                         </div>
                                       </div>
                                     </TabsContent>
                                     
-                                    <TabsContent value="reviews" className="p-4">
+                                    <TabsContent value="reviews" className="p-6">
                                       <CourseReviewsTab courseId={courseId} />
                                     </TabsContent>
                                     
-                                    <TabsContent value="discussion" className="p-4">
-                                      <div className="space-y-4">
-                                        {/* Add Discussion */}
-                                        <div className="space-y-3">
-                                          <h4 className="font-medium text-gray-900">Start a Discussion</h4>
-                                          <Textarea
-                                            placeholder="Ask a question or share your thoughts..."
-                                            value={newDiscussion}
-                                            onChange={(e) => setNewDiscussion(e.target.value)}
-                                            rows={3}
-                                          />
-                                          <div className="flex justify-end">
-                                            <Button
-                                              onClick={handleAddDiscussion}
-                                              disabled={!newDiscussion.trim()}
-                                              size="sm"
-                                            >
-                                              <Send className="h-4 w-4 mr-2" />
-                                              Post Discussion
-                                            </Button>
-                                          </div>
-                                        </div>
-
-                                        {/* Discussions List */}
-                                        <div className="space-y-6">
-                                          <h4 className="font-medium text-gray-900">Discussions</h4>
-                                          {discussions.length > 0 ? (
-                                            discussions.map((discussion) => (
-                                              <DiscussionThread
-                                                key={discussion.id}
-                                                discussion={discussion}
-                                                onReply={(parentId) => {
-                                                  setReplyingTo(parentId);
-                                                }}
-                                                onLike={handleLikeDiscussion}
-                                                onDelete={handleDeleteDiscussion}
-                                                currentUserId={user?.id}
-                                              />
-                                            ))
-                                          ) : (
-                                            <p className="text-gray-500 text-center py-4">No discussions yet. Start the conversation!</p>
-                                          )}
-                                        </div>
-
-                                        {/* Reply Input */}
-                                        {replyingTo && (
-                                          <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 shadow-lg">
-                                            <div className="container mx-auto max-w-4xl">
-                                              <div className="flex gap-3">
-                                                <div className="flex-1">
-                                                  <Textarea
-                                                    placeholder="Write a reply..."
-                                                    value={replyContent}
-                                                    onChange={(e) => setReplyContent(e.target.value)}
-                                                    rows={2}
-                                                    className="resize-none"
-                                                  />
-                                                  <div className="flex justify-end gap-2 mt-2">
-                                                    <Button
-                                                      variant="outline"
-                                                      size="sm"
-                                                      onClick={() => {
-                                                        setReplyingTo(null);
-                                                        setReplyContent('');
-                                                      }}
-                                                    >
-                                                      Cancel
-                                                    </Button>
-                                                    <Button
-                                                      size="sm"
-                                                      onClick={() => handleAddReply(replyingTo)}
-                                                      disabled={!replyContent.trim()}
-                                                    >
-                                                      <Send className="h-4 w-4 mr-1" />
-                                                      Reply
-                                                    </Button>
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        )}
-                                      </div>
+                                    <TabsContent value="discussion" className="p-6">
+                                      <EnhancedDiscussionSection
+                                        discussions={discussions}
+                                        onAddDiscussion={handleAddDiscussion}
+                                        onReply={handleAddReply}
+                                        onLike={handleLikeDiscussion}
+                                        onDelete={handleDeleteDiscussion}
+                                        currentUserId={user?.id}
+                                      />
                                     </TabsContent>
                                   </Tabs>
                                 </div>
@@ -3219,9 +3611,9 @@ const CourseLearningPage = () => {
 
                             {/* Lesson Content */}
                             {(selectedLesson?.content || modules[0]?.lessons[0]?.content) && (
-                              <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm mt-6 w-full">
+                              <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 border border-gray-200 shadow-sm mt-6 w-full">
                                 <div className="flex items-center gap-3 mb-4">
-                                  <FileText className="h-6 w-6 text-orange-500" />
+                                  <FileText className="h-6 w-6 text-blue-500" />
                                   <div>
                                     <h3 className="text-xl font-semibold text-gray-900">Lesson Materials</h3>
                                     <p className="text-gray-600 text-sm">
@@ -3230,7 +3622,7 @@ const CourseLearningPage = () => {
                                   </div>
                                 </div>
                                 
-                                <div className="prose prose-lg max-w-none bg-gray-50 rounded-lg p-4 border border-gray-200 w-full">
+                                <div className="prose prose-lg max-w-none bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl p-4 border border-gray-200 w-full">
                                   {typeof (selectedLesson?.content || modules[0]?.lessons[0]?.content) === 'string' 
                                     ? (selectedLesson?.content || modules[0]?.lessons[0]?.content)
                                     : JSON.stringify(selectedLesson?.content || modules[0]?.lessons[0]?.content)
@@ -3263,13 +3655,13 @@ const CourseLearningPage = () => {
                         )
                       ) : (
                         <div className="text-center py-12 w-full">
-                          <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full flex items-center justify-center">
+                          <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg">
                             <Crown className="h-10 w-10 text-white" />
                           </div>
                           <h3 className="text-xl font-semibold mb-2">Enroll to Access Content</h3>
                           <p className="text-gray-600 mb-6">Join thousands of students learning this course</p>
                           <Button 
-                            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-lg px-8 py-3 shadow-lg transition-all duration-200"
+                            className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-lg px-8 py-3 shadow-lg hover:shadow-xl transition-all duration-200"
                             onClick={() => navigate(`/course/${courseId}/enroll`)}
                           >
                             <Rocket className="h-5 w-5 mr-2" />
@@ -3286,16 +3678,16 @@ const CourseLearningPage = () => {
 
           {/* Enrollment Card */}
           {!isEnrolled && (
-            <Card className="mt-8 sticky bottom-6 shadow-2xl border-0 bg-gradient-to-r from-orange-50 to-purple-50 z-10">
+            <Card className="mt-8 sticky bottom-6 shadow-2xl border-0 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 z-10">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                   <div className="text-center md:text-left">
-                    <div className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent mb-2">
+                    <div className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
                       {course.is_free ? 'Free' : (
                         <PriceDisplay 
                           amount={course.price} 
                           originalCurrency="USD" 
-                          className="text-orange-600"
+                          className="text-blue-600"
                         />
                       )}
                     </div>
@@ -3313,7 +3705,7 @@ const CourseLearningPage = () => {
                         />
                       )}
                       <Button 
-                        className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white text-lg px-8 py-3 shadow-lg transition-all duration-200 hover:scale-105"
+                        className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white text-lg px-8 py-3 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
                         size="lg"
                         onClick={() => navigate(`/course/${courseId}/enroll`)}
                       >
@@ -3323,7 +3715,7 @@ const CourseLearningPage = () => {
                     </div>
                   ) : (
                     <Button 
-                      className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white text-lg px-8 py-3 shadow-lg transition-all duration-200 hover:scale-105"
+                      className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white text-lg px-8 py-3 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
                       size="lg"
                       onClick={() => navigate('/auth')}
                     >
@@ -3357,22 +3749,22 @@ const CourseLearningPage = () => {
 
       {/* Next Lesson Dialog */}
       <Dialog open={showNextLessonDialog} onOpenChange={setShowNextLessonDialog}>
-        <DialogContent className="sm:max-w-md bg-gradient-to-br from-orange-50 to-purple-50 border-0 shadow-2xl">
+        <DialogContent className="sm:max-w-md bg-gradient-to-br from-blue-50/80 to-indigo-50/80 border-0 shadow-2xl rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-center text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+            <DialogTitle className="text-center text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
               Ready for Next Lesson!
             </DialogTitle>
           </DialogHeader>
           
           <div className="text-center py-4">
-            <div className="w-16 h-16 mx-auto bg-gradient-to-r from-orange-500 to-purple-600 rounded-full flex items-center justify-center mb-4">
+            <div className="w-16 h-16 mx-auto bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mb-4 shadow-lg">
               <Play className="h-8 w-8 text-white" />
             </div>
             <p className="text-gray-700 mb-3">
               Great progress! You've completed 97% of this lesson.
             </p>
             {nextLesson && (
-              <div className="bg-white rounded-lg p-4 border border-orange-200 shadow-sm mb-4">
+              <div className="bg-white rounded-xl p-4 border border-blue-200 shadow-sm mb-4">
                 <p className="font-medium text-gray-900">{nextLesson.title}</p>
                 <p className="text-sm text-gray-600 mt-1">Next lesson</p>
               </div>
@@ -3383,13 +3775,13 @@ const CourseLearningPage = () => {
             <Button
               onClick={() => setShowNextLessonDialog(false)}
               variant="outline"
-              className="flex-1"
+              className="flex-1 border-gray-300 hover:bg-gray-100"
             >
               Continue Current
             </Button>
             <Button
               onClick={handleProceedToNextLesson}
-              className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+              className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-md hover:shadow-lg"
             >
               <Play className="h-4 w-4 mr-2" />
               Proceed to Next Lesson
@@ -3400,9 +3792,9 @@ const CourseLearningPage = () => {
 
       {/* Resume Learning Modal */}
       <Dialog open={showResumeModal} onOpenChange={setShowResumeModal}>
-        <DialogContent className="sm:max-w-md bg-gradient-to-br from-orange-50 to-purple-50 border-0 shadow-2xl">
+        <DialogContent className="sm:max-w-md bg-gradient-to-br from-blue-50/80 to-indigo-50/80 border-0 shadow-2xl rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-center text-2xl font-bold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+            <DialogTitle className="text-center text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
               {isCourseCompleted ? 'Course Completed!' : 'Continue Learning?'}
             </DialogTitle>
           </DialogHeader>
@@ -3410,7 +3802,7 @@ const CourseLearningPage = () => {
           <div className="text-center py-6">
             {isCourseCompleted ? (
               <div className="space-y-4">
-                <div className="w-16 h-16 mx-auto bg-gradient-to-r from-green-500 to-emerald-600 rounded-full flex items-center justify-center">
+                <div className="w-16 h-16 mx-auto bg-gradient-to-r from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-lg">
                   <Trophy className="h-8 w-8 text-white" />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900">Congratulations! 🎉</h3>
@@ -3421,7 +3813,7 @@ const CourseLearningPage = () => {
                   }
                 </p>
                 {examResult && !hasPassedExam && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <div className="bg-gradient-to-r from-yellow-50/80 to-orange-50/80 border border-yellow-200 rounded-xl p-3">
                     <div className="flex items-center gap-2 text-yellow-800">
                       <AlertCircle className="h-4 w-4" />
                       <span className="text-sm font-medium">Previous exam score: {examResult.score}%</span>
@@ -3431,7 +3823,7 @@ const CourseLearningPage = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="w-16 h-16 mx-auto bg-gradient-to-r from-orange-500 to-purple-600 rounded-full flex items-center justify-center">
+                <div className="w-16 h-16 mx-auto bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg">
                   <Play className="h-8 w-8 text-white" />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900">Welcome Back!</h3>
@@ -3439,7 +3831,7 @@ const CourseLearningPage = () => {
                   Continue from where you left off or start from the beginning.
                 </p>
                 {resumeLesson && (
-                  <div className="bg-white rounded-lg p-4 border border-orange-200 shadow-sm">
+                  <div className="bg-white rounded-xl p-4 border border-blue-200 shadow-sm">
                     <p className="font-medium text-gray-900">{resumeLesson.title}</p>
                     <p className="text-sm text-gray-600 mt-1">Your last watched lesson</p>
                   </div>
@@ -3454,14 +3846,14 @@ const CourseLearningPage = () => {
                 <Button
                   onClick={() => setShowResumeModal(false)}
                   variant="outline"
-                  className="flex-1 border-gray-300 hover:bg-gray-50"
+                  className="flex-1 border-gray-300 hover:bg-gray-100"
                 >
                   Review Course
                 </Button>
                 {showTakeExamButton && (
                   <Button
                     onClick={handleTakeExam}
-                    className="flex-1 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg"
+                    className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-md hover:shadow-lg"
                   >
                     Take Final Exam
                   </Button>
@@ -3469,7 +3861,7 @@ const CourseLearningPage = () => {
                 {showRetakeExamButton && (
                   <Button
                     onClick={handleTakeExam}
-                    className="flex-1 bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 text-white shadow-lg"
+                    className="flex-1 bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 text-white shadow-md hover:shadow-lg"
                   >
                     Retake Exam
                   </Button>
@@ -3477,7 +3869,7 @@ const CourseLearningPage = () => {
                 {showRestartCourseButton && (
                   <Button
                     onClick={resetCourseProgress}
-                    className="flex-1 bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white shadow-lg"
+                    className="flex-1 bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white shadow-md hover:shadow-lg"
                   >
                     <RotateCcw className="h-4 w-4 mr-2" />
                     Restart Course
@@ -3486,7 +3878,7 @@ const CourseLearningPage = () => {
                 {showViewCertificateButton && (
                   <Button
                     onClick={navigateToCourseResults}
-                    className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg"
+                    className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-md hover:shadow-lg"
                   >
                     View Certificate
                   </Button>
@@ -3497,13 +3889,13 @@ const CourseLearningPage = () => {
                 <Button
                   onClick={handleStartFromBeginning}
                   variant="outline"
-                  className="flex-1 border-gray-300 hover:bg-gray-50"
+                  className="flex-1 border-gray-300 hover:bg-gray-100"
                 >
                   Start Over
                 </Button>
                 <Button
                   onClick={handleResumeLearning}
-                  className="flex-1 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg transition-all duration-200 hover:scale-105"
+                  className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
                 >
                   <Play className="h-4 w-4 mr-2" />
                   Continue
