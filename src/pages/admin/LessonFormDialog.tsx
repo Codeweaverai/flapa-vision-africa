@@ -118,7 +118,7 @@ const LessonFormDialog = ({
       if (result.success && result.url) {
         setVideoUrl(result.url);
         const storageType = result.storage;
-        toast.success(`Video uploaded successfully via ${storageType === 'wasabi' ? 'Wasabi' : 'Supabase fallback'}`);
+        toast.success(`Video uploaded successfully via ${storageType === 'wasabi' ? 'Wasabi' : 'skillpulse'}`);
         
         // Auto-enable transcript generation for new uploads
         if (!editingLesson) {
