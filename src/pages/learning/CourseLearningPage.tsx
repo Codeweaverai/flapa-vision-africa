@@ -4130,6 +4130,7 @@ const CourseLearningPage = () => {
         onClose={() => setShowQuizModal(false)}
         quizId={currentQuizId}
         lessonId={currentLessonId}
+        courseId={courseId} // Add this
         onComplete={handleQuizComplete}
       />
 
