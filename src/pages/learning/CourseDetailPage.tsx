@@ -32,7 +32,7 @@ import CreatorCard from '@/components/course/CreatorCard';
 import RecommendedCourses from '@/components/course/RecommendedCourses';
 import { useCart } from '@/contexts/CartContext';
 import PriceDisplay from '@/components/currency/PriceDisplay';
-import ReactPlayer from 'react-player';
+import OptimizedVideoPlayer from '@/components/video/OptimizedVideoPlayer';
 import WishlistButton from '@/components/wishlist/WishlistButton';
 
 interface Course {
@@ -966,22 +966,13 @@ const CourseDetailPage = () => {
                     <div className="mb-6">
                       <h3 className="text-lg font-semibold mb-3">Course Preview</h3>
                       <div className="aspect-video rounded-xl overflow-hidden bg-gray-100">
-                        <ReactPlayer
+                        <OptimizedVideoPlayer
                           url={course.course_preview.preview_video_url}
+                          poster={course.thumbnail_url}
                           controls={true}
-                          width="100%"
-                          height="100%"
                           light={course.thumbnail_url}
-                          config={{
-                            file: {
-                              attributes: {
-                                controlsList: 'nodownload noremoteplayback',
-                                disablePictureInPicture: true,
-                                onContextMenu: (e: React.MouseEvent) => e.preventDefault()
-                              }
-                            }
-                          }}
-                          style={{ borderRadius: '8px' }}
+                          playsinline={true}
+                          preload="metadata"
                         />
                       </div>
                     </div>
