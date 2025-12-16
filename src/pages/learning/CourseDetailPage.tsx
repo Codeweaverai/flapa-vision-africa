@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
@@ -34,10 +34,6 @@ import { useCart } from '@/contexts/CartContext';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import ReactPlayer from 'react-player';
 import WishlistButton from '@/components/wishlist/WishlistButton';
-
-// Import the optimized components
-import { OptimizedVideoPlayer } from '@/components/video/OptimizedVideoPlayer';
-import { useVideoPreload } from '@/hooks/useVideoPreload';
 
 interface Course {
   id: string;
@@ -140,13 +136,13 @@ const SkillsYouWillGain = ({ skills }: { skills: Course['course_skill_outcomes']
   const getSkillLevelColor = (level: string) => {
     switch (level?.toLowerCase()) {
       case 'beginner':
-        return 'from-orange-500 to-purple-600';
+        return 'from-orange-500 to-purple-600'; // CHANGED from green to orange-purple
       case 'intermediate':
-        return 'from-orange-500 to-purple-600';
+        return 'from-orange-500 to-purple-600'; // CHANGED from blue to orange-purple
       case 'advanced':
-        return 'from-orange-500 to-purple-600';
+        return 'from-orange-500 to-purple-600'; // CHANGED from purple to orange-purple
       case 'expert':
-        return 'from-orange-500 to-purple-600';
+        return 'from-orange-500 to-purple-600'; // CHANGED from red to orange-purple
       default:
         return 'from-orange-500 to-purple-600';
     }
@@ -191,7 +187,7 @@ const SkillsYouWillGain = ({ skills }: { skills: Course['course_skill_outcomes']
                         {skill.is_core_skill && (
                           <Badge 
                             variant="outline" 
-                            className="text-xs bg-gradient-to-r from-orange-50 to-purple-50 text-orange-700 border-orange-200"
+                            className="text-xs bg-gradient-to-r from-orange-50 to-purple-50 text-orange-700 border-orange-200" // CHANGED from yellow to orange-purple
                           >
                             Core Skill
                           </Badge>
@@ -451,36 +447,6 @@ const CourseDetailPage = () => {
   const [enrollmentLoading, setEnrollmentLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const playerRef = useRef<ReactPlayer>(null);
-
-  // Get all video URLs for preloading
-  const videoUrls = React.useMemo(() => {
-    if (!course) return [];
-    
-    const urls: string[] = [];
-    
-    // Add preview video
-    if (course.course_preview?.preview_video_url) {
-      urls.push(course.course_preview.preview_video_url);
-    }
-    
-    // Add lesson videos
-    course.course_modules.forEach(module => {
-      module.lessons.forEach(lesson => {
-        if (lesson.content_type === 'video' && lesson.video_url) {
-          urls.push(lesson.video_url);
-        }
-      });
-    });
-    
-    return urls;
-  }, [course]);
-
-  // Use video preloading hook
-  const { isLoaded } = useVideoPreload(
-    videoUrls,
-    course?.course_preview?.preview_video_url
-  );
 
   // Check authentication status on component mount
   useEffect(() => {
@@ -636,10 +602,10 @@ const CourseDetailPage = () => {
           .eq('course_id', id)
       ]);
 
-      // Process creator data - FIXED: Added null check for creator_id
-      const creatorData = creatorResult.status === 'fulfilled' && !creatorResult.value.error && courseData.creator_id ? 
+      // Process creator data
+      const creatorData = creatorResult.status === 'fulfilled' && !creatorResult.value.error ? 
         creatorResult.value.data : { 
-          id: courseData.creator_id || 'unknown', 
+          id: courseData.creator_id, 
           full_name: 'Unknown Creator',
           avatar_url: null,
           bio: null
@@ -671,21 +637,19 @@ const CourseDetailPage = () => {
         const reviewsData = reviewsResult.value.data;
         const userIds = reviewsData.map(review => review.user_id);
         
-        if (userIds.length > 0) {
-          // Fetch user profiles for reviews in parallel
-          const { data: reviewProfiles } = await supabase
-            .from('profiles')
-            .select('id, full_name, avatar_url')
-            .in('id', userIds);
+        // Fetch user profiles for reviews in parallel
+        const { data: reviewProfiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .in('id', userIds);
 
-          reviewsWithProfiles = reviewsData.map(review => ({
-            ...review,
-            profiles: reviewProfiles?.find(profile => profile.id === review.user_id) || {
-              full_name: 'Unknown User',
-              avatar_url: null
-            }
-          }));
-        }
+        reviewsWithProfiles = reviewsData.map(review => ({
+          ...review,
+          profiles: reviewProfiles?.find(profile => profile.id === review.user_id) || {
+            full_name: 'Unknown User',
+            avatar_url: null
+          }
+        }));
       }
 
       // Combine all data
@@ -703,9 +667,7 @@ const CourseDetailPage = () => {
       setCourse(completeCourse);
 
       // Fetch creator profile with stats in background
-      if (courseData.creator_id) {
-        fetchCreatorProfile(courseData.creator_id);
-      }
+      fetchCreatorProfile(courseData.creator_id);
 
     } catch (error) {
       console.error('Error:', error);
@@ -724,8 +686,6 @@ const CourseDetailPage = () => {
         .eq('id', creatorId)
         .single();
 
-      if (!profileData) return;
-
       // Use Promise.all for parallel data fetching
       const [coursesResult, enrollmentsResult] = await Promise.allSettled([
         // Creator courses
@@ -742,11 +702,12 @@ const CourseDetailPage = () => {
           .eq('payment_status', 'completed')
           .in('course_id', 
             course?.id ? [course.id] : 
-            await supabase
+            profileData ? await supabase
               .from('courses')
               .select('id')
               .eq('creator_id', creatorId)
               .then(({ data }) => data?.map(c => c.id) || [])
+            : []
           )
       ]);
 
@@ -961,7 +922,7 @@ const CourseDetailPage = () => {
                         {course.difficulty_level}
                       </Badge>
                       {course.certificate_enabled && (
-                        <Badge variant="outline" className="bg-gradient-to-r from-orange-50 to-purple-50 text-orange-700 border-orange-200">
+                        <Badge variant="outline" className="bg-gradient-to-r from-orange-50 to-purple-50 text-orange-700 border-orange-200"> {/* CHANGED from yellow to orange-purple */}
                           <Award className="w-3 h-3 mr-1" />
                           Certificate
                         </Badge>
@@ -1000,48 +961,52 @@ const CourseDetailPage = () => {
                     </div>
                   </div>
 
-                  {/* Course Preview Video - OPTIMIZED */}
+                  {/* Course Preview Video */}
                   {course.course_preview?.preview_video_url && (
                     <div className="mb-6">
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-lg font-semibold">Course Preview</h3>
-                        {!isLoaded(course.course_preview.preview_video_url) && (
-                          <div className="flex items-center gap-2 text-sm text-orange-600">
-                            <div className="w-3 h-3 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" />
-                            <span>Optimizing video...</span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <OptimizedVideoPlayer
-                        url={course.course_preview.preview_video_url}
-                        thumbnail={course.thumbnail_url}
-                        onError={(error) => {
-                          console.error('Video playback error:', error);
-                          toast.error('Video failed to load. Trying alternative source...');
-                        }}
-                        className="rounded-xl"
-                      />
-                      
-                      {/* Performance Tips */}
-                      <div className="mt-3 p-3 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg border border-orange-200">
-                        <div className="flex items-center gap-2 text-sm text-gray-700">
-                          <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                          <span>
-                            <strong>Optimized Playback:</strong> Video quality automatically adjusts based on your connection speed for smooth playback.
-                          </span>
-                        </div>
+                      <h3 className="text-lg font-semibold mb-3">Course Preview</h3>
+                      <div className="aspect-video rounded-xl overflow-hidden bg-gray-100">
+                        <ReactPlayer
+                          url={course.course_preview.preview_video_url}
+                          controls={true}
+                          width="100%"
+                          height="100%"
+                          light={course.thumbnail_url}
+                          config={{
+                            file: {
+                              attributes: {
+                                controlsList: 'nodownload noremoteplayback',
+                                disablePictureInPicture: true,
+                                onContextMenu: (e: React.MouseEvent) => e.preventDefault()
+                              }
+                            }
+                          }}
+                          style={{ borderRadius: '8px' }}
+                        />
                       </div>
                     </div>
                   )}
 
-                  {/* Instructor Card - Moved to sidebar */}
+                  {/* Instructor */}
+                  <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg border border-orange-200">
+                    <Avatar className="w-12 h-12 border-2 border-orange-300">
+                      <AvatarImage src={course.profiles?.avatar_url} />
+                      <AvatarFallback className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
+                        {course.profiles?.full_name?.charAt(0) || 'I'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-sm text-gray-600">Instructor</p>
+                      <p className="font-semibold text-gray-900">{course.profiles?.full_name || 'Unknown Creator'}</p>
+                      {course.profiles?.bio && (
+                        <p className="text-sm text-gray-600 mt-1">{course.profiles.bio}</p>
+                      )}
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 
-              {/* Course Tabs */}
+              {/* Course Tabs - UPDATED: Replaced Instructor with Skills You'll Gain */}
               <Tabs defaultValue="overview" className="space-y-6">
                 <TabsList className="grid w-full grid-cols-4 bg-white/80 backdrop-blur-sm border border-gray-200">
                   <TabsTrigger value="overview" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">
@@ -1211,7 +1176,7 @@ const CourseDetailPage = () => {
                 </CardContent>
               </Card>
 
-              {/* Creator Card - FIXED: Moved to sidebar and always show student count */}
+              {/* Creator Card - FIXED: Always show student count regardless of login status */}
               {creatorProfile && (
                 <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
                   <CardContent className="p-6">
@@ -1307,7 +1272,7 @@ const CourseDetailPage = () => {
                         itemType="course"
                         className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-medium py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center"
                       >
-                        <Heart className="w-4 h-4 mr-2" />
+            
                         Add to Wishlist
                       </WishlistButton>
                     </div>
