@@ -978,8 +978,8 @@ const CourseDetailPage = () => {
                     </div>
                   )}
 
-                  {/* Instructor */}
-                  <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg border border-orange-200">
+                  {/* Instructor - Hidden on mobile, shown in sidebar on desktop */}
+                  <div className="hidden lg:flex items-center gap-4 p-4 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg border border-orange-200">
                     <Avatar className="w-12 h-12 border-2 border-orange-300">
                       <AvatarImage src={course.profiles?.avatar_url} />
                       <AvatarFallback className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
@@ -990,7 +990,7 @@ const CourseDetailPage = () => {
                       <p className="text-sm text-gray-600">Instructor</p>
                       <p className="font-semibold text-gray-900">{course.profiles?.full_name || 'Unknown Creator'}</p>
                       {course.profiles?.bio && (
-                        <p className="text-sm text-gray-600 mt-1">{course.profiles.bio}</p>
+                        <p className="text-sm text-gray-600 mt-1 line-clamp-2">{course.profiles.bio}</p>
                       )}
                     </div>
                   </div>
