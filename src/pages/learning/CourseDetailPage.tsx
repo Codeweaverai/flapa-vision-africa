@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react'; // Added useRef
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
@@ -136,13 +136,13 @@ const SkillsYouWillGain = ({ skills }: { skills: Course['course_skill_outcomes']
   const getSkillLevelColor = (level: string) => {
     switch (level?.toLowerCase()) {
       case 'beginner':
-        return 'from-orange-500 to-purple-600'; // CHANGED from green to orange-purple
+        return 'from-orange-500 to-purple-600';
       case 'intermediate':
-        return 'from-orange-500 to-purple-600'; // CHANGED from blue to orange-purple
+        return 'from-orange-500 to-purple-600';
       case 'advanced':
-        return 'from-orange-500 to-purple-600'; // CHANGED from purple to orange-purple
+        return 'from-orange-500 to-purple-600';
       case 'expert':
-        return 'from-orange-500 to-purple-600'; // CHANGED from red to orange-purple
+        return 'from-orange-500 to-purple-600';
       default:
         return 'from-orange-500 to-purple-600';
     }
@@ -187,7 +187,7 @@ const SkillsYouWillGain = ({ skills }: { skills: Course['course_skill_outcomes']
                         {skill.is_core_skill && (
                           <Badge 
                             variant="outline" 
-                            className="text-xs bg-gradient-to-r from-orange-50 to-purple-50 text-orange-700 border-orange-200" // CHANGED from yellow to orange-purple
+                            className="text-xs bg-gradient-to-r from-orange-50 to-purple-50 text-orange-700 border-orange-200"
                           >
                             Core Skill
                           </Badge>
@@ -447,6 +447,18 @@ const CourseDetailPage = () => {
   const [enrollmentLoading, setEnrollmentLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const playerRef = useRef<ReactPlayer>(null);
+
+  // Check if device is mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent));
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Check authentication status on component mount
   useEffect(() => {
@@ -602,10 +614,10 @@ const CourseDetailPage = () => {
           .eq('course_id', id)
       ]);
 
-      // Process creator data
-      const creatorData = creatorResult.status === 'fulfilled' && !creatorResult.value.error ? 
+      // Process creator data - FIXED: Added null check for creator_id
+      const creatorData = creatorResult.status === 'fulfilled' && !creatorResult.value.error && courseData.creator_id ? 
         creatorResult.value.data : { 
-          id: courseData.creator_id, 
+          id: courseData.creator_id || 'unknown', 
           full_name: 'Unknown Creator',
           avatar_url: null,
           bio: null
@@ -637,19 +649,21 @@ const CourseDetailPage = () => {
         const reviewsData = reviewsResult.value.data;
         const userIds = reviewsData.map(review => review.user_id);
         
-        // Fetch user profiles for reviews in parallel
-        const { data: reviewProfiles } = await supabase
-          .from('profiles')
-          .select('id, full_name, avatar_url')
-          .in('id', userIds);
+        if (userIds.length > 0) {
+          // Fetch user profiles for reviews in parallel
+          const { data: reviewProfiles } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url')
+            .in('id', userIds);
 
-        reviewsWithProfiles = reviewsData.map(review => ({
-          ...review,
-          profiles: reviewProfiles?.find(profile => profile.id === review.user_id) || {
-            full_name: 'Unknown User',
-            avatar_url: null
-          }
-        }));
+          reviewsWithProfiles = reviewsData.map(review => ({
+            ...review,
+            profiles: reviewProfiles?.find(profile => profile.id === review.user_id) || {
+              full_name: 'Unknown User',
+              avatar_url: null
+            }
+          }));
+        }
       }
 
       // Combine all data
@@ -667,7 +681,9 @@ const CourseDetailPage = () => {
       setCourse(completeCourse);
 
       // Fetch creator profile with stats in background
-      fetchCreatorProfile(courseData.creator_id);
+      if (courseData.creator_id) {
+        fetchCreatorProfile(courseData.creator_id);
+      }
 
     } catch (error) {
       console.error('Error:', error);
@@ -686,6 +702,8 @@ const CourseDetailPage = () => {
         .eq('id', creatorId)
         .single();
 
+      if (!profileData) return;
+
       // Use Promise.all for parallel data fetching
       const [coursesResult, enrollmentsResult] = await Promise.allSettled([
         // Creator courses
@@ -702,12 +720,11 @@ const CourseDetailPage = () => {
           .eq('payment_status', 'completed')
           .in('course_id', 
             course?.id ? [course.id] : 
-            profileData ? await supabase
+            await supabase
               .from('courses')
               .select('id')
               .eq('creator_id', creatorId)
               .then(({ data }) => data?.map(c => c.id) || [])
-            : []
           )
       ]);
 
@@ -858,6 +875,12 @@ const CourseDetailPage = () => {
     }
   };
 
+  // Handle ReactPlayer error
+  const handlePlayerError = (error: any) => {
+    console.error('ReactPlayer error:', error);
+    toast.error('Failed to load video. Please try again or use a different browser.');
+  };
+
   // Gradient Icon Component
   const GradientIcon = ({ children }: { children: React.ReactNode }) => (
     <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-2 rounded-lg text-white">
@@ -922,7 +945,7 @@ const CourseDetailPage = () => {
                         {course.difficulty_level}
                       </Badge>
                       {course.certificate_enabled && (
-                        <Badge variant="outline" className="bg-gradient-to-r from-orange-50 to-purple-50 text-orange-700 border-orange-200"> {/* CHANGED from yellow to orange-purple */}
+                        <Badge variant="outline" className="bg-gradient-to-r from-orange-50 to-purple-50 text-orange-700 border-orange-200">
                           <Award className="w-3 h-3 mr-1" />
                           Certificate
                         </Badge>
@@ -961,52 +984,69 @@ const CourseDetailPage = () => {
                     </div>
                   </div>
 
-                  {/* Course Preview Video */}
+                  {/* Course Preview Video - FIXED FOR MOBILE */}
                   {course.course_preview?.preview_video_url && (
-                    <div className="mb-6">
+                    <div className="mb-4">
                       <h3 className="text-lg font-semibold mb-3">Course Preview</h3>
-                      <div className="aspect-video rounded-xl overflow-hidden bg-gray-100">
+                      <div className="aspect-video rounded-xl overflow-hidden bg-gray-900 relative">
                         <ReactPlayer
+                          ref={playerRef}
                           url={course.course_preview.preview_video_url}
                           controls={true}
                           width="100%"
                           height="100%"
-                          light={course.thumbnail_url}
+                          playsinline={true}
+                          playing={false}
+                          light={isMobile ? false : course.thumbnail_url}
+                          onError={handlePlayerError}
                           config={{
                             file: {
                               attributes: {
-                                controlsList: 'nodownload noremoteplayback',
-                                disablePictureInPicture: true,
-                                onContextMenu: (e: React.MouseEvent) => e.preventDefault()
-                              }
+                                controlsList: 'nodownload',
+                                playsInline: true,
+                                preload: 'metadata',
+                                crossOrigin: 'anonymous'
+                              },
+                              forceVideo: true,
+                              forceAudio: true,
+                              forceHLS: isMobile, // Use HLS for mobile compatibility
+                              forceDASH: isMobile, // Use DASH for mobile compatibility
                             }
                           }}
-                          style={{ borderRadius: '8px' }}
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            borderRadius: '8px'
+                          }}
+                          playIcon={
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                              <div className="w-16 h-16 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center shadow-2xl">
+                                <Play className="h-8 w-8 text-white ml-1" />
+                              </div>
+                            </div>
+                          }
                         />
                       </div>
+                      
+                      {/* Video Quality/Playback Info for Mobile */}
+                      {isMobile && (
+                        <div className="mt-2 text-xs text-gray-600 flex items-center gap-2">
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                          </svg>
+                          <span>Tap to play. Ensure your browser allows autoplay.</span>
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  {/* Instructor */}
-                  <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg border border-orange-200">
-                    <Avatar className="w-12 h-12 border-2 border-orange-300">
-                      <AvatarImage src={course.profiles?.avatar_url} />
-                      <AvatarFallback className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
-                        {course.profiles?.full_name?.charAt(0) || 'I'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm text-gray-600">Instructor</p>
-                      <p className="font-semibold text-gray-900">{course.profiles?.full_name || 'Unknown Creator'}</p>
-                      {course.profiles?.bio && (
-                        <p className="text-sm text-gray-600 mt-1">{course.profiles.bio}</p>
-                      )}
-                    </div>
-                  </div>
+                  {/* Removed the instructor card that was here to give more space to video */}
+                  
                 </CardContent>
               </Card>
 
-              {/* Course Tabs - UPDATED: Replaced Instructor with Skills You'll Gain */}
+              {/* Course Tabs */}
               <Tabs defaultValue="overview" className="space-y-6">
                 <TabsList className="grid w-full grid-cols-4 bg-white/80 backdrop-blur-sm border border-gray-200">
                   <TabsTrigger value="overview" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">
@@ -1176,7 +1216,7 @@ const CourseDetailPage = () => {
                 </CardContent>
               </Card>
 
-              {/* Creator Card - FIXED: Always show student count regardless of login status */}
+              {/* Creator Card - FIXED: Moved to sidebar and always show student count */}
               {creatorProfile && (
                 <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
                   <CardContent className="p-6">
@@ -1272,7 +1312,7 @@ const CourseDetailPage = () => {
                         itemType="course"
                         className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-medium py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center"
                       >
-            
+                        <Heart className="w-4 h-4 mr-2" />
                         Add to Wishlist
                       </WishlistButton>
                     </div>
