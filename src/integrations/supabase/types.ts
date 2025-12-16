@@ -92,6 +92,54 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_audit_logs: {
+        Row: {
+          action: string
+          admin_id: string | null
+          created_at: string | null
+          details: Json | null
+          id: string
+          ip_address: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          admin_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          admin_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_audit_logs_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_assistant_interactions: {
         Row: {
           ai_response: string
@@ -3515,6 +3563,8 @@ export type Database = {
           module_id: string
           order_index: number
           title: string
+          transcription_status: string | null
+          transcription_updated_at: string | null
           updated_at: string | null
           video_url: string | null
         }
@@ -3528,6 +3578,8 @@ export type Database = {
           module_id: string
           order_index: number
           title: string
+          transcription_status?: string | null
+          transcription_updated_at?: string | null
           updated_at?: string | null
           video_url?: string | null
         }
@@ -3541,6 +3593,8 @@ export type Database = {
           module_id?: string
           order_index?: number
           title?: string
+          transcription_status?: string | null
+          transcription_updated_at?: string | null
           updated_at?: string | null
           video_url?: string | null
         }
@@ -4250,6 +4304,8 @@ export type Database = {
           bio: string | null
           created_at: string | null
           creator_enabled_at: string | null
+          deactivated_at: string | null
+          deactivation_reason: string | null
           default_payout_method: string | null
           email_verified: boolean | null
           expo_push_token: string | null
@@ -4271,9 +4327,13 @@ export type Database = {
           push_last_updated: string | null
           push_notifications_enabled: boolean | null
           role: Database["public"]["Enums"]["user_role"] | null
+          status: string | null
           stripe_connect_account_id: string | null
           stripe_connect_id: string | null
           stripe_onboarding_completed: boolean | null
+          suspension_ends_at: string | null
+          suspension_reason: string | null
+          suspension_started_at: string | null
           updated_at: string | null
           username: string | null
         }
@@ -4286,6 +4346,8 @@ export type Database = {
           bio?: string | null
           created_at?: string | null
           creator_enabled_at?: string | null
+          deactivated_at?: string | null
+          deactivation_reason?: string | null
           default_payout_method?: string | null
           email_verified?: boolean | null
           expo_push_token?: string | null
@@ -4307,9 +4369,13 @@ export type Database = {
           push_last_updated?: string | null
           push_notifications_enabled?: boolean | null
           role?: Database["public"]["Enums"]["user_role"] | null
+          status?: string | null
           stripe_connect_account_id?: string | null
           stripe_connect_id?: string | null
           stripe_onboarding_completed?: boolean | null
+          suspension_ends_at?: string | null
+          suspension_reason?: string | null
+          suspension_started_at?: string | null
           updated_at?: string | null
           username?: string | null
         }
@@ -4322,6 +4388,8 @@ export type Database = {
           bio?: string | null
           created_at?: string | null
           creator_enabled_at?: string | null
+          deactivated_at?: string | null
+          deactivation_reason?: string | null
           default_payout_method?: string | null
           email_verified?: boolean | null
           expo_push_token?: string | null
@@ -4343,9 +4411,13 @@ export type Database = {
           push_last_updated?: string | null
           push_notifications_enabled?: boolean | null
           role?: Database["public"]["Enums"]["user_role"] | null
+          status?: string | null
           stripe_connect_account_id?: string | null
           stripe_connect_id?: string | null
           stripe_onboarding_completed?: boolean | null
+          suspension_ends_at?: string | null
+          suspension_reason?: string | null
+          suspension_started_at?: string | null
           updated_at?: string | null
           username?: string | null
         }
