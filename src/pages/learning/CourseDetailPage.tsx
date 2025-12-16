@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'; // Added useRef
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
@@ -34,6 +34,10 @@ import { useCart } from '@/contexts/CartContext';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import ReactPlayer from 'react-player';
 import WishlistButton from '@/components/wishlist/WishlistButton';
+
+// Import the optimized components
+import { OptimizedVideoPlayer } from '@/components/video/OptimizedVideoPlayer';
+import { useVideoPreload } from '@/hooks/useVideoPreload';
 
 interface Course {
   id: string;
@@ -447,18 +451,36 @@ const CourseDetailPage = () => {
   const [enrollmentLoading, setEnrollmentLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
   const playerRef = useRef<ReactPlayer>(null);
 
-  // Check if device is mobile
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent));
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  // Get all video URLs for preloading
+  const videoUrls = React.useMemo(() => {
+    if (!course) return [];
+    
+    const urls: string[] = [];
+    
+    // Add preview video
+    if (course.course_preview?.preview_video_url) {
+      urls.push(course.course_preview.preview_video_url);
+    }
+    
+    // Add lesson videos
+    course.course_modules.forEach(module => {
+      module.lessons.forEach(lesson => {
+        if (lesson.content_type === 'video' && lesson.video_url) {
+          urls.push(lesson.video_url);
+        }
+      });
+    });
+    
+    return urls;
+  }, [course]);
+
+  // Use video preloading hook
+  const { isLoaded } = useVideoPreload(
+    videoUrls,
+    course?.course_preview?.preview_video_url
+  );
 
   // Check authentication status on component mount
   useEffect(() => {
@@ -875,12 +897,6 @@ const CourseDetailPage = () => {
     }
   };
 
-  // Handle ReactPlayer error
-  const handlePlayerError = (error: any) => {
-    console.error('ReactPlayer error:', error);
-    toast.error('Failed to load video. Please try again or use a different browser.');
-  };
-
   // Gradient Icon Component
   const GradientIcon = ({ children }: { children: React.ReactNode }) => (
     <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-2 rounded-lg text-white">
@@ -984,65 +1000,44 @@ const CourseDetailPage = () => {
                     </div>
                   </div>
 
-                  {/* Course Preview Video - FIXED FOR MOBILE */}
+                  {/* Course Preview Video - OPTIMIZED */}
                   {course.course_preview?.preview_video_url && (
-                    <div className="mb-4">
-                      <h3 className="text-lg font-semibold mb-3">Course Preview</h3>
-                      <div className="aspect-video rounded-xl overflow-hidden bg-gray-900 relative">
-                        <ReactPlayer
-                          ref={playerRef}
-                          url={course.course_preview.preview_video_url}
-                          controls={true}
-                          width="100%"
-                          height="100%"
-                          playsinline={true}
-                          playing={false}
-                          light={isMobile ? false : course.thumbnail_url}
-                          onError={handlePlayerError}
-                          config={{
-                            file: {
-                              attributes: {
-                                controlsList: 'nodownload',
-                                playsInline: true,
-                                preload: 'metadata',
-                                crossOrigin: 'anonymous'
-                              },
-                              forceVideo: true,
-                              forceAudio: true,
-                              forceHLS: isMobile, // Use HLS for mobile compatibility
-                              forceDASH: isMobile, // Use DASH for mobile compatibility
-                            }
-                          }}
-                          style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            borderRadius: '8px'
-                          }}
-                          playIcon={
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                              <div className="w-16 h-16 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center shadow-2xl">
-                                <Play className="h-8 w-8 text-white ml-1" />
-                              </div>
-                            </div>
-                          }
-                        />
+                    <div className="mb-6">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-lg font-semibold">Course Preview</h3>
+                        {!isLoaded(course.course_preview.preview_video_url) && (
+                          <div className="flex items-center gap-2 text-sm text-orange-600">
+                            <div className="w-3 h-3 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" />
+                            <span>Optimizing video...</span>
+                          </div>
+                        )}
                       </div>
                       
-                      {/* Video Quality/Playback Info for Mobile */}
-                      {isMobile && (
-                        <div className="mt-2 text-xs text-gray-600 flex items-center gap-2">
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                      <OptimizedVideoPlayer
+                        url={course.course_preview.preview_video_url}
+                        thumbnail={course.thumbnail_url}
+                        onError={(error) => {
+                          console.error('Video playback error:', error);
+                          toast.error('Video failed to load. Trying alternative source...');
+                        }}
+                        className="rounded-xl"
+                      />
+                      
+                      {/* Performance Tips */}
+                      <div className="mt-3 p-3 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg border border-orange-200">
+                        <div className="flex items-center gap-2 text-sm text-gray-700">
+                          <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                           </svg>
-                          <span>Tap to play. Ensure your browser allows autoplay.</span>
+                          <span>
+                            <strong>Optimized Playback:</strong> Video quality automatically adjusts based on your connection speed for smooth playback.
+                          </span>
                         </div>
-                      )}
+                      </div>
                     </div>
                   )}
 
-                  {/* Removed the instructor card that was here to give more space to video */}
-                  
+                  {/* Instructor Card - Moved to sidebar */}
                 </CardContent>
               </Card>
 
