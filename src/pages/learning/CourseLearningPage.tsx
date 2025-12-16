@@ -1904,10 +1904,10 @@ const PulseLoading = () => {
         <div className="container mx-auto px-4 py-8">
           <div className="flex flex-col items-center justify-center min-h-96">
             <div className="relative w-40 h-40 flex items-center justify-center mb-8">
-              <div className="absolute w-40 h-40 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 animate-ping" />
-              <div className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 animate-pulse" />
-              <div className="absolute w-24 h-24 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 animate-pulse" />
-              <div className="absolute w-16 h-16 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 flex items-center justify-center shadow-lg">
+              <div className="absolute w-40 h-40 rounded-full bg-gradient-to-r from-orange-500/10 to-purple-600/10 animate-ping" />
+              <div className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 animate-pulse" />
+              <div className="absolute w-24 h-24 rounded-full bg-gradient-to-r from-orange-500/10 to-purple-600/10 animate-pulse" />
+              <div className="absolute w-16 h-16 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 flex items-center justify-center shadow-lg">
                 <BookOpen className="h-8 w-8 text-white" />
               </div>
             </div>
@@ -1920,9 +1920,9 @@ const PulseLoading = () => {
               </p>
             </div>
             <div className="flex space-x-2 mt-6">
-              <div className="w-3 h-3 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-3 h-3 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-3 h-3 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-3 h-3 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '300ms' }} />
             </div>
           </div>
         </div>
