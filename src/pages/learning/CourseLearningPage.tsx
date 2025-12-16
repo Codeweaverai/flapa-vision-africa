@@ -971,30 +971,8 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
   const [playbackRate, setPlaybackRate] = useState(1);
   const [volume, setVolume] = useState(0.8);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [hasSubtitles, setHasSubtitles] = useState(false);
+  const [showSubtitles, setShowSubtitles] = useState(false);
   const playerRef = useRef<any>(null);
-
-  // Check if subtitles exist
-  useEffect(() => {
-    const checkSubtitles = async () => {
-      if (!videoUrl) {
-        setHasSubtitles(false);
-        return;
-      }
-      
-      try {
-        // Try to load the VTT file
-        const vttUrl = `${videoUrl}.vtt`;
-        const response = await fetch(vttUrl, { method: 'HEAD' });
-        setHasSubtitles(response.ok);
-      } catch (error) {
-        console.log('Subtitles not available:', error);
-        setHasSubtitles(false);
-      }
-    };
-    
-    checkSubtitles();
-  }, [videoUrl]);
 
   const handleReady = () => {
     console.log('Video ready to play');
@@ -1050,15 +1028,6 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
       },
       forceVideo: true,
       forceAudio: true,
-      tracks: hasSubtitles ? [
-        {
-          kind: 'subtitles',
-          src: `${videoUrl}.vtt`,
-          srcLang: 'en',
-          label: 'English',
-          default: true,
-        },
-      ] : [],
     },
   };
 
@@ -1153,9 +1122,9 @@ const QuizItem: React.FC<QuizItemProps> = ({ quiz, onStart, isModuleQuiz = false
       )}
       onClick={onStart}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-1 min-w-0">
         <div className={cn(
-          "p-2 rounded-full shadow-sm",
+          "p-2 rounded-full shadow-sm flex-shrink-0",
           passed 
             ? "bg-green-100 text-green-600" 
             : quiz.is_completed 
@@ -1164,13 +1133,13 @@ const QuizItem: React.FC<QuizItemProps> = ({ quiz, onStart, isModuleQuiz = false
         )}>
           <HelpCircle className="h-5 w-5" />
         </div>
-        <div>
-          <h4 className="font-medium text-gray-900">
+        <div className="flex-1 min-w-0">
+          <h4 className="font-medium text-gray-900 truncate">
             {isModuleQuiz ? 'Module Quiz' : 'Lesson Quiz'}: {quiz.title}
           </h4>
-          <div className="flex items-center gap-3 mt-1">
+          <div className="flex items-center gap-3 mt-1 flex-wrap">
             <Badge variant="outline" className={cn(
-              "text-xs",
+              "text-xs flex-shrink-0",
               passed 
                 ? "bg-green-100 text-green-700 border-green-300" 
                 : quiz.is_completed 
@@ -1179,11 +1148,12 @@ const QuizItem: React.FC<QuizItemProps> = ({ quiz, onStart, isModuleQuiz = false
             )}>
               {quiz.passing_score}% to pass
             </Badge>
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-gray-500 flex-shrink-0">
               {quiz.question_count || 0} questions
             </span>
             {quiz.is_completed && quiz.user_score && (
               <Badge className={cn(
+                "flex-shrink-0",
                 passed ? "bg-green-500" : "bg-red-500"
               )}>
                 {quiz.user_score}%
@@ -1192,23 +1162,23 @@ const QuizItem: React.FC<QuizItemProps> = ({ quiz, onStart, isModuleQuiz = false
           </div>
         </div>
       </div>
-      <div>
+      <div className="flex-shrink-0 ml-3">
         {quiz.is_completed ? (
           <div className="flex items-center gap-1">
             {passed ? (
               <>
-                <CheckCircle className="h-5 w-5 text-green-500" />
-                <span className="text-sm text-green-600 font-medium">Passed</span>
+                <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
+                <span className="text-sm text-green-600 font-medium flex-shrink-0">Passed</span>
               </>
             ) : (
               <>
-                <AlertCircle className="h-5 w-5 text-red-500" />
-                <span className="text-sm text-red-600 font-medium">Failed</span>
+                <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
+                <span className="text-sm text-red-600 font-medium flex-shrink-0">Failed</span>
               </>
             )}
           </div>
         ) : (
-          <Button size="sm" className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700">
+          <Button size="sm" className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 flex-shrink-0 whitespace-nowrap">
             Start Quiz
           </Button>
         )}
