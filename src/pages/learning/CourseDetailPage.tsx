@@ -963,7 +963,7 @@ const CourseDetailPage = () => {
 
                   {/* Course Preview Video */}
                   {course.course_preview?.preview_video_url && (
-                    <div className="mb-6">
+                    <div className="mb-4">
                       <h3 className="text-lg font-semibold mb-3">Course Preview</h3>
                       <div className="aspect-video rounded-xl overflow-hidden bg-gray-100">
                         <OptimizedVideoPlayer
@@ -977,23 +977,6 @@ const CourseDetailPage = () => {
                       </div>
                     </div>
                   )}
-
-                  {/* Instructor - Hidden on mobile, shown in sidebar on desktop */}
-                  <div className="hidden lg:flex items-center gap-4 p-4 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg border border-orange-200">
-                    <Avatar className="w-12 h-12 border-2 border-orange-300">
-                      <AvatarImage src={course.profiles?.avatar_url} />
-                      <AvatarFallback className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
-                        {course.profiles?.full_name?.charAt(0) || 'I'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm text-gray-600">Instructor</p>
-                      <p className="font-semibold text-gray-900">{course.profiles?.full_name || 'Unknown Creator'}</p>
-                      {course.profiles?.bio && (
-                        <p className="text-sm text-gray-600 mt-1 line-clamp-2">{course.profiles.bio}</p>
-                      )}
-                    </div>
-                  </div>
                 </CardContent>
               </Card>
 
