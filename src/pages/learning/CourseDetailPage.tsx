@@ -993,7 +993,7 @@ const CourseDetailPage = () => {
                     Reviews
                   </TabsTrigger>
                   <TabsTrigger value="skills" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-purple-600 data-[state=active]:text-white">
-                    Skills You'll Gain
+                    Skills
                   </TabsTrigger>
                 </TabsList>
 
