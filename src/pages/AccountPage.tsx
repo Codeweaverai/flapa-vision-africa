@@ -477,8 +477,9 @@ const AccountPage = () => {
             deviceId = await beamsClient.getDeviceId();
             
             console.log('✅ Pusher Beams subscribed', { 
-              devId: deviceId, 
-              authenticated: tokenSuccess
+              deviceId, 
+              authenticated: tokenSuccess,
+              deviceId 
             });
 
             if (!tokenSuccess) {

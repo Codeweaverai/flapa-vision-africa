@@ -248,8 +248,9 @@ const QuizFormDialog = ({
           const savedQuestion = await createQuizQuestion({
             quiz_id: quiz.id,
             question: question.question,
+            explanation: question.explanation || null,
             order_index: i
-          } as any);
+          });
           setSavingProgress(prev => ({ ...prev, current: prev.current + 1 }));
 
           if (savedQuestion) {

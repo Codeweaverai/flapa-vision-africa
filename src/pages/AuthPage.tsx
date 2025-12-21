@@ -557,7 +557,7 @@ const AuthPage = () => {
         </div>
       </div>
 
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style jsx>{`
         @keyframes float {
           0%, 100% { transform: translateY(0px) scale(1); }
           50% { transform: translateY(-20px) scale(1.05); }
@@ -659,7 +659,7 @@ const AuthPage = () => {
           align-items: center;
           gap: 1rem;
         }
-      ` }} />
+      `}</style>
     </div>
   );
 };

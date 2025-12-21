@@ -195,7 +195,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
 
       // Get all quiz results for this enrollment
       const { data: results, error } = await supabase
-        .from('quiz_results' as any)
+        .from('quiz_results')
         .select('*')
         .eq('enrollment_id', enrollment.id);
 
@@ -203,8 +203,8 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
 
       // Convert to lookup object
       const resultsMap: {[key: string]: QuizResult} = {};
-      (results as any[])?.forEach((result: any) => {
-        resultsMap[result.quiz_id] = result as QuizResult;
+      results?.forEach(result => {
+        resultsMap[result.quiz_id] = result;
       });
 
       setQuizResults(resultsMap);

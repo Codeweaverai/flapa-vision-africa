@@ -457,7 +457,7 @@ const LiveEventsSection = () => {
         </div>
       </div>
 
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style jsx>{`
         @keyframes pulse-slow {
           0%, 100% { opacity: 0.9; transform: scale(1); }
           50% { opacity: 1; transform: scale(1.05); }
@@ -478,7 +478,7 @@ const LiveEventsSection = () => {
         .snap-start {
           scroll-snap-align: start;
         }
-      ` }} />
+      `}</style>
     </section>
   );
 };
