@@ -209,7 +209,7 @@ const CurrencySwitcher: React.FC = () => {
     .map(code => code as CurrencyCode);
 
   // Show loading state while context is initializing or saving
-  const showLoading = contextLoading || saving || (!initialized && user);
+  const showLoading = contextLoading || saving || (!initialized && !!user);
 
   return (
     <Select 

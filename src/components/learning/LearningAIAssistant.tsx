@@ -39,7 +39,7 @@ const LearningAIAssistant: React.FC<LearningAIAssistantProps> = ({
   courseId, 
   courseName 
 }) => {
-  const { user, userProfile } = useAuth();
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -47,7 +47,7 @@ const LearningAIAssistant: React.FC<LearningAIAssistantProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Get user's first name for personalization
-  const userName = userProfile?.full_name?.split(' ')[0] || 'there';
+  const userName = user?.user_metadata?.full_name?.split(' ')[0] || 'there';
 
   useEffect(() => {
     if (isOpen && messages.length === 0) {
@@ -156,7 +156,7 @@ const LearningAIAssistant: React.FC<LearningAIAssistantProps> = ({
           courseId,
           courseName,
           userId: user.id,
-          userName: userProfile?.full_name || 'Student',
+          userName: user?.user_metadata?.full_name || 'Student',
           conversationHistory: messages
             .filter(msg => msg.type === 'user' || msg.type === 'assistant')
             .map(msg => ({

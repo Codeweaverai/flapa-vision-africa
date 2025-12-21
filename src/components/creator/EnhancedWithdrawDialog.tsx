@@ -173,7 +173,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
       }
 
       if (data) {
-        setProfileData(data);
+        setProfileData(data as any);
         
         // Set the payout method based on what's configured
         if (data.default_payout_method) {
@@ -182,7 +182,7 @@ const EnhancedWithdrawDialog: React.FC<EnhancedWithdrawDialogProps> = ({
           setSelectedPayoutMethod('stripe');
         } else if (data.mobile_money_operator && data.mobile_money_number) {
           setSelectedPayoutMethod('mobile_money');
-        } else if (data.bank_account_details && data.bank_account_details.verified) {
+        } else if (data.bank_account_details && (data.bank_account_details as any)?.verified) {
           setSelectedPayoutMethod('bank');
         }
       }

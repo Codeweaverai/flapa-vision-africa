@@ -97,7 +97,7 @@ const CoursePreviewDialog: React.FC<CoursePreviewDialogProps> = ({
       if (previewError && previewError.code !== 'PGRST116') throw previewError;
 
       setLearningOutcomes(outcomes || []);
-      setSkillOutcomes(skills || []);
+      setSkillOutcomes(skills as any || []);
       setPreviewVideoUrl(preview?.preview_video_url || '');
     } catch (error) {
       console.error('Error loading data:', error);
