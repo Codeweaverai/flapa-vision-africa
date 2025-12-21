@@ -162,10 +162,11 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
       }
 
       // Create assistant message
+      const responseText = typeof result.response === 'string' ? result.response : String(result.response || '');
       const assistantMessage: Message = {
         id: 'assistant-' + Date.now(),
         type: 'assistant',
-        content: result.response!,
+        content: responseText,
         timestamp: new Date()
       };
 
@@ -175,7 +176,7 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
       // Save assistant response to database
       await saveChatMessage(
         'assistant', 
-        result.response!, 
+        responseText, 
         lessonId, 
         courseId, 
         { 
@@ -183,7 +184,7 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
           timestamp: new Date().toISOString(),
           model: 'gpt-4.1-2025-04-14',
           source: 'floating-assistant',
-          messageLength: result.response!.length
+          messageLength: responseText.length
         }
       );
 

@@ -251,7 +251,7 @@ const PayoutMethodSetupDialog: React.FC<PayoutMethodSetupDialogProps> = ({
       }
 
       if (data) {
-        setProfileData(data);
+        setProfileData(data as any);
         if (data.default_payout_method) {
           setSelectedMethod(data.default_payout_method as 'stripe' | 'mobile_money' | 'bank');
         }

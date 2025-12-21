@@ -497,7 +497,7 @@ const CertificateDisplay: React.FC<{ certificate: Certificate; courseSkills: Rec
         </div>
       </div>
 
-      <style jsx>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .certificate-display {
           font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
@@ -1012,7 +1012,7 @@ const CertificateDisplay: React.FC<{ certificate: Certificate; courseSkills: Rec
             white-space: nowrap !important;
           }
         }
-      `}</style>
+      ` }} />
     </div>
   );
 };

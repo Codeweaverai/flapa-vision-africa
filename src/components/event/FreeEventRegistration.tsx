@@ -223,7 +223,7 @@ const FreeEventRegistration: React.FC<FreeEventRegistrationProps> = ({
     if (!event) return;
     
     const startDate = new Date(event.start_time);
-    const endDate = new Date(event.end_time);
+    const endDate = new Date((event as any).end_time || event.start_time);
     
     const formatDateForGoogle = (date: Date) => {
       return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
@@ -234,7 +234,7 @@ const FreeEventRegistration: React.FC<FreeEventRegistrationProps> = ({
     googleCalendarUrl.searchParams.set('text', event.title);
     googleCalendarUrl.searchParams.set('dates', `${formatDateForGoogle(startDate)}/${formatDateForGoogle(endDate)}`);
     googleCalendarUrl.searchParams.set('details', `Event: ${event.title}\n\nTicket Code: ${generateTicketCode()}`);
-    googleCalendarUrl.searchParams.set('location', event.location || '');
+    googleCalendarUrl.searchParams.set('location', (event as any).location || '');
 
     window.open(googleCalendarUrl.toString(), '_blank');
   };

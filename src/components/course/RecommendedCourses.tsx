@@ -449,7 +449,7 @@ const RecommendedCourses = ({ currentCourseId, category }: RecommendedCoursesPro
         </div>
       </div>
 
-      <style jsx>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         @keyframes pulse-slow {
           0%, 100% { opacity: 0.9; transform: scale(1); }
           50% { opacity: 1; transform: scale(1.05); }
@@ -470,7 +470,7 @@ const RecommendedCourses = ({ currentCourseId, category }: RecommendedCoursesPro
         .snap-start {
           scroll-snap-align: start;
         }
-      `}</style>
+      ` }} />
     </section>
   );
 };
