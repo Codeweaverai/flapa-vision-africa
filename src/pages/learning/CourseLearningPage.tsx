@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -264,687 +264,160 @@ interface Certificate {
   updated_at: string;
 }
 
-// ==================== ENHANCED DISCUSSION COMPONENTS ====================
+// ==================== PERFORMANCE OPTIMIZATIONS ====================
 
-interface DiscussionThreadProps {
-  discussion: LessonDiscussion;
-  onReply: (parentId: string) => void;
-  onLike: (discussionId: string) => void;
-  onDelete?: (discussionId: string) => void;
-  currentUserId?: string;
-}
+// Video Cache Manager
+class VideoCacheManager {
+  private static instance: VideoCacheManager;
+  private cache: Map<string, { url: string; timestamp: number }> = new Map();
+  private readonly MAX_CACHE_SIZE = 50; // Max 50 cached videos
+  private readonly CACHE_EXPIRY = 30 * 60 * 1000; // 30 minutes
 
-const DiscussionThread: React.FC<DiscussionThreadProps> = ({ 
-  discussion, 
-  onReply, 
-  onLike,
-  onDelete,
-  currentUserId 
-}) => {
-  const [showReplies, setShowReplies] = useState(false);
-  const [showReplyInput, setShowReplyInput] = useState(false);
-  const [replyContent, setReplyContent] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [showOptions, setShowOptions] = useState(false);
+  private constructor() {}
 
-  const handleSubmitReply = () => {
-    if (replyContent.trim()) {
-      onReply(discussion.id);
-      setReplyContent('');
-      setShowReplyInput(false);
+  static getInstance(): VideoCacheManager {
+    if (!VideoCacheManager.instance) {
+      VideoCacheManager.instance = new VideoCacheManager();
     }
-  };
-
-  const handleDelete = async () => {
-    if (onDelete && window.confirm('Are you sure you want to delete this comment?')) {
-      setIsDeleting(true);
-      try {
-        await onDelete(discussion.id);
-      } finally {
-        setIsDeleting(false);
-        setShowOptions(false);
-      }
-    }
-  };
-
-  const canDelete = currentUserId === discussion.user_id || discussion.profile?.is_creator;
-  const isInstructor = discussion.profile?.is_creator;
-  const hasReplies = discussion.replies && discussion.replies.length > 0;
-  const replyCount = discussion.reply_count || (discussion.replies ? discussion.replies.length : 0);
-
-  const getTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-    
-    if (diffInSeconds < 60) return 'just now';
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
-    return date.toLocaleDateString();
-  };
-
-  return (
-    <div className="space-y-4">
-      {/* Main Comment */}
-      <div className={`relative group p-4 rounded-2xl transition-all duration-300 hover:shadow-lg ${
-        isInstructor 
-          ? 'bg-gradient-to-br from-blue-50/80 to-indigo-50/80 border-l-4 border-blue-500' 
-          : 'bg-gradient-to-br from-gray-50/80 to-slate-50/80 border-l-4 border-gray-300'
-      }`}>
-        {/* Avatar and Header */}
-        <div className="flex items-start gap-3 mb-3">
-          <div className="relative">
-            <Avatar className={`h-12 w-12 ring-2 ${isInstructor ? 'ring-blue-200' : 'ring-gray-200'} shadow-sm`}>
-              <AvatarImage src={discussion.profile?.avatar_url} />
-              <AvatarFallback className={`${isInstructor ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}>
-                {discussion.profile?.full_name?.charAt(0) || 'U'}
-              </AvatarFallback>
-            </Avatar>
-            {isInstructor && (
-              <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
-                <Crown className="h-3 w-3 text-white" />
-              </div>
-            )}
-          </div>
-          
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={`font-semibold ${isInstructor ? 'text-blue-700' : 'text-gray-900'}`}>
-                    {discussion.profile?.full_name || 'Anonymous'}
-                  </span>
-                  {isInstructor && (
-                    <Badge className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs px-2 py-0.5 rounded-full">
-                      Instructor
-                    </Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <Calendar className="h-3 w-3" />
-                  {getTimeAgo(discussion.created_at)}
-                  {discussion.is_instructor_reply && (
-                    <span className="flex items-center gap-1 text-blue-500">
-                      <MessageSquare className="h-3 w-3" />
-                      Official reply
-                    </span>
-                  )}
-                </div>
-              </div>
-              
-              <div className="relative">
-                <button 
-                  onClick={() => setShowOptions(!showOptions)}
-                  className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
-                >
-                  <MoreVertical className="h-4 w-4" />
-                </button>
-                
-                {showOptions && (
-                  <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border z-10">
-                    <div className="py-1">
-                      {canDelete && (
-                        <button
-                          onClick={handleDelete}
-                          disabled={isDeleting}
-                          className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                        >
-                          {isDeleting ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
-                          Delete Comment
-                        </button>
-                      )}
-                      <button className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-600 hover:bg-gray-100">
-                        <Flag className="h-4 w-4" />
-                        Report
-                      </button>
-                      <button className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-600 hover:bg-gray-100">
-                        <EyeOff className="h-4 w-4" />
-                        Hide
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="mb-4">
-          <p className="text-gray-800 whitespace-pre-wrap leading-relaxed">
-            {discussion.content}
-          </p>
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => onLike(discussion.id)}
-              className={cn(
-                "flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-200",
-                discussion.is_liked 
-                  ? "bg-gradient-to-r from-pink-50 to-rose-50 text-pink-600 border border-pink-200" 
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              )}
-            >
-              <Heart className={cn("h-4 w-4", discussion.is_liked && "fill-pink-500")} />
-              <span className="text-sm font-medium">{discussion.likes_count || 0}</span>
-            </button>
-            
-            <button 
-              onClick={() => {
-                setShowReplyInput(true);
-                setShowReplies(true);
-              }}
-              className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-full transition-all duration-200"
-            >
-              <Reply className="h-4 w-4" />
-              <span className="text-sm font-medium">Reply</span>
-            </button>
-            
-            {hasReplies && (
-              <button 
-                onClick={() => setShowReplies(!showReplies)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-full transition-all duration-200"
-              >
-                <MessageSquare className="h-4 w-4" />
-                <span className="text-sm font-medium">
-                  {showReplies ? 'Hide' : 'Show'} {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
-                </span>
-              </button>
-            )}
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <button className="p-1.5 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
-              <Share className="h-4 w-4" />
-            </button>
-            <button className="p-1.5 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
-              <Bookmark className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Reply Input */}
-        {showReplyInput && (
-          <div className="mt-4 pl-4 border-l-2 border-blue-300">
-            <div className="flex gap-3">
-              <Avatar className="h-8 w-8 ring-1 ring-gray-300">
-                <AvatarFallback className="bg-gray-100 text-gray-600">
-                  {currentUserId?.charAt(0) || 'U'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <Textarea
-                  placeholder={`Reply to ${discussion.profile?.full_name || 'this comment'}...`}
-                  value={replyContent}
-                  onChange={(e) => setReplyContent(e.target.value)}
-                  rows={2}
-                  className="resize-none border-gray-300 focus:border-blue-400 focus:ring-blue-300 rounded-xl"
-                />
-                <div className="flex items-center justify-between mt-2">
-                  <div className="flex items-center gap-2">
-                    <button className="p-1.5 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
-                      <Smile className="h-4 w-4" />
-                    </button>
-                    <button className="p-1.5 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
-                      <Image className="h-4 w-4" />
-                    </button>
-                    <button className="p-1.5 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
-                      <Paperclip className="h-4 w-4" />
-                    </button>
-                    <button className="p-1.5 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
-                      <Code className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowReplyInput(false)}
-                      className="border-gray-300 hover:bg-gray-100"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={handleSubmitReply}
-                      disabled={!replyContent.trim()}
-                      className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
-                    >
-                      <Send className="h-4 w-4 mr-1" />
-                      Reply
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Nested Replies */}
-      {showReplies && discussion.replies && discussion.replies.length > 0 && (
-        <div className="ml-8 space-y-4 border-l-2 border-gray-200 pl-4">
-          {discussion.replies.map((reply) => (
-            <div key={reply.id} className="relative">
-              {/* Reply Connector Line */}
-              <div className="absolute -left-4 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-300 to-purple-300" />
-              
-              <div className={`p-3 rounded-xl transition-all duration-300 hover:shadow-md ${
-                reply.profile?.is_creator
-                  ? 'bg-gradient-to-br from-purple-50/80 to-pink-50/80 border-l-2 border-purple-400'
-                  : 'bg-gradient-to-br from-slate-50/80 to-gray-50/80 border-l-2 border-gray-300'
-              }`}>
-                <div className="flex items-start gap-3">
-                  <Avatar className={`h-8 w-8 ring-1 ${reply.profile?.is_creator ? 'ring-purple-200' : 'ring-gray-200'}`}>
-                    <AvatarImage src={reply.profile?.avatar_url} />
-                    <AvatarFallback className={`${reply.profile?.is_creator ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'}`}>
-                      {reply.profile?.full_name?.charAt(0) || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-sm font-medium ${reply.profile?.is_creator ? 'text-purple-700' : 'text-gray-900'}`}>
-                        {reply.profile?.full_name || 'Anonymous'}
-                      </span>
-                      {reply.profile?.is_creator && (
-                        <Badge className="bg-gradient-to-r from-purple-500 to-pink-600 text-white text-xs px-1.5 py-0 rounded-full">
-                          Instructor
-                        </Badge>
-                      )}
-                      <span className="text-xs text-gray-500">
-                        {getTimeAgo(reply.created_at)}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                      {reply.content}
-                    </p>
-                    
-                    <div className="flex items-center gap-3 mt-2">
-                      <button 
-                        onClick={() => onLike(reply.id)}
-                        className={cn(
-                          "flex items-center gap-1 text-xs",
-                          reply.is_liked ? "text-pink-600" : "text-gray-500 hover:text-gray-700"
-                        )}
-                      >
-                        <Heart className={cn("h-3 w-3", reply.is_liked && "fill-pink-500")} />
-                        <span>{reply.likes_count || 0}</span>
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setShowReplyInput(true);
-                        }}
-                        className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                      >
-                        <Reply className="h-3 w-3" />
-                        Reply
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ==================== DISCUSSION FILTERS ====================
-
-interface DiscussionFiltersProps {
-  activeFilter: string;
-  onFilterChange: (filter: string) => void;
-  searchQuery: string;
-  onSearchChange: (query: string) => void;
-}
-
-const DiscussionFilters: React.FC<DiscussionFiltersProps> = ({
-  activeFilter,
-  onFilterChange,
-  searchQuery,
-  onSearchChange
-}) => {
-  const filters = [
-    { id: 'all', label: 'All Comments', icon: <MessageSquare className="h-4 w-4" /> },
-    { id: 'instructor', label: 'Instructor Replies', icon: <Crown className="h-4 w-4" /> },
-    { id: 'popular', label: 'Most Liked', icon: <TrendingUp className="h-4 w-4" /> },
-    { id: 'recent', label: 'Recent', icon: <Calendar className="h-4 w-4" /> },
-  ];
-
-  return (
-    <div className="space-y-4">
-      {/* Search Bar */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search discussions..."
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-        />
-        {searchQuery && (
-          <button
-            onClick={() => onSearchChange('')}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        )}
-      </div>
-
-      {/* Filter Chips */}
-      <div className="flex flex-wrap gap-2">
-        {filters.map((filter) => (
-          <button
-            key={filter.id}
-            onClick={() => onFilterChange(filter.id)}
-            className={cn(
-              "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200",
-              activeFilter === filter.id
-                ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            )}
-          >
-            {filter.icon}
-            {filter.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Sort Options */}
-      <div className="flex items-center gap-2 text-sm text-gray-600">
-        <SortAsc className="h-4 w-4" />
-        <span>Sort by:</span>
-        <select className="bg-transparent border-none focus:ring-0 text-gray-700 font-medium">
-          <option>Newest First</option>
-          <option>Most Liked</option>
-          <option>Oldest First</option>
-        </select>
-      </div>
-    </div>
-  );
-};
-
-// ==================== ENHANCED DISCUSSION SECTION ====================
-
-interface EnhancedDiscussionSectionProps {
-  discussions: LessonDiscussion[];
-  onAddDiscussion: (content: string) => void;
-  onReply: (parentId: string, content: string) => void;
-  onLike: (discussionId: string) => void;
-  onDelete: (discussionId: string) => void;
-  currentUserId?: string;
-  isLoading?: boolean;
-}
-
-const EnhancedDiscussionSection: React.FC<EnhancedDiscussionSectionProps> = ({
-  discussions,
-  onAddDiscussion,
-  onReply,
-  onLike,
-  onDelete,
-  currentUserId,
-  isLoading = false
-}) => {
-  const [newDiscussion, setNewDiscussion] = useState('');
-  const [activeFilter, setActiveFilter] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [replyingTo, setReplyingTo] = useState<string | null>(null);
-  const [replyContent, setReplyContent] = useState('');
-
-  const filteredDiscussions = discussions.filter(discussion => {
-    if (activeFilter === 'instructor' && !discussion.profile?.is_creator) return false;
-    if (searchQuery && !discussion.content.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    return true;
-  });
-
-  const handleAddDiscussion = () => {
-    if (newDiscussion.trim()) {
-      onAddDiscussion(newDiscussion.trim());
-      setNewDiscussion('');
-    }
-  };
-
-  const handleAddReply = (parentId: string) => {
-    if (replyContent.trim()) {
-      onReply(parentId, replyContent.trim());
-      setReplyContent('');
-      setReplyingTo(null);
-    }
-  };
-
-  const handleReplyClick = (discussionId: string) => {
-    setReplyingTo(discussionId);
-  };
-
-  const stats = {
-    total: discussions.length,
-    instructorReplies: discussions.filter(d => d.profile?.is_creator).length,
-    popular: discussions.filter(d => (d.likes_count || 0) > 5).length,
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-        <p className="text-gray-600">Loading discussions...</p>
-      </div>
-    );
+    return VideoCacheManager.instance;
   }
 
-  return (
-    <div className="space-y-6">
-      {/* Discussion Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-2xl border border-blue-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <MessageSquare className="h-5 w-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Comments</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-4 rounded-2xl border border-purple-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Crown className="h-5 w-5 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Instructor Replies</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.instructorReplies}</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-gradient-to-br from-orange-50 to-red-50 p-4 rounded-2xl border border-orange-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <TrendingUp className="h-5 w-5 text-orange-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Popular Discussions</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.popular}</p>
-            </div>
-          </div>
-        </div>
-      </div>
+  set(url: string, blobUrl: string): void {
+    this.cleanup();
+    if (this.cache.size >= this.MAX_CACHE_SIZE) {
+      const oldestKey = Array.from(this.cache.entries())
+        .reduce((oldest, current) => 
+          current[1].timestamp < oldest[1].timestamp ? current : oldest
+        )[0];
+      this.delete(oldestKey);
+    }
+    this.cache.set(url, { url: blobUrl, timestamp: Date.now() });
+  }
 
-      {/* Add Discussion Card */}
-      <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl border border-gray-200 p-6 shadow-sm">
-        <div className="flex gap-3">
-          <Avatar className="h-10 w-10 ring-2 ring-blue-100">
-            <AvatarFallback className="bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-600">
-              {currentUserId?.charAt(0) || 'U'}
-            </AvatarFallback>
-          </Avatar>
-          
-          <div className="flex-1">
-            <div className="mb-3">
-              <h3 className="font-semibold text-gray-900 mb-1">Start a Discussion</h3>
-              <p className="text-sm text-gray-600">
-                Ask questions, share insights, or help other learners
-              </p>
-            </div>
-            
-            <Textarea
-              placeholder="What would you like to discuss?"
-              value={newDiscussion}
-              onChange={(e) => setNewDiscussion(e.target.value)}
-              rows={3}
-              className="resize-none border-gray-300 focus:border-blue-400 focus:ring-blue-300 rounded-xl"
-            />
-            
-            <div className="flex items-center justify-between mt-3">
-              <div className="flex items-center gap-2">
-                <button className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
-                  <Smile className="h-5 w-5" />
-                </button>
-                <button className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
-                  <Image className="h-5 w-5" />
-                </button>
-                <button className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
-                  <Paperclip className="h-5 w-5" />
-                </button>
-                <button className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
-                  <Code className="h-5 w-5" />
-                </button>
-                <button className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
-                  <LinkIcon className="h-5 w-5" />
-                </button>
-              </div>
-              
-              <Button
-                onClick={handleAddDiscussion}
-                disabled={!newDiscussion.trim()}
-                className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 px-6 shadow-md hover:shadow-lg transition-all duration-200"
-              >
-                <Send className="h-4 w-4 mr-2" />
-                Post Discussion
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
+  get(url: string): string | null {
+    const cached = this.cache.get(url);
+    if (cached && Date.now() - cached.timestamp < this.CACHE_EXPIRY) {
+      return cached.url;
+    }
+    return null;
+  }
 
-      {/* Filters */}
-      <DiscussionFilters
-        activeFilter={activeFilter}
-        onFilterChange={setActiveFilter}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-      />
+  delete(url: string): void {
+    const cached = this.cache.get(url);
+    if (cached) {
+      URL.revokeObjectURL(cached.url);
+      this.cache.delete(url);
+    }
+  }
 
-      {/* Discussions List */}
-      <div className="space-y-4">
-        {filteredDiscussions.length > 0 ? (
-          filteredDiscussions.map((discussion) => (
-            <DiscussionThread
-              key={discussion.id}
-              discussion={discussion}
-              onReply={(parentId) => handleReplyClick(parentId)}
-              onLike={onLike}
-              onDelete={onDelete}
-              currentUserId={currentUserId}
-            />
-          ))
-        ) : (
-          <div className="text-center py-12">
-            <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full flex items-center justify-center">
-              <MessageSquare className="h-10 w-10 text-gray-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {searchQuery ? 'No matching discussions found' : 'No discussions yet'}
-            </h3>
-            <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              {searchQuery 
-                ? 'Try different search terms or clear the search'
-                : 'Be the first to start a discussion! Share your thoughts or ask a question.'
-              }
-            </p>
-            {!searchQuery && (
-              <Button
-                onClick={() => document.querySelector('textarea')?.focus()}
-                className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
-              >
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Start First Discussion
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
+  private cleanup(): void {
+    const now = Date.now();
+    for (const [url, cached] of this.cache.entries()) {
+      if (now - cached.timestamp > this.CACHE_EXPIRY) {
+        this.delete(url);
+      }
+    }
+  }
 
-      {/* Floating Reply Input */}
-      {replyingTo && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-2xl z-50 animate-in slide-in-from-bottom duration-300">
-          <div className="container mx-auto max-w-4xl px-4 py-3">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Reply className="h-4 w-4 text-blue-500" />
-                <span className="text-sm font-medium text-gray-900">Replying to discussion</span>
-              </div>
-              <button
-                onClick={() => setReplyingTo(null)}
-                className="p-1 text-gray-400 hover:text-gray-600 rounded-full"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <Textarea
-                  placeholder="Write your reply..."
-                  value={replyContent}
-                  onChange={(e) => setReplyContent(e.target.value)}
-                  rows={2}
-                  className="resize-none border-gray-300 focus:border-blue-400 focus:ring-blue-300 rounded-xl"
-                  autoFocus
-                />
-                <div className="flex justify-end gap-2 mt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setReplyingTo(null)}
-                    className="border-gray-300 hover:bg-gray-100"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => handleAddReply(replyingTo)}
-                    disabled={!replyContent.trim()}
-                    className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
-                  >
-                    <Send className="h-4 w-4 mr-1" />
-                    Reply
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  clear(): void {
+    for (const [url] of this.cache.entries()) {
+      this.delete(url);
+    }
+  }
+}
+
+// Network Quality Detector
+class NetworkQualityDetector {
+  private static instance: NetworkQualityDetector;
+  private connection: any;
+  private listeners: ((quality: string) => void)[] = [];
+
+  private constructor() {
+    if (typeof window !== 'undefined') {
+      this.connection = (navigator as any).connection || 
+                       (navigator as any).mozConnection || 
+                       (navigator as any).webkitConnection;
+      
+      if (this.connection) {
+        this.connection.addEventListener('change', this.handleConnectionChange.bind(this));
+      }
+    }
+  }
+
+  static getInstance(): NetworkQualityDetector {
+    if (!NetworkQualityDetector.instance) {
+      NetworkQualityDetector.instance = new NetworkQualityDetector();
+    }
+    return NetworkQualityDetector.instance;
+  }
+
+  private handleConnectionChange(): void {
+    const quality = this.getNetworkQuality();
+    this.listeners.forEach(listener => listener(quality));
+  }
+
+  getNetworkQuality(): 'slow' | 'medium' | 'fast' {
+    if (!this.connection) return 'fast';
+
+    const { downlink, effectiveType } = this.connection;
+    
+    if (downlink < 1.5 || effectiveType === '2g' || effectiveType === '3g') {
+      return 'slow';
+    } else if (downlink < 5 || effectiveType === '4g') {
+      return 'medium';
+    }
+    return 'fast';
+  }
+
+  addListener(listener: (quality: string) => void): void {
+    this.listeners.push(listener);
+  }
+
+  removeListener(listener: (quality: string) => void): void {
+    this.listeners = this.listeners.filter(l => l !== listener);
+  }
+
+  async checkConnectivity(): Promise<boolean> {
+    try {
+      const response = await fetch('https://www.google.com', { 
+        method: 'HEAD', 
+        mode: 'no-cors' 
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+// Debounce utility
+const debounce = <T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): ((...args: Parameters<T>) => void) => {
+  let timeout: NodeJS.Timeout;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
 };
 
-// ==================== CUSTOM VIDEO PLAYER ====================
+// Throttle utility
+const throttle = <T extends (...args: any[]) => any>(
+  func: T,
+  limit: number
+): ((...args: Parameters<T>) => void) => {
+  let inThrottle: boolean;
+  return (...args: Parameters<T>) => {
+    if (!inThrottle) {
+      func(...args);
+      inThrottle = true;
+      setTimeout(() => (inThrottle = false), limit);
+    }
+  };
+};
+
+// ==================== ENHANCED VIDEO PLAYER WITH CACHING ====================
 
 interface CustomVideoPlayerProps {
   videoUrl: string;
@@ -957,47 +430,7 @@ interface CustomVideoPlayerProps {
   controls?: boolean;
 }
 
-// Helper to detect video type from URL
-const getVideoType = (url: string): string => {
-  if (!url) return 'unknown';
-  const lowerUrl = url.toLowerCase();
-  
-  // Third-party platforms
-  if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) return 'youtube';
-  if (lowerUrl.includes('vimeo.com')) return 'vimeo';
-  if (lowerUrl.includes('dailymotion.com') || lowerUrl.includes('dai.ly')) return 'dailymotion';
-  if (lowerUrl.includes('twitch.tv')) return 'twitch';
-  if (lowerUrl.includes('facebook.com') || lowerUrl.includes('fb.watch')) return 'facebook';
-  if (lowerUrl.includes('wistia.com') || lowerUrl.includes('wistia.net')) return 'wistia';
-  if (lowerUrl.includes('soundcloud.com')) return 'soundcloud';
-  if (lowerUrl.includes('mixcloud.com')) return 'mixcloud';
-  if (lowerUrl.includes('streamable.com')) return 'streamable';
-  
-  // Streaming formats
-  if (lowerUrl.includes('.m3u8')) return 'hls';
-  if (lowerUrl.includes('.mpd')) return 'dash';
-  
-  // Direct video files
-  if (lowerUrl.includes('.mp4')) return 'mp4';
-  if (lowerUrl.includes('.webm')) return 'webm';
-  if (lowerUrl.includes('.ogg') || lowerUrl.includes('.ogv')) return 'ogg';
-  if (lowerUrl.includes('.mov')) return 'mov';
-  if (lowerUrl.includes('.avi')) return 'avi';
-  if (lowerUrl.includes('.mkv')) return 'mkv';
-  if (lowerUrl.includes('.flv')) return 'flv';
-  if (lowerUrl.includes('.wmv')) return 'wmv';
-  if (lowerUrl.includes('.3gp')) return '3gp';
-  
-  // Audio files
-  if (lowerUrl.includes('.mp3')) return 'mp3';
-  if (lowerUrl.includes('.wav')) return 'wav';
-  if (lowerUrl.includes('.flac')) return 'flac';
-  if (lowerUrl.includes('.aac')) return 'aac';
-  
-  return 'generic';
-};
-
-const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({ 
+const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = React.memo(({ 
   videoUrl, 
   onProgress, 
   onError, 
@@ -1014,52 +447,138 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [isReady, setIsReady] = useState(false);
+  const [optimizedUrl, setOptimizedUrl] = useState(videoUrl);
+  const [networkQuality, setNetworkQuality] = useState<'slow' | 'medium' | 'fast'>('fast');
+  
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const cacheManager = useRef(VideoCacheManager.getInstance());
+  const networkDetector = useRef(NetworkQualityDetector.getInstance());
   
-  const videoType = getVideoType(videoUrl);
-  const maxRetries = 3;
+  const videoType = useMemo(() => {
+    if (!videoUrl) return 'unknown';
+    const lowerUrl = videoUrl.toLowerCase();
+    
+    if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) return 'youtube';
+    if (lowerUrl.includes('vimeo.com')) return 'vimeo';
+    if (lowerUrl.includes('.m3u8')) return 'hls';
+    if (lowerUrl.includes('.mpd')) return 'dash';
+    if (lowerUrl.includes('.mp4')) return 'mp4';
+    if (lowerUrl.includes('.webm')) return 'webm';
+    
+    return 'generic';
+  }, [videoUrl]);
 
-  const handleReady = () => {
+  // Cache video on mount
+  useEffect(() => {
+    const cacheVideo = async () => {
+      if (videoType === 'mp4' || videoType === 'webm') {
+        const cachedUrl = cacheManager.current.get(videoUrl);
+        if (cachedUrl) {
+          setOptimizedUrl(cachedUrl);
+          return;
+        }
+
+        try {
+          // Create a preload link for better performance
+          const link = document.createElement('link');
+          link.rel = 'preload';
+          link.as = 'video';
+          link.href = videoUrl;
+          document.head.appendChild(link);
+          
+          // Cache the video
+          const response = await fetch(videoUrl, { 
+            mode: 'cors',
+            cache: 'force-cache'
+          });
+          
+          if (response.ok) {
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            cacheManager.current.set(videoUrl, blobUrl);
+            setOptimizedUrl(blobUrl);
+          }
+        } catch (error) {
+          console.warn('Failed to cache video, using original URL:', error);
+          setOptimizedUrl(videoUrl);
+        }
+      } else {
+        setOptimizedUrl(videoUrl);
+      }
+    };
+
+    cacheVideo();
+  }, [videoUrl, videoType]);
+
+  // Network quality monitoring
+  useEffect(() => {
+    const handleNetworkChange = (quality: string) => {
+      setNetworkQuality(quality as 'slow' | 'medium' | 'fast');
+    };
+
+    networkDetector.current.addListener(handleNetworkChange);
+    setNetworkQuality(networkDetector.current.getNetworkQuality());
+
+    return () => {
+      networkDetector.current.removeListener(handleNetworkChange);
+    };
+  }, []);
+
+  // Adaptive quality based on network
+  useEffect(() => {
+    if (videoType === 'mp4' || videoType === 'webm') {
+      const url = new URL(videoUrl);
+      const params = new URLSearchParams(url.search);
+      
+      if (networkQuality === 'slow') {
+        params.set('quality', '360');
+      } else if (networkQuality === 'medium') {
+        params.set('quality', '720');
+      } else {
+        params.set('quality', '1080');
+      }
+      
+      url.search = params.toString();
+      setOptimizedUrl(url.toString());
+    }
+  }, [networkQuality, videoUrl, videoType]);
+
+  const handleReady = useCallback(() => {
     console.log('Video ready to play:', videoType);
     setIsReady(true);
     setHasError(false);
     setRetryCount(0);
     if (onReady) onReady();
-  };
+  }, [videoType, onReady]);
 
-  const handleBuffer = () => {
+  const handleBuffer = useCallback(() => {
     setIsBuffering(true);
-  };
+  }, []);
 
-  const handleBufferEnd = () => {
+  const handleBufferEnd = useCallback(() => {
     setIsBuffering(false);
-  };
+  }, []);
 
-  const handlePlaybackRateChange = (rate: number) => {
-    setPlaybackRate(rate);
-  };
-
-  const handleVolumeChange = (vol: number) => {
-    setVolume(vol);
-  };
-
-  const handleError = (error: any) => {
+  const handleError = useCallback((error: any) => {
     console.error('Video playback error:', error, 'Type:', videoType);
     
-    if (retryCount < maxRetries) {
+    if (retryCount < 3) {
       setRetryCount(prev => prev + 1);
-      console.log(`Retry attempt ${retryCount + 1}/${maxRetries}`);
       setTimeout(() => {
         setHasError(false);
+        // Try with lower quality on retry
+        if (networkQuality !== 'slow') {
+          setNetworkQuality('slow');
+        }
       }, 1000 * (retryCount + 1));
     } else {
       setHasError(true);
       if (onError) onError(error);
     }
-  };
+  }, [videoType, retryCount, networkQuality, onError]);
 
-  const toggleFullscreen = () => {
+  const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
     
     if (!isFullscreen) {
@@ -1067,19 +586,15 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
         containerRef.current.requestFullscreen();
       } else if ((containerRef.current as any).webkitRequestFullscreen) {
         (containerRef.current as any).webkitRequestFullscreen();
-      } else if ((containerRef.current as any).msRequestFullscreen) {
-        (containerRef.current as any).msRequestFullscreen();
       }
     } else {
       if (document.exitFullscreen) {
         document.exitFullscreen();
       } else if ((document as any).webkitExitFullscreen) {
         (document as any).webkitExitFullscreen();
-      } else if ((document as any).msExitFullscreen) {
-        (document as any).msExitFullscreen();
       }
     }
-  };
+  }, [isFullscreen]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -1088,25 +603,34 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-    document.addEventListener('msfullscreenchange', handleFullscreenChange);
     
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('msfullscreenchange', handleFullscreenChange);
     };
   }, []);
 
-  // Reset state when URL changes
-  useEffect(() => {
-    setHasError(false);
-    setRetryCount(0);
-    setIsReady(false);
-    setIsBuffering(false);
-  }, [videoUrl]);
+  // Throttled progress handler
+  const throttledProgress = useCallback(throttle((progress: { played: number, playedSeconds: number }) => {
+    if (onProgress) onProgress(progress);
+  }, 1000), [onProgress]);
 
-  // Comprehensive config for all video formats
-  const config = {
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (videoType === 'mp4' || videoType === 'webm') {
+        // Don't revoke blob URL if it's cached
+        const cached = cacheManager.current.get(videoUrl);
+        if (!cached) {
+          if (optimizedUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(optimizedUrl);
+          }
+        }
+      }
+    };
+  }, [videoUrl, optimizedUrl, videoType]);
+
+  const config = useMemo(() => ({
     file: {
       attributes: {
         controlsList: 'nodownload noremoteplayback',
@@ -1121,10 +645,10 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
       hlsOptions: {
         enableWorker: true,
         lowLatencyMode: true,
-        backBufferLength: 90,
-        maxBufferLength: 30,
-        maxMaxBufferLength: 600,
-        startLevel: -1, // Auto quality
+        backBufferLength: networkQuality === 'slow' ? 30 : 90,
+        maxBufferLength: networkQuality === 'slow' ? 15 : 30,
+        maxMaxBufferLength: networkQuality === 'slow' ? 300 : 600,
+        startLevel: -1,
       },
       dashOptions: {
         autoPlay: false,
@@ -1149,31 +673,9 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
         responsive: true,
       },
     },
-    dailymotion: {
-      params: {
-        'queue-enable': false,
-        'ui-logo': false,
-        'ui-start-screen-info': false,
-      },
-    },
-    facebook: {
-      appId: '',
-      version: 'v3.3',
-      playerId: `facebook-player-${Date.now()}`,
-    },
-    twitch: {
-      options: {
-        parent: [window.location.hostname],
-      },
-    },
-    wistia: {
-      options: {
-        silentAutoPlay: 'allow',
-      },
-    },
-  };
+  }), [videoType, networkQuality]);
 
-  if (hasError && retryCount >= maxRetries) {
+  if (hasError && retryCount >= 3) {
     return (
       <div className="relative w-full aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl overflow-hidden shadow-xl flex items-center justify-center">
         <div className="text-center text-white p-6">
@@ -1182,17 +684,28 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
           <p className="text-sm text-gray-400 mb-4">
             The video could not be played. Please check your connection or try again later.
           </p>
-          <Button
-            onClick={() => {
-              setHasError(false);
-              setRetryCount(0);
-            }}
-            variant="outline"
-            className="border-white/20 text-white hover:bg-white/10"
-          >
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Try Again
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => {
+                setHasError(false);
+                setRetryCount(0);
+              }}
+              variant="outline"
+              className="border-white/20 text-white hover:bg-white/10"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Try Again
+            </Button>
+            {networkQuality !== 'slow' && (
+              <Button
+                onClick={() => setNetworkQuality('slow')}
+                variant="outline"
+                className="border-white/20 text-white hover:bg-white/10"
+              >
+                Try Lower Quality
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -1203,6 +716,18 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
       ref={containerRef}
       className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-xl group"
     >
+      {/* Network Quality Indicator */}
+      {networkQuality !== 'fast' && (
+        <div className="absolute top-4 left-4 z-20">
+          <Badge variant="secondary" className={cn(
+            "bg-opacity-90",
+            networkQuality === 'slow' ? "bg-red-500" : "bg-yellow-500"
+          )}>
+            {networkQuality === 'slow' ? 'Low Quality' : 'Medium Quality'}
+          </Badge>
+        </div>
+      )}
+
       {/* Loading/Buffering Overlay */}
       {(isBuffering || !isReady) && !hasError && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10 backdrop-blur-sm">
@@ -1211,13 +736,16 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
             <p className="text-sm font-medium">
               {!isReady ? 'Loading video...' : 'Buffering...'}
             </p>
+            <p className="text-xs text-gray-400 mt-1">
+              Network: {networkQuality}
+            </p>
           </div>
         </div>
       )}
       
       <ReactPlayer
         ref={playerRef}
-        url={videoUrl}
+        url={optimizedUrl}
         width="100%"
         height="100%"
         playing={playing}
@@ -1231,7 +759,7 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
         onReady={handleReady}
         onBuffer={handleBuffer}
         onBufferEnd={handleBufferEnd}
-        onProgress={onProgress}
+        onProgress={throttledProgress}
         onError={handleError}
         onEnded={onEnd}
         config={config}
@@ -1250,7 +778,7 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
               {/* Playback Speed */}
               <select
                 value={playbackRate}
-                onChange={(e) => handlePlaybackRateChange(parseFloat(e.target.value))}
+                onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
                 className="text-white text-sm bg-white/10 hover:bg-white/20 rounded px-2 py-1.5 border-0 cursor-pointer focus:ring-2 focus:ring-blue-500"
               >
                 <option value={0.5}>0.5x</option>
@@ -1265,7 +793,7 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
               {/* Volume Control */}
               <div className="flex items-center gap-2 group/volume">
                 <button
-                  onClick={() => handleVolumeChange(volume > 0 ? 0 : 0.8)}
+                  onClick={() => setVolume(volume > 0 ? 0 : 0.8)}
                   className="text-white hover:text-blue-400 transition-colors"
                 >
                   <Volume2 className="h-5 w-5" />
@@ -1276,16 +804,16 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
                   max="1"
                   step="0.05"
                   value={volume}
-                  onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                  onChange={(e) => setVolume(parseFloat(e.target.value))}
                   className="w-20 h-1 accent-blue-500 cursor-pointer"
                 />
               </div>
             </div>
             
             <div className="flex items-center gap-2">
-              {/* Video Type Badge */}
-              <span className="text-xs text-gray-400 bg-white/10 px-2 py-1 rounded capitalize">
-                {videoType}
+              {/* Network Quality */}
+              <span className="text-xs text-gray-400 bg-white/10 px-2 py-1 rounded">
+                {networkQuality}
               </span>
               
               {/* Fullscreen */}
@@ -1302,193 +830,9 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
       )}
     </div>
   );
-};
+});
 
-// ==================== QUIZ ITEM COMPONENT ====================
-
-interface QuizItemProps {
-  quiz: Quiz;
-  onStart: () => void;
-  isModuleQuiz?: boolean;
-}
-
-const QuizItem: React.FC<QuizItemProps> = ({ quiz, onStart, isModuleQuiz = false }) => {
-  const passed = quiz.is_completed && (quiz.user_score || 0) >= quiz.passing_score;
-  
-  return (
-    <div 
-      className={cn(
-        "flex items-center justify-between p-4 rounded-xl border transition-all hover:shadow-md cursor-pointer",
-        passed 
-          ? "bg-gradient-to-r from-green-50/80 to-emerald-50/80 border-green-200 hover:bg-green-100" 
-          : quiz.is_completed 
-            ? "bg-gradient-to-r from-red-50/80 to-orange-50/80 border-red-200 hover:bg-red-100"
-            : "bg-gradient-to-r from-blue-50/80 to-indigo-50/80 border-blue-200 hover:bg-blue-100"
-      )}
-      onClick={onStart}
-    >
-      <div className="flex items-center gap-3 flex-1 min-w-0">
-        <div className={cn(
-          "p-2 rounded-full shadow-sm flex-shrink-0",
-          passed 
-            ? "bg-green-100 text-green-600" 
-            : quiz.is_completed 
-              ? "bg-red-100 text-red-600"
-              : "bg-blue-100 text-blue-600"
-        )}>
-          <HelpCircle className="h-5 w-5" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <h4 className="font-medium text-gray-900 truncate">
-            {isModuleQuiz ? 'Module Quiz' : 'Lesson Quiz'}: {quiz.title}
-          </h4>
-          <div className="flex items-center gap-3 mt-1 flex-wrap">
-            <Badge variant="outline" className={cn(
-              "text-xs flex-shrink-0",
-              passed 
-                ? "bg-green-100 text-green-700 border-green-300" 
-                : quiz.is_completed 
-                  ? "bg-red-100 text-red-700 border-red-300"
-                  : "bg-blue-100 text-blue-700 border-blue-300"
-            )}>
-              {quiz.passing_score}% to pass
-            </Badge>
-            <span className="text-xs text-gray-500 flex-shrink-0">
-              {quiz.question_count || 0} questions
-            </span>
-            {quiz.is_completed && quiz.user_score && (
-              <Badge className={cn(
-                "flex-shrink-0",
-                passed ? "bg-green-500" : "bg-red-500"
-              )}>
-                {quiz.user_score}%
-              </Badge>
-            )}
-          </div>
-        </div>
-      </div>
-      <div className="flex-shrink-0 ml-3">
-        {quiz.is_completed ? (
-          <div className="flex items-center gap-1">
-            {passed ? (
-              <>
-                <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
-                <span className="text-sm text-green-600 font-medium flex-shrink-0">Passed</span>
-              </>
-            ) : (
-              <>
-                <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
-                <span className="text-sm text-red-600 font-medium flex-shrink-0">Failed</span>
-              </>
-            )}
-          </div>
-        ) : (
-          <Button size="sm" className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 flex-shrink-0 whitespace-nowrap">
-            Start Quiz
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// ==================== COURSE COMPLETION CARD ====================
-
-interface CourseCompletionCardProps {
-  isCourseCompleted: boolean;
-  hasCertificate: boolean;
-  completedLessons: number;
-  totalLessons: number;
-  allQuizzesPassed: boolean;
-  finalExam?: FinalExam;
-  examResult?: FinalExamAttempt | null;
-  onViewCertificate: () => void;
-}
-
-const CourseCompletionCard: React.FC<CourseCompletionCardProps> = ({
-  isCourseCompleted,
-  hasCertificate,
-  completedLessons,
-  totalLessons,
-  allQuizzesPassed,
-  finalExam,
-  examResult,
-  onViewCertificate
-}) => {
-  if (!isCourseCompleted) return null;
-
-  const passedExam = examResult?.passed;
-  const showExamInfo = finalExam && examResult;
-
-  return (
-    <div className="bg-gradient-to-r from-green-50/80 to-emerald-50/80 border-2 border-green-200 rounded-2xl p-6 mb-6 shadow-lg">
-      <div className="flex items-center gap-4 mb-4">
-        <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white p-3 rounded-full shadow-md">
-          <CheckCircle className="h-8 w-8" />
-        </div>
-        <div className="flex-1">
-          <h3 className="text-xl font-bold text-green-800">Course Completed!</h3>
-          <p className="text-green-600">
-            {hasCertificate 
-              ? 'Your certificate has been issued successfully.'
-              : 'Congratulations on completing the course!'
-            }
-          </p>
-        </div>
-      </div>
-      
-      <div className="space-y-3">
-        <div className="flex items-center gap-3">
-          <CheckCircle className="h-5 w-5 text-green-500" />
-          <span className="text-green-700">
-            All lessons completed ({completedLessons}/{totalLessons})
-          </span>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          {allQuizzesPassed ? (
-            <CheckCircle className="h-5 w-5 text-green-500" />
-          ) : (
-            <AlertCircle className="h-5 w-5 text-yellow-500" />
-          )}
-          <span className="text-green-700">
-            {allQuizzesPassed ? 'All quizzes passed' : 'Some quizzes pending'}
-          </span>
-        </div>
-        
-        {showExamInfo && (
-          <div className="flex items-center gap-3">
-            {passedExam ? (
-              <Award className="h-5 w-5 text-green-500" />
-            ) : (
-              <AlertCircle className="h-5 w-5 text-red-500" />
-            )}
-            <span className="text-green-700">
-              Final Exam: {passedExam ? 'Passed' : 'Failed'} ({examResult.score}%)
-            </span>
-          </div>
-        )}
-        
-        <div className="flex items-center gap-3">
-          <Award className="h-5 w-5 text-green-500" />
-          <span className="text-green-700">
-            {hasCertificate ? 'Certificate issued' : 'Certificate available'}
-          </span>
-        </div>
-      </div>
-      
-      {hasCertificate && (
-        <Button 
-          onClick={onViewCertificate}
-          className="w-full mt-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-md hover:shadow-lg"
-        >
-          <Award className="h-5 w-5 mr-2" />
-          View Certificate
-        </Button>
-      )}
-    </div>
-  );
-};
+CustomVideoPlayer.displayName = 'CustomVideoPlayer';
 
 // ==================== ENHANCED COURSE MODULE LIST ====================
 
@@ -1507,7 +851,7 @@ interface EnhancedCourseModuleListProps {
   onRestartCourse?: () => void;
 }
 
-const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
+const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = React.memo(({
   modules,
   courseId,
   creatorId,
@@ -1528,275 +872,87 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
   const [creatorProfile, setCreatorProfile] = useState<Profile | null>(null);
   const [courseProgress, setCourseProgress] = useState(0);
   const [isNavigating, setIsNavigating] = useState(false);
-  const [quizAttempts, setQuizAttempts] = useState<{[key: string]: QuizAttempt}>({});
 
+  // Memoized calculations
+  const totalLessons = useMemo(() => 
+    modules.reduce((acc, module) => acc + module.lessons.length, 0), 
+    [modules]
+  );
+
+  const progressPercentage = useMemo(() => {
+    if (totalLessons === 0) return 0;
+    return Math.round((completedLessons.length / totalLessons) * 100);
+  }, [completedLessons, totalLessons]);
+
+  // Fetch data with caching
   useEffect(() => {
-    if (courseId) {
-      fetchFinalExam();
-    }
-    if (creatorId) {
-      fetchCreatorProfile();
-    }
+    const fetchData = async () => {
+      try {
+        const [examData, profileData] = await Promise.all([
+          courseId ? supabase
+            .from('final_exams')
+            .select('*')
+            .eq('course_id', courseId)
+            .eq('is_published', true)
+            .maybeSingle() : Promise.resolve({ data: null, error: null }),
+          creatorId ? supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url, bio, is_creator')
+            .eq('id', creatorId)
+            .single() : Promise.resolve({ data: null, error: null })
+        ]);
+
+        if (examData.data) setFinalExam(examData.data);
+        if (profileData.data) setCreatorProfile(profileData.data);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    };
+
+    fetchData();
   }, [courseId, creatorId]);
 
   useEffect(() => {
-    calculateProgress();
-  }, [modules, completedLessons]);
+    setCourseProgress(progressPercentage);
+  }, [progressPercentage]);
 
-  useEffect(() => {
-    if (user && courseId) {
-      fetchQuizAttempts();
-    }
-  }, [user, courseId, modules]);
-
-  const fetchFinalExam = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('final_exams')
-        .select('*')
-        .eq('course_id', courseId)
-        .eq('is_published', true)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') throw error;
-      setFinalExam(data);
-    } catch (error) {
-      console.error('Error fetching final exam:', error);
-    }
-  };
-
-  const fetchCreatorProfile = async () => {
-    if (!creatorId) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url, bio, is_creator')
-        .eq('id', creatorId)
-        .single();
-
-      if (error) throw error;
-      setCreatorProfile(data);
-    } catch (error) {
-      console.error('Error fetching creator profile:', error);
-    }
-  };
-
-  const fetchQuizAttempts = async () => {
-    if (!user) return;
-
-    try {
-      // Get enrollment
-      const { data: enrollment } = await supabase
-        .from('course_enrollments')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('course_id', courseId)
-        .single();
-
-      if (!enrollment) return;
-
-      console.log('Loading quiz attempts for enrollment:', enrollment.id);
-      
-      // Get all quiz attempts for this enrollment
-      const { data: attempts, error } = await supabase
-        .from('quiz_attempts')
-        .select('quiz_id, score, passed')
-        .eq('enrollment_id', enrollment.id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching quiz attempts:', error);
-        return;
-      }
-
-      console.log('Found quiz attempts:', attempts);
-
-      // Group attempts by quiz_id to get the latest attempt
-      const latestAttempts = new Map();
-      attempts?.forEach(attempt => {
-        if (!latestAttempts.has(attempt.quiz_id)) {
-          latestAttempts.set(attempt.quiz_id, attempt);
-        }
-      });
-
-      setQuizAttempts(Object.fromEntries(latestAttempts));
-      
-      // Update modules with quiz completion status
-      const updatedModules = modules.map(module => {
-        // Update lesson quizzes
-        const updatedLessons = module.lessons.map(lesson => {
-          if (lesson.quiz) {
-            const attempt = latestAttempts.get(lesson.quiz.id);
-            console.log(`Checking quiz ${lesson.quiz.id} for lesson ${lesson.title}:`, attempt);
-            return {
-              ...lesson,
-              quiz: {
-                ...lesson.quiz,
-                is_completed: attempt?.passed || false,
-                user_score: attempt?.score || 0
-              }
-            };
-          }
-          return lesson;
-        });
-
-        // Update module quizzes
-        const updatedModuleQuizzes = module.quizzes.map(quiz => {
-          const attempt = latestAttempts.get(quiz.id);
-          console.log(`Checking module quiz ${quiz.id}:`, attempt);
-          return {
-            ...quiz,
-            is_completed: attempt?.passed || false,
-            user_score: attempt?.score || 0
-          };
-        });
-
-        return {
-          ...module,
-          lessons: updatedLessons,
-          quizzes: updatedModuleQuizzes
-        };
-      });
-
-      // Only update if modules changed
-      if (JSON.stringify(modules) !== JSON.stringify(updatedModules)) {
-        // We'll let the parent component handle this update
-        console.log('Quiz attempts updated modules');
-      }
-    } catch (error) {
-      console.error('Error fetching quiz attempts:', error);
-    }
-  };
-
-  const calculateProgress = () => {
-    const totalLessons = modules.reduce((acc, module) => acc + module.lessons.length, 0);
-    if (totalLessons === 0) {
-      setCourseProgress(0);
-      return;
-    }
-    const progress = (completedLessons.length / totalLessons) * 100;
-    setCourseProgress(Math.round(progress));
-  };
-
-  const getCurrentLessonPosition = () => {
+  const getNextLesson = useCallback(() => {
     if (!currentLessonId) return null;
     
-    for (let moduleIndex = 0; moduleIndex < modules.length; moduleIndex++) {
-      const module = modules[moduleIndex];
-      const lessonIndex = module.lessons.findIndex(lesson => lesson.id === currentLessonId);
-      if (lessonIndex !== -1) {
-        return { moduleIndex, lessonIndex };
-      }
-    }
-    return null;
-  };
-
-  const getNextLesson = () => {
-    const position = getCurrentLessonPosition();
-    if (!position) return null;
+    const allLessons = modules.flatMap(m => m.lessons);
+    const currentIndex = allLessons.findIndex(l => l.id === currentLessonId);
     
-    const { moduleIndex, lessonIndex } = position;
-    const currentModule = modules[moduleIndex];
-    
-    if (lessonIndex < currentModule.lessons.length - 1) {
-      return currentModule.lessons[lessonIndex + 1];
-    }
-    
-    if (moduleIndex < modules.length - 1) {
-      const nextModule = modules[moduleIndex + 1];
-      if (nextModule.lessons.length > 0) {
-        return nextModule.lessons[0];
-      }
-    }
-    
-    return null;
-  };
+    return currentIndex !== -1 && currentIndex < allLessons.length - 1 
+      ? allLessons[currentIndex + 1] 
+      : null;
+  }, [currentLessonId, modules]);
 
-  const getPreviousLesson = () => {
-    const position = getCurrentLessonPosition();
-    if (!position) return null;
+  const getPreviousLesson = useCallback(() => {
+    if (!currentLessonId) return null;
     
-    const { moduleIndex, lessonIndex } = position;
+    const allLessons = modules.flatMap(m => m.lessons);
+    const currentIndex = allLessons.findIndex(l => l.id === currentLessonId);
     
-    if (lessonIndex > 0) {
-      return modules[moduleIndex].lessons[lessonIndex - 1];
-    }
-    
-    if (moduleIndex > 0) {
-      const previousModule = modules[moduleIndex - 1];
-      if (previousModule.lessons.length > 0) {
-        return previousModule.lessons[previousModule.lessons.length - 1];
-      }
-    }
-    
-    return null;
-  };
+    return currentIndex > 0 ? allLessons[currentIndex - 1] : null;
+  }, [currentLessonId, modules]);
 
-  const markLessonComplete = async (lessonId: string) => {
-    if (!user) return;
-    
-    try {
-      const { data: enrollment } = await supabase
-        .from('course_enrollments')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('course_id', courseId)
-        .single();
-
-      if (!enrollment) return;
-
-      await supabase
-        .from('lesson_progress')
-        .upsert({
-          enrollment_id: enrollment.id,
-          lesson_id: lessonId,
-          is_completed: true,
-          completion_date: new Date().toISOString()
-        });
-
-      const totalLessons = modules.reduce((acc, module) => acc + module.lessons.length, 0);
-      const newCompletedCount = completedLessons.length + 1;
-      const newProgress = Math.round((newCompletedCount / totalLessons) * 100);
-
-      await supabase
-        .from('course_progress')
-        .upsert({
-          user_id: user.id,
-          course_id: courseId,
-          progress_percentage: newProgress,
-          last_lesson_completed: lessonId
-        });
-
-    } catch (error) {
-      console.error('Error marking lesson complete:', error);
-    }
-  };
-
-  const handleNextLesson = async () => {
+  const handleNextLesson = useCallback(async () => {
     const nextLesson = getNextLesson();
     if (!nextLesson || isNavigating) return;
     
     setIsNavigating(true);
-    
-    if (currentLessonId && !completedLessons.includes(currentLessonId)) {
-      await markLessonComplete(currentLessonId);
+    try {
+      await onLessonSelect(nextLesson);
+    } finally {
+      setIsNavigating(false);
     }
-    
-    onLessonSelect(nextLesson);
-    setIsNavigating(false);
-  };
+  }, [getNextLesson, isNavigating, onLessonSelect]);
 
-  const handlePreviousLesson = () => {
+  const handlePreviousLesson = useCallback(() => {
     const previousLesson = getPreviousLesson();
     if (!previousLesson || isNavigating) return;
-    
     onLessonSelect(previousLesson);
-  };
-
-  const isLessonCompleted = (lessonId: string) => {
-    return completedLessons.includes(lessonId);
-  };
+  }, [getPreviousLesson, isNavigating, onLessonSelect]);
 
   const hasPassedExam = examResult?.passed;
   const hasExceededAttempts = examResult && examResult.attempts >= maxExamAttempts;
@@ -1805,6 +961,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
 
   return (
     <div className="space-y-4 w-full">
+      {/* Progress Bar */}
       <div className="bg-gradient-to-r from-blue-50/80 to-indigo-50/80 p-3 rounded-xl border border-blue-200">
         <div className="flex items-center justify-between mb-1">
           <span className="text-sm sm:text-base font-medium text-gray-800">Course Progress</span>
@@ -1813,6 +970,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
         <Progress value={courseProgress} className="h-1.5 sm:h-2 bg-blue-100" />
       </div>
 
+      {/* Navigation Buttons */}
       {currentLessonId && (
         <div className="flex flex-col sm:flex-row gap-2">
           <Button
@@ -1837,6 +995,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
         </div>
       )}
 
+      {/* Modules */}
       <Accordion 
         type="multiple" 
         value={openModules}
@@ -1857,21 +1016,10 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
                   <Badge variant="outline" className="bg-white/80 text-xs">
                     {module.lessons?.length || 0} lessons
                   </Badge>
-                  {module.quizzes?.length > 0 && (
-                    <Badge variant="outline" className="bg-white/80 text-xs border-purple-200 text-purple-600">
-                      {module.quizzes.length} quiz{module.quizzes.length !== 1 ? 'zes' : ''}
-                    </Badge>
-                  )}
                 </div>
               </div>
             </AccordionTrigger>
             <AccordionContent className="px-3 sm:px-4 pb-3 sm:pb-4">
-              {module.description && (
-                <p className="text-xs sm:text-sm text-muted-foreground mb-3">
-                  {module.description}
-                </p>
-              )}
-              
               {module.lessons && module.lessons.length > 0 ? (
                 <div className="space-y-3">
                   {module.lessons.map((lesson, index) => (
@@ -1887,29 +1035,16 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
                       >
                         <div className="flex items-center space-x-2 sm:space-x-3 w-full">
                           <div className="flex items-center space-x-1 sm:space-x-2">
-                            {isLessonCompleted(lesson.id) ? (
+                            {completedLessons.includes(lesson.id) ? (
                               <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
                             ) : (
                               <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-gray-300 rounded-full flex items-center justify-center">
                                 <span className="text-xs font-medium">{index + 1}</span>
                               </div>
                             )}
-                            {lesson.content_type === 'video' ? (
-                              <Video className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500" />
-                            ) : (
-                              <FileText className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
-                            )}
-                            {lesson.quiz && (
-                              <HelpCircle className="h-3 w-3 sm:h-4 sm:w-4 text-purple-500" />
-                            )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <h4 className="text-sm sm:text-base font-medium truncate">{lesson.title}</h4>
-                            {lesson.description && (
-                              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1 sm:line-clamp-2">
-                                {lesson.description}
-                              </p>
-                            )}
                           </div>
                         </div>
                         <Button
@@ -1924,16 +1059,6 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
                           {currentLessonId === lesson.id ? 'Watching' : 'Watch'}
                         </Button>
                       </div>
-
-                      {/* Lesson Quizzes */}
-                      {lesson.quiz && (
-                        <div className="ml-4 space-y-2 border-l-2 border-blue-200 pl-3">
-                          <QuizItem
-                            quiz={lesson.quiz}
-                            onStart={() => onQuizStart?.(lesson.quiz!.id, lesson.id)}
-                          />
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -1942,34 +1067,12 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
                   No lessons available in this module
                 </div>
               )}
-
-              {/* Module-level Quizzes */}
-              {module.quizzes && module.quizzes.length > 0 && (
-                <div className="mt-4 pt-4 border-t">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Award className="h-4 w-4 text-indigo-600" />
-                    <span className="font-medium text-sm text-gray-700">Module Quizzes</span>
-                    <Badge variant="outline" className="text-xs">
-                      {module.quizzes.length} quiz{module.quizzes.length !== 1 ? 'zes' : ''}
-                    </Badge>
-                  </div>
-                  <div className="space-y-2">
-                    {module.quizzes.map((quiz) => (
-                      <QuizItem
-                        key={quiz.id}
-                        quiz={quiz}
-                        onStart={() => onModuleQuizStart?.(quiz.id, module.id)}
-                        isModuleQuiz
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
             </AccordionContent>
           </AccordionItem>
         ))}
       </Accordion>
 
+      {/* Final Exam Button */}
       {showFinalExamButton && (
         <div className="bg-gradient-to-r from-orange-50/80 to-yellow-50/80 border-2 border-orange-200 rounded-xl p-3 sm:p-4">
           <div className="flex flex-col gap-3">
@@ -1977,28 +1080,11 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
               <Award className="h-5 w-5 sm:h-6 sm:w-6 text-orange-600" />
               <div className="flex-1">
                 <h4 className="text-sm sm:text-base font-semibold text-orange-800">{finalExam.title}</h4>
-                {finalExam.description && (
-                  <p className="text-xs sm:text-sm text-orange-600 mt-1 line-clamp-2">{finalExam.description}</p>
-                )}
                 <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-2">
                   <Badge variant="outline" className="text-xs sm:text-sm text-orange-700 border-orange-300">
                     {finalExam.passing_score}% to pass
                   </Badge>
-                  <div className="flex items-center text-xs text-orange-600">
-                    <Clock className="h-3 w-3 mr-1" />
-                    {finalExam.time_limit_minutes} mins
-                  </div>
-                  {examResult && (
-                    <Badge variant="outline" className="text-xs sm:text-sm text-orange-700 border-orange-300">
-                      Attempt {examResult.attempts}/{maxExamAttempts}
-                    </Badge>
-                  )}
                 </div>
-                {examResult && (
-                  <p className="text-xs text-orange-600 mt-1">
-                    Previous score: {examResult.score}%
-                  </p>
-                )}
               </div>
             </div>
             <Button 
@@ -2012,60 +1098,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
         </div>
       )}
 
-      {showRestartCourseButton && (
-        <div className="bg-gradient-to-r from-red-50/80 to-orange-50/80 border-2 border-red-200 rounded-xl p-3 sm:p-4">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6 text-red-600" />
-              <div className="flex-1">
-                <h4 className="text-sm sm:text-base font-semibold text-red-800">Maximum Attempts Reached</h4>
-                <p className="text-xs sm:text-sm text-red-600 mt-1">
-                  You've used all {maxExamAttempts} exam attempts. Review the course materials and restart to try again.
-                </p>
-                {examResult && (
-                  <div className="mt-2 space-y-1">
-                    <p className="text-xs text-red-600">
-                      Last score: {examResult.score}% (Required: {finalExam?.passing_score}%)
-                    </p>
-                    <p className="text-xs text-red-600">
-                      Attempts: {examResult.attempts}/{maxExamAttempts}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-            <Button 
-              className="w-full bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 shadow-md hover:shadow-lg"
-              onClick={onRestartCourse}
-            >
-              <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-              Restart Course & Review Materials
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {courseProgress === 100 && (!finalExam || hasPassedExam) && (
-        <div className="bg-gradient-to-r from-green-50/80 to-emerald-50/80 border-2 border-green-200 rounded-xl p-3 sm:p-4">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <Trophy className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
-              <div>
-                <h4 className="text-sm sm:text-base font-semibold text-green-800">Course Completed!</h4>
-                <p className="text-xs sm:text-sm text-green-600 mt-1">View your final results and certificate</p>
-              </div>
-            </div>
-            <Button 
-              className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-md hover:shadow-lg"
-              onClick={() => navigate(`/course/${courseId}/results`)}
-            >
-              <Trophy className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-              View Results
-            </Button>
-          </div>
-        </div>
-      )}
-
+      {/* Instructor Profile */}
       {creatorProfile && (
         <div className="bg-gradient-to-r from-blue-50/80 to-indigo-50/80 border-2 border-blue-200 rounded-xl p-3 sm:p-4">
           <div className="flex flex-col gap-3">
@@ -2079,62 +1112,16 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
               <div className="flex-1 min-w-0">
                 <h4 className="text-sm sm:text-base font-semibold text-blue-800">Your Instructor</h4>
                 <p className="text-xs sm:text-sm font-medium text-blue-700 truncate">{creatorProfile.full_name}</p>
-                {creatorProfile.bio && (
-                  <p className="text-xs text-blue-600 mt-1 line-clamp-2">{creatorProfile.bio}</p>
-                )}
               </div>
             </div>
-            <Button 
-              variant="outline"
-              size="sm"
-              className="w-full border-blue-300 text-blue-600 hover:bg-blue-100"
-              onClick={() => navigate(`/creator/profile/${creatorProfile.id}`)}
-            >
-              <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-              View Profile
-            </Button>
           </div>
         </div>
       )}
     </div>
   );
-};
+});
 
-// ==================== PULSE LOADING COMPONENT ====================
-
-const PulseLoading = () => {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
-      <Layout>
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex flex-col items-center justify-center min-h-96">
-            <div className="relative w-40 h-40 flex items-center justify-center mb-8">
-              <div className="absolute w-40 h-40 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 animate-ping" />
-              <div className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-orange-500/30 to-purple-600/30 animate-pulse" />
-              <div className="absolute w-24 h-24 rounded-full bg-gradient-to-r from-orange-500/40 to-purple-600/40 animate-pulse" />
-              <div className="absolute w-16 h-16 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 flex items-center justify-center shadow-lg">
-                <BookOpen className="h-8 w-8 text-white" />
-              </div>
-            </div>
-            <div className="text-center space-y-2">
-              <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
-                Loading Your Course
-              </h3>
-              <p className="text-muted-foreground text-lg">
-                Preparing your learning experience...
-              </p>
-            </div>
-            <div className="flex space-x-2 mt-6">
-              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-3 h-3 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
-          </div>
-        </div>
-      </Layout>
-    </div>
-  );
-};
+EnhancedCourseModuleList.displayName = 'EnhancedCourseModuleList';
 
 // ==================== MAIN COURSE LEARNING PAGE ====================
 
@@ -2157,12 +1144,7 @@ const CourseLearningPage = () => {
   const [currentQuizId, setCurrentQuizId] = useState<string>('');
   const [currentLessonId, setCurrentLessonId] = useState<string>('');
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
-  const [showQuizResultsModal, setShowQuizResultsModal] = useState(false);
-  const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
-  const [quizScore, setQuizScore] = useState(0);
-  const [quizPassed, setQuizPassed] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState<CourseLesson | null>(null);
-  const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [resumeLesson, setResumeLesson] = useState<CourseLesson | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -2173,695 +1155,237 @@ const CourseLearningPage = () => {
   const [showNextLessonDialog, setShowNextLessonDialog] = useState(false);
   const [currentLessonProgress, setCurrentLessonProgress] = useState(0);
   
-  // Enhanced Discussion & Notes State
+  // Performance optimizations
   const [notes, setNotes] = useState<LessonNote[]>([]);
   const [newNote, setNewNote] = useState('');
-  const [editingNote, setEditingNote] = useState<string | null>(null);
-  const [editNoteContent, setEditNoteContent] = useState('');
   const [discussions, setDiscussions] = useState<LessonDiscussion[]>([]);
-  const [newDiscussion, setNewDiscussion] = useState('');
-  const [discussionFilter, setDiscussionFilter] = useState('all');
-  const [discussionSearch, setDiscussionSearch] = useState('');
-  const [replyingTo, setReplyingTo] = useState<string | null>(null);
-  const [replyContent, setReplyContent] = useState('');
   const [transcripts, setTranscripts] = useState<LessonTranscript[]>([]);
   
-  // Realtime subscription ref
   const subscriptionRef = useRef<any>(null);
-  
-  // Completion state guards
   const completionInProgress = useRef(false);
   const completionAttempted = useRef(false);
 
-  // ==================== DEBUG LOGGING ====================
-  useEffect(() => {
-    console.log('=== QUIZ DEBUG INFO ===');
-    console.log('Modules:', modules.length);
-    
-    modules.forEach((module, modIndex) => {
-      console.log(`\nModule ${modIndex + 1}: ${module.title}`);
-      console.log(`  Total lessons: ${module.lessons.length}`);
-      console.log(`  Total module quizzes: ${module.quizzes.length}`);
-      
-      // Check lesson quizzes
-      module.lessons.forEach((lesson, lessonIndex) => {
-        if (lesson.quiz) {
-          console.log(`  Lesson ${lessonIndex + 1}: ${lesson.title}`);
-          console.log(`    Has quiz: Yes`);
-          console.log(`    Quiz ID: ${lesson.quiz.id}`);
-          console.log(`    Quiz title: ${lesson.quiz.title}`);
-          console.log(`    Question count: ${lesson.quiz.question_count}`);
-          console.log(`    Is completed: ${lesson.quiz.is_completed}`);
-          console.log(`    User score: ${lesson.quiz.user_score}`);
-        }
-      });
-      
-      // Check module quizzes
-      module.quizzes.forEach((quiz, quizIndex) => {
-        console.log(`  Module Quiz ${quizIndex + 1}: ${quiz.title}`);
-        console.log(`    Quiz ID: ${quiz.id}`);
-        console.log(`    Question count: ${quiz.question_count}`);
-        console.log(`    Is completed: ${quiz.is_completed}`);
-        console.log(`    User score: ${quiz.user_score}`);
-      });
-    });
-  }, [modules]);
-  
-  const isEnrolled = enrollment?.payment_status === 'completed';
-  const progressPercentage = progress?.progress_percentage || 0;
-  const isNotComplete = progressPercentage < 100;
-  const hasLessons = modules.some(module => module.lessons.length > 0);
-  const totalLessons = modules.reduce((total, module) => total + module.lessons.length, 0);
-  const isCourseCompleted = enrollment?.is_completed || false;
-  const hasPassedExam = examResult?.passed;
-  const isFirstExamAttempt = !examResult;
-  const maxExamAttempts = 5;
-  const hasExceededAttempts = examResult && examResult.attempts >= maxExamAttempts;
-  const hasCertificate = !!certificate;
-  
-  const allQuizzesPassed = modules.every(module => 
-    module.lessons.every(lesson => 
-      !lesson.quiz || lesson.quiz.is_completed
-    ) && 
-    module.quizzes.every(quiz => quiz.is_completed)
+  // Memoized calculations
+  const isEnrolled = useMemo(() => enrollment?.payment_status === 'completed', [enrollment]);
+  const progressPercentage = useMemo(() => progress?.progress_percentage || 0, [progress]);
+  const totalLessons = useMemo(() => 
+    modules.reduce((total, module) => total + module.lessons.length, 0), 
+    [modules]
   );
-  
-  const showTakeExamButton = isCourseCompleted && finalExam && isFirstExamAttempt;
-  const showRetakeExamButton = isCourseCompleted && finalExam && examResult && !hasPassedExam && !hasExceededAttempts;
-  const showRestartCourseButton = isCourseCompleted && finalExam && examResult && !hasPassedExam && hasExceededAttempts;
-  const showViewCertificateButton = isCourseCompleted && (!finalExam || hasPassedExam);
+  const isCourseCompleted = useMemo(() => enrollment?.is_completed || false, [enrollment]);
+  const hasCertificate = useMemo(() => !!certificate, [certificate]);
 
-  // ==================== REAL-TIME SUBSCRIPTIONS ====================
-
-  const setupRealtimeSubscription = (lessonId: string) => {
-    if (subscriptionRef.current) {
-      supabase.removeChannel(subscriptionRef.current);
-    }
-
-    const channel = supabase
-      .channel(`lesson_discussions_${lessonId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'lesson_discussions',
-          filter: `lesson_id=eq.${lessonId}`
-        },
-        async (payload) => {
-          console.log('Realtime discussion change:', payload);
-          await loadDiscussions(lessonId);
-        }
-      )
-      .subscribe();
-
-    subscriptionRef.current = channel;
-
-    return () => {
-      if (subscriptionRef.current) {
-        supabase.removeChannel(subscriptionRef.current);
-      }
-    };
-  };
-
-  useEffect(() => {
-    return () => {
-      if (subscriptionRef.current) {
-        supabase.removeChannel(subscriptionRef.current);
-      }
-    };
-  }, []);
-
-  // ==================== COMPLETION VALIDATION ====================
-
-  const validateCompletionConditions = async (): Promise<boolean> => {
-    if (!enrollment || !courseId || isCourseCompleted) return false;
-
-    try {
-      const { data: lessonProgress, error } = await supabase
-        .from('lesson_progress')
-        .select('lesson_id, is_completed')
-        .eq('enrollment_id', enrollment.id)
-        .eq('is_completed', true);
-
-      if (error) {
-        console.error('Error validating completion conditions:', error);
-        return false;
-      }
-
-      const actualCompletedCount = lessonProgress?.length || 0;
-      const allLessonsCompleted = actualCompletedCount === totalLessons;
-
-      console.log(`Completion validation: ${actualCompletedCount}/${totalLessons} lessons completed`);
-
-      return allLessonsCompleted && !finalExam;
-    } catch (error) {
-      console.error('Error validating completion conditions:', error);
-      return false;
-    }
-  };
-
-  const completeCourse = async (): Promise<boolean> => {
-    if (!enrollment || !user || isCourseCompleted || completionInProgress.current) {
-      console.log('Course completion prevented: already completed or in progress');
-      return false;
-    }
-
-    completionInProgress.current = true;
-    completionAttempted.current = true;
-
-    try {
-      const { data: currentEnrollment, error: checkError } = await supabase
-        .from('course_enrollments')
-        .select('completion_date, is_completed')
-        .eq('id', enrollment.id)
-        .single();
-
-      if (checkError) {
-        console.error('Error checking enrollment status:', checkError);
-        return false;
-      }
+  // Debounced note saving
+  const saveNoteDebounced = useCallback(
+    debounce(async (content: string, lessonId: string) => {
+      if (!content.trim() || !user) return;
       
-      if (currentEnrollment?.completion_date) {
-        console.log('Course already completed');
-        setEnrollment(prev => prev ? { 
-          ...prev, 
-          completion_date: currentEnrollment.completion_date,
-          is_completed: currentEnrollment.is_completed 
-        } : null);
-        return true;
+      try {
+        await supabase
+          .from('lesson_notes')
+          .upsert({
+            user_id: user.id,
+            lesson_id: lessonId,
+            content: content.trim(),
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id,lesson_id'
+          });
+      } catch (error) {
+        console.error('Error auto-saving note:', error);
       }
+    }, 2000),
+    [user]
+  );
 
-      const isValid = await validateCompletionConditions();
-      if (!isValid) {
-        console.log('Course completion conditions not met');
-        return false;
-      }
-
-      const { error: enrollmentError } = await supabase
-        .from('course_enrollments')
-        .update({ 
-          completion_date: new Date().toISOString(),
-          is_completed: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', enrollment.id)
-        .is('completion_date', null);
-
-      if (enrollmentError) {
-        if (enrollmentError.code === '23505') {
-          console.log('Course already completed (unique constraint)');
-          return true;
-        }
-        console.error('Error updating enrollment:', enrollmentError);
-        throw enrollmentError;
-      }
-
-      const { data: updatedEnrollment, error: fetchError } = await supabase
-        .from('course_enrollments')
-        .select('*')
-        .eq('id', enrollment.id)
-        .single();
-
-      if (fetchError) {
-        console.error('Error fetching updated enrollment:', fetchError);
-        throw fetchError;
-      }
-      
-      setEnrollment(updatedEnrollment);
-
-      // Check for certificate with retry logic
-      let retries = 3;
-      while (retries > 0) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        await checkCertificate();
-        if (certificate) break;
-        retries--;
-      }
-
-      toast.success('Course completed! Certificate has been issued.');
-      return true;
-    } catch (error) {
-      console.error('Error completing course:', error);
-      toast.error('Failed to mark course as completed. Please try again.');
-      return false;
-    } finally {
-      completionInProgress.current = false;
+  // Optimized data loading
+  const loadCourseData = useCallback(async () => {
+    if (!courseId || dataLoaded) {
+      setLoading(false);
+      return;
     }
-  };
 
-  // ==================== DATA LOADING FUNCTIONS ====================
-
-  const syncCourseProgress = async () => {
-    if (!user || !courseId || !enrollment || completionInProgress.current) return;
-
+    setLoading(true);
+    
     try {
-      const { data: completedData, error: completedError } = await supabase
-        .from('lesson_progress')
-        .select('lesson_id')
-        .eq('enrollment_id', enrollment.id)
-        .eq('is_completed', true);
+      // Load course and modules in parallel
+      const [coursePromise, modulesPromise] = await Promise.all([
+        supabase.from('courses').select('*').eq('id', courseId).maybeSingle(),
+        supabase.from('course_modules').select('*').eq('course_id', courseId).order('order_index', { ascending: true })
+      ]);
 
-      if (completedError) throw completedError;
-
-      const completedLessonIds = completedData?.map(item => item.lesson_id) || [];
-      const progressPercentage = Math.round((completedLessonIds.length / totalLessons) * 100);
-
-      setCompletedLessons(completedLessonIds);
-      
-      const { error: progressError } = await supabase
-        .from('course_progress')
-        .upsert({
-          user_id: user.id,
-          course_id: courseId,
-          progress_percentage: progressPercentage,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,course_id'
-        });
-
-      if (progressError) throw progressError;
-
-      const { data: progressData } = await supabase
-        .from('course_progress')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('course_id', courseId)
-        .single();
-
-      setProgress(progressData);
-
-      // Auto-complete course when conditions are met
-      const shouldAutoComplete = !finalExam && 
-                                completedLessonIds.length === totalLessons && 
-                                totalLessons > 0 && 
-                                !isCourseCompleted &&
-                                !completionAttempted.current;
-
-      if (shouldAutoComplete) {
-        console.log('Attempting auto-completion...');
-        await completeCourse();
-      }
-    } catch (error) {
-      console.error('Error syncing course progress:', error);
-    }
-  };
-
-  const checkCertificate = async () => {
-    if (!enrollment) return;
-
-    try {
-      const { data: certificateData, error } = await supabase
-        .from('certificates')
-        .select('*')
-        .eq('enrollment_id', enrollment.id)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') throw error;
-      
-      setCertificate(certificateData || null);
-    } catch (error) {
-      console.error('Error checking certificate:', error);
-    }
-  };
-
-  const loadFinalExamAttempt = async () => {
-    if (!finalExam || !user || !enrollment) return;
-
-    try {
-      const { data: attemptData, error } = await supabase
-        .from('final_exam_attempts')
-        .select('*')
-        .eq('exam_id', finalExam.id)
-        .eq('user_id', user.id)
-        .eq('enrollment_id', enrollment.id)
-        .order('attempt_number', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') throw error;
-
-      setExamResult(attemptData);
-    } catch (error) {
-      console.error('Error loading final exam attempt:', error);
-    }
-  };
-
-  const loadQuizAttempts = async () => {
-    if (!user || !enrollment) return;
-
-    try {
-      console.log('Loading quiz attempts for enrollment:', enrollment.id);
-      
-      // Get all quiz attempts
-      const { data: quizAttempts, error } = await supabase
-        .from('quiz_attempts')
-        .select('quiz_id, score, passed')
-        .eq('enrollment_id', enrollment.id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error loading quiz attempts:', error);
+      if (coursePromise.error) throw coursePromise.error;
+      if (!coursePromise.data) {
+        setCourse(null);
+        setLoading(false);
         return;
       }
 
-      console.log('Found quiz attempts:', quizAttempts);
+      setCourse(coursePromise.data);
 
-      // Group attempts by quiz_id to get the latest attempt
-      const latestAttempts = new Map();
-      quizAttempts?.forEach(attempt => {
-        if (!latestAttempts.has(attempt.quiz_id)) {
-          latestAttempts.set(attempt.quiz_id, attempt);
-        }
-      });
-
-      // Update modules with quiz completion status
-      setModules(prevModules => 
-        prevModules.map(module => ({
-          ...module,
-          lessons: module.lessons.map(lesson => {
-            if (lesson.quiz) {
-              const attempt = latestAttempts.get(lesson.quiz.id);
-              console.log(`Checking quiz ${lesson.quiz.id} for lesson ${lesson.title}:`, attempt);
-              return {
-                ...lesson,
-                quiz: {
-                  ...lesson.quiz,
-                  is_completed: attempt?.passed || false,
-                  user_score: attempt?.score || 0
-                }
-              };
-            }
-            return lesson;
-          }),
-          quizzes: module.quizzes.map(quiz => {
-            const attempt = latestAttempts.get(quiz.id);
-            console.log(`Checking module quiz ${quiz.id}:`, attempt);
-            return {
-              ...quiz,
-              is_completed: attempt?.passed || false,
-              user_score: attempt?.score || 0
-            };
-          })
-        }))
-      );
-    } catch (error) {
-      console.error('Error loading quiz attempts:', error);
-    }
-  };
-
-  const loadDiscussions = async (lessonId: string) => {
-    try {
-      const { data: discussionsData, error: discussionsError } = await supabase
-        .from('lesson_discussions')
-        .select(`
-          *,
-          profile:profiles!user_id (
-            id,
-            full_name,
-            avatar_url,
-            is_creator
-          )
-        `)
-        .eq('lesson_id', lessonId)
-        .is('parent_id', null)
-        .order('created_at', { ascending: false });
-
-      if (discussionsError) {
-        console.error('Error loading discussions:', discussionsError);
-        setDiscussions([]);
-        return;
-      }
-
-      if (!discussionsData || discussionsData.length === 0) {
-        setDiscussions([]);
-        return;
-      }
-
-      // Fetch replies for each discussion
-      const discussionsWithReplies = await Promise.all(
-        discussionsData.map(async (discussion) => {
-          const { data: repliesData, error: repliesError } = await supabase
-            .from('lesson_discussions')
-            .select(`
-              *,
-              profile:profiles!user_id (
-                id,
-                full_name,
-                avatar_url,
-                is_creator
-              )
-            `)
-            .eq('parent_id', discussion.id)
-            .order('created_at', { ascending: true });
-
-          let replies = [];
-          if (!repliesError && repliesData) {
-            replies = repliesData;
-          }
-
-          // Fetch likes count
-          const { data: likesData } = await supabase
-            .from('discussion_likes')
+      if (modulesPromise.error) throw modulesPromise.error;
+      
+      // Load lessons for each module
+      const modulesWithLessons = await Promise.all(
+        (modulesPromise.data || []).map(async (module) => {
+          const { data: lessonsData } = await supabase
+            .from('lessons')
             .select('*')
-            .eq('discussion_id', discussion.id);
+            .eq('module_id', module.id)
+            .order('order_index', { ascending: true });
 
-          // Check if current user liked
-          const { data: userLikeData } = await supabase
-            .from('discussion_likes')
-            .select('*')
-            .eq('discussion_id', discussion.id)
-            .eq('user_id', user?.id)
-            .maybeSingle();
-
-          return {
-            ...discussion,
-            replies,
-            likes_count: likesData?.length || 0,
-            is_liked: !!userLikeData,
-            reply_count: replies.length
+          return { 
+            ...module, 
+            lessons: lessonsData || [],
+            quizzes: [] 
           };
         })
       );
 
-      setDiscussions(discussionsWithReplies);
-    } catch (error) {
-      console.error('Error loading discussions:', error);
-      setDiscussions([]);
-    }
-  };
+      setModules(modulesWithLessons);
 
-  const loadLessonData = async (lessonId: string) => {
+      // Load user data if logged in
+      if (user?.id) {
+        const [enrollmentData, progressData] = await Promise.all([
+          supabase
+            .from('course_enrollments')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('course_id', courseId)
+            .maybeSingle(),
+          supabase
+            .from('course_progress')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('course_id', courseId)
+            .maybeSingle()
+        ]);
+
+        setEnrollment(enrollmentData.data);
+        setProgress(progressData.data);
+
+        if (enrollmentData.data) {
+          const { data: completedData } = await supabase
+            .from('lesson_progress')
+            .select('lesson_id')
+            .eq('enrollment_id', enrollmentData.data.id)
+            .eq('is_completed', true);
+          setCompletedLessons(completedData?.map(item => item.lesson_id) || []);
+        }
+      }
+
+      setDataLoaded(true);
+      
+    } catch (error) {
+      console.error('Error loading course data:', error);
+      toast.error('Failed to load course data');
+    } finally {
+      setLoading(false);
+    }
+  }, [courseId, user, dataLoaded]);
+
+  // Load lesson data with caching
+  const loadLessonData = useCallback(async (lessonId: string) => {
     if (!user) return;
 
     try {
-      // Load notes
-      const { data: notesData, error: notesError } = await supabase
-        .from('lesson_notes')
-        .select(`
-          *,
-          profile:profiles!user_id (
-            id,
-            full_name,
-            avatar_url
-          )
-        `)
-        .eq('user_id', user.id)
-        .eq('lesson_id', lessonId)
-        .order('created_at', { ascending: false });
+      // Load notes, discussions, and transcripts in parallel
+      const [notesData, discussionsData, transcriptsData] = await Promise.all([
+        supabase
+          .from('lesson_notes')
+          .select(`
+            *,
+            profile:profiles!user_id (
+              id,
+              full_name,
+              avatar_url
+            )
+          `)
+          .eq('user_id', user.id)
+          .eq('lesson_id', lessonId)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('lesson_discussions')
+          .select(`
+            *,
+            profile:profiles!user_id (
+              id,
+              full_name,
+              avatar_url,
+              is_creator
+            )
+          `)
+          .eq('lesson_id', lessonId)
+          .is('parent_id', null)
+          .order('created_at', { ascending: false })
+          .limit(20), // Limit to 20 discussions for performance
+        supabase
+          .from('lesson_transcripts')
+          .select('*')
+          .eq('lesson_id', lessonId)
+          .order('start_time', { ascending: true })
+      ]);
 
-      if (notesError) {
-        console.error('Error loading notes:', notesError);
-      } else {
-        setNotes(notesData || []);
-      }
-
-      // Load discussions
-      await loadDiscussions(lessonId);
-      
-      // Setup realtime subscription
-      setupRealtimeSubscription(lessonId);
-
-      // Load transcripts
-      const { data: transcriptsData, error: transcriptsError } = await supabase
-        .from('lesson_transcripts')
-        .select('*')
-        .eq('lesson_id', lessonId)
-        .order('start_time', { ascending: true });
-
-      if (transcriptsError) {
-        console.error('Error loading transcripts:', transcriptsError);
-        setTranscripts([]);
-      } else {
-        setTranscripts(transcriptsData || []);
-      }
+      setNotes(notesData.data || []);
+      setDiscussions(discussionsData.data || []);
+      setTranscripts(transcriptsData.data || []);
     } catch (error) {
       console.error('Error loading lesson data:', error);
     }
-  };
+  }, [user]);
 
-  const findNextLesson = (currentLesson: CourseLesson): CourseLesson | null => {
-    const allLessons: CourseLesson[] = [];
-    
-    modules
-      .sort((a, b) => a.order_index - b.order_index)
-      .forEach(module => {
-        const sortedLessons = module.lessons.sort((a, b) => a.order_index - b.order_index);
-        allLessons.push(...sortedLessons);
-      });
-    
+  // Handle video progress with debouncing
+  const handleVideoProgress = useCallback(
+    debounce(async (progress: { played: number, playedSeconds: number }) => {
+      if (!selectedLesson || !isEnrolled || !enrollment) return;
+
+      const watchPercentage = progress.played * 100;
+      setCurrentLessonProgress(watchPercentage);
+      
+      // Preload next lesson at 95%
+      if (watchPercentage >= 95 && !showNextLessonDialog) {
+        const nextLessonToLoad = findNextLesson(selectedLesson);
+        if (nextLessonToLoad) {
+          setNextLesson(nextLessonToLoad);
+          setShowNextLessonDialog(true);
+        }
+      }
+      
+      // Mark as completed at 90%
+      if (watchPercentage > 90 && !completedLessons.includes(selectedLesson.id)) {
+        try {
+          await supabase
+            .from('lesson_progress')
+            .upsert({
+              enrollment_id: enrollment.id,
+              lesson_id: selectedLesson.id,
+              is_completed: true,
+              completion_date: new Date().toISOString(),
+              last_position_seconds: Math.floor(progress.playedSeconds)
+            }, {
+              onConflict: 'enrollment_id,lesson_id'
+            });
+
+          setCompletedLessons(prev => [...prev, selectedLesson.id]);
+        } catch (error) {
+          console.error('Error updating lesson progress:', error);
+        }
+      }
+    }, 1000),
+    [selectedLesson, isEnrolled, enrollment, completedLessons, showNextLessonDialog]
+  );
+
+  // Find next lesson efficiently
+  const findNextLesson = useCallback((currentLesson: CourseLesson): CourseLesson | null => {
+    const allLessons = modules.flatMap(m => m.lessons);
     const currentIndex = allLessons.findIndex(lesson => lesson.id === currentLesson.id);
-    
-    if (currentIndex !== -1 && currentIndex < allLessons.length - 1) {
-      return allLessons[currentIndex + 1];
-    }
-    
-    return null;
-  };
+    return currentIndex !== -1 && currentIndex < allLessons.length - 1 
+      ? allLessons[currentIndex + 1] 
+      : null;
+  }, [modules]);
 
-  // ==================== TEST QUIZ FETCHING ====================
-
-  const testQuizFetching = async () => {
-    if (!courseId) return;
-    
-    console.log('=== TESTING QUIZ FETCHING ===');
-    
-    try {
-      // Test 1: Get all quizzes for this course
-      const { data: allQuizzes, error } = await supabase
-        .from('quizzes')
-        .select('*, lesson:lessons(title), module:course_modules(title)')
-        .or(`lesson_id.in.(select id from lessons where module_id in (select id from course_modules where course_id = '${courseId}')),module_id.in.(select id from course_modules where course_id = '${courseId}')`);
-      
-      if (error) {
-        console.error('Error fetching all quizzes:', error);
-        return;
-      }
-      
-      console.log('All quizzes in course:', allQuizzes);
-      
-      // Test 2: Check if quizzes have questions
-      await Promise.all(
-        allQuizzes?.map(async (quiz) => {
-          const { data: questions, error: qError } = await supabase
-            .from('quiz_questions')
-            .select('*, answers:quiz_answers(*)')
-            .eq('quiz_id', quiz.id);
-          
-          if (qError) {
-            console.error(`Error fetching questions for quiz ${quiz.id}:`, qError);
-          } else {
-            console.log(`Quiz ${quiz.title} (${quiz.id}): ${questions?.length || 0} questions`);
-          }
-        }) || []
-      );
-      
-    } catch (error) {
-      console.error('Test failed:', error);
-    }
-  };
-
-  // ==================== EVENT HANDLERS ====================
-
-  const handleVideoProgress = async (progress: { played: number, playedSeconds: number }) => {
-    setCurrentVideoTime(progress.playedSeconds);
-    
-    if (!selectedLesson || !isEnrolled || !enrollment) return;
-
-    const watchPercentage = progress.played * 100;
-    setCurrentLessonProgress(watchPercentage);
-    
-    // Preload next lesson when progress reaches 97%
-    if (watchPercentage >= 97 && !showNextLessonDialog) {
-      const nextLessonToLoad = findNextLesson(selectedLesson);
-      if (nextLessonToLoad) {
-        setNextLesson(nextLessonToLoad);
-        setShowNextLessonDialog(true);
-        console.log('Preloading next lesson:', nextLessonToLoad.title);
-      }
-    }
-    
-    if (watchPercentage > 80 && !completedLessons.includes(selectedLesson.id)) {
-      try {
-        const { error } = await supabase
-          .from('lesson_progress')
-          .upsert({
-            enrollment_id: enrollment.id,
-            lesson_id: selectedLesson.id,
-            is_completed: true,
-            completion_date: new Date().toISOString(),
-            last_position_seconds: Math.floor(progress.playedSeconds)
-          }, {
-            onConflict: 'enrollment_id,lesson_id'
-          });
-
-        if (error) throw error;
-        await syncCourseProgress();
-      } catch (error) {
-        console.error('Error updating lesson progress:', error);
-      }
-    }
-  };
-
-  const handleVideoEnd = async () => {
-    console.log('Video ended, proceeding to next content');
-    
-    if (!selectedLesson || !enrollment) return;
-
-    // Mark lesson as completed
-    if (!completedLessons.includes(selectedLesson.id)) {
-      try {
-        const { error } = await supabase
-          .from('lesson_progress')
-          .upsert({
-            enrollment_id: enrollment.id,
-            lesson_id: selectedLesson.id,
-            is_completed: true,
-            completion_date: new Date().toISOString(),
-            last_position_seconds: 0
-          }, {
-            onConflict: 'enrollment_id,lesson_id'
-          });
-
-        if (error) throw error;
-        await syncCourseProgress();
-      } catch (error) {
-        console.error('Error updating lesson progress:', error);
-      }
-    }
-
-    // Check for quiz
-    if (selectedLesson.quiz) {
-      console.log('Loading quiz for lesson:', selectedLesson.title);
-      setCurrentQuiz(selectedLesson.quiz);
-      setCurrentQuizId(selectedLesson.quiz.id);
-      setShowQuizModal(true);
-      return;
-    }
-
-    // Proceed to next lesson
-    const nextLessonToLoad = findNextLesson(selectedLesson);
-    if (nextLessonToLoad) {
-      console.log('Auto-proceeding to next lesson:', nextLessonToLoad.title);
-      await handleLessonSelect(nextLessonToLoad);
-    }
-  };
-
-  const handleQuizComplete = async (quiz: Quiz, score: number, passed: boolean) => {
-    console.log(`Quiz completed: ${passed ? 'Passed' : 'Failed'} with score ${score}%`);
-    
-    // Reload quiz attempts to update completion status
-    await loadQuizAttempts();
-    
-    // Proceed to next lesson after quiz completion
-    const nextLessonToLoad = findNextLesson(selectedLesson!);
-    if (nextLessonToLoad) {
-      console.log('Proceeding to next lesson after quiz:', nextLessonToLoad.title);
-      await handleLessonSelect(nextLessonToLoad);
-    }
-  };
-
-  const handleLessonSelect = async (lesson: CourseLesson) => {
+  // Handle lesson selection with caching
+  const handleLessonSelect = useCallback(async (lesson: CourseLesson) => {
     if (!lesson?.title?.trim()) return;
     
     setSelectedLesson(lesson);
@@ -2870,11 +1394,11 @@ const CourseLearningPage = () => {
     setNextLesson(null);
     setCurrentLessonProgress(0);
     
-    // Load lesson-specific data
+    // Load lesson data
     await loadLessonData(lesson.id);
     
     if (isEnrolled && user) {
-      supabase
+      await supabase
         .from('course_progress')
         .upsert({
           user_id: user.id,
@@ -2883,571 +1407,26 @@ const CourseLearningPage = () => {
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'user_id,course_id'
-        })
-        .then(({ error }) => {
-          if (error) console.error('Error updating last accessed:', error);
         });
     }
     
     setIsMobileSidebarOpen(false);
-  };
+  }, [isEnrolled, user, courseId, loadLessonData]);
 
-  const handleQuizStart = (quizId: string, lessonId: string) => {
-    console.log('Starting quiz:', { quizId, lessonId });
-    
-    setCurrentQuizId(quizId);
-    setCurrentLessonId(lessonId);
-    
-    // Find the quiz in modules
-    let foundQuiz: Quiz | undefined;
-    
-    for (const module of modules) {
-      // Check lesson quizzes
-      for (const lesson of module.lessons) {
-        if (lesson.quiz?.id === quizId) {
-          foundQuiz = lesson.quiz;
-          break;
-        }
-      }
-      
-      // Check module quizzes
-      if (!foundQuiz) {
-        const moduleQuiz = module.quizzes.find(q => q.id === quizId);
-        if (moduleQuiz) {
-          foundQuiz = moduleQuiz;
-          break;
-        }
-      }
-      
-      if (foundQuiz) break;
+  // Auto-save note
+  const handleNoteChange = useCallback((content: string) => {
+    setNewNote(content);
+    if (selectedLesson) {
+      saveNoteDebounced(content, selectedLesson.id);
     }
-    
-    if (foundQuiz) {
-      console.log('Found quiz:', foundQuiz);
-      setCurrentQuiz(foundQuiz);
-      setShowQuizModal(true);
-    } else {
-      console.error('Quiz not found:', quizId);
-      toast.error('Quiz not found or not available');
-    }
-  };
+  }, [selectedLesson, saveNoteDebounced]);
 
-  const handleModuleQuizStart = (quizId: string, moduleId: string) => {
-    console.log('Starting module quiz:', { quizId, moduleId });
-    
-    setCurrentQuizId(quizId);
-    
-    const module = modules.find(m => m.id === moduleId);
-    const quiz = module?.quizzes.find(q => q.id === quizId);
-    
-    if (quiz) {
-      console.log('Found module quiz:', quiz);
-      setCurrentQuiz(quiz);
-      setShowQuizModal(true);
-    } else {
-      console.error('Module quiz not found:', quizId);
-      toast.error('Module quiz not found or not available');
-    }
-  };
-
-  const handleAddNote = async () => {
-    if (!newNote.trim() || !selectedLesson || !user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('lesson_notes')
-        .insert({
-          user_id: user.id,
-          lesson_id: selectedLesson.id,
-          content: newNote.trim()
-        })
-        .select(`
-          *,
-          profile:profiles!user_id (
-            id,
-            full_name,
-            avatar_url
-          )
-        `)
-        .single();
-
-      if (error) throw error;
-
-      setNotes(prev => [data, ...prev]);
-      setNewNote('');
-      toast.success('Note added successfully');
-    } catch (error) {
-      console.error('Error adding note:', error);
-      toast.error('Failed to add note. Please try again.');
-    }
-  };
-
-  const handleUpdateNote = async (noteId: string) => {
-    if (!editNoteContent.trim()) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('lesson_notes')
-        .update({ 
-          content: editNoteContent.trim(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', noteId)
-        .select(`
-          *,
-          profile:profiles!user_id (
-            id,
-            full_name,
-            avatar_url
-          )
-        `)
-        .single();
-
-      if (error) throw error;
-
-      setNotes(prev => prev.map(note => note.id === noteId ? data : note));
-      setEditingNote(null);
-      setEditNoteContent('');
-      toast.success('Note updated successfully');
-    } catch (error) {
-      console.error('Error updating note:', error);
-      toast.error('Failed to update note. Please try again.');
-    }
-  };
-
-  const handleDeleteNote = async (noteId: string) => {
-    try {
-      const { error } = await supabase
-        .from('lesson_notes')
-        .delete()
-        .eq('id', noteId);
-
-      if (error) throw error;
-
-      setNotes(prev => prev.filter(note => note.id !== noteId));
-      toast.success('Note deleted successfully');
-    } catch (error) {
-      console.error('Error deleting note:', error);
-      toast.error('Failed to delete note. Please try again.');
-    }
-  };
-
-  const handleAddDiscussion = async (content: string) => {
-    if (!content.trim() || !selectedLesson || !user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('lesson_discussions')
-        .insert({
-          user_id: user.id,
-          lesson_id: selectedLesson.id,
-          content: content.trim(),
-          is_instructor_reply: false
-        })
-        .select(`
-          *,
-          profile:profiles!user_id (
-            id,
-            full_name,
-            avatar_url,
-            is_creator
-          )
-        `)
-        .single();
-
-      if (error) throw error;
-
-      setNewDiscussion('');
-      toast.success('Discussion added successfully');
-      
-      // Realtime subscription will update the list
-    } catch (error) {
-      console.error('Error adding discussion:', error);
-      toast.error('Failed to add discussion. Please try again.');
-    }
-  };
-
-  const handleAddReply = async (parentId: string, content: string) => {
-    if (!content.trim() || !selectedLesson || !user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('lesson_discussions')
-        .insert({
-          user_id: user.id,
-          lesson_id: selectedLesson.id,
-          parent_id: parentId,
-          content: content.trim(),
-          is_instructor_reply: false
-        })
-        .select(`
-          *,
-          profile:profiles!user_id (
-            id,
-            full_name,
-            avatar_url,
-            is_creator
-          )
-        `)
-        .single();
-
-      if (error) throw error;
-
-      setReplyContent('');
-      setReplyingTo(null);
-      toast.success('Reply added successfully');
-    } catch (error) {
-      console.error('Error adding reply:', error);
-      toast.error('Failed to add reply. Please try again.');
-    }
-  };
-
-  const handleLikeDiscussion = async (discussionId: string) => {
-    if (!user) return;
-
-    try {
-      const { data: existingLike, error: checkError } = await supabase
-        .from('discussion_likes')
-        .select('*')
-        .eq('discussion_id', discussionId)
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (checkError) throw checkError;
-
-      if (existingLike) {
-        // Unlike
-        const { error } = await supabase
-          .from('discussion_likes')
-          .delete()
-          .eq('id', existingLike.id);
-
-        if (error) throw error;
-      } else {
-        // Like
-        const { error } = await supabase
-          .from('discussion_likes')
-          .insert({
-            user_id: user.id,
-            discussion_id: discussionId
-          });
-
-        if (error) throw error;
-      }
-
-      // Update local state
-      setDiscussions(prev => prev.map(discussion => {
-        if (discussion.id === discussionId) {
-          const newLikesCount = existingLike 
-            ? (discussion.likes_count || 1) - 1 
-            : (discussion.likes_count || 0) + 1;
-          
-          return {
-            ...discussion,
-            likes_count: newLikesCount,
-            is_liked: !existingLike
-          };
-        }
-        return discussion;
-      }));
-    } catch (error) {
-      console.error('Error liking discussion:', error);
-    }
-  };
-
-  const handleDeleteDiscussion = async (discussionId: string) => {
-    try {
-      const { error } = await supabase
-        .from('lesson_discussions')
-        .delete()
-        .eq('id', discussionId);
-
-      if (error) throw error;
-
-      setDiscussions(prev => prev.filter(d => d.id !== discussionId));
-      toast.success('Discussion deleted successfully');
-    } catch (error) {
-      console.error('Error deleting discussion:', error);
-      toast.error('Failed to delete discussion. Please try again.');
-    }
-  };
-
-  const handleProceedToNextLesson = async () => {
-    if (nextLesson) {
-      await handleLessonSelect(nextLesson);
-      setShowNextLessonDialog(false);
-      setNextLesson(null);
-      setCurrentLessonProgress(0);
-    }
-  };
-
-  const handleResumeLearning = () => {
-    if (resumeLesson) {
-      setSelectedLesson(resumeLesson);
-      setCurrentLessonId(resumeLesson.id);
-      setShowResumeModal(false);
-    }
-  };
-
-  const handleStartFromBeginning = () => {
-    const firstLesson = modules[0]?.lessons?.[0];
-    if (firstLesson) {
-      setSelectedLesson(firstLesson);
-      setCurrentLessonId(firstLesson.id);
-      setShowResumeModal(false);
-    }
-  };
-
-  const resetCourseProgress = async () => {
-    if (!user || !courseId || !enrollment) return;
-
-    try {
-      const { error: progressError } = await supabase
-        .from('lesson_progress')
-        .delete()
-        .eq('enrollment_id', enrollment.id);
-
-      if (progressError) throw progressError;
-
-      const { error: courseProgressError } = await supabase
-        .from('course_progress')
-        .upsert({
-          user_id: user.id,
-          course_id: courseId,
-          progress_percentage: 0,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,course_id'
-        });
-
-      if (courseProgressError) throw courseProgressError;
-
-      if (examResult) {
-        const { error: examError } = await supabase
-          .from('exam_results')
-          .delete()
-          .eq('id', examResult.id);
-
-        if (examError) throw examError;
-      }
-
-      setCompletedLessons([]);
-      setExamResult(null);
-      await syncCourseProgress();
-      
-      toast.success('Course progress reset successfully. Please review all materials before retaking the exam.');
-    } catch (error) {
-      console.error('Error resetting course progress:', error);
-      toast.error('Failed to reset course progress');
-    }
-  };
-
-  const handleTakeExam = () => {
-    setShowExamModal(true);
-  };
-
-  const handleExamComplete = async (result: any) => {
-    setShowExamModal(false);
-    await loadFinalExamAttempt();
-  };
-
-  const handleRetakeQuiz = () => {
-    setShowQuizResultsModal(false);
-    setShowQuizModal(true);
-  };
-
-  const navigateToCourseResults = () => {
-    navigate(`/course/${courseId}/results`);
-  };
-
-  // ==================== USE EFFECTS ====================
-
+  // Initial data load
   useEffect(() => {
-    const loadData = async () => {
-      if (!courseId || dataLoaded) {
-        setLoading(false);
-        return;
-      }
+    loadCourseData();
+  }, [loadCourseData]);
 
-      setLoading(true);
-      
-      try {
-        const { data: courseData, error: courseError } = await supabase
-          .from('courses')
-          .select('*')
-          .eq('id', courseId)
-          .maybeSingle();
-
-        if (courseError) throw courseError;
-        if (!courseData) {
-          setCourse(null);
-          setLoading(false);
-          return;
-        }
-
-        setCourse(courseData);
-
-        const { data: modulesData, error: modulesError } = await supabase
-          .from('course_modules')
-          .select('*')
-          .eq('course_id', courseId)
-          .order('order_index', { ascending: true });
-
-        if (modulesError) throw modulesError;
-
-        const modulesWithLessons = await Promise.all(
-          (modulesData as CourseModule[]).map(async (module) => {
-            // Fetch lessons first
-            const { data: lessonsData, error: lessonsError } = await supabase
-              .from('lessons')
-              .select('*')
-              .eq('module_id', module.id)
-              .order('order_index', { ascending: true });
-
-            if (lessonsError) return { ...module, lessons: [], quizzes: [] };
-            
-            // Fetch quizzes for each lesson
-            const lessonsWithQuizInfo = await Promise.all(
-              (lessonsData as CourseLesson[]).map(async (lesson) => {
-                const { data: quizData, error: quizError } = await supabase
-                  .from('quizzes')
-                  .select(`
-                    *,
-                    questions:quiz_questions(
-                      *,
-                      answers:quiz_answers(*)
-                    )
-                  `)
-                  .eq('lesson_id', lesson.id)
-                  .maybeSingle();
-
-                if (quizError) {
-                  console.error(`Error fetching quiz for lesson ${lesson.id}:`, quizError);
-                  return { ...lesson, quiz: undefined };
-                }
-
-                // Calculate question count
-                const questionCount = quizData?.questions?.length || 0;
-                
-                return {
-                  ...lesson,
-                  quiz: quizData ? {
-                    ...quizData,
-                    question_count: questionCount
-                  } : undefined,
-                  has_quiz: !!quizData
-                };
-              })
-            );
-
-            // Fetch module-level quizzes (where module_id is not null and lesson_id is null)
-            const { data: moduleQuizzes, error: moduleQuizzesError } = await supabase
-              .from('quizzes')
-              .select(`
-                *,
-                questions:quiz_questions(
-                  *,
-                  answers:quiz_answers(*)
-                )
-              `)
-              .eq('module_id', module.id)
-              .is('lesson_id', null);
-
-            if (moduleQuizzesError) {
-              console.error(`Error fetching module quizzes for module ${module.id}:`, moduleQuizzesError);
-            }
-
-            // Process module quizzes to include question count
-            const processedModuleQuizzes = (moduleQuizzes || []).map(quiz => ({
-              ...quiz,
-              question_count: quiz.questions?.length || 0
-            }));
-
-            return { 
-              ...module, 
-              lessons: lessonsWithQuizInfo || [],
-              quizzes: processedModuleQuizzes || []
-            };
-          })
-        );
-        
-        console.log('Loaded modules with quizzes:', modulesWithLessons);
-        setModules(modulesWithLessons);
-
-        const [examData, instructorData] = await Promise.all([
-          supabase
-            .from('final_exams')
-            .select('*')
-            .eq('course_id', courseId)
-            .maybeSingle(),
-          courseData.creator_id ? 
-            supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', courseData.creator_id)
-              .maybeSingle() : 
-            Promise.resolve({ data: null, error: null })
-        ]);
-
-        if (examData.data) setFinalExam(examData.data);
-
-        if (user?.id) {
-          const [enrollmentData, progressData] = await Promise.all([
-            supabase
-              .from('course_enrollments')
-              .select('*')
-              .eq('user_id', user.id)
-              .eq('course_id', courseId)
-              .maybeSingle(),
-            supabase
-              .from('course_progress')
-              .select('*')
-              .eq('user_id', user.id)
-              .eq('course_id', courseId)
-              .maybeSingle()
-          ]);
-
-          setEnrollment(enrollmentData.data);
-          setProgress(progressData.data);
-
-          if (enrollmentData.data) {
-            const { data: completedData } = await supabase
-              .from('lesson_progress')
-              .select('lesson_id')
-              .eq('enrollment_id', enrollmentData.data.id)
-              .eq('is_completed', true);
-            setCompletedLessons(completedData?.map(item => item.lesson_id) || []);
-          }
-        }
-
-        setDataLoaded(true);
-        
-        // Run test
-        await testQuizFetching();
-        
-      } catch (error) {
-        toast.error('Failed to load course data');
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-  }, [courseId, user, dataLoaded]);
-
-  useEffect(() => {
-    if (finalExam && enrollment) {
-      loadFinalExamAttempt();
-    }
-  }, [finalExam, enrollment]);
-
-  useEffect(() => {
-    if (enrollment && modules.length > 0) {
-      loadQuizAttempts();
-    }
-  }, [enrollment, modules]);
-
+  // Auto-select initial lesson
   useEffect(() => {
     if (isEnrolled && modules.length > 0 && !selectedLesson && !loading) {
       const determineInitialLesson = () => {
@@ -3474,50 +1453,42 @@ const CourseLearningPage = () => {
         setCurrentLessonId(initialLesson.id);
       }
     }
-  }, [isEnrolled, modules, progress, completedLessons, loading]);
+  }, [isEnrolled, modules, progress, completedLessons, loading, selectedLesson]);
 
-  // Auto-completion logic
+  // Cleanup on unmount
   useEffect(() => {
-    const autoCompleteIfNeeded = async () => {
-      const shouldAutoComplete = !finalExam && 
-                                completedLessons.length === totalLessons && 
-                                totalLessons > 0 && 
-                                !isCourseCompleted &&
-                                !completionAttempted.current &&
-                                enrollment?.payment_status === 'completed';
-
-      if (shouldAutoComplete) {
-        console.log('Auto-completion conditions met, validating...');
-        const isValid = await validateCompletionConditions();
-        if (isValid) {
-          await completeCourse();
-        }
+    return () => {
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
       }
+      VideoCacheManager.getInstance().clear();
     };
-
-    autoCompleteIfNeeded();
-  }, [completedLessons.length, totalLessons, isCourseCompleted, finalExam, enrollment]);
-
-  // ==================== RENDER ====================
+  }, []);
 
   if (loading) {
-    return <PulseLoading />;
-  }
-
-  if (!courseId) {
     return (
       <Layout>
-        <main className="flex-grow flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Invalid course URL</h1>
-            <p className="text-gray-600 mb-4">The course ID is missing from the URL.</p>
-            <Link to="/explore-courses">
-              <Button className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700">
-                Browse Courses
-              </Button>
-            </Link>
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
+          <div className="container mx-auto px-4 py-8">
+            <div className="flex flex-col items-center justify-center min-h-96">
+              <div className="relative w-40 h-40 flex items-center justify-center mb-8">
+                <div className="absolute w-40 h-40 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 animate-ping" />
+                <div className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-orange-500/30 to-purple-600/30 animate-pulse" />
+                <div className="absolute w-16 h-16 rounded-full bg-gradient-to-r from-orange-500/20 to-purple-600/20 flex items-center justify-center shadow-lg">
+                  <BookOpen className="h-8 w-8 text-white" />
+                </div>
+              </div>
+              <div className="text-center space-y-2">
+                <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
+                  Loading Your Course
+                </h3>
+                <p className="text-muted-foreground text-lg">
+                  Preparing your learning experience...
+                </p>
+              </div>
+            </div>
           </div>
-        </main>
+        </div>
       </Layout>
     );
   }
@@ -3549,7 +1520,6 @@ const CourseLearningPage = () => {
               <Badge variant="secondary" className="text-sm bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700">{course.category}</Badge>
               <Badge variant="outline" className="text-sm border-blue-200 text-blue-600">{course.difficulty_level}</Badge>
               {course.is_free && <Badge className="bg-gradient-to-r from-green-500 to-emerald-600 text-sm">Free</Badge>}
-              {course.certificate_enabled && <Badge className="bg-gradient-to-r from-purple-500 to-pink-600 text-sm flex items-center gap-1"><Award className="h-3 w-3" /> Certificate</Badge>}
             </div>
             
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 leading-tight">{course.title}</h1>
@@ -3582,85 +1552,9 @@ const CourseLearningPage = () => {
                     style={{ width: `${progressPercentage}%` }}
                   />
                 </Progress>
-
-                <div className="flex flex-col gap-3 mt-4">
-                  {showTakeExamButton && (
-                    <Button
-                      onClick={handleTakeExam}
-                      size="sm"
-                      className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white w-full sm:w-auto shadow-md hover:shadow-lg"
-                    >
-                      <GraduationCap className="h-4 w-4 mr-2" />
-                      Take Final Exam
-                    </Button>
-                  )}
-
-                  {showRetakeExamButton && (
-                    <div className="space-y-2">
-                      <Button
-                        onClick={handleTakeExam}
-                        size="sm"
-                        className="bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 text-white w-full sm:w-auto shadow-md hover:shadow-lg"
-                      >
-                        <GraduationCap className="h-4 w-4 mr-2" />
-                        Retake Final Exam (Attempt {examResult?.attempt_number || 1}/{maxExamAttempts})
-                      </Button>
-                      {examResult && (
-                        <p className="text-sm text-gray-600 text-center">
-                          Previous score: {examResult.score}% - {examResult.passed ? 'Passed' : 'Failed'}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {showRestartCourseButton && (
-                    <div className="space-y-2">
-                      <div className="bg-gradient-to-r from-yellow-50/80 to-orange-50/80 border border-yellow-200 rounded-xl p-3">
-                        <div className="flex items-center gap-2 text-yellow-800 mb-2">
-                          <AlertCircle className="h-4 w-4" />
-                          <span className="text-sm font-medium">Maximum exam attempts reached</span>
-                        </div>
-                        <p className="text-sm text-yellow-700 mb-3">
-                          You've used all {maxExamAttempts} attempts. Please review the course materials and restart the course to try again.
-                        </p>
-                        <Button
-                          onClick={resetCourseProgress}
-                          size="sm"
-                          className="bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white w-full shadow-md hover:shadow-lg"
-                        >
-                          <RotateCcw className="h-4 w-4 mr-2" />
-                          Restart Course & Review Materials
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {showViewCertificateButton && (
-                    <Button
-                      onClick={navigateToCourseResults}
-                      size="sm"
-                      className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white w-full sm:w-auto shadow-md hover:shadow-lg"
-                    >
-                      <Trophy className="h-4 w-4 mr-2" />
-                      View Certificate
-                    </Button>
-                  )}
-                </div>
               </CardContent>
             </Card>
           )}
-
-          {/* Course Completion Card */}
-          <CourseCompletionCard
-            isCourseCompleted={isCourseCompleted}
-            hasCertificate={hasCertificate}
-            completedLessons={completedLessons.length}
-            totalLessons={totalLessons}
-            allQuizzesPassed={allQuizzesPassed}
-            finalExam={finalExam || undefined}
-            examResult={examResult}
-            onViewCertificate={navigateToCourseResults}
-          />
 
           {/* Mobile Sidebar Toggle */}
           <div className="lg:hidden mb-4">
@@ -3710,12 +1604,6 @@ const CourseLearningPage = () => {
                     onLessonSelect={handleLessonSelect}
                     currentLessonId={currentLessonId}
                     completedLessons={completedLessons}
-                    onQuizStart={handleQuizStart}
-                    onModuleQuizStart={handleModuleQuizStart}
-                    onFinalExamStart={() => setShowExamModal(true)}
-                    examResult={examResult}
-                    maxExamAttempts={maxExamAttempts}
-                    onRestartCourse={resetCourseProgress}
                   />
                 </CardContent>
               </Card>
@@ -3752,20 +1640,6 @@ const CourseLearningPage = () => {
                                   </p>
                                 )}
                               </div>
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                {selectedLesson && completedLessons.includes(selectedLesson.id) && (
-                                  <Badge className="bg-gradient-to-r from-green-500 to-emerald-600 text-white flex items-center gap-1 shadow-sm">
-                                    <CheckCircle2 className="h-3 w-3" />
-                                    Completed
-                                  </Badge>
-                                )}
-                                {selectedLesson?.quiz && (
-                                  <Badge className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white flex items-center gap-1 shadow-sm">
-                                    <HelpCircle className="h-3 w-3" />
-                                    Quiz Available
-                                  </Badge>
-                                )}
-                              </div>
                             </div>
 
                             {/* Video Player */}
@@ -3775,40 +1649,13 @@ const CourseLearningPage = () => {
                                   videoUrl={selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url || ''}
                                   thumbnail={course.thumbnail_url}
                                   onProgress={handleVideoProgress}
-                                  onEnd={handleVideoEnd}
                                   onError={(error) => {
                                     console.error('Video playback error:', error);
                                     toast.error('There was an issue loading the video. Please try again.');
                                   }}
                                 />
                                 
-                                {/* Video Controls */}
-                                <div className="flex flex-wrap gap-3 w-full">
-                                  <Button variant="outline" size="sm" className="border-gray-300 hover:bg-gray-100">
-                                    <Bookmark className="h-4 w-4 mr-2" />
-                                    Bookmark
-                                  </Button>
-                                  <Button variant="outline" size="sm" className="border-gray-300 hover:bg-gray-100">
-                                    <Download className="h-4 w-4 mr-2" />
-                                    Download
-                                  </Button>
-                                  <Button variant="outline" size="sm" className="border-gray-300 hover:bg-gray-100">
-                                    <Share className="h-4 w-4 mr-2" />
-                                    Share
-                                  </Button>
-                                  {selectedLesson?.quiz && (
-                                    <Button 
-                                      onClick={() => handleQuizStart(selectedLesson.quiz!.id, selectedLesson.id)}
-                                      size="sm"
-                                      className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-md hover:shadow-lg"
-                                    >
-                                      <HelpCircle className="h-4 w-4 mr-2" />
-                                      Take Quiz
-                                    </Button>
-                                  )}
-                                </div>
-
-                                {/* Secondary Tabs - Enhanced Design */}
+                                {/* Secondary Tabs */}
                                 <div className="border border-gray-200 rounded-2xl mt-6 w-full overflow-hidden">
                                   <Tabs value={secondaryTab} onValueChange={setSecondaryTab} className="w-full">
                                     <TabsList className="w-full grid grid-cols-4 h-14 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 p-1 border-b">
@@ -3826,28 +1673,11 @@ const CourseLearningPage = () => {
                                         <StickyNote className="h-4 w-4 mr-2" />
                                         Notes
                                       </TabsTrigger>
-                                      <TabsTrigger 
-                                        value="reviews" 
-                                        className="text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600 rounded-lg transition-all duration-200"
-                                      >
-                                        <Star className="h-4 w-4 mr-2" />
-                                        Reviews
-                                      </TabsTrigger>
-                                      <TabsTrigger 
-                                        value="discussion" 
-                                        className="text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600 rounded-lg transition-all duration-200"
-                                      >
-                                        <Users className="h-4 w-4 mr-2" />
-                                        Discussion
-                                      </TabsTrigger>
                                     </TabsList>
                                     
                                     <TabsContent value="transcripts" className="p-6">
                                       {transcripts.length > 0 ? (
                                         <div className="space-y-3">
-                                          <p className="text-sm text-gray-500 text-center">
-                                            {transcripts.length} transcript segments
-                                          </p>
                                           {transcripts.map((transcript) => (
                                             <div key={transcript.id} className="bg-gradient-to-r from-blue-50/80 to-indigo-50/80 p-4 rounded-xl border border-blue-100 hover:border-blue-200 transition-all duration-200">
                                               <div className="flex items-center gap-3">
@@ -3875,21 +1705,10 @@ const CourseLearningPage = () => {
                                           <Textarea
                                             placeholder="Add your notes for this lesson..."
                                             value={newNote}
-                                            onChange={(e) => setNewNote(e.target.value)}
+                                            onChange={(e) => handleNoteChange(e.target.value)}
                                             rows={3}
                                             className="border-gray-300 focus:border-blue-400 focus:ring-blue-300 rounded-xl"
                                           />
-                                          <div className="flex justify-end">
-                                            <Button
-                                              onClick={handleAddNote}
-                                              disabled={!newNote.trim()}
-                                              size="sm"
-                                              className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-md hover:shadow-lg"
-                                            >
-                                              <Send className="h-4 w-4 mr-2" />
-                                              Add Note
-                                            </Button>
-                                          </div>
                                         </div>
 
                                         {/* Notes List */}
@@ -3898,66 +1717,12 @@ const CourseLearningPage = () => {
                                           {notes.length > 0 ? (
                                             notes.map((note) => (
                                               <div key={note.id} className="bg-gradient-to-r from-gray-50/80 to-slate-50/80 border border-gray-200 rounded-xl p-4 hover:shadow-sm transition-all duration-200">
-                                                {editingNote === note.id ? (
-                                                  <div className="space-y-3">
-                                                    <Textarea
-                                                      value={editNoteContent}
-                                                      onChange={(e) => setEditNoteContent(e.target.value)}
-                                                      rows={3}
-                                                      className="border-gray-300 focus:border-blue-400 focus:ring-blue-300 rounded-xl"
-                                                    />
-                                                    <div className="flex justify-end gap-2">
-                                                      <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => {
-                                                          setEditingNote(null);
-                                                          setEditNoteContent('');
-                                                        }}
-                                                        className="border-gray-300 hover:bg-gray-100"
-                                                      >
-                                                        Cancel
-                                                      </Button>
-                                                      <Button
-                                                        size="sm"
-                                                        onClick={() => handleUpdateNote(note.id)}
-                                                        className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
-                                                      >
-                                                        Save
-                                                      </Button>
-                                                    </div>
-                                                  </div>
-                                                ) : (
-                                                  <>
-                                                    <p className="text-gray-800 whitespace-pre-wrap">{note.content}</p>
-                                                    <div className="flex justify-between items-center mt-3">
-                                                      <span className="text-xs text-gray-500">
-                                                        {new Date(note.created_at).toLocaleDateString()}
-                                                      </span>
-                                                      <div className="flex gap-2">
-                                                        <Button
-                                                          variant="ghost"
-                                                          size="sm"
-                                                          onClick={() => {
-                                                            setEditingNote(note.id);
-                                                            setEditNoteContent(note.content);
-                                                          }}
-                                                          className="text-gray-500 hover:text-blue-600 hover:bg-blue-50"
-                                                        >
-                                                          <Edit2 className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                          variant="ghost"
-                                                          size="sm"
-                                                          onClick={() => handleDeleteNote(note.id)}
-                                                          className="text-gray-500 hover:text-red-600 hover:bg-red-50"
-                                                        >
-                                                          <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                      </div>
-                                                    </div>
-                                                  </>
-                                                )}
+                                                <p className="text-gray-800 whitespace-pre-wrap">{note.content}</p>
+                                                <div className="flex justify-between items-center mt-3">
+                                                  <span className="text-xs text-gray-500">
+                                                    {new Date(note.created_at).toLocaleDateString()}
+                                                  </span>
+                                                </div>
                                               </div>
                                             ))
                                           ) : (
@@ -3969,61 +1734,8 @@ const CourseLearningPage = () => {
                                         </div>
                                       </div>
                                     </TabsContent>
-                                    
-                                    <TabsContent value="reviews" className="p-6">
-                                      <CourseReviewsTab courseId={courseId} />
-                                    </TabsContent>
-                                    
-                                    <TabsContent value="discussion" className="p-6">
-                                      <EnhancedDiscussionSection
-                                        discussions={discussions}
-                                        onAddDiscussion={handleAddDiscussion}
-                                        onReply={handleAddReply}
-                                        onLike={handleLikeDiscussion}
-                                        onDelete={handleDeleteDiscussion}
-                                        currentUserId={user?.id}
-                                      />
-                                    </TabsContent>
                                   </Tabs>
                                 </div>
-                              </div>
-                            )}
-
-                            {/* Lesson Content */}
-                            {(selectedLesson?.content || modules[0]?.lessons[0]?.content) && (
-                              <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 border border-gray-200 shadow-sm mt-6 w-full">
-                                <div className="flex items-center gap-3 mb-4">
-                                  <FileText className="h-6 w-6 text-blue-500" />
-                                  <div>
-                                    <h3 className="text-xl font-semibold text-gray-900">Lesson Materials</h3>
-                                    <p className="text-gray-600 text-sm">
-                                      Supplementary resources and materials to enhance your learning experience
-                                    </p>
-                                  </div>
-                                </div>
-                                
-                                <div className="prose prose-lg max-w-none bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl p-4 border border-gray-200 w-full">
-                                  {typeof (selectedLesson?.content || modules[0]?.lessons[0]?.content) === 'string' 
-                                    ? (selectedLesson?.content || modules[0]?.lessons[0]?.content)
-                                    : JSON.stringify(selectedLesson?.content || modules[0]?.lessons[0]?.content)
-                                  }
-                                </div>
-                                
-                                {selectedLesson?.materials_urls && selectedLesson.materials_urls.length > 0 && (
-                                  <div className="mt-4">
-                                    <h4 className="font-semibold text-gray-900 mb-2">Downloadable Resources</h4>
-                                    <div className="space-y-2">
-                                      {selectedLesson.materials_urls.map((url, index) => (
-                                        <div key={index} className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800">
-                                          <Download className="h-4 w-4" />
-                                          <a href={url} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                                            Resource {index + 1}
-                                          </a>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
                               </div>
                             )}
                           </div>
@@ -4121,9 +1833,6 @@ const CourseLearningPage = () => {
           courseId={courseId}
           lessonId={selectedLesson?.id || modules[0]?.lessons[0]?.id || ''}
           lessonTitle={selectedLesson?.title || modules[0]?.lessons[0]?.title || ''}
-          lessonContent={typeof (selectedLesson?.content || modules[0]?.lessons[0]?.content) === 'string' 
-            ? (selectedLesson?.content || modules[0]?.lessons[0]?.content || '')
-            : JSON.stringify(selectedLesson?.content || modules[0]?.lessons[0]?.content || {})}
         />
       </main>
 
@@ -4141,7 +1850,7 @@ const CourseLearningPage = () => {
               <Play className="h-8 w-8 text-white" />
             </div>
             <p className="text-gray-700 mb-3">
-              Great progress! You've completed 97% of this lesson.
+              Great progress! You've completed 95% of this lesson.
             </p>
             {nextLesson && (
               <div className="bg-white rounded-xl p-4 border border-blue-200 shadow-sm mb-4">
@@ -4160,7 +1869,7 @@ const CourseLearningPage = () => {
               Continue Current
             </Button>
             <Button
-              onClick={handleProceedToNextLesson}
+              onClick={() => nextLesson && handleLessonSelect(nextLesson)}
               className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-md hover:shadow-lg"
             >
               <Play className="h-4 w-4 mr-2" />
@@ -4169,159 +1878,6 @@ const CourseLearningPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Resume Learning Modal */}
-      <Dialog open={showResumeModal} onOpenChange={setShowResumeModal}>
-        <DialogContent className="sm:max-w-md bg-gradient-to-br from-blue-50/80 to-indigo-50/80 border-0 shadow-2xl rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-center text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              {isCourseCompleted ? 'Course Completed!' : 'Continue Learning?'}
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="text-center py-6">
-            {isCourseCompleted ? (
-              <div className="space-y-4">
-                <div className="w-16 h-16 mx-auto bg-gradient-to-r from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-lg">
-                  <Trophy className="h-8 w-8 text-white" />
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900">Congratulations! 🎉</h3>
-                <p className="text-gray-600">
-                  {finalExam 
-                    ? "You've completed all lessons! Ready to take the final exam and earn your certificate?"
-                    : "You've successfully completed this course! You can now generate your certificate."
-                  }
-                </p>
-                {examResult && !hasPassedExam && (
-                  <div className="bg-gradient-to-r from-yellow-50/80 to-orange-50/80 border border-yellow-200 rounded-xl p-3">
-                    <div className="flex items-center gap-2 text-yellow-800">
-                      <AlertCircle className="h-4 w-4" />
-                      <span className="text-sm font-medium">Previous exam score: {examResult.score}%</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="w-16 h-16 mx-auto bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg">
-                  <Play className="h-8 w-8 text-white" />
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900">Welcome Back!</h3>
-                <p className="text-gray-600">
-                  Continue from where you left off or start from the beginning.
-                </p>
-                {resumeLesson && (
-                  <div className="bg-white rounded-xl p-4 border border-blue-200 shadow-sm">
-                    <p className="font-medium text-gray-900">{resumeLesson.title}</p>
-                    <p className="text-sm text-gray-600 mt-1">Your last watched lesson</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-3">
-            {isCourseCompleted ? (
-              <>
-                <Button
-                  onClick={() => setShowResumeModal(false)}
-                  variant="outline"
-                  className="flex-1 border-gray-300 hover:bg-gray-100"
-                >
-                  Review Course
-                </Button>
-                {showTakeExamButton && (
-                  <Button
-                    onClick={handleTakeExam}
-                    className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-md hover:shadow-lg"
-                  >
-                    Take Final Exam
-                  </Button>
-                )}
-                {showRetakeExamButton && (
-                  <Button
-                    onClick={handleTakeExam}
-                    className="flex-1 bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 text-white shadow-md hover:shadow-lg"
-                  >
-                    Retake Exam
-                  </Button>
-                )}
-                {showRestartCourseButton && (
-                  <Button
-                    onClick={resetCourseProgress}
-                    className="flex-1 bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white shadow-md hover:shadow-lg"
-                  >
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                    Restart Course
-                  </Button>
-                )}
-                {showViewCertificateButton && (
-                  <Button
-                    onClick={navigateToCourseResults}
-                    className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-md hover:shadow-lg"
-                  >
-                    View Certificate
-                  </Button>
-                )}
-              </>
-            ) : (
-              <>
-                <Button
-                  onClick={handleStartFromBeginning}
-                  variant="outline"
-                  className="flex-1 border-gray-300 hover:bg-gray-100"
-                >
-                  Start Over
-                </Button>
-                <Button
-                  onClick={handleResumeLearning}
-                  className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
-                >
-                  <Play className="h-4 w-4 mr-2" />
-                  Continue
-                </Button>
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Exam Modal */}
-      {finalExam && (
-        <FinalExamModal
-          isOpen={showExamModal}
-          onClose={() => setShowExamModal(false)}
-          exam={finalExam}
-          enrollmentId={enrollment?.id || ''}
-          onComplete={handleExamComplete}
-          previousAttempt={examResult}
-          maxAttempts={maxExamAttempts}
-        />
-      )}
-
-      {/* Quiz Modal */}
-      <QuizModal
-        isOpen={showQuizModal}
-        onClose={() => setShowQuizModal(false)}
-        quizId={currentQuizId}
-        lessonId={currentLessonId}
-        courseId={courseId} // Add this
-        onComplete={handleQuizComplete}
-      />
-
-      {/* Quiz Results Modal */}
-      {currentQuiz && (
-        <QuizResultsModal
-          isOpen={showQuizResultsModal}
-          onClose={() => setShowQuizResultsModal(false)}
-          quiz={currentQuiz}
-          score={quizScore}
-          passed={quizPassed}
-          onRetake={handleRetakeQuiz}
-          onProceed={() => setShowQuizResultsModal(false)}
-          hasNextContent={true}
-        />
-      )}
     </Layout>
   );
 };
