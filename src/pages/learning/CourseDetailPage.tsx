@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+// src/pages/learning/CourseDetailPage.tsx
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
@@ -24,7 +25,12 @@ import {
   GraduationCap,
   ThumbsUp,
   Zap,
-  Target
+  Target,
+  Download,
+  AlertCircle,
+  Loader2,
+  Check,
+  Volume2
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import CourseReviews from '@/components/course/CourseReviews';
@@ -32,8 +38,9 @@ import CreatorCard from '@/components/course/CreatorCard';
 import RecommendedCourses from '@/components/course/RecommendedCourses';
 import { useCart } from '@/contexts/CartContext';
 import PriceDisplay from '@/components/currency/PriceDisplay';
-import OptimizedVideoPlayer from '@/components/video/OptimizedVideoPlayer';
+import OptimizedVideoPlayer, { VideoCacheManager } from '@/components/video/OptimizedVideoPlayer';
 import WishlistButton from '@/components/wishlist/WishlistButton';
+import { cn } from '@/lib/utils';
 
 interface Course {
   id: string;
@@ -447,6 +454,9 @@ const CourseDetailPage = () => {
   const [enrollmentLoading, setEnrollmentLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [videoCacheStatus, setVideoCacheStatus] = useState<'checking' | 'cached' | 'uncached' | 'error'>('checking');
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
 
   // Check authentication status on component mount
   useEffect(() => {
@@ -504,6 +514,27 @@ const CourseDetailPage = () => {
       fetchCourse();
     }
   }, [id, authChecked]);
+
+  // Check video cache status
+  useEffect(() => {
+    const checkVideoCache = async () => {
+      if (course?.course_preview?.preview_video_url) {
+        try {
+          const cacheManager = VideoCacheManager.getInstance();
+          await cacheManager.init();
+          const isCached = await cacheManager.isCached(course.course_preview.preview_video_url);
+          setVideoCacheStatus(isCached ? 'cached' : 'uncached');
+        } catch (error) {
+          console.error('Error checking video cache:', error);
+          setVideoCacheStatus('error');
+        }
+      }
+    };
+
+    if (course?.course_preview?.preview_video_url) {
+      checkVideoCache();
+    }
+  }, [course?.course_preview?.preview_video_url]);
 
   const fetchCourse = async () => {
     try {
@@ -858,6 +889,44 @@ const CourseDetailPage = () => {
     }
   };
 
+  // Video event handlers
+  const handleVideoReady = useCallback(() => {
+    console.log('Preview video is ready');
+  }, []);
+
+  const handleVideoError = useCallback((error: any) => {
+    console.error('Preview video error:', error);
+    toast.error('Failed to load preview video');
+  }, []);
+
+  const handleVideoPlay = useCallback(() => {
+    setIsVideoPlaying(true);
+  }, []);
+
+  const handleVideoPause = useCallback(() => {
+    setIsVideoPlaying(false);
+  }, []);
+
+  const handleVideoProgress = useCallback((state: { loaded: number; loadedSeconds: number; played: number; playedSeconds: number }) => {
+    // Update download progress for UI feedback
+    if (state.loaded > 0) {
+      setDownloadProgress(state.loaded * 100);
+    }
+  }, []);
+
+  // Clear video cache (for debugging/development)
+  const clearVideoCache = async () => {
+    try {
+      const cacheManager = VideoCacheManager.getInstance();
+      await cacheManager.clearCache();
+      setVideoCacheStatus('uncached');
+      toast.success('Video cache cleared');
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+      toast.error('Failed to clear cache');
+    }
+  };
+
   // Gradient Icon Component
   const GradientIcon = ({ children }: { children: React.ReactNode }) => (
     <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-2 rounded-lg text-white">
@@ -961,19 +1030,100 @@ const CourseDetailPage = () => {
                     </div>
                   </div>
 
-                  {/* Course Preview Video */}
+                  {/* Course Preview Video with Enhanced Features */}
                   {course.course_preview?.preview_video_url && (
-                    <div className="mb-4">
-                      <h3 className="text-lg font-semibold mb-3">Course Preview</h3>
-                      <div className="aspect-video rounded-xl overflow-hidden bg-gray-100">
+                    <div className="mb-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                          Course Preview
+                        </h3>
+                        
+                        {/* Cache Status Indicator */}
+                        <div className="flex items-center gap-2">
+                          {videoCacheStatus === 'checking' && (
+                            <Badge variant="outline" className="text-xs bg-gray-50 text-gray-700 border-gray-200">
+                              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                              Checking cache...
+                            </Badge>
+                          )}
+                          {videoCacheStatus === 'cached' && (
+                            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              Ready (cached)
+                            </Badge>
+                          )}
+                          {videoCacheStatus === 'uncached' && (
+                            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                              <Download className="w-3 h-3 mr-1" />
+                              Streaming
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="aspect-video rounded-xl overflow-hidden bg-gray-100 shadow-lg relative">
+                        {/* Download Progress Indicator */}
+                        {downloadProgress > 0 && downloadProgress < 100 && (
+                          <div className="absolute top-4 left-4 right-4 z-20">
+                            <div className="w-full h-2 bg-gray-700/50 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-gradient-to-r from-orange-500 to-purple-600 transition-all duration-300"
+                                style={{ width: `${downloadProgress}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Cached Indicator Overlay */}
+                        {videoCacheStatus === 'cached' && isVideoPlaying && (
+                          <div className="absolute top-4 left-4 z-20">
+                            <Badge className="bg-green-500/90 backdrop-blur-sm border-0 text-white">
+                              <Check className="w-3 h-3 mr-1" />
+                              Playing from cache
+                            </Badge>
+                          </div>
+                        )}
+
                         <OptimizedVideoPlayer
                           url={course.course_preview.preview_video_url}
                           poster={course.thumbnail_url}
                           controls={true}
                           light={course.thumbnail_url}
                           playsinline={true}
-                          preload="metadata"
+                          preload="auto" // Changed to auto for better preloading
+                          priority="high" // High priority for preview video
+                          cacheStrategy="aggressive" // Aggressive caching for preview videos
+                          onReady={handleVideoReady}
+                          onError={handleVideoError}
+                          onPlay={handleVideoPlay}
+                          onPause={handleVideoPause}
+                          onProgress={handleVideoProgress}
+                          className="rounded-xl"
                         />
+                      </div>
+                      
+                      {/* Video Optimization Info */}
+                      <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                        <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-2 rounded-lg text-center">
+                          <div className="font-medium text-gray-700">Quality</div>
+                          <div className="text-gray-900 font-semibold">Adaptive HD</div>
+                        </div>
+                        <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-2 rounded-lg text-center">
+                          <div className="font-medium text-gray-700">Status</div>
+                          <div className="text-gray-900 font-semibold">
+                            {videoCacheStatus === 'cached' ? 'Cached' : 'Streaming'}
+                          </div>
+                        </div>
+                        <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-2 rounded-lg text-center">
+                          <div className="font-medium text-gray-700">Format</div>
+                          <div className="text-gray-900 font-semibold">
+                            {course.course_preview.preview_video_url.includes('.m3u8') ? 'HLS' : 'MP4'}
+                          </div>
+                        </div>
+                        <div className="bg-gradient-to-r from-orange-50 to-purple-50 p-2 rounded-lg text-center">
+                          <div className="font-medium text-gray-700">Optimized</div>
+                          <div className="text-green-600 font-semibold">✓</div>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1246,7 +1396,7 @@ const CourseDetailPage = () => {
                         itemType="course"
                         className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white font-medium py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center"
                       >
-            
+                        <Heart className="w-5 h-5 mr-2" />
                         Add to Wishlist
                       </WishlistButton>
                     </div>
