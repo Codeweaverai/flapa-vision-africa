@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -13,6 +13,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import ReactPlayer from 'react-player';
+import { useVideoCache, useVideoPreloader } from '@/hooks/useVideoCache';
 import { 
   Play, Clock, User, BookOpen, Award, Star, Users,
   MessageCircle, Target, CheckCircle, StickyNote,
@@ -1014,52 +1015,76 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [isReady, setIsReady] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(playing);
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const hasStartedRef = useRef(false);
+  
+  // Use video caching hook for smart caching and network adaptation
+  const { 
+    effectiveUrl, 
+    isCaching, 
+    isPreloaded, 
+    networkQuality, 
+    getHlsOptions, 
+    getFileConfig,
+    isCacheable 
+  } = useVideoCache(videoUrl);
   
   const videoType = getVideoType(videoUrl);
   const maxRetries = 3;
 
-  const handleReady = () => {
-    console.log('Video ready to play:', videoType);
+  const handleReady = useCallback(() => {
+    if (hasStartedRef.current) return;
+    hasStartedRef.current = true;
+    console.log('Video ready to play:', videoType, 'Quality:', networkQuality.quality);
     setIsReady(true);
     setHasError(false);
     setRetryCount(0);
     if (onReady) onReady();
-  };
+  }, [videoType, networkQuality.quality, onReady]);
 
-  const handleBuffer = () => {
+  const handleBuffer = useCallback(() => {
     setIsBuffering(true);
-  };
+  }, []);
 
-  const handleBufferEnd = () => {
+  const handleBufferEnd = useCallback(() => {
     setIsBuffering(false);
-  };
+  }, []);
 
-  const handlePlaybackRateChange = (rate: number) => {
+  const handlePlaybackRateChange = useCallback((rate: number) => {
     setPlaybackRate(rate);
-  };
+  }, []);
 
-  const handleVolumeChange = (vol: number) => {
+  const handleVolumeChange = useCallback((vol: number) => {
     setVolume(vol);
-  };
+  }, []);
 
-  const handleError = (error: any) => {
+  const handlePlay = useCallback(() => {
+    setIsPlaying(true);
+  }, []);
+
+  const handlePause = useCallback(() => {
+    setIsPlaying(false);
+  }, []);
+
+  const handleError = useCallback((error: any) => {
     console.error('Video playback error:', error, 'Type:', videoType);
     
     if (retryCount < maxRetries) {
       setRetryCount(prev => prev + 1);
       console.log(`Retry attempt ${retryCount + 1}/${maxRetries}`);
       setTimeout(() => {
+        hasStartedRef.current = false;
         setHasError(false);
       }, 1000 * (retryCount + 1));
     } else {
       setHasError(true);
       if (onError) onError(error);
     }
-  };
+  }, [retryCount, maxRetries, videoType, onError]);
 
-  const toggleFullscreen = () => {
+  const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
     
     if (!isFullscreen) {
@@ -1079,7 +1104,7 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
         (document as any).msExitFullscreen();
       }
     }
-  };
+  }, [isFullscreen]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -1103,75 +1128,73 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
     setRetryCount(0);
     setIsReady(false);
     setIsBuffering(false);
+    setIsPlaying(false);
+    hasStartedRef.current = false;
   }, [videoUrl]);
 
-  // Comprehensive config for all video formats
-  const config = {
-    file: {
-      attributes: {
-        controlsList: 'nodownload noremoteplayback',
-        preload: 'auto',
-        crossOrigin: 'anonymous',
-        playsInline: true,
+  // Memoized config for all video formats with network adaptation
+  const config = useMemo(() => {
+    const hlsOptions = getHlsOptions();
+    const fileConfig = getFileConfig();
+    
+    return {
+      file: {
+        ...fileConfig,
+        forceVideo: true,
+        forceAudio: false,
+        forceHLS: videoType === 'hls',
+        forceDASH: videoType === 'dash',
+        hlsOptions,
+        dashOptions: {
+          autoPlay: false,
+        },
       },
-      forceVideo: true,
-      forceAudio: false,
-      forceHLS: videoType === 'hls',
-      forceDASH: videoType === 'dash',
-      hlsOptions: {
-        enableWorker: true,
-        lowLatencyMode: true,
-        backBufferLength: 90,
-        maxBufferLength: 30,
-        maxMaxBufferLength: 600,
-        startLevel: -1, // Auto quality
+      youtube: {
+        playerVars: {
+          modestbranding: 1,
+          rel: 0,
+          showinfo: 0,
+          iv_load_policy: 3,
+          playsinline: 1,
+          origin: window.location.origin,
+        },
       },
-      dashOptions: {
-        autoPlay: false,
+      vimeo: {
+        playerOptions: {
+          autopause: false,
+          byline: false,
+          portrait: false,
+          title: false,
+          responsive: true,
+        },
       },
-    },
-    youtube: {
-      playerVars: {
-        modestbranding: 1,
-        rel: 0,
-        showinfo: 0,
-        iv_load_policy: 3,
-        playsinline: 1,
-        origin: window.location.origin,
+      dailymotion: {
+        params: {
+          'queue-enable': false,
+          'ui-logo': false,
+          'ui-start-screen-info': false,
+        },
       },
-    },
-    vimeo: {
-      playerOptions: {
-        autopause: false,
-        byline: false,
-        portrait: false,
-        title: false,
-        responsive: true,
+      facebook: {
+        appId: '',
+        version: 'v3.3',
+        playerId: `facebook-player-${Date.now()}`,
       },
-    },
-    dailymotion: {
-      params: {
-        'queue-enable': false,
-        'ui-logo': false,
-        'ui-start-screen-info': false,
+      twitch: {
+        options: {
+          parent: [window.location.hostname],
+        },
       },
-    },
-    facebook: {
-      appId: '',
-      version: 'v3.3',
-      playerId: `facebook-player-${Date.now()}`,
-    },
-    twitch: {
-      options: {
-        parent: [window.location.hostname],
+      wistia: {
+        options: {
+          silentAutoPlay: 'allow',
+        },
       },
-    },
-    wistia: {
-      options: {
-        silentAutoPlay: 'allow',
-      },
-    },
-  };
+    };
+  }, [videoType, getHlsOptions, getFileConfig]);
+
+  // Generate unique key for ReactPlayer to prevent multiple loads
+  const playerKey = useMemo(() => `player-${effectiveUrl}`, [effectiveUrl]);
 
   if (hasError && retryCount >= maxRetries) {
     return (
@@ -1186,6 +1209,7 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
             onClick={() => {
               setHasError(false);
               setRetryCount(0);
+              hasStartedRef.current = false;
             }}
             variant="outline"
             className="border-white/20 text-white hover:bg-white/10"
@@ -1203,24 +1227,30 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
       ref={containerRef}
       className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-xl group"
     >
-      {/* Loading/Buffering Overlay */}
-      {(isBuffering || !isReady) && !hasError && (
+      {/* Loading/Buffering/Caching Overlay */}
+      {((isBuffering || !isReady || isCaching) && !hasError) && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10 backdrop-blur-sm">
           <div className="text-white text-center">
             <Loader2 className="h-10 w-10 animate-spin mx-auto mb-3" />
             <p className="text-sm font-medium">
-              {!isReady ? 'Loading video...' : 'Buffering...'}
+              {isCaching ? 'Optimizing video...' : !isReady ? 'Loading video...' : 'Buffering...'}
             </p>
+            {networkQuality.quality !== 'auto' && (
+              <p className="text-xs text-gray-400 mt-1">
+                Quality: {networkQuality.quality.toUpperCase()}
+              </p>
+            )}
           </div>
         </div>
       )}
       
       <ReactPlayer
+        key={playerKey}
         ref={playerRef}
-        url={videoUrl}
+        url={effectiveUrl}
         width="100%"
         height="100%"
-        playing={playing}
+        playing={isPlaying}
         controls={controls}
         playsinline
         pip
@@ -1234,6 +1264,8 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
         onProgress={onProgress}
         onError={handleError}
         onEnded={onEnd}
+        onPlay={handlePlay}
+        onPause={handlePause}
         config={config}
         fallback={
           <div className="flex items-center justify-center h-full bg-gray-900">
@@ -1283,10 +1315,17 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({
             </div>
             
             <div className="flex items-center gap-2">
-              {/* Video Type Badge */}
+              {/* Network Quality Badge */}
               <span className="text-xs text-gray-400 bg-white/10 px-2 py-1 rounded capitalize">
-                {videoType}
+                {networkQuality.quality} • {videoType}
               </span>
+              
+              {/* Cached indicator */}
+              {isCacheable && isPreloaded && (
+                <span className="text-xs text-green-400 bg-green-500/20 px-2 py-1 rounded">
+                  Cached
+                </span>
+              )}
               
               {/* Fullscreen */}
               <button
