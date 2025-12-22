@@ -13,6 +13,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import ReactPlayer from 'react-player';
+import { useVideoCache, useVideoPreloader } from '@/hooks/useVideoCache';
 import { 
   Play, Clock, User, BookOpen, Award, Star, Users,
   MessageCircle, Target, CheckCircle, StickyNote,
@@ -37,7 +38,6 @@ import RecommendedCourses from '@/components/course/RecommendedCourses';
 import Layout from '@/components/layout/Layout';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { cn } from '@/lib/utils';
-import debounce from 'lodash/debounce';
 
 // ==================== INTERFACES ====================
 
@@ -264,159 +264,6 @@ interface Certificate {
   created_at: string;
   updated_at: string;
 }
-
-// ==================== SIMPLIFIED VIDEO PLAYER ====================
-
-interface CustomVideoPlayerProps {
-  videoUrl: string;
-  onProgress?: (progress: { played: number, playedSeconds: number }) => void;
-  onError?: (error: any) => void;
-  onEnd?: () => void;
-  onReady?: () => void;
-  thumbnail?: string;
-  playing?: boolean;
-  controls?: boolean;
-}
-
-const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({ 
-  videoUrl, 
-  onProgress, 
-  onError, 
-  onEnd, 
-  onReady,
-  thumbnail,
-  playing = false,
-  controls = true
-}) => {
-  const [hasError, setHasError] = useState(false);
-  const [isReady, setIsReady] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const [isBuffering, setIsBuffering] = useState(false);
-  const playerRef = useRef<any>(null);
-  const maxRetries = 3;
-
-  const handleReady = useCallback(() => {
-    console.log('Video ready to play');
-    setIsReady(true);
-    setHasError(false);
-    setRetryCount(0);
-    if (onReady) onReady();
-  }, [onReady]);
-
-  const handleError = useCallback((error: any) => {
-    console.error('Video playback error:', error);
-    
-    if (retryCount < maxRetries) {
-      setRetryCount(prev => prev + 1);
-      console.log(`Retry attempt ${retryCount + 1}/${maxRetries}`);
-      
-      // Try to reload the player after delay
-      setTimeout(() => {
-        setHasError(false);
-      }, 1000 * (retryCount + 1));
-    } else {
-      setHasError(true);
-      if (onError) onError(error);
-    }
-  }, [retryCount, maxRetries, onError]);
-
-  const handleBuffer = useCallback(() => {
-    setIsBuffering(true);
-  }, []);
-
-  const handleBufferEnd = useCallback(() => {
-    setIsBuffering(false);
-  }, []);
-
-  // Simple config - just YouTube and basic file settings
-  const config = {
-    youtube: {
-      playerVars: {
-        modestbranding: 1,
-        rel: 0,
-        showinfo: 0,
-      },
-    },
-    file: {
-      attributes: {
-        preload: 'metadata', // Changed from 'auto' to prevent preloading issues
-        controlsList: 'nodownload',
-      },
-    },
-  };
-
-  // Reset state when URL changes
-  useEffect(() => {
-    setHasError(false);
-    setRetryCount(0);
-    setIsReady(false);
-    setIsBuffering(false);
-  }, [videoUrl]);
-
-  if (hasError && retryCount >= maxRetries) {
-    return (
-      <div className="relative w-full aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl overflow-hidden shadow-xl flex items-center justify-center">
-        <div className="text-center text-white p-6">
-          <AlertCircle className="h-12 w-12 mx-auto mb-4 text-red-400" />
-          <h3 className="text-lg font-semibold mb-2">Unable to load video</h3>
-          <p className="text-sm text-gray-400 mb-4">
-            The video could not be played. Please check your connection or try again later.
-          </p>
-          <Button
-            onClick={() => {
-              setHasError(false);
-              setRetryCount(0);
-            }}
-            variant="outline"
-            className="border-white/20 text-white hover:bg-white/10"
-          >
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Try Again
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-xl">
-      {/* Loading/Buffering Overlay */}
-      {(isBuffering || !isReady) && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
-          <div className="text-white text-center">
-            <Loader2 className="h-10 w-10 animate-spin mx-auto mb-3" />
-            <p className="text-sm font-medium">
-              {!isReady ? 'Loading video...' : 'Buffering...'}
-            </p>
-          </div>
-        </div>
-      )}
-      
-      <ReactPlayer
-        ref={playerRef}
-        url={videoUrl}
-        width="100%"
-        height="100%"
-        playing={playing}
-        controls={controls}
-        playsinline
-        light={thumbnail && !isReady ? thumbnail : false}
-        onReady={handleReady}
-        onBuffer={handleBuffer}
-        onBufferEnd={handleBufferEnd}
-        onProgress={onProgress}
-        onError={handleError}
-        onEnded={onEnd}
-        config={config}
-        fallback={
-          <div className="flex items-center justify-center h-full bg-gray-900">
-            <Loader2 className="h-8 w-8 animate-spin text-white" />
-          </div>
-        }
-      />
-    </div>
-  );
-};
 
 // ==================== ENHANCED DISCUSSION COMPONENTS ====================
 
@@ -1098,6 +945,404 @@ const EnhancedDiscussionSection: React.FC<EnhancedDiscussionSectionProps> = ({
   );
 };
 
+// ==================== CUSTOM VIDEO PLAYER ====================
+
+interface CustomVideoPlayerProps {
+  videoUrl: string;
+  onProgress?: (progress: { played: number, playedSeconds: number }) => void;
+  onError?: (error: any) => void;
+  onEnd?: () => void;
+  onReady?: () => void;
+  thumbnail?: string;
+  playing?: boolean;
+  controls?: boolean;
+}
+
+// Helper to detect video type from URL
+const getVideoType = (url: string): string => {
+  if (!url) return 'unknown';
+  const lowerUrl = url.toLowerCase();
+  
+  // Third-party platforms
+  if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) return 'youtube';
+  if (lowerUrl.includes('vimeo.com')) return 'vimeo';
+  if (lowerUrl.includes('dailymotion.com') || lowerUrl.includes('dai.ly')) return 'dailymotion';
+  if (lowerUrl.includes('twitch.tv')) return 'twitch';
+  if (lowerUrl.includes('facebook.com') || lowerUrl.includes('fb.watch')) return 'facebook';
+  if (lowerUrl.includes('wistia.com') || lowerUrl.includes('wistia.net')) return 'wistia';
+  if (lowerUrl.includes('soundcloud.com')) return 'soundcloud';
+  if (lowerUrl.includes('mixcloud.com')) return 'mixcloud';
+  if (lowerUrl.includes('streamable.com')) return 'streamable';
+  
+  // Streaming formats
+  if (lowerUrl.includes('.m3u8')) return 'hls';
+  if (lowerUrl.includes('.mpd')) return 'dash';
+  
+  // Direct video files
+  if (lowerUrl.includes('.mp4')) return 'mp4';
+  if (lowerUrl.includes('.webm')) return 'webm';
+  if (lowerUrl.includes('.ogg') || lowerUrl.includes('.ogv')) return 'ogg';
+  if (lowerUrl.includes('.mov')) return 'mov';
+  if (lowerUrl.includes('.avi')) return 'avi';
+  if (lowerUrl.includes('.mkv')) return 'mkv';
+  if (lowerUrl.includes('.flv')) return 'flv';
+  if (lowerUrl.includes('.wmv')) return 'wmv';
+  if (lowerUrl.includes('.3gp')) return '3gp';
+  
+  // Audio files
+  if (lowerUrl.includes('.mp3')) return 'mp3';
+  if (lowerUrl.includes('.wav')) return 'wav';
+  if (lowerUrl.includes('.flac')) return 'flac';
+  if (lowerUrl.includes('.aac')) return 'aac';
+  
+  return 'generic';
+};
+
+const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({ 
+  videoUrl, 
+  onProgress, 
+  onError, 
+  onEnd, 
+  onReady,
+  thumbnail,
+  playing = false,
+  controls = true
+}) => {
+  const [isBuffering, setIsBuffering] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [volume, setVolume] = useState(0.8);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isReady, setIsReady] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(playing);
+  const playerRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const hasStartedRef = useRef(false);
+  
+  // Use video caching hook for smart caching and network adaptation
+  const { 
+    effectiveUrl, 
+    isCaching, 
+    isPreloaded, 
+    networkQuality, 
+    getHlsOptions, 
+    getFileConfig,
+    isCacheable 
+  } = useVideoCache(videoUrl);
+  
+  const videoType = getVideoType(videoUrl);
+  const maxRetries = 3;
+
+  const handleReady = useCallback(() => {
+    if (hasStartedRef.current) return;
+    hasStartedRef.current = true;
+    console.log('Video ready to play:', videoType, 'Quality:', networkQuality.quality);
+    setIsReady(true);
+    setHasError(false);
+    setRetryCount(0);
+    if (onReady) onReady();
+  }, [videoType, networkQuality.quality, onReady]);
+
+  const handleBuffer = useCallback(() => {
+    setIsBuffering(true);
+  }, []);
+
+  const handleBufferEnd = useCallback(() => {
+    setIsBuffering(false);
+  }, []);
+
+  const handlePlaybackRateChange = useCallback((rate: number) => {
+    setPlaybackRate(rate);
+  }, []);
+
+  const handleVolumeChange = useCallback((vol: number) => {
+    setVolume(vol);
+  }, []);
+
+  const handlePlay = useCallback(() => {
+    setIsPlaying(true);
+  }, []);
+
+  const handlePause = useCallback(() => {
+    setIsPlaying(false);
+  }, []);
+
+  const handleError = useCallback((error: any) => {
+    console.error('Video playback error:', error, 'Type:', videoType);
+    
+    if (retryCount < maxRetries) {
+      setRetryCount(prev => prev + 1);
+      console.log(`Retry attempt ${retryCount + 1}/${maxRetries}`);
+      setTimeout(() => {
+        hasStartedRef.current = false;
+        setHasError(false);
+      }, 1000 * (retryCount + 1));
+    } else {
+      setHasError(true);
+      if (onError) onError(error);
+    }
+  }, [retryCount, maxRetries, videoType, onError]);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!containerRef.current) return;
+    
+    if (!isFullscreen) {
+      if (containerRef.current.requestFullscreen) {
+        containerRef.current.requestFullscreen();
+      } else if ((containerRef.current as any).webkitRequestFullscreen) {
+        (containerRef.current as any).webkitRequestFullscreen();
+      } else if ((containerRef.current as any).msRequestFullscreen) {
+        (containerRef.current as any).msRequestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen();
+      } else if ((document as any).msExitFullscreen) {
+        (document as any).msExitFullscreen();
+      }
+    }
+  }, [isFullscreen]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('msfullscreenchange', handleFullscreenChange);
+    
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('msfullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  // Reset state when URL changes
+  useEffect(() => {
+    setHasError(false);
+    setRetryCount(0);
+    setIsReady(false);
+    setIsBuffering(false);
+    setIsPlaying(false);
+    hasStartedRef.current = false;
+  }, [videoUrl]);
+
+  // Memoized config for all video formats with network adaptation
+  const config = useMemo(() => {
+    const hlsOptions = getHlsOptions();
+    const fileConfig = getFileConfig();
+    
+    return {
+      file: {
+        ...fileConfig,
+        forceVideo: true,
+        forceAudio: false,
+        forceHLS: videoType === 'hls',
+        forceDASH: videoType === 'dash',
+        hlsOptions,
+        dashOptions: {
+          autoPlay: false,
+        },
+      },
+      youtube: {
+        playerVars: {
+          modestbranding: 1,
+          rel: 0,
+          showinfo: 0,
+          iv_load_policy: 3,
+          playsinline: 1,
+          origin: window.location.origin,
+        },
+      },
+      vimeo: {
+        playerOptions: {
+          autopause: false,
+          byline: false,
+          portrait: false,
+          title: false,
+          responsive: true,
+        },
+      },
+      dailymotion: {
+        params: {
+          'queue-enable': false,
+          'ui-logo': false,
+          'ui-start-screen-info': false,
+        },
+      },
+      facebook: {
+        appId: '',
+        version: 'v3.3',
+        playerId: `facebook-player-${Date.now()}`,
+      },
+      twitch: {
+        options: {
+          parent: [window.location.hostname],
+        },
+      },
+      wistia: {
+        options: {
+          silentAutoPlay: 'allow',
+        },
+      },
+    };
+  }, [videoType, getHlsOptions, getFileConfig]);
+
+  // Generate unique key for ReactPlayer to prevent multiple loads
+  const playerKey = useMemo(() => `player-${effectiveUrl}`, [effectiveUrl]);
+
+  if (hasError && retryCount >= maxRetries) {
+    return (
+      <div className="relative w-full aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl overflow-hidden shadow-xl flex items-center justify-center">
+        <div className="text-center text-white p-6">
+          <AlertCircle className="h-12 w-12 mx-auto mb-4 text-red-400" />
+          <h3 className="text-lg font-semibold mb-2">Unable to load video</h3>
+          <p className="text-sm text-gray-400 mb-4">
+            The video could not be played. Please check your connection or try again later.
+          </p>
+          <Button
+            onClick={() => {
+              setHasError(false);
+              setRetryCount(0);
+              hasStartedRef.current = false;
+            }}
+            variant="outline"
+            className="border-white/20 text-white hover:bg-white/10"
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      ref={containerRef}
+      className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-xl group"
+    >
+      {/* Loading/Buffering/Caching Overlay */}
+      {((isBuffering || !isReady || isCaching) && !hasError) && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10 backdrop-blur-sm">
+          <div className="text-white text-center">
+            <Loader2 className="h-10 w-10 animate-spin mx-auto mb-3" />
+            <p className="text-sm font-medium">
+              {isCaching ? 'Optimizing video...' : !isReady ? 'Loading video...' : 'Buffering...'}
+            </p>
+            {networkQuality.quality !== 'auto' && (
+              <p className="text-xs text-gray-400 mt-1">
+                Quality: {networkQuality.quality.toUpperCase()}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+      
+      <ReactPlayer
+        key={playerKey}
+        ref={playerRef}
+        url={effectiveUrl}
+        width="100%"
+        height="100%"
+        playing={isPlaying}
+        controls={controls}
+        playsinline
+        pip
+        stopOnUnmount
+        light={thumbnail && !isReady ? thumbnail : false}
+        playbackRate={playbackRate}
+        volume={volume}
+        onReady={handleReady}
+        onBuffer={handleBuffer}
+        onBufferEnd={handleBufferEnd}
+        onProgress={onProgress}
+        onError={handleError}
+        onEnded={onEnd}
+        onPlay={handlePlay}
+        onPause={handlePause}
+        config={config}
+        fallback={
+          <div className="flex items-center justify-center h-full bg-gray-900">
+            <Loader2 className="h-8 w-8 animate-spin text-white" />
+          </div>
+        }
+      />
+
+      {/* Enhanced Custom Controls Overlay */}
+      {controls && isReady && (
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none">
+          <div className="flex items-center justify-between pointer-events-auto">
+            <div className="flex items-center gap-3">
+              {/* Playback Speed */}
+              <select
+                value={playbackRate}
+                onChange={(e) => handlePlaybackRateChange(parseFloat(e.target.value))}
+                className="text-white text-sm bg-white/10 hover:bg-white/20 rounded px-2 py-1.5 border-0 cursor-pointer focus:ring-2 focus:ring-blue-500"
+              >
+                <option value={0.5}>0.5x</option>
+                <option value={0.75}>0.75x</option>
+                <option value={1}>1x</option>
+                <option value={1.25}>1.25x</option>
+                <option value={1.5}>1.5x</option>
+                <option value={1.75}>1.75x</option>
+                <option value={2}>2x</option>
+              </select>
+              
+              {/* Volume Control */}
+              <div className="flex items-center gap-2 group/volume">
+                <button
+                  onClick={() => handleVolumeChange(volume > 0 ? 0 : 0.8)}
+                  className="text-white hover:text-blue-400 transition-colors"
+                >
+                  <Volume2 className="h-5 w-5" />
+                </button>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={volume}
+                  onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                  className="w-20 h-1 accent-blue-500 cursor-pointer"
+                />
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {/* Network Quality Badge */}
+              <span className="text-xs text-gray-400 bg-white/10 px-2 py-1 rounded capitalize">
+                {networkQuality.quality} • {videoType}
+              </span>
+              
+              {/* Cached indicator */}
+              {isCacheable && isPreloaded && (
+                <span className="text-xs text-green-400 bg-green-500/20 px-2 py-1 rounded">
+                  Cached
+                </span>
+              )}
+              
+              {/* Fullscreen */}
+              <button
+                onClick={toggleFullscreen}
+                className="text-white hover:text-blue-400 hover:bg-white/10 p-2 rounded-lg transition-all"
+                title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+              >
+                <Maximize2 className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ==================== QUIZ ITEM COMPONENT ====================
 
 interface QuizItemProps {
@@ -1390,6 +1635,8 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
 
       if (!enrollment) return;
 
+      console.log('Loading quiz attempts for enrollment:', enrollment.id);
+      
       // Get all quiz attempts for this enrollment
       const { data: attempts, error } = await supabase
         .from('quiz_attempts')
@@ -1401,6 +1648,8 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
         console.error('Error fetching quiz attempts:', error);
         return;
       }
+
+      console.log('Found quiz attempts:', attempts);
 
       // Group attempts by quiz_id to get the latest attempt
       const latestAttempts = new Map();
@@ -1418,6 +1667,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
         const updatedLessons = module.lessons.map(lesson => {
           if (lesson.quiz) {
             const attempt = latestAttempts.get(lesson.quiz.id);
+            console.log(`Checking quiz ${lesson.quiz.id} for lesson ${lesson.title}:`, attempt);
             return {
               ...lesson,
               quiz: {
@@ -1433,6 +1683,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
         // Update module quizzes
         const updatedModuleQuizzes = module.quizzes.map(quiz => {
           const attempt = latestAttempts.get(quiz.id);
+          console.log(`Checking module quiz ${quiz.id}:`, attempt);
           return {
             ...quiz,
             is_completed: attempt?.passed || false,
@@ -1447,6 +1698,11 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
         };
       });
 
+      // Only update if modules changed
+      if (JSON.stringify(modules) !== JSON.stringify(updatedModules)) {
+        // We'll let the parent component handle this update
+        console.log('Quiz attempts updated modules');
+      }
     } catch (error) {
       console.error('Error fetching quiz attempts:', error);
     }
@@ -1818,7 +2074,7 @@ const EnhancedCourseModuleList: React.FC<EnhancedCourseModuleListProps> = ({
               </div>
             </div>
             <Button 
-              className="w-full bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-700 shadow-md hover:shadow-lg"
+              className="w-full bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 shadow-md hover:shadow-lg"
               onClick={onRestartCourse}
             >
               <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
@@ -1976,326 +2232,106 @@ const CourseLearningPage = () => {
   const completionInProgress = useRef(false);
   const completionAttempted = useRef(false);
 
-  // ==================== SIMPLIFIED DATA LOADING ====================
-
+  // ==================== DEBUG LOGGING ====================
   useEffect(() => {
-    const loadData = async () => {
-      if (!courseId || dataLoaded) {
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
+    console.log('=== QUIZ DEBUG INFO ===');
+    console.log('Modules:', modules.length);
+    
+    modules.forEach((module, modIndex) => {
+      console.log(`\nModule ${modIndex + 1}: ${module.title}`);
+      console.log(`  Total lessons: ${module.lessons.length}`);
+      console.log(`  Total module quizzes: ${module.quizzes.length}`);
       
-      try {
-        // Load course data
-        const { data: courseData, error: courseError } = await supabase
-          .from('courses')
-          .select('*')
-          .eq('id', courseId)
-          .maybeSingle();
-
-        if (courseError) throw courseError;
-        if (!courseData) {
-          setCourse(null);
-          setLoading(false);
-          return;
+      // Check lesson quizzes
+      module.lessons.forEach((lesson, lessonIndex) => {
+        if (lesson.quiz) {
+          console.log(`  Lesson ${lessonIndex + 1}: ${lesson.title}`);
+          console.log(`    Has quiz: Yes`);
+          console.log(`    Quiz ID: ${lesson.quiz.id}`);
+          console.log(`    Quiz title: ${lesson.quiz.title}`);
+          console.log(`    Question count: ${lesson.quiz.question_count}`);
+          console.log(`    Is completed: ${lesson.quiz.is_completed}`);
+          console.log(`    User score: ${lesson.quiz.user_score}`);
         }
-
-        setCourse(courseData);
-
-        // Load modules
-        const { data: modulesData, error: modulesError } = await supabase
-          .from('course_modules')
-          .select('*')
-          .eq('course_id', courseId)
-          .order('order_index', { ascending: true });
-
-        if (modulesError) throw modulesError;
-
-        const modulesWithLessons = await Promise.all(
-          (modulesData as CourseModule[]).map(async (module) => {
-            // Fetch lessons
-            const { data: lessonsData } = await supabase
-              .from('lessons')
-              .select('*')
-              .eq('module_id', module.id)
-              .order('order_index', { ascending: true });
-
-            return { 
-              ...module, 
-              lessons: lessonsData || [],
-              quizzes: [] // We'll load quizzes separately
-            };
-          })
-        );
-        
-        setModules(modulesWithLessons);
-
-        // Load final exam
-        const { data: examData } = await supabase
-          .from('final_exams')
-          .select('*')
-          .eq('course_id', courseId)
-          .maybeSingle();
-
-        setFinalExam(examData);
-
-        // Load user data if logged in
-        if (user?.id) {
-          const [enrollmentData, progressData] = await Promise.all([
-            supabase
-              .from('course_enrollments')
-              .select('*')
-              .eq('user_id', user.id)
-              .eq('course_id', courseId)
-              .maybeSingle(),
-            supabase
-              .from('course_progress')
-              .select('*')
-              .eq('user_id', user.id)
-              .eq('course_id', courseId)
-              .maybeSingle()
-          ]);
-
-          setEnrollment(enrollmentData.data);
-          setProgress(progressData.data);
-
-          if (enrollmentData.data) {
-            const { data: completedData } = await supabase
-              .from('lesson_progress')
-              .select('lesson_id')
-              .eq('enrollment_id', enrollmentData.data.id)
-              .eq('is_completed', true);
-            setCompletedLessons(completedData?.map(item => item.lesson_id) || []);
-          }
-        }
-
-        setDataLoaded(true);
-        
-      } catch (error) {
-        toast.error('Failed to load course data');
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-  }, [courseId, user, dataLoaded]);
-
-  // Load quizzes separately to avoid overwhelming Supabase
-  useEffect(() => {
-    if (!enrollment || modules.length === 0) return;
-
-    const loadQuizzes = async () => {
-      try {
-        // Get all lesson IDs from modules
-        const allLessonIds = modules.flatMap(module => 
-          module.lessons.map(lesson => lesson.id)
-        );
-
-        if (allLessonIds.length === 0) return;
-
-        // Fetch quizzes for these lessons
-        const { data: lessonQuizzes, error } = await supabase
-          .from('quizzes')
-          .select('*')
-          .in('lesson_id', allLessonIds);
-
-        if (error) {
-          console.error('Error loading quizzes:', error);
-          return;
-        }
-
-        // Update modules with quizzes
-        const updatedModules = modules.map(module => ({
-          ...module,
-          lessons: module.lessons.map(lesson => {
-            const quiz = lessonQuizzes?.find(q => q.lesson_id === lesson.id);
-            return {
-              ...lesson,
-              quiz: quiz ? {
-                ...quiz,
-                question_count: 0 // We'll load questions separately if needed
-              } : undefined,
-              has_quiz: !!quiz
-            };
-          })
-        }));
-
-        setModules(updatedModules);
-      } catch (error) {
-        console.error('Error in loadQuizzes:', error);
-      }
-    };
-
-    loadQuizzes();
-  }, [enrollment, modules]);
-
-  // Load final exam attempt
-  useEffect(() => {
-    if (!finalExam || !user || !enrollment) return;
-
-    const loadFinalExamAttempt = async () => {
-      try {
-        const { data: attemptData, error } = await supabase
-          .from('final_exam_attempts')
-          .select('*')
-          .eq('exam_id', finalExam.id)
-          .eq('user_id', user.id)
-          .eq('enrollment_id', enrollment.id)
-          .order('attempt_number', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (error && error.code !== 'PGRST116') throw error;
-
-        setExamResult(attemptData);
-      } catch (error) {
-        console.error('Error loading final exam attempt:', error);
-      }
-    };
-
-    loadFinalExamAttempt();
-  }, [finalExam, user, enrollment]);
-
-  // Load quiz attempts
-  useEffect(() => {
-    if (!user || !enrollment) return;
-
-    const loadQuizAttempts = async () => {
-      try {
-        const { data: quizAttempts, error } = await supabase
-          .from('quiz_attempts')
-          .select('quiz_id, score, passed')
-          .eq('enrollment_id', enrollment.id)
-          .order('created_at', { ascending: false });
-
-        if (error) {
-          console.error('Error loading quiz attempts:', error);
-          return;
-        }
-
-        // Group attempts by quiz_id to get the latest attempt
-        const latestAttempts = new Map();
-        quizAttempts?.forEach(attempt => {
-          if (!latestAttempts.has(attempt.quiz_id)) {
-            latestAttempts.set(attempt.quiz_id, attempt);
-          }
-        });
-
-        // Update modules with quiz completion status
-        setModules(prevModules => 
-          prevModules.map(module => ({
-            ...module,
-            lessons: module.lessons.map(lesson => {
-              if (lesson.quiz) {
-                const attempt = latestAttempts.get(lesson.quiz.id);
-                return {
-                  ...lesson,
-                  quiz: {
-                    ...lesson.quiz,
-                    is_completed: attempt?.passed || false,
-                    user_score: attempt?.score || 0
-                  }
-                };
-              }
-              return lesson;
-            }),
-            quizzes: module.quizzes.map(quiz => {
-              const attempt = latestAttempts.get(quiz.id);
-              return {
-                ...quiz,
-                is_completed: attempt?.passed || false,
-                user_score: attempt?.score || 0
-              };
-            })
-          }))
-        );
-      } catch (error) {
-        console.error('Error loading quiz attempts:', error);
-      }
-    };
-
-    loadQuizAttempts();
-  }, [user, enrollment]);
-
-  // ==================== EVENT HANDLERS ====================
-
-  const syncCourseProgress = async () => {
-    if (!user || !courseId || !enrollment || completionInProgress.current) return;
-
-    try {
-      const { data: completedData, error: completedError } = await supabase
-        .from('lesson_progress')
-        .select('lesson_id')
-        .eq('enrollment_id', enrollment.id)
-        .eq('is_completed', true);
-
-      if (completedError) throw completedError;
-
-      const completedLessonIds = completedData?.map(item => item.lesson_id) || [];
-      const totalLessons = modules.reduce((total, module) => total + module.lessons.length, 0);
-      const progressPercentage = Math.round((completedLessonIds.length / totalLessons) * 100);
-
-      setCompletedLessons(completedLessonIds);
+      });
       
-      const { error: progressError } = await supabase
-        .from('course_progress')
-        .upsert({
-          user_id: user.id,
-          course_id: courseId,
-          progress_percentage: progressPercentage,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,course_id'
-        });
+      // Check module quizzes
+      module.quizzes.forEach((quiz, quizIndex) => {
+        console.log(`  Module Quiz ${quizIndex + 1}: ${quiz.title}`);
+        console.log(`    Quiz ID: ${quiz.id}`);
+        console.log(`    Question count: ${quiz.question_count}`);
+        console.log(`    Is completed: ${quiz.is_completed}`);
+        console.log(`    User score: ${quiz.user_score}`);
+      });
+    });
+  }, [modules]);
+  
+  const isEnrolled = enrollment?.payment_status === 'completed';
+  const progressPercentage = progress?.progress_percentage || 0;
+  const isNotComplete = progressPercentage < 100;
+  const hasLessons = modules.some(module => module.lessons.length > 0);
+  const totalLessons = modules.reduce((total, module) => total + module.lessons.length, 0);
+  const isCourseCompleted = enrollment?.is_completed || false;
+  const hasPassedExam = examResult?.passed;
+  const isFirstExamAttempt = !examResult;
+  const maxExamAttempts = 5;
+  const hasExceededAttempts = examResult && examResult.attempts >= maxExamAttempts;
+  const hasCertificate = !!certificate;
+  
+  const allQuizzesPassed = modules.every(module => 
+    module.lessons.every(lesson => 
+      !lesson.quiz || lesson.quiz.is_completed
+    ) && 
+    module.quizzes.every(quiz => quiz.is_completed)
+  );
+  
+  const showTakeExamButton = isCourseCompleted && finalExam && isFirstExamAttempt;
+  const showRetakeExamButton = isCourseCompleted && finalExam && examResult && !hasPassedExam && !hasExceededAttempts;
+  const showRestartCourseButton = isCourseCompleted && finalExam && examResult && !hasPassedExam && hasExceededAttempts;
+  const showViewCertificateButton = isCourseCompleted && (!finalExam || hasPassedExam);
 
-      if (progressError) throw progressError;
+  // ==================== REAL-TIME SUBSCRIPTIONS ====================
 
-      const { data: progressData } = await supabase
-        .from('course_progress')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('course_id', courseId)
-        .single();
-
-      setProgress(progressData);
-
-      // Auto-complete course when conditions are met
-      const shouldAutoComplete = !finalExam && 
-                                completedLessonIds.length === totalLessons && 
-                                totalLessons > 0 && 
-                                !isCourseCompleted &&
-                                !completionAttempted.current;
-
-      if (shouldAutoComplete) {
-        console.log('Attempting auto-completion...');
-        await completeCourse();
-      }
-    } catch (error) {
-      console.error('Error syncing course progress:', error);
+  const setupRealtimeSubscription = (lessonId: string) => {
+    if (subscriptionRef.current) {
+      supabase.removeChannel(subscriptionRef.current);
     }
+
+    const channel = supabase
+      .channel(`lesson_discussions_${lessonId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'lesson_discussions',
+          filter: `lesson_id=eq.${lessonId}`
+        },
+        async (payload) => {
+          console.log('Realtime discussion change:', payload);
+          await loadDiscussions(lessonId);
+        }
+      )
+      .subscribe();
+
+    subscriptionRef.current = channel;
+
+    return () => {
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+      }
+    };
   };
 
-  const checkCertificate = async () => {
-    if (!enrollment) return;
+  useEffect(() => {
+    return () => {
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+      }
+    };
+  }, []);
 
-    try {
-      const { data: certificateData, error } = await supabase
-        .from('certificates')
-        .select('*')
-        .eq('enrollment_id', enrollment.id)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') throw error;
-      
-      setCertificate(certificateData || null);
-    } catch (error) {
-      console.error('Error checking certificate:', error);
-    }
-  };
+  // ==================== COMPLETION VALIDATION ====================
 
   const validateCompletionConditions = async (): Promise<boolean> => {
     if (!enrollment || !courseId || isCourseCompleted) return false;
@@ -2313,7 +2349,6 @@ const CourseLearningPage = () => {
       }
 
       const actualCompletedCount = lessonProgress?.length || 0;
-      const totalLessons = modules.reduce((total, module) => total + module.lessons.length, 0);
       const allLessonsCompleted = actualCompletedCount === totalLessons;
 
       console.log(`Completion validation: ${actualCompletedCount}/${totalLessons} lessons completed`);
@@ -2414,35 +2449,164 @@ const CourseLearningPage = () => {
     }
   };
 
-  const setupRealtimeSubscription = (lessonId: string) => {
-    if (subscriptionRef.current) {
-      supabase.removeChannel(subscriptionRef.current);
-    }
+  // ==================== DATA LOADING FUNCTIONS ====================
 
-    const channel = supabase
-      .channel(`lesson_discussions_${lessonId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'lesson_discussions',
-          filter: `lesson_id=eq.${lessonId}`
-        },
-        async (payload) => {
-          console.log('Realtime discussion change:', payload);
-          await loadDiscussions(lessonId);
-        }
-      )
-      .subscribe();
+  const syncCourseProgress = async () => {
+    if (!user || !courseId || !enrollment || completionInProgress.current) return;
 
-    subscriptionRef.current = channel;
+    try {
+      const { data: completedData, error: completedError } = await supabase
+        .from('lesson_progress')
+        .select('lesson_id')
+        .eq('enrollment_id', enrollment.id)
+        .eq('is_completed', true);
 
-    return () => {
-      if (subscriptionRef.current) {
-        supabase.removeChannel(subscriptionRef.current);
+      if (completedError) throw completedError;
+
+      const completedLessonIds = completedData?.map(item => item.lesson_id) || [];
+      const progressPercentage = Math.round((completedLessonIds.length / totalLessons) * 100);
+
+      setCompletedLessons(completedLessonIds);
+      
+      const { error: progressError } = await supabase
+        .from('course_progress')
+        .upsert({
+          user_id: user.id,
+          course_id: courseId,
+          progress_percentage: progressPercentage,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,course_id'
+        });
+
+      if (progressError) throw progressError;
+
+      const { data: progressData } = await supabase
+        .from('course_progress')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('course_id', courseId)
+        .single();
+
+      setProgress(progressData);
+
+      // Auto-complete course when conditions are met
+      const shouldAutoComplete = !finalExam && 
+                                completedLessonIds.length === totalLessons && 
+                                totalLessons > 0 && 
+                                !isCourseCompleted &&
+                                !completionAttempted.current;
+
+      if (shouldAutoComplete) {
+        console.log('Attempting auto-completion...');
+        await completeCourse();
       }
-    };
+    } catch (error) {
+      console.error('Error syncing course progress:', error);
+    }
+  };
+
+  const checkCertificate = async () => {
+    if (!enrollment) return;
+
+    try {
+      const { data: certificateData, error } = await supabase
+        .from('certificates')
+        .select('*')
+        .eq('enrollment_id', enrollment.id)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      
+      setCertificate(certificateData || null);
+    } catch (error) {
+      console.error('Error checking certificate:', error);
+    }
+  };
+
+  const loadFinalExamAttempt = async () => {
+    if (!finalExam || !user || !enrollment) return;
+
+    try {
+      const { data: attemptData, error } = await supabase
+        .from('final_exam_attempts')
+        .select('*')
+        .eq('exam_id', finalExam.id)
+        .eq('user_id', user.id)
+        .eq('enrollment_id', enrollment.id)
+        .order('attempt_number', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+
+      setExamResult(attemptData);
+    } catch (error) {
+      console.error('Error loading final exam attempt:', error);
+    }
+  };
+
+  const loadQuizAttempts = async () => {
+    if (!user || !enrollment) return;
+
+    try {
+      console.log('Loading quiz attempts for enrollment:', enrollment.id);
+      
+      // Get all quiz attempts
+      const { data: quizAttempts, error } = await supabase
+        .from('quiz_attempts')
+        .select('quiz_id, score, passed')
+        .eq('enrollment_id', enrollment.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading quiz attempts:', error);
+        return;
+      }
+
+      console.log('Found quiz attempts:', quizAttempts);
+
+      // Group attempts by quiz_id to get the latest attempt
+      const latestAttempts = new Map();
+      quizAttempts?.forEach(attempt => {
+        if (!latestAttempts.has(attempt.quiz_id)) {
+          latestAttempts.set(attempt.quiz_id, attempt);
+        }
+      });
+
+      // Update modules with quiz completion status
+      setModules(prevModules => 
+        prevModules.map(module => ({
+          ...module,
+          lessons: module.lessons.map(lesson => {
+            if (lesson.quiz) {
+              const attempt = latestAttempts.get(lesson.quiz.id);
+              console.log(`Checking quiz ${lesson.quiz.id} for lesson ${lesson.title}:`, attempt);
+              return {
+                ...lesson,
+                quiz: {
+                  ...lesson.quiz,
+                  is_completed: attempt?.passed || false,
+                  user_score: attempt?.score || 0
+                }
+              };
+            }
+            return lesson;
+          }),
+          quizzes: module.quizzes.map(quiz => {
+            const attempt = latestAttempts.get(quiz.id);
+            console.log(`Checking module quiz ${quiz.id}:`, attempt);
+            return {
+              ...quiz,
+              is_completed: attempt?.passed || false,
+              user_score: attempt?.score || 0
+            };
+          })
+        }))
+      );
+    } catch (error) {
+      console.error('Error loading quiz attempts:', error);
+    }
   };
 
   const loadDiscussions = async (lessonId: string) => {
@@ -2594,48 +2758,89 @@ const CourseLearningPage = () => {
     return null;
   };
 
-  // ==================== VIDEO HANDLERS ====================
+  // ==================== TEST QUIZ FETCHING ====================
 
-  const handleVideoProgress = useMemo(() => 
-    debounce(async (progress: { played: number, playedSeconds: number }) => {
-      setCurrentVideoTime(progress.playedSeconds);
+  const testQuizFetching = async () => {
+    if (!courseId) return;
+    
+    console.log('=== TESTING QUIZ FETCHING ===');
+    
+    try {
+      // Test 1: Get all quizzes for this course
+      const { data: allQuizzes, error } = await supabase
+        .from('quizzes')
+        .select('*, lesson:lessons(title), module:course_modules(title)')
+        .or(`lesson_id.in.(select id from lessons where module_id in (select id from course_modules where course_id = '${courseId}')),module_id.in.(select id from course_modules where course_id = '${courseId}')`);
       
-      if (!selectedLesson || !isEnrolled || !enrollment) return;
-
-      const watchPercentage = progress.played * 100;
-      setCurrentLessonProgress(watchPercentage);
-      
-      // Only check for next lesson at 97% completion
-      if (watchPercentage >= 97 && !nextLesson && !showNextLessonDialog) {
-        const nextLessonToLoad = findNextLesson(selectedLesson);
-        if (nextLessonToLoad) {
-          setNextLesson(nextLessonToLoad);
-          setShowNextLessonDialog(true);
-        }
+      if (error) {
+        console.error('Error fetching all quizzes:', error);
+        return;
       }
       
-      // Mark as completed if watched more than 80%
-      if (watchPercentage > 80 && !completedLessons.includes(selectedLesson.id)) {
-        try {
-          await supabase
-            .from('lesson_progress')
-            .upsert({
-              enrollment_id: enrollment.id,
-              lesson_id: selectedLesson.id,
-              is_completed: true,
-              completion_date: new Date().toISOString(),
-              last_position_seconds: Math.floor(progress.playedSeconds)
-            }, {
-              onConflict: 'enrollment_id,lesson_id'
-            });
+      console.log('All quizzes in course:', allQuizzes);
+      
+      // Test 2: Check if quizzes have questions
+      await Promise.all(
+        allQuizzes?.map(async (quiz) => {
+          const { data: questions, error: qError } = await supabase
+            .from('quiz_questions')
+            .select('*, answers:quiz_answers(*)')
+            .eq('quiz_id', quiz.id);
           
-          await syncCourseProgress();
-        } catch (error) {
-          console.error('Error updating lesson progress:', error);
-        }
+          if (qError) {
+            console.error(`Error fetching questions for quiz ${quiz.id}:`, qError);
+          } else {
+            console.log(`Quiz ${quiz.title} (${quiz.id}): ${questions?.length || 0} questions`);
+          }
+        }) || []
+      );
+      
+    } catch (error) {
+      console.error('Test failed:', error);
+    }
+  };
+
+  // ==================== EVENT HANDLERS ====================
+
+  const handleVideoProgress = async (progress: { played: number, playedSeconds: number }) => {
+    setCurrentVideoTime(progress.playedSeconds);
+    
+    if (!selectedLesson || !isEnrolled || !enrollment) return;
+
+    const watchPercentage = progress.played * 100;
+    setCurrentLessonProgress(watchPercentage);
+    
+    // Preload next lesson when progress reaches 97%
+    if (watchPercentage >= 97 && !showNextLessonDialog) {
+      const nextLessonToLoad = findNextLesson(selectedLesson);
+      if (nextLessonToLoad) {
+        setNextLesson(nextLessonToLoad);
+        setShowNextLessonDialog(true);
+        console.log('Preloading next lesson:', nextLessonToLoad.title);
       }
-    }, 2000), // Debounce by 2 seconds
-  [selectedLesson, isEnrolled, enrollment, nextLesson, showNextLessonDialog, completedLessons]);
+    }
+    
+    if (watchPercentage > 80 && !completedLessons.includes(selectedLesson.id)) {
+      try {
+        const { error } = await supabase
+          .from('lesson_progress')
+          .upsert({
+            enrollment_id: enrollment.id,
+            lesson_id: selectedLesson.id,
+            is_completed: true,
+            completion_date: new Date().toISOString(),
+            last_position_seconds: Math.floor(progress.playedSeconds)
+          }, {
+            onConflict: 'enrollment_id,lesson_id'
+          });
+
+        if (error) throw error;
+        await syncCourseProgress();
+      } catch (error) {
+        console.error('Error updating lesson progress:', error);
+      }
+    }
+  };
 
   const handleVideoEnd = async () => {
     console.log('Video ended, proceeding to next content');
@@ -2685,40 +2890,7 @@ const CourseLearningPage = () => {
     console.log(`Quiz completed: ${passed ? 'Passed' : 'Failed'} with score ${score}%`);
     
     // Reload quiz attempts to update completion status
-    if (user && enrollment) {
-      try {
-        const { data: quizAttempts, error } = await supabase
-          .from('quiz_attempts')
-          .select('quiz_id, score, passed')
-          .eq('enrollment_id', enrollment.id)
-          .order('created_at', { ascending: false });
-
-        if (!error && quizAttempts) {
-          // Update local modules state
-          setModules(prevModules => 
-            prevModules.map(module => ({
-              ...module,
-              lessons: module.lessons.map(lesson => {
-                if (lesson.quiz?.id === quiz.id) {
-                  const attempt = quizAttempts.find(a => a.quiz_id === quiz.id);
-                  return {
-                    ...lesson,
-                    quiz: {
-                      ...lesson.quiz,
-                      is_completed: attempt?.passed || false,
-                      user_score: attempt?.score || 0
-                    }
-                  };
-                }
-                return lesson;
-              })
-            }))
-          );
-        }
-      } catch (error) {
-        console.error('Error reloading quiz attempts:', error);
-      }
-    }
+    await loadQuizAttempts();
     
     // Proceed to next lesson after quiz completion
     const nextLessonToLoad = findNextLesson(selectedLesson!);
@@ -2727,8 +2899,6 @@ const CourseLearningPage = () => {
       await handleLessonSelect(nextLessonToLoad);
     }
   };
-
-  // ==================== LESSON HANDLERS ====================
 
   const handleLessonSelect = async (lesson: CourseLesson) => {
     if (!lesson?.title?.trim()) return;
@@ -3117,26 +3287,7 @@ const CourseLearningPage = () => {
 
   const handleExamComplete = async (result: any) => {
     setShowExamModal(false);
-    
-    // Reload exam result
-    if (finalExam && user && enrollment) {
-      try {
-        const { data: attemptData, error } = await supabase
-          .from('final_exam_attempts')
-          .select('*')
-          .eq('exam_id', finalExam.id)
-          .eq('user_id', user.id)
-          .eq('enrollment_id', enrollment.id)
-          .order('attempt_number', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (error && error.code !== 'PGRST116') throw error;
-        setExamResult(attemptData);
-      } catch (error) {
-        console.error('Error loading final exam attempt:', error);
-      }
-    }
+    await loadFinalExamAttempt();
   };
 
   const handleRetakeQuiz = () => {
@@ -3151,36 +3302,191 @@ const CourseLearningPage = () => {
   // ==================== USE EFFECTS ====================
 
   useEffect(() => {
-    return () => {
-      if (subscriptionRef.current) {
-        supabase.removeChannel(subscriptionRef.current);
+    const loadData = async () => {
+      if (!courseId || dataLoaded) {
+        setLoading(false);
+        return;
       }
-    };
-  }, []);
 
-  // Auto-completion logic
-  useEffect(() => {
-    const autoCompleteIfNeeded = async () => {
-      const shouldAutoComplete = !finalExam && 
-                                completedLessons.length === totalLessons && 
-                                totalLessons > 0 && 
-                                !isCourseCompleted &&
-                                !completionAttempted.current &&
-                                enrollment?.payment_status === 'completed';
+      setLoading(true);
+      
+      try {
+        const { data: courseData, error: courseError } = await supabase
+          .from('courses')
+          .select('*')
+          .eq('id', courseId)
+          .maybeSingle();
 
-      if (shouldAutoComplete) {
-        console.log('Auto-completion conditions met, validating...');
-        const isValid = await validateCompletionConditions();
-        if (isValid) {
-          await completeCourse();
+        if (courseError) throw courseError;
+        if (!courseData) {
+          setCourse(null);
+          setLoading(false);
+          return;
         }
+
+        setCourse(courseData);
+
+        const { data: modulesData, error: modulesError } = await supabase
+          .from('course_modules')
+          .select('*')
+          .eq('course_id', courseId)
+          .order('order_index', { ascending: true });
+
+        if (modulesError) throw modulesError;
+
+        const modulesWithLessons = await Promise.all(
+          (modulesData as CourseModule[]).map(async (module) => {
+            // Fetch lessons first
+            const { data: lessonsData, error: lessonsError } = await supabase
+              .from('lessons')
+              .select('*')
+              .eq('module_id', module.id)
+              .order('order_index', { ascending: true });
+
+            if (lessonsError) return { ...module, lessons: [], quizzes: [] };
+            
+            // Fetch quizzes for each lesson
+            const lessonsWithQuizInfo = await Promise.all(
+              (lessonsData as CourseLesson[]).map(async (lesson) => {
+                const { data: quizData, error: quizError } = await supabase
+                  .from('quizzes')
+                  .select(`
+                    *,
+                    questions:quiz_questions(
+                      *,
+                      answers:quiz_answers(*)
+                    )
+                  `)
+                  .eq('lesson_id', lesson.id)
+                  .maybeSingle();
+
+                if (quizError) {
+                  console.error(`Error fetching quiz for lesson ${lesson.id}:`, quizError);
+                  return { ...lesson, quiz: undefined };
+                }
+
+                // Calculate question count
+                const questionCount = quizData?.questions?.length || 0;
+                
+                return {
+                  ...lesson,
+                  quiz: quizData ? {
+                    ...quizData,
+                    question_count: questionCount
+                  } : undefined,
+                  has_quiz: !!quizData
+                };
+              })
+            );
+
+            // Fetch module-level quizzes (where module_id is not null and lesson_id is null)
+            const { data: moduleQuizzes, error: moduleQuizzesError } = await supabase
+              .from('quizzes')
+              .select(`
+                *,
+                questions:quiz_questions(
+                  *,
+                  answers:quiz_answers(*)
+                )
+              `)
+              .eq('module_id', module.id)
+              .is('lesson_id', null);
+
+            if (moduleQuizzesError) {
+              console.error(`Error fetching module quizzes for module ${module.id}:`, moduleQuizzesError);
+            }
+
+            // Process module quizzes to include question count
+            const processedModuleQuizzes = (moduleQuizzes || []).map(quiz => ({
+              ...quiz,
+              question_count: quiz.questions?.length || 0
+            }));
+
+            return { 
+              ...module, 
+              lessons: lessonsWithQuizInfo || [],
+              quizzes: processedModuleQuizzes || []
+            };
+          })
+        );
+        
+        console.log('Loaded modules with quizzes:', modulesWithLessons);
+        setModules(modulesWithLessons);
+
+        const [examData, instructorData] = await Promise.all([
+          supabase
+            .from('final_exams')
+            .select('*')
+            .eq('course_id', courseId)
+            .maybeSingle(),
+          courseData.creator_id ? 
+            supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', courseData.creator_id)
+              .maybeSingle() : 
+            Promise.resolve({ data: null, error: null })
+        ]);
+
+        if (examData.data) setFinalExam(examData.data);
+
+        if (user?.id) {
+          const [enrollmentData, progressData] = await Promise.all([
+            supabase
+              .from('course_enrollments')
+              .select('*')
+              .eq('user_id', user.id)
+              .eq('course_id', courseId)
+              .maybeSingle(),
+            supabase
+              .from('course_progress')
+              .select('*')
+              .eq('user_id', user.id)
+              .eq('course_id', courseId)
+              .maybeSingle()
+          ]);
+
+          setEnrollment(enrollmentData.data);
+          setProgress(progressData.data);
+
+          if (enrollmentData.data) {
+            const { data: completedData } = await supabase
+              .from('lesson_progress')
+              .select('lesson_id')
+              .eq('enrollment_id', enrollmentData.data.id)
+              .eq('is_completed', true);
+            setCompletedLessons(completedData?.map(item => item.lesson_id) || []);
+          }
+        }
+
+        setDataLoaded(true);
+        
+        // Run test
+        await testQuizFetching();
+        
+      } catch (error) {
+        toast.error('Failed to load course data');
+        console.error(error);
+      } finally {
+        setLoading(false);
       }
     };
 
-    autoCompleteIfNeeded();
-  }, [completedLessons.length, totalLessons, isCourseCompleted, finalExam, enrollment]);
+    loadData();
+  }, [courseId, user, dataLoaded]);
 
-  // Determine initial lesson
+  useEffect(() => {
+    if (finalExam && enrollment) {
+      loadFinalExamAttempt();
+    }
+  }, [finalExam, enrollment]);
+
+  useEffect(() => {
+    if (enrollment && modules.length > 0) {
+      loadQuizAttempts();
+    }
+  }, [enrollment, modules]);
+
   useEffect(() => {
     if (isEnrolled && modules.length > 0 && !selectedLesson && !loading) {
       const determineInitialLesson = () => {
@@ -3209,29 +3515,27 @@ const CourseLearningPage = () => {
     }
   }, [isEnrolled, modules, progress, completedLessons, loading]);
 
-  // ==================== COMPUTED VALUES ====================
+  // Auto-completion logic
+  useEffect(() => {
+    const autoCompleteIfNeeded = async () => {
+      const shouldAutoComplete = !finalExam && 
+                                completedLessons.length === totalLessons && 
+                                totalLessons > 0 && 
+                                !isCourseCompleted &&
+                                !completionAttempted.current &&
+                                enrollment?.payment_status === 'completed';
 
-  const isEnrolled = enrollment?.payment_status === 'completed';
-  const progressPercentage = progress?.progress_percentage || 0;
-  const totalLessons = modules.reduce((total, module) => total + module.lessons.length, 0);
-  const isCourseCompleted = enrollment?.is_completed || false;
-  const hasPassedExam = examResult?.passed;
-  const isFirstExamAttempt = !examResult;
-  const maxExamAttempts = 5;
-  const hasExceededAttempts = examResult && examResult.attempts >= maxExamAttempts;
-  const hasCertificate = !!certificate;
-  
-  const allQuizzesPassed = modules.every(module => 
-    module.lessons.every(lesson => 
-      !lesson.quiz || lesson.quiz.is_completed
-    ) && 
-    module.quizzes.every(quiz => quiz.is_completed)
-  );
-  
-  const showTakeExamButton = isCourseCompleted && finalExam && isFirstExamAttempt;
-  const showRetakeExamButton = isCourseCompleted && finalExam && examResult && !hasPassedExam && !hasExceededAttempts;
-  const showRestartCourseButton = isCourseCompleted && finalExam && examResult && !hasPassedExam && hasExceededAttempts;
-  const showViewCertificateButton = isCourseCompleted && (!finalExam || hasPassedExam);
+      if (shouldAutoComplete) {
+        console.log('Auto-completion conditions met, validating...');
+        const isValid = await validateCompletionConditions();
+        if (isValid) {
+          await completeCourse();
+        }
+      }
+    };
+
+    autoCompleteIfNeeded();
+  }, [completedLessons.length, totalLessons, isCourseCompleted, finalExam, enrollment]);
 
   // ==================== RENDER ====================
 
@@ -3517,11 +3821,15 @@ const CourseLearningPage = () => {
                                   }}
                                 />
                                 
-                                {/* Simple video controls */}
+                                {/* Video Controls */}
                                 <div className="flex flex-wrap gap-3 w-full">
                                   <Button variant="outline" size="sm" className="border-gray-300 hover:bg-gray-100">
                                     <Bookmark className="h-4 w-4 mr-2" />
                                     Bookmark
+                                  </Button>
+                                  <Button variant="outline" size="sm" className="border-gray-300 hover:bg-gray-100">
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Download
                                   </Button>
                                   <Button variant="outline" size="sm" className="border-gray-300 hover:bg-gray-100">
                                     <Share className="h-4 w-4 mr-2" />
@@ -4036,7 +4344,7 @@ const CourseLearningPage = () => {
         onClose={() => setShowQuizModal(false)}
         quizId={currentQuizId}
         lessonId={currentLessonId}
-        courseId={courseId}
+        courseId={courseId} // Add this
         onComplete={handleQuizComplete}
       />
 
