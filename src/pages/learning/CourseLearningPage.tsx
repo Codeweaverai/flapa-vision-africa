@@ -37,6 +37,8 @@ import RecommendedCourses from '@/components/course/RecommendedCourses';
 import Layout from '@/components/layout/Layout';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { cn } from '@/lib/utils';
+import { ReactPlayerWithCache } from '@/components/video/ReactPlayerWithCache';
+import { useVideoPreloader } from '@/hooks/useVideoPreloader';
 
 // ==================== INTERFACES ====================
 
@@ -3768,18 +3770,20 @@ const CourseLearningPage = () => {
                               </div>
                             </div>
 
-                            {/* Video Player */}
+                            {/* Video Player with Caching */}
                             {(selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url) && (
                               <div className="space-y-6 w-full">
-                                <CustomVideoPlayer
-                                  videoUrl={selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url || ''}
+                                <ReactPlayerWithCache
+                                  url={selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url || ''}
                                   thumbnail={course.thumbnail_url}
+                                  title={selectedLesson?.title || modules[0]?.lessons[0]?.title}
                                   onProgress={handleVideoProgress}
                                   onEnd={handleVideoEnd}
                                   onError={(error) => {
                                     console.error('Video playback error:', error);
                                     toast.error('There was an issue loading the video. Please try again.');
                                   }}
+                                  controls={true}
                                 />
                                 
                                 {/* Video Controls */}
