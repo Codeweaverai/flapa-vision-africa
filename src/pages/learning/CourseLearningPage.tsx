@@ -3025,7 +3025,8 @@ const CourseLearningPage = () => {
                 answers:quiz_answers(*)
               )
             `)
-            .in('lesson_id', lessonIds);
+            .in('lesson_id', lessonIds)
+            .neq('lesson_id', null); // Only lesson quizzes where lesson_id is not null
           lessonQuizzesData = data;
           lessonQuizzesError = error;
         }
@@ -3162,8 +3163,8 @@ const CourseLearningPage = () => {
 
         setDataLoaded(true);
 
-        // Run test
-        await testQuizFetching();
+        // Run test - commented out to prevent additional API calls
+        // await testQuizFetching();
 
       } catch (error) {
         toast.error('Failed to load course data');
