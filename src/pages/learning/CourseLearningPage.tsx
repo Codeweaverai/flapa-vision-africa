@@ -3144,7 +3144,7 @@ const CourseLearningPage = () => {
               .select('lesson_id')
               .eq('user_id', user.id)
               .eq('course_id', courseId)
-              .eq('is_completed', true)
+              .eq('is_completed', 'true') // Use string representation for boolean
           ]);
 
           if (enrollmentResult.status === 'fulfilled') {
