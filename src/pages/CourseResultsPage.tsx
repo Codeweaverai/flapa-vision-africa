@@ -1298,9 +1298,13 @@ const CourseResultsPage = () => {
 
   // Function to share certificate as a post to LinkedIn
   const shareToLinkedInPost = (certificate: Certificate) => {
-    // Create a share URL for LinkedIn with a congratulatory message
+    // Get skills for this course to include in the post
+    const skills = certificate.course_id ? (courseSkills[certificate.course_id] || []) : [];
+    const skillNames = skills.slice(0, 5).map(skill => skill.skill_name).join(', '); // Limit to first 5 skills
+
+    // Create share URL for LinkedIn with a congratulatory message
     const certificateUrl = `https://skillpulse.cloud/verify?code=${certificate.verification_code}`;
-    const shareText = `🎓 Just earned my ${certificate.course_title} certificate from SkillPulse! 🌟 So proud of this achievement. Hard work and dedication paid off! #LearningJourney #Achievement #Certification #ProfessionalDevelopment`;
+    const shareText = `🎓 Just completed ${certificate.course_title} with SkillPulse Innovations Limited! 🌟 Achieved professional development in ${skillNames || 'various skills'} and earned my certification. So proud of this milestone! 🚀 #LearningJourney #Achievement #Certification #ProfessionalDevelopment #SkillPulse`;
 
     const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(certificateUrl)}&summary=${encodeURIComponent(shareText)}`;
 
@@ -1309,13 +1313,17 @@ const CourseResultsPage = () => {
 
   // Function to add certificate to LinkedIn profile
   const addToLinkedInProfile = (certificate: Certificate) => {
+    // Get skills for this course to include in the profile
+    const skills = certificate.course_id ? (courseSkills[certificate.course_id] || []) : [];
+    const skillNames = skills.slice(0, 5).map(skill => skill.skill_name).join(', '); // Limit to first 5 skills
+
     // Extract year from issue date
     const issueDate = new Date(certificate.issue_date);
     const year = issueDate.getFullYear();
     const month = issueDate.getMonth() + 1; // Month is 0-indexed
 
-    // Create the LinkedIn add to profile URL with course details
-    const profileUrl = `https://www.linkedin.com/profile/add?startTask=CERTIFICATION_NAME&name=${encodeURIComponent(certificate.course_title)}&organizationId=1337&issueYear=${year}&issueMonth=${month}&certUrl=${encodeURIComponent(`https://skillpulse.cloud/verify?code=${certificate.verification_code}`)}&certId=${certificate.verification_code}`;
+    // Create the LinkedIn add to profile URL with course details and skills
+    const profileUrl = `https://www.linkedin.com/profile/add?startTask=CERTIFICATION_NAME&name=${encodeURIComponent(certificate.course_title)}&organizationId=1337&organizationName=${encodeURIComponent('SkillPulse Innovations Limited')}&issueYear=${year}&issueMonth=${month}&certUrl=${encodeURIComponent(`https://skillpulse.cloud/verify?code=${certificate.verification_code}`)}&certId=${certificate.verification_code}`;
 
     window.open(profileUrl, '_blank', 'width=800,height=600');
   };
@@ -1565,7 +1573,7 @@ const CourseResultsPage = () => {
                                   className="border-blue-300 text-blue-700 hover:bg-blue-50 hover:border-blue-400"
                                 >
                                   <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path fillRule="evenodd" d="M19.812 5.418c.861.23 1.538.907 1.768 1.768C21.998 8.746 22 12 22 12s0 6.549-3.75 6.549c-1.739 0-3.163-1.177-3.463-2.781H12v-3.24h3.847v-2.26H12v-3.206h3.496c-.097-1.765.393-3.53 2.34-4.703zM8.048 19.6V8.398H5.791v11.202h2.257zm-1.113-13.612c-.68 0-1.227.553-1.227 1.24 0 .678.547 1.227 1.227 1.227.69 0 1.238-.549 1.238-1.227 0-.687-.548-1.24-1.238-1.24zm-2.96 13.612H1.729V8.398h2.246v11.202zM.31 4.184h2.258v11.202H.31V4.184z" clipRule="evenodd" />
+                                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
                                   </svg>
                                   Share Post
                                 </Button>
@@ -1576,7 +1584,7 @@ const CourseResultsPage = () => {
                                   className="border-blue-500 bg-blue-500 text-white hover:bg-blue-600 hover:border-blue-600"
                                 >
                                   <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path fillRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.418 0-8-3.582-8-8s3.582-8 8-8 8 3.582 8 8-3.582 8-8 8zm-1-13v2h-2v2h2v2h2v-2h2v-2h-2V7h-2z" clipRule="evenodd" />
+                                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
                                   </svg>
                                   Add to Profile
                                 </Button>
