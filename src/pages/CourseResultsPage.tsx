@@ -1392,33 +1392,16 @@ const CourseResultsPage = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-6 space-y-6">
-                    {(() => {
-                      // Calculate pagination
-                      const startIndex = (currentPage - 1) * itemsPerPage;
-                      const endIndex = startIndex + itemsPerPage;
-                      const paginatedResults = examResults.length > 0 ? examResults.slice(startIndex, endIndex) : [];
-
-                      if (paginatedResults.length === 0) {
-                        return (
-                          <div className="text-center py-12">
-                            <Target className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-                            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Exam Results Yet</h3>
-                            <p className="text-gray-600">Complete course exams to see your results here.</p>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <>
-                          {paginatedResults.map((result) => (
-                            <div
-                              key={result.id}
-                              className={`p-6 rounded-xl border-l-4 transition-all duration-300 hover:shadow-lg ${
-                                result.passed
-                                  ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-500'
-                                  : 'bg-gradient-to-r from-red-50 to-orange-50 border-red-500'
-                              }`}
-                            >
+                    {examResults.length > 0 ? (
+                      examResults.map((result) => (
+                        <div
+                          key={result.id}
+                          className={`p-6 rounded-xl border-l-4 transition-all duration-300 hover:shadow-lg ${
+                            result.passed
+                              ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-500'
+                              : 'bg-gradient-to-r from-red-50 to-orange-50 border-red-500'
+                          }`}
+                        >
                           <div className="flex items-center justify-between mb-4">
                             <h3 className="font-semibold text-lg text-gray-900 line-clamp-1">
                               {result.course.title}
@@ -1499,46 +1482,11 @@ const CourseResultsPage = () => {
                           </div>
                         </div>
                       ))
-                    )}
-                    </>
-                  )()}
-
-                    {/* Pagination Controls */}
-                    {examResults.length > itemsPerPage && (
-                      <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-200">
-                        <Button
-                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                          disabled={currentPage === 1}
-                          variant="outline"
-                          className="border-gray-300 hover:bg-gray-100"
-                        >
-                          Previous
-                        </Button>
-
-                        <div className="flex items-center gap-2">
-                          {Array.from({ length: Math.ceil(examResults.length / itemsPerPage) }, (_, i) => i + 1).map(page => (
-                            <Button
-                              key={page}
-                              onClick={() => setCurrentPage(page)}
-                              variant={currentPage === page ? "default" : "outline"}
-                              className={currentPage === page
-                                ? "bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
-                                : "border-gray-300 hover:bg-gray-100"
-                              }
-                            >
-                              {page}
-                            </Button>
-                          ))}
-                        </div>
-
-                        <Button
-                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(examResults.length / itemsPerPage)))}
-                          disabled={currentPage === Math.ceil(examResults.length / itemsPerPage)}
-                          variant="outline"
-                          className="border-gray-300 hover:bg-gray-100"
-                        >
-                          Next
-                        </Button>
+                    ) : (
+                      <div className="text-center py-12">
+                        <Target className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">No Exam Results Yet</h3>
+                        <p className="text-gray-600">Complete course exams to see your results here.</p>
                       </div>
                     )}
                   </CardContent>
