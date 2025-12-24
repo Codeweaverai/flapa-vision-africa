@@ -2345,12 +2345,14 @@ const CourseLearningPage = () => {
   };
 
   const findNextLesson = useCallback((currentLesson: CourseLesson): CourseLesson | null => {
+    if (!modules || modules.length === 0) return null;
+
     const allLessons: CourseLesson[] = [];
 
     modules
       .sort((a, b) => a.order_index - b.order_index)
       .forEach(module => {
-        const sortedLessons = module.lessons.sort((a, b) => a.order_index - b.order_index);
+        const sortedLessons = [...module.lessons].sort((a, b) => a.order_index - b.order_index);
         allLessons.push(...sortedLessons);
       });
 
@@ -2489,7 +2491,7 @@ const CourseLearningPage = () => {
       console.log('Auto-proceeding to next lesson:', nextLessonToLoad.title);
       await handleLessonSelect(nextLessonToLoad);
     }
-  }, [selectedLesson, enrollment, completedLessons, syncCourseProgress, handleLessonSelect]);
+  }, [selectedLesson, enrollment, completedLessons, syncCourseProgress]); // Removed handleLessonSelect to avoid circular dependency
 
   const handleQuizComplete = async (quiz: Quiz, score: number, passed: boolean) => {
     console.log(`Quiz completed: ${passed ? 'Passed' : 'Failed'} with score ${score}%`);
@@ -2517,7 +2519,7 @@ const CourseLearningPage = () => {
     // Load lesson-specific data
     await loadLessonData(lesson.id);
 
-    if (isEnrolled && user) {
+    if (isEnrolled && user && courseId) {
       supabase
         .from('course_progress')
         .upsert({
@@ -2534,7 +2536,7 @@ const CourseLearningPage = () => {
     }
 
     setIsMobileSidebarOpen(false);
-  }, [isEnrolled, user, courseId]);
+  }, [isEnrolled, user, courseId, loadLessonData]);
 
   const handleQuizStart = (quizId: string, lessonId: string) => {
     console.log('Starting quiz:', { quizId, lessonId });
