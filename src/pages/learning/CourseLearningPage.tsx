@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
-import SimpleVideoPlayer from '@/components/course/SimpleVideoPlayer';
+import LazyVideoPlayer from '@/components/course/LazyVideoPlayer';
 import { 
   Play, Clock, User, BookOpen, Award, Star, Users,
   MessageCircle, Target, CheckCircle, StickyNote,
@@ -945,7 +945,7 @@ const EnhancedDiscussionSection: React.FC<EnhancedDiscussionSectionProps> = ({
 };
 
 // ==================== VIDEO PLAYER WRAPPER ====================
-// Uses SimpleVideoPlayer component for production-ready video playback
+// Uses LazyVideoPlayer component for optimized video playback
 
 // ==================== QUIZ ITEM COMPONENT ====================
 
@@ -1779,6 +1779,7 @@ const PulseLoading = () => {
   );
 };
 
+
 // ==================== MAIN COURSE LEARNING PAGE ====================
 
 const CourseLearningPage = () => {
@@ -2343,24 +2344,24 @@ const CourseLearningPage = () => {
     }
   };
 
-  const findNextLesson = (currentLesson: CourseLesson): CourseLesson | null => {
+  const findNextLesson = useCallback((currentLesson: CourseLesson): CourseLesson | null => {
     const allLessons: CourseLesson[] = [];
-    
+
     modules
       .sort((a, b) => a.order_index - b.order_index)
       .forEach(module => {
         const sortedLessons = module.lessons.sort((a, b) => a.order_index - b.order_index);
         allLessons.push(...sortedLessons);
       });
-    
+
     const currentIndex = allLessons.findIndex(lesson => lesson.id === currentLesson.id);
-    
+
     if (currentIndex !== -1 && currentIndex < allLessons.length - 1) {
       return allLessons[currentIndex + 1];
     }
-    
+
     return null;
-  };
+  }, [modules]);
 
   // ==================== TEST QUIZ FETCHING ====================
 
@@ -2406,14 +2407,14 @@ const CourseLearningPage = () => {
 
   // ==================== EVENT HANDLERS ====================
 
-  const handleVideoProgress = async (progress: { played: number, playedSeconds: number }) => {
+  const handleVideoProgress = useCallback(async (progress: { played: number, playedSeconds: number }) => {
     setCurrentVideoTime(progress.playedSeconds);
-    
+
     if (!selectedLesson || !isEnrolled || !enrollment) return;
 
     const watchPercentage = progress.played * 100;
     setCurrentLessonProgress(watchPercentage);
-    
+
     // Preload next lesson when progress reaches 97%
     if (watchPercentage >= 97 && !showNextLessonDialog) {
       const nextLessonToLoad = findNextLesson(selectedLesson);
@@ -2423,7 +2424,7 @@ const CourseLearningPage = () => {
         console.log('Preloading next lesson:', nextLessonToLoad.title);
       }
     }
-    
+
     if (watchPercentage > 80 && !completedLessons.includes(selectedLesson.id)) {
       try {
         const { error } = await supabase
@@ -2444,11 +2445,11 @@ const CourseLearningPage = () => {
         console.error('Error updating lesson progress:', error);
       }
     }
-  };
+  }, [selectedLesson, isEnrolled, enrollment, completedLessons, syncCourseProgress]);
 
-  const handleVideoEnd = async () => {
+  const handleVideoEnd = useCallback(async () => {
     console.log('Video ended, proceeding to next content');
-    
+
     if (!selectedLesson || !enrollment) return;
 
     // Mark lesson as completed
@@ -2488,7 +2489,7 @@ const CourseLearningPage = () => {
       console.log('Auto-proceeding to next lesson:', nextLessonToLoad.title);
       await handleLessonSelect(nextLessonToLoad);
     }
-  };
+  }, [selectedLesson, enrollment, completedLessons, syncCourseProgress, handleLessonSelect]);
 
   const handleQuizComplete = async (quiz: Quiz, score: number, passed: boolean) => {
     console.log(`Quiz completed: ${passed ? 'Passed' : 'Failed'} with score ${score}%`);
@@ -2504,18 +2505,18 @@ const CourseLearningPage = () => {
     }
   };
 
-  const handleLessonSelect = async (lesson: CourseLesson) => {
+  const handleLessonSelect = useCallback(async (lesson: CourseLesson) => {
     if (!lesson?.title?.trim()) return;
-    
+
     setSelectedLesson(lesson);
     setCurrentLessonId(lesson.id);
     setShowNextLessonDialog(false);
     setNextLesson(null);
     setCurrentLessonProgress(0);
-    
+
     // Load lesson-specific data
     await loadLessonData(lesson.id);
-    
+
     if (isEnrolled && user) {
       supabase
         .from('course_progress')
@@ -2531,9 +2532,9 @@ const CourseLearningPage = () => {
           if (error) console.error('Error updating last accessed:', error);
         });
     }
-    
+
     setIsMobileSidebarOpen(false);
-  };
+  }, [isEnrolled, user, courseId]);
 
   const handleQuizStart = (quizId: string, lessonId: string) => {
     console.log('Starting quiz:', { quizId, lessonId });
@@ -2913,129 +2914,179 @@ const CourseLearningPage = () => {
       }
 
       setLoading(true);
-      
-      try {
-        const { data: courseData, error: courseError } = await supabase
-          .from('courses')
-          .select('*')
-          .eq('id', courseId)
-          .maybeSingle();
 
-        if (courseError) throw courseError;
-        if (!courseData) {
+      try {
+        // Fetch course and modules in parallel
+        const [courseDataResult, modulesDataResult] = await Promise.allSettled([
+          supabase
+            .from('courses')
+            .select('*')
+            .eq('id', courseId)
+            .maybeSingle(),
+          supabase
+            .from('course_modules')
+            .select('*')
+            .eq('course_id', courseId)
+            .order('order_index', { ascending: true })
+        ]);
+
+        if (courseDataResult.status === 'rejected' || !courseDataResult.value.data) {
+          if (courseDataResult.reason) {
+            console.error('Course fetch error:', courseDataResult.reason);
+          }
           setCourse(null);
           setLoading(false);
           return;
         }
 
+        const courseData = courseDataResult.value.data;
         setCourse(courseData);
 
-        const { data: modulesData, error: modulesError } = await supabase
-          .from('course_modules')
+        if (modulesDataResult.status === 'rejected') {
+          console.error('Modules fetch error:', modulesDataResult.reason);
+          setModules([]);
+          setLoading(false);
+          return;
+        }
+
+        const modulesData = modulesDataResult.value.data as CourseModule[];
+
+        // Fetch all lessons for all modules in a single query
+        const moduleIds = modulesData.map(m => m.id);
+        const { data: allLessonsData, error: allLessonsError } = await supabase
+          .from('lessons')
           .select('*')
-          .eq('course_id', courseId)
+          .in('module_id', moduleIds)
           .order('order_index', { ascending: true });
 
-        if (modulesError) throw modulesError;
+        if (allLessonsError) {
+          console.error('Error fetching all lessons:', allLessonsError);
+          // Continue with empty lessons array
+        }
 
-        const modulesWithLessons = await Promise.all(
-          (modulesData as CourseModule[]).map(async (module) => {
-            // Fetch lessons first
-            const { data: lessonsData, error: lessonsError } = await supabase
-              .from('lessons')
-              .select('*')
-              .eq('module_id', module.id)
-              .order('order_index', { ascending: true });
-
-            if (lessonsError) return { ...module, lessons: [], quizzes: [] };
-            
-            // Fetch quizzes for each lesson
-            const lessonsWithQuizInfo = await Promise.all(
-              (lessonsData as CourseLesson[]).map(async (lesson) => {
-                const { data: quizData, error: quizError } = await supabase
-                  .from('quizzes')
-                  .select(`
-                    *,
-                    questions:quiz_questions(
-                      *,
-                      answers:quiz_answers(*)
-                    )
-                  `)
-                  .eq('lesson_id', lesson.id)
-                  .maybeSingle();
-
-                if (quizError) {
-                  console.error(`Error fetching quiz for lesson ${lesson.id}:`, quizError);
-                  return { ...lesson, quiz: undefined };
-                }
-
-                // Calculate question count
-                const questionCount = quizData?.questions?.length || 0;
-                
-                return {
-                  ...lesson,
-                  quiz: quizData ? {
-                    ...quizData,
-                    question_count: questionCount
-                  } : undefined,
-                  has_quiz: !!quizData
-                };
-              })
-            );
-
-            // Fetch module-level quizzes (where module_id is not null and lesson_id is null)
-            const { data: moduleQuizzes, error: moduleQuizzesError } = await supabase
-              .from('quizzes')
-              .select(`
-                *,
-                questions:quiz_questions(
-                  *,
-                  answers:quiz_answers(*)
-                )
-              `)
-              .eq('module_id', module.id)
-              .is('lesson_id', null);
-
-            if (moduleQuizzesError) {
-              console.error(`Error fetching module quizzes for module ${module.id}:`, moduleQuizzesError);
+        // Group lessons by module_id for efficient lookup
+        const lessonsByModuleId = new Map<string, CourseLesson[]>();
+        if (allLessonsData) {
+          allLessonsData.forEach(lesson => {
+            const moduleId = lesson.module_id;
+            if (!lessonsByModuleId.has(moduleId)) {
+              lessonsByModuleId.set(moduleId, []);
             }
+            lessonsByModuleId.get(moduleId)!.push(lesson as CourseLesson);
+          });
+        }
 
-            // Process module quizzes to include question count
-            const processedModuleQuizzes = (moduleQuizzes || []).map(quiz => ({
-              ...quiz,
-              question_count: quiz.questions?.length || 0
-            }));
+        // Fetch all quizzes for lessons in a single query
+        const lessonIds = allLessonsData?.map(l => l.id) || [];
+        const { data: lessonQuizzesData, error: lessonQuizzesError } = await supabase
+          .from('quizzes')
+          .select(`
+            *,
+            questions:quiz_questions(
+              *,
+              answers:quiz_answers(*)
+            )
+          `)
+          .in('lesson_id', lessonIds)
+          .is('lesson_id', 'not', null); // Only lesson quizzes
 
-            return { 
-              ...module, 
-              lessons: lessonsWithQuizInfo || [],
-              quizzes: processedModuleQuizzes || []
+        if (lessonQuizzesError) {
+          console.error('Error fetching lesson quizzes:', lessonQuizzesError);
+        }
+
+        // Group lesson quizzes by lesson_id for efficient lookup
+        const lessonQuizzesByLessonId = new Map<string, any>();
+        if (lessonQuizzesData) {
+          lessonQuizzesData.forEach(quiz => {
+            if (quiz.lesson_id) {
+              lessonQuizzesByLessonId.set(quiz.lesson_id, {
+                ...quiz,
+                question_count: quiz.questions?.length || 0
+              });
+            }
+          });
+        }
+
+        // Fetch all module-level quizzes in a single query
+        const { data: moduleQuizzesData, error: moduleQuizzesError } = await supabase
+          .from('quizzes')
+          .select(`
+            *,
+            questions:quiz_questions(
+              *,
+              answers:quiz_answers(*)
+            )
+          `)
+          .in('module_id', moduleIds)
+          .is('lesson_id', null); // Only module quizzes
+
+        if (moduleQuizzesError) {
+          console.error('Error fetching module quizzes:', moduleQuizzesError);
+        }
+
+        // Group module quizzes by module_id for efficient lookup
+        const moduleQuizzesByModuleId = new Map<string, any[]>();
+        if (moduleQuizzesData) {
+          moduleQuizzesData.forEach(quiz => {
+            if (quiz.module_id) {
+              if (!moduleQuizzesByModuleId.has(quiz.module_id)) {
+                moduleQuizzesByModuleId.set(quiz.module_id, []);
+              }
+              moduleQuizzesByModuleId.get(quiz.module_id)!.push({
+                ...quiz,
+                question_count: quiz.questions?.length || 0
+              });
+            }
+          });
+        }
+
+        // Build modules with lessons and quizzes
+        const modulesWithLessons = modulesData.map(module => {
+          const lessons = lessonsByModuleId.get(module.id) || [];
+          const lessonsWithQuizzes = lessons.map(lesson => {
+            const quiz = lessonQuizzesByLessonId.get(lesson.id);
+            return {
+              ...lesson,
+              quiz: quiz || undefined,
+              has_quiz: !!quiz
             };
-          })
-        );
-        
+          });
+
+          const moduleQuizzes = moduleQuizzesByModuleId.get(module.id) || [];
+
+          return {
+            ...module,
+            lessons: lessonsWithQuizzes,
+            quizzes: moduleQuizzes
+          };
+        });
+
         console.log('Loaded modules with quizzes:', modulesWithLessons);
         setModules(modulesWithLessons);
 
-        const [examData, instructorData] = await Promise.all([
+        // Fetch final exam and instructor profile in parallel
+        const [examDataResult, instructorDataResult] = await Promise.allSettled([
           supabase
             .from('final_exams')
             .select('*')
             .eq('course_id', courseId)
             .maybeSingle(),
-          courseData.creator_id ? 
-            supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', courseData.creator_id)
-              .maybeSingle() : 
-            Promise.resolve({ data: null, error: null })
+          courseData.creator_id
+            ? supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', courseData.creator_id)
+                .maybeSingle()
+            : Promise.resolve({ data: null, error: null })
         ]);
 
-        if (examData.data) setFinalExam(examData.data);
+        if (examDataResult.status === 'fulfilled' && examDataResult.value.data) {
+          setFinalExam(examDataResult.value.data);
+        }
 
         if (user?.id) {
-          const [enrollmentData, progressData] = await Promise.all([
+          // Fetch enrollment, progress, and completed lessons in parallel
+          const [enrollmentResult, progressResult, completedLessonsResult] = await Promise.allSettled([
             supabase
               .from('course_enrollments')
               .select('*')
@@ -3047,27 +3098,33 @@ const CourseLearningPage = () => {
               .select('*')
               .eq('user_id', user.id)
               .eq('course_id', courseId)
-              .maybeSingle()
-          ]);
-
-          setEnrollment(enrollmentData.data);
-          setProgress(progressData.data);
-
-          if (enrollmentData.data) {
-            const { data: completedData } = await supabase
+              .maybeSingle(),
+            supabase
               .from('lesson_progress')
               .select('lesson_id')
-              .eq('enrollment_id', enrollmentData.data.id)
-              .eq('is_completed', true);
-            setCompletedLessons(completedData?.map(item => item.lesson_id) || []);
+              .eq('user_id', user.id)
+              .eq('course_id', courseId)
+              .eq('is_completed', true)
+          ]);
+
+          if (enrollmentResult.status === 'fulfilled') {
+            setEnrollment(enrollmentResult.value.data);
+          }
+
+          if (progressResult.status === 'fulfilled') {
+            setProgress(progressResult.value.data);
+          }
+
+          if (completedLessonsResult.status === 'fulfilled') {
+            setCompletedLessons(completedLessonsResult.value.data?.map(item => item.lesson_id) || []);
           }
         }
 
         setDataLoaded(true);
-        
+
         // Run test
         await testQuizFetching();
-        
+
       } catch (error) {
         toast.error('Failed to load course data');
         console.error(error);
@@ -3414,7 +3471,7 @@ const CourseLearningPage = () => {
                             {/* Video Player */}
                             {(selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url) && (
                               <div className="space-y-6 w-full">
-                                <SimpleVideoPlayer
+                                <LazyVideoPlayer
                                   videoUrl={selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url || ''}
                                   thumbnail={course.thumbnail_url}
                                   onProgress={handleVideoProgress}
