@@ -1950,7 +1950,7 @@ const CourseLearningPage = () => {
         .from('lesson_progress')
         .select('lesson_id, is_completed')
         .eq('enrollment_id', enrollment.id)
-        .eq('is_completed', true);
+        .eq('is_completed', 'true');
 
       if (error) {
         console.error('Error validating completion conditions:', error);
@@ -2068,7 +2068,7 @@ const CourseLearningPage = () => {
         .from('lesson_progress')
         .select('lesson_id')
         .eq('enrollment_id', enrollment.id)
-        .eq('is_completed', true);
+        .eq('is_completed', 'true');
 
       if (completedError) throw completedError;
 
