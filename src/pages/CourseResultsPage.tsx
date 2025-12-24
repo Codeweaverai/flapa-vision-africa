@@ -1283,28 +1283,43 @@ const CourseResultsPage = () => {
     }
   };
 
-  // Calculate quiz performance per course
+  // Calculate quiz performance per course by aggregating from quiz_attempts
   const getQuizPerformanceByCourse = (courseTitle: string) => {
     // Find the exam result for this course to get the enrollment_id
     const examResult = examResults.find(er => er.course.title === courseTitle);
     if (!examResult) return { averageScore: 0, totalQuizzes: 0, passedQuizzes: 0 };
 
-    // For now, use the quiz_scores from the exam result itself
-    // This represents the quiz scores that were stored with the exam result
-    const quizScores = examResult.quiz_scores || [];
+    // Find all quiz attempts for this user that are related to this course
+    // This requires connecting quiz_attempts -> quizzes -> (lesson_id or module_id) -> course_modules -> courses
+    const courseQuizzes = quizAttempts.filter(qa => {
+      // Find the quiz associated with this attempt
+      const quiz = qa.quiz; // This is already loaded with the quiz_attempts
 
-    if (quizScores.length === 0) {
+      // Check if the quiz is associated with a lesson that belongs to this course
+      if (quiz?.lesson_id) {
+        // Need to check if this lesson_id is part of the current course
+        // For now, we'll rely on the enrollment_id connection since we have it
+        return qa.enrollment_id === examResult.enrollment_id; // Connect via enrollment
+      }
+      // Check if the quiz is associated with a module that belongs to this course
+      else if (quiz?.module_id) {
+        // Same logic - connect via enrollment
+        return qa.enrollment_id === examResult.enrollment_id;
+      }
+      return false;
+    });
+
+    if (courseQuizzes.length === 0) {
       return { averageScore: 0, totalQuizzes: 0, passedQuizzes: 0 };
     }
 
-    const totalScore = quizScores.reduce((sum, score) => sum + score, 0);
-    const averageScore = Math.round(totalScore / quizScores.length);
-    // Count quizzes with scores >= 70% as passed
-    const passedQuizzes = quizScores.filter(score => score >= 70).length;
+    const totalScore = courseQuizzes.reduce((sum, attempt) => sum + attempt.score, 0);
+    const averageScore = Math.round(totalScore / courseQuizzes.length);
+    const passedQuizzes = courseQuizzes.filter(qa => qa.passed).length;
 
     return {
       averageScore,
-      totalQuizzes: quizScores.length,
+      totalQuizzes: courseQuizzes.length,
       passedQuizzes
     };
   };
