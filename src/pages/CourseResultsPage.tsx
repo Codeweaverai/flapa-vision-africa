@@ -1285,12 +1285,12 @@ const CourseResultsPage = () => {
 
   // Calculate quiz performance per course
   const getQuizPerformanceByCourse = (courseTitle: string) => {
-    // Find the exam result for this course to get the enrollment_id or course_id
+    // Find the exam result for this course to get the enrollment_id
     const examResult = examResults.find(er => er.course.title === courseTitle);
     if (!examResult) return { averageScore: 0, totalQuizzes: 0, passedQuizzes: 0 };
 
-    // Since we don't have direct course linking in quiz attempts yet, we'll calculate based on available data
-    // For now, we'll just return the quiz scores from the exam result itself
+    // For now, use the quiz_scores from the exam result itself
+    // This represents the quiz scores that were stored with the exam result
     const quizScores = examResult.quiz_scores || [];
 
     if (quizScores.length === 0) {
@@ -1299,8 +1299,8 @@ const CourseResultsPage = () => {
 
     const totalScore = quizScores.reduce((sum, score) => sum + score, 0);
     const averageScore = Math.round(totalScore / quizScores.length);
-    // For simplicity, assuming all quizzes with scores are passed ones
-    const passedQuizzes = quizScores.length;
+    // Count quizzes with scores >= 70% as passed
+    const passedQuizzes = quizScores.filter(score => score >= 70).length;
 
     return {
       averageScore,
