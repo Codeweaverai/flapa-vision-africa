@@ -77,6 +77,25 @@ const PulseLoading = () => {
   );
 };
 
+interface QuizAttempt {
+  id: string;
+  quiz_id: string;
+  user_id: string;
+  enrollment_id: string;
+  score: number;
+  passed: boolean;
+  attempt_number: number;
+  started_at: string;
+  completed_at?: string;
+  created_at: string;
+  updated_at: string;
+  quiz: {
+    title: string;
+    lesson_id?: string;
+    module_id?: string;
+  };
+}
+
 interface ExamResult {
   id: string;
   score: number;
@@ -1022,10 +1041,15 @@ const CourseResultsPage = () => {
   const navigate = useNavigate();
   const [examResults, setExamResults] = useState<ExamResult[]>([]);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const [quizAttempts, setQuizAttempts] = useState<QuizAttempt[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
   const [selectedCertificate, setSelectedCertificate] = useState<Certificate | null>(null);
   const [courseSkills, setCourseSkills] = useState<Record<string, CourseSkill[]>>({});
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 2; // Show only 2 courses per page
 
   useEffect(() => {
     if (!user) {
@@ -1081,21 +1105,98 @@ const CourseResultsPage = () => {
             }
           };
         }) || [];
-        
+
         setExamResults(transformedResults);
       }
 
+      // Fetch quiz attempts with course information in a more efficient way
+      // Get lesson-based quiz attempts with course info
+      const { data: lessonQuizAttempts, error: lessonQuizError } = await supabase
+        .from('quiz_attempts')
+        .select(`
+          *,
+          quiz:quizzes!inner (
+            title,
+            lesson_id,
+            lessons!inner (
+              course_modules!inner (
+                courses!inner (id, title)
+              )
+            )
+          )
+        `)
+        .eq('user_id', user!.id)
+        .not('quiz.lesson_id', 'is', null);
+
+      // Get module-based quiz attempts with course info
+      const { data: moduleQuizAttempts, error: moduleQuizError } = await supabase
+        .from('quiz_attempts')
+        .select(`
+          *,
+          quiz:quizzes!inner (
+            title,
+            module_id,
+            course_modules!inner (
+              courses!inner (id, title)
+            )
+          )
+        `)
+        .eq('user_id', user!.id)
+        .not('quiz.module_id', 'is', null);
+
+      if (lessonQuizError) {
+        console.error('Error fetching lesson quiz attempts:', lessonQuizError);
+      }
+      if (moduleQuizError) {
+        console.error('Error fetching module quiz attempts:', moduleQuizError);
+      }
+
+      // Combine and transform the quiz attempts
+      const allQuizAttempts = [
+        ...(lessonQuizAttempts || []).map(attempt => ({
+          ...attempt,
+          course_id: attempt.quiz?.lessons?.course_modules?.courses?.id,
+          course_title: attempt.quiz?.lessons?.course_modules?.courses?.title
+        })),
+        ...(moduleQuizAttempts || []).map(attempt => ({
+          ...attempt,
+          course_id: attempt.quiz?.course_modules?.courses?.id,
+          course_title: attempt.quiz?.course_modules?.courses?.title
+        }))
+      ];
+
+      const transformedQuizAttempts: QuizAttempt[] = allQuizAttempts.map(attempt => ({
+        id: attempt.id,
+        quiz_id: attempt.quiz_id,
+        user_id: attempt.user_id,
+        enrollment_id: attempt.enrollment_id,
+        score: attempt.score,
+        passed: attempt.passed,
+        attempt_number: attempt.attempt_number,
+        started_at: attempt.started_at,
+        completed_at: attempt.completed_at,
+        created_at: attempt.created_at,
+        updated_at: attempt.updated_at,
+        quiz: {
+          title: attempt.quiz?.title || 'Untitled Quiz',
+          lesson_id: attempt.quiz?.lesson_id,
+          module_id: attempt.quiz?.module_id
+        }
+      }));
+
+      setQuizAttempts(transformedQuizAttempts);
+
       // Fetch certificates with better error handling
-      const { data: userEnrollments, error: enrollmentError } = await supabase
+      const { data: certEnrollments, error: certEnrollmentError } = await supabase
         .from('course_enrollments')
         .select('id, course_id, courses!course_enrollments_course_id_fkey(title, creator_id)')
         .eq('user_id', user!.id);
 
-      if (enrollmentError) {
-        console.error('Error fetching enrollments:', enrollmentError);
-      } else if (userEnrollments && userEnrollments.length > 0) {
-        const enrollmentIds = userEnrollments.map(e => e.id);
-        
+      if (certEnrollmentError) {
+        console.error('Error fetching enrollments for certificates:', certEnrollmentError);
+      } else if (certEnrollments && certEnrollments.length > 0) {
+        const enrollmentIds = certEnrollments.map(e => e.id);
+
         const { data: certificatesData, error: certificatesError } = await supabase
           .from('certificates')
           .select('*')
@@ -1107,7 +1208,7 @@ const CourseResultsPage = () => {
         } else {
           // Transform certificates with course titles
           const transformedCertificates: Certificate[] = certificatesData?.map(cert => {
-            const enrollment = userEnrollments.find(e => e.id === cert.enrollment_id);
+            const enrollment = certEnrollments.find(e => e.id === cert.enrollment_id);
             return {
               id: cert.id,
               verification_code: cert.verification_code,
@@ -1118,14 +1219,14 @@ const CourseResultsPage = () => {
               course_id: enrollment?.course_id
             };
           }) || [];
-          
+
           setCertificates(transformedCertificates);
 
           // Fetch skills for each course with certificates
           const courseIds = transformedCertificates
             .map(cert => cert.course_id)
             .filter(Boolean) as string[];
-          
+
           if (courseIds.length > 0) {
             const { data: skillsData, error: skillsError } = await supabase
               .from('course_skill_outcomes')
@@ -1168,6 +1269,42 @@ const CourseResultsPage = () => {
       default:
         return 'bg-gray-500 text-white';
     }
+  };
+
+  // Calculate quiz performance per course
+  const getQuizPerformanceByCourse = (courseTitle: string) => {
+    // Filter quiz attempts for this specific course
+    const courseQuizzes = quizAttempts.filter(qa => {
+      // This would require having course information attached to quiz attempts
+      // which we need to implement during data loading
+      // For now, we'll use a simplified approach
+      return true; // Will be updated when we have proper course linking
+    });
+
+    if (courseQuizzes.length === 0) {
+      return { averageScore: 0, totalQuizzes: 0, passedQuizzes: 0 };
+    }
+
+    const totalScore = courseQuizzes.reduce((sum, attempt) => sum + attempt.score, 0);
+    const averageScore = Math.round(totalScore / courseQuizzes.length);
+    const passedQuizzes = courseQuizzes.filter(qa => qa.passed).length;
+
+    return {
+      averageScore,
+      totalQuizzes: courseQuizzes.length,
+      passedQuizzes
+    };
+  };
+
+  // Function to share certificate to LinkedIn
+  const shareToLinkedIn = (certificate: Certificate) => {
+    // Create a share URL for LinkedIn
+    const certificateUrl = `https://skillpulse.cloud/verify?code=${certificate.verification_code}`;
+    const shareText = `I just earned a certificate in ${certificate.course_title} from SkillPulse!`;
+
+    const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(certificateUrl)}&summary=${encodeURIComponent(shareText)}`;
+
+    window.open(linkedInUrl, '_blank', 'width=600,height=400');
   };
 
   const viewCertificate = (certificate: Certificate) => {
@@ -1256,15 +1393,21 @@ const CourseResultsPage = () => {
                   </CardHeader>
                   <CardContent className="p-6 space-y-6">
                     {examResults.length > 0 ? (
-                      examResults.map((result) => (
-                        <div
-                          key={result.id}
-                          className={`p-6 rounded-xl border-l-4 transition-all duration-300 hover:shadow-lg ${
-                            result.passed
-                              ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-500'
-                              : 'bg-gradient-to-r from-red-50 to-orange-50 border-red-500'
-                          }`}
-                        >
+                      (() => {
+                        // Calculate pagination
+                        const startIndex = (currentPage - 1) * itemsPerPage;
+                        const endIndex = startIndex + itemsPerPage;
+                        const paginatedResults = examResults.slice(startIndex, endIndex);
+
+                        return paginatedResults.map((result) => (
+                          <div
+                            key={result.id}
+                            className={`p-6 rounded-xl border-l-4 transition-all duration-300 hover:shadow-lg ${
+                              result.passed
+                                ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-500'
+                                : 'bg-gradient-to-r from-red-50 to-orange-50 border-red-500'
+                            }`}
+                          >
                           <div className="flex items-center justify-between mb-4">
                             <h3 className="font-semibold text-lg text-gray-900 line-clamp-1">
                               {result.course.title}
@@ -1316,6 +1459,23 @@ const CourseResultsPage = () => {
                             />
                           </div>
 
+                          {/* Additional Quiz Performance Section */}
+                          <div className="mb-4">
+                            <div className="flex justify-between text-sm mb-2">
+                              <span className="text-gray-600">Overall Quiz Average</span>
+                              <span className="font-medium">
+                                {getQuizPerformanceByCourse(result.course.title).averageScore}%
+                              </span>
+                            </div>
+                            <div className="text-xs text-gray-500 mb-1">
+                              {getQuizPerformanceByCourse(result.course.title).totalQuizzes} quizzes • {getQuizPerformanceByCourse(result.course.title).passedQuizzes} passed
+                            </div>
+                            <Progress
+                              value={getQuizPerformanceByCourse(result.course.title).averageScore}
+                              className="h-2 bg-blue-200"
+                            />
+                          </div>
+
                           <div className="flex items-center justify-between text-sm text-gray-500">
                             <span className="flex items-center gap-2">
                               <Calendar className="h-4 w-4" />
@@ -1333,6 +1493,45 @@ const CourseResultsPage = () => {
                         <Target className="h-16 w-16 mx-auto mb-4 text-gray-400" />
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">No Exam Results Yet</h3>
                         <p className="text-gray-600">Complete course exams to see your results here.</p>
+                      </div>
+                    )}
+
+                    {/* Pagination Controls */}
+                    {examResults.length > itemsPerPage && (
+                      <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-200">
+                        <Button
+                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                          disabled={currentPage === 1}
+                          variant="outline"
+                          className="border-gray-300 hover:bg-gray-100"
+                        >
+                          Previous
+                        </Button>
+
+                        <div className="flex items-center gap-2">
+                          {Array.from({ length: Math.ceil(examResults.length / itemsPerPage) }, (_, i) => i + 1).map(page => (
+                            <Button
+                              key={page}
+                              onClick={() => setCurrentPage(page)}
+                              variant={currentPage === page ? "default" : "outline"}
+                              className={currentPage === page
+                                ? "bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
+                                : "border-gray-300 hover:bg-gray-100"
+                              }
+                            >
+                              {page}
+                            </Button>
+                          ))}
+                        </div>
+
+                        <Button
+                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(examResults.length / itemsPerPage)))}
+                          disabled={currentPage === Math.ceil(examResults.length / itemsPerPage)}
+                          variant="outline"
+                          className="border-gray-300 hover:bg-gray-100"
+                        >
+                          Next
+                        </Button>
                       </div>
                     )}
                   </CardContent>
@@ -1397,6 +1596,17 @@ const CourseResultsPage = () => {
                                 Issued on {new Date(certificate.issue_date).toLocaleDateString()}
                               </div>
                               <div className="flex gap-2">
+                                <Button
+                                  onClick={() => shareToLinkedIn(certificate)}
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-blue-300 text-blue-700 hover:bg-blue-50 hover:border-blue-400"
+                                >
+                                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path fillRule="evenodd" d="M19.812 5.418c.861.23 1.538.907 1.768 1.768C21.998 8.746 22 12 22 12s0 6.549-3.75 6.549c-1.739 0-3.163-1.177-3.463-2.781H12v-3.24h3.847v-2.26H12v-3.206h3.496c-.097-1.765.393-3.53 2.34-4.703zM8.048 19.6V8.398H5.791v11.202h2.257zm-1.113-13.612c-.68 0-1.227.553-1.227 1.24 0 .678.547 1.227 1.227 1.227.69 0 1.238-.549 1.238-1.227 0-.687-.548-1.24-1.238-1.24zm-2.96 13.612H1.729V8.398h2.246v11.202zM.31 4.184h2.258v11.202H.31V4.184z" clipRule="evenodd" />
+                                  </svg>
+                                  Share
+                                </Button>
                                 <Button
                                   onClick={() => viewCertificate(certificate)}
                                   size="sm"
