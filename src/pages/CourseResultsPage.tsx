@@ -1355,7 +1355,7 @@ const CourseResultsPage = () => {
                   </div>
                 </CardContent>
               </Card>
-              
+
               <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
                 <CardContent className="p-6">
                   <div className="flex items-center">
@@ -1367,7 +1367,7 @@ const CourseResultsPage = () => {
                   </div>
                 </CardContent>
               </Card>
-              
+
               <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
                 <CardContent className="p-6">
                   <div className="flex items-center">
@@ -1392,22 +1392,33 @@ const CourseResultsPage = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-6 space-y-6">
-                    {examResults.length > 0 ? (
-                      (() => {
-                        // Calculate pagination
-                        const startIndex = (currentPage - 1) * itemsPerPage;
-                        const endIndex = startIndex + itemsPerPage;
-                        const paginatedResults = examResults.slice(startIndex, endIndex);
+                    {(() => {
+                      // Calculate pagination
+                      const startIndex = (currentPage - 1) * itemsPerPage;
+                      const endIndex = startIndex + itemsPerPage;
+                      const paginatedResults = examResults.length > 0 ? examResults.slice(startIndex, endIndex) : [];
 
-                        return paginatedResults.map((result) => (
-                          <div
-                            key={result.id}
-                            className={`p-6 rounded-xl border-l-4 transition-all duration-300 hover:shadow-lg ${
-                              result.passed
-                                ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-500'
-                                : 'bg-gradient-to-r from-red-50 to-orange-50 border-red-500'
-                            }`}
-                          >
+                      if (paginatedResults.length === 0) {
+                        return (
+                          <div className="text-center py-12">
+                            <Target className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Exam Results Yet</h3>
+                            <p className="text-gray-600">Complete course exams to see your results here.</p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <>
+                          {paginatedResults.map((result) => (
+                            <div
+                              key={result.id}
+                              className={`p-6 rounded-xl border-l-4 transition-all duration-300 hover:shadow-lg ${
+                                result.passed
+                                  ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-500'
+                                  : 'bg-gradient-to-r from-red-50 to-orange-50 border-red-500'
+                              }`}
+                            >
                           <div className="flex items-center justify-between mb-4">
                             <h3 className="font-semibold text-lg text-gray-900 line-clamp-1">
                               {result.course.title}
@@ -1488,13 +1499,9 @@ const CourseResultsPage = () => {
                           </div>
                         </div>
                       ))
-                    ) : (
-                      <div className="text-center py-12">
-                        <Target className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">No Exam Results Yet</h3>
-                        <p className="text-gray-600">Complete course exams to see your results here.</p>
-                      </div>
                     )}
+                    </>
+                  )()}
 
                     {/* Pagination Controls */}
                     {examResults.length > itemsPerPage && (
