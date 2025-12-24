@@ -1076,7 +1076,7 @@ const CourseResultsPage = () => {
         console.error('Error fetching exam results:', resultsError);
       } else {
         // Transform the data to match our interface
-        const transformedResults: ExamResult[] = resultsData?.map(result => {
+        const allTransformedResults: ExamResult[] = resultsData?.map(result => {
           // Safely convert quiz_scores from Json to number[]
           let quizScores: number[] = [];
           if (Array.isArray(result.quiz_scores)) {
@@ -1106,7 +1106,20 @@ const CourseResultsPage = () => {
           };
         }) || [];
 
-        setExamResults(transformedResults);
+        // Filter to keep only the highest result per course
+        const highestResultsPerCourse: ExamResult[] = [];
+        const courseMap = new Map<string, ExamResult>();
+
+        allTransformedResults.forEach(result => {
+          const existingResult = courseMap.get(result.course.title);
+
+          if (!existingResult || result.final_grade > existingResult.final_grade) {
+            courseMap.set(result.course.title, result);
+          }
+        });
+
+        // Convert map back to array
+        setExamResults(Array.from(courseMap.values()));
       }
 
       // Fetch quiz attempts with course information in a more efficient way
@@ -1273,27 +1286,43 @@ const CourseResultsPage = () => {
 
   // Calculate quiz performance per course
   const getQuizPerformanceByCourse = (courseTitle: string) => {
-    // Filter quiz attempts for this specific course
-    const courseQuizzes = quizAttempts.filter(qa => {
-      // This would require having course information attached to quiz attempts
-      // which we need to implement during data loading
-      // For now, we'll use a simplified approach
-      return true; // Will be updated when we have proper course linking
-    });
+    // Find the exam result for this course to get the enrollment_id or course_id
+    const examResult = examResults.find(er => er.course.title === courseTitle);
+    if (!examResult) return { averageScore: 0, totalQuizzes: 0, passedQuizzes: 0 };
 
-    if (courseQuizzes.length === 0) {
+    // Since we don't have direct course linking in quiz attempts yet, we'll calculate based on available data
+    // For now, we'll just return the quiz scores from the exam result itself
+    const quizScores = examResult.quiz_scores || [];
+
+    if (quizScores.length === 0) {
       return { averageScore: 0, totalQuizzes: 0, passedQuizzes: 0 };
     }
 
-    const totalScore = courseQuizzes.reduce((sum, attempt) => sum + attempt.score, 0);
-    const averageScore = Math.round(totalScore / courseQuizzes.length);
-    const passedQuizzes = courseQuizzes.filter(qa => qa.passed).length;
+    const totalScore = quizScores.reduce((sum, score) => sum + score, 0);
+    const averageScore = Math.round(totalScore / quizScores.length);
+    // For simplicity, assuming all quizzes with scores are passed ones
+    const passedQuizzes = quizScores.length;
 
     return {
       averageScore,
-      totalQuizzes: courseQuizzes.length,
+      totalQuizzes: quizScores.length,
       passedQuizzes
     };
+  };
+
+  // Calculate combined course grade (average of quizzes and final exam)
+  const getCombinedCourseGrade = (courseTitle: string) => {
+    const examResult = examResults.find(er => er.course.title === courseTitle);
+    if (!examResult) return 0;
+
+    const quizPerformance = getQuizPerformanceByCourse(courseTitle);
+
+    // Calculate combined grade as average of quiz average and final exam score
+    if (quizPerformance.totalQuizzes > 0) {
+      return Math.round((quizPerformance.averageScore + examResult.percentage_score) / 2);
+    } else {
+      return examResult.percentage_score;
+    }
   };
 
   // Function to share certificate as a post to LinkedIn
@@ -1303,12 +1332,16 @@ const CourseResultsPage = () => {
     const skillNames = skills.slice(0, 5).map(skill => skill.skill_name).join(', '); // Limit to first 5 skills
 
     // Create share URL for LinkedIn with a congratulatory message
+    // Use the proper LinkedIn share URL that supports pre-populated content
     const certificateUrl = `https://skillpulse.cloud/verify?code=${certificate.verification_code}`;
     const shareText = `🎓 Just completed ${certificate.course_title} with SkillPulse Innovations Limited! 🌟 Achieved professional development in ${skillNames || 'various skills'} and earned my certification. So proud of this milestone! 🚀 #LearningJourney #Achievement #Certification #ProfessionalDevelopment #SkillPulse`;
 
-    const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(certificateUrl)}&summary=${encodeURIComponent(shareText)}`;
+    // LinkedIn doesn't allow pre-populating text in shares anymore for privacy reasons
+    // We'll use the official share URL that opens the share composer with the URL pre-filled
+    const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(certificateUrl)}`;
 
     window.open(linkedInUrl, '_blank', 'width=600,height=400');
+  };
   };
 
   // Function to add certificate to LinkedIn profile
@@ -1342,7 +1375,7 @@ const CourseResultsPage = () => {
   const totalCourses = examResults.length;
   const passedCourses = examResults.filter(r => r.passed).length;
   const averageGrade = examResults.length > 0
-    ? Math.round(examResults.reduce((sum, r) => sum + r.final_grade, 0) / examResults.length)
+    ? Math.round(examResults.reduce((sum, r) => sum + getCombinedCourseGrade(r.course.title), 0) / examResults.length)
     : 0;
 
   return (
@@ -1441,9 +1474,9 @@ const CourseResultsPage = () => {
                           <div className="grid grid-cols-2 gap-6 mb-4">
                             <div className="text-center p-3 bg-white rounded-lg shadow-sm">
                               <div className="text-2xl font-bold text-purple-600">
-                                {result.percentage_score}%
+                                {getCombinedCourseGrade(result.course.title)}%
                               </div>
-                              <div className="text-xs text-gray-500 uppercase tracking-wide">Exam Score</div>
+                              <div className="text-xs text-gray-500 uppercase tracking-wide">Combined Score</div>
                             </div>
                             <div className="text-center p-3 bg-white rounded-lg shadow-sm">
                               <div className="text-2xl font-bold text-orange-600">
