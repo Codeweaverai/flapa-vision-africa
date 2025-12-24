@@ -1296,15 +1296,28 @@ const CourseResultsPage = () => {
     };
   };
 
-  // Function to share certificate to LinkedIn
-  const shareToLinkedIn = (certificate: Certificate) => {
-    // Create a share URL for LinkedIn
+  // Function to share certificate as a post to LinkedIn
+  const shareToLinkedInPost = (certificate: Certificate) => {
+    // Create a share URL for LinkedIn with a congratulatory message
     const certificateUrl = `https://skillpulse.cloud/verify?code=${certificate.verification_code}`;
-    const shareText = `I just earned a certificate in ${certificate.course_title} from SkillPulse!`;
+    const shareText = `🎓 Just earned my ${certificate.course_title} certificate from SkillPulse! 🌟 So proud of this achievement. Hard work and dedication paid off! #LearningJourney #Achievement #Certification #ProfessionalDevelopment`;
 
     const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(certificateUrl)}&summary=${encodeURIComponent(shareText)}`;
 
     window.open(linkedInUrl, '_blank', 'width=600,height=400');
+  };
+
+  // Function to add certificate to LinkedIn profile
+  const addToLinkedInProfile = (certificate: Certificate) => {
+    // Extract year from issue date
+    const issueDate = new Date(certificate.issue_date);
+    const year = issueDate.getFullYear();
+    const month = issueDate.getMonth() + 1; // Month is 0-indexed
+
+    // Create the LinkedIn add to profile URL with course details
+    const profileUrl = `https://www.linkedin.com/profile/add?startTask=CERTIFICATION_NAME&name=${encodeURIComponent(certificate.course_title)}&organizationId=1337&issueYear=${year}&issueMonth=${month}&certUrl=${encodeURIComponent(`https://skillpulse.cloud/verify?code=${certificate.verification_code}`)}&certId=${certificate.verification_code}`;
+
+    window.open(profileUrl, '_blank', 'width=800,height=600');
   };
 
   const viewCertificate = (certificate: Certificate) => {
@@ -1434,26 +1447,20 @@ const CourseResultsPage = () => {
 
                           <div className="mb-4">
                             <div className="flex justify-between text-sm mb-2">
-                              <span className="text-gray-600">Quiz Performance</span>
+                              <span className="text-gray-600">Final Exam Score</span>
                               <span className="font-medium">
-                                {result.quiz_scores.length > 0
-                                  ? Math.round(result.quiz_scores.reduce((a, b) => a + b, 0) / result.quiz_scores.length)
-                                  : 0}%
+                                {result.percentage_score}%
                               </span>
                             </div>
                             <Progress
-                              value={
-                                result.quiz_scores.length > 0
-                                  ? result.quiz_scores.reduce((a, b) => a + b, 0) / result.quiz_scores.length
-                                  : 0
-                              }
+                              value={result.percentage_score}
                               className={`h-2 ${
                                 result.passed ? 'bg-green-200' : 'bg-red-200'
                               }`}
                             />
                           </div>
 
-                          {/* Additional Quiz Performance Section */}
+                          {/* Overall Quiz Average Section */}
                           <div className="mb-4">
                             <div className="flex justify-between text-sm mb-2">
                               <span className="text-gray-600">Overall Quiz Average</span>
@@ -1552,7 +1559,7 @@ const CourseResultsPage = () => {
                               </div>
                               <div className="flex gap-2">
                                 <Button
-                                  onClick={() => shareToLinkedIn(certificate)}
+                                  onClick={() => shareToLinkedInPost(certificate)}
                                   size="sm"
                                   variant="outline"
                                   className="border-blue-300 text-blue-700 hover:bg-blue-50 hover:border-blue-400"
@@ -1560,7 +1567,18 @@ const CourseResultsPage = () => {
                                   <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                     <path fillRule="evenodd" d="M19.812 5.418c.861.23 1.538.907 1.768 1.768C21.998 8.746 22 12 22 12s0 6.549-3.75 6.549c-1.739 0-3.163-1.177-3.463-2.781H12v-3.24h3.847v-2.26H12v-3.206h3.496c-.097-1.765.393-3.53 2.34-4.703zM8.048 19.6V8.398H5.791v11.202h2.257zm-1.113-13.612c-.68 0-1.227.553-1.227 1.24 0 .678.547 1.227 1.227 1.227.69 0 1.238-.549 1.238-1.227 0-.687-.548-1.24-1.238-1.24zm-2.96 13.612H1.729V8.398h2.246v11.202zM.31 4.184h2.258v11.202H.31V4.184z" clipRule="evenodd" />
                                   </svg>
-                                  Share
+                                  Share Post
+                                </Button>
+                                <Button
+                                  onClick={() => addToLinkedInProfile(certificate)}
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-blue-500 bg-blue-500 text-white hover:bg-blue-600 hover:border-blue-600"
+                                >
+                                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path fillRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.418 0-8-3.582-8-8s3.582-8 8-8 8 3.582 8 8-3.582 8-8 8zm-1-13v2h-2v2h2v2h2v-2h2v-2h-2V7h-2z" clipRule="evenodd" />
+                                  </svg>
+                                  Add to Profile
                                 </Button>
                                 <Button
                                   onClick={() => viewCertificate(certificate)}
