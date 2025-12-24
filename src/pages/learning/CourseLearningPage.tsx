@@ -3125,8 +3125,8 @@ const CourseLearningPage = () => {
         }
 
         if (user?.id) {
-          // Fetch enrollment, progress, and completed lessons in parallel
-          const [enrollmentResult, progressResult, completedLessonsResult] = await Promise.allSettled([
+          // Fetch enrollment and progress in parallel
+          const [enrollmentResult, progressResult] = await Promise.allSettled([
             supabase
               .from('course_enrollments')
               .select('*')
@@ -3138,14 +3138,24 @@ const CourseLearningPage = () => {
               .select('*')
               .eq('user_id', user.id)
               .eq('course_id', courseId)
-              .maybeSingle(),
-            supabase
+              .maybeSingle()
+          ]);
+
+          // Fetch completed lessons separately to avoid complex query issues
+          let completedLessonsData = [];
+          try {
+            const { data, error } = await supabase
               .from('lesson_progress')
               .select('lesson_id')
               .eq('user_id', user.id)
               .eq('course_id', courseId)
-              .eq('is_completed', 'true') // Use string representation for boolean
-          ]);
+              .eq('is_completed', true);
+            if (!error) {
+              completedLessonsData = data?.map(item => item.lesson_id) || [];
+            }
+          } catch (error) {
+            console.error('Error fetching completed lessons:', error);
+          }
 
           if (enrollmentResult.status === 'fulfilled') {
             setEnrollment(enrollmentResult.value.data);
@@ -3155,9 +3165,7 @@ const CourseLearningPage = () => {
             setProgress(progressResult.value.data);
           }
 
-          if (completedLessonsResult.status === 'fulfilled') {
-            setCompletedLessons(completedLessonsResult.value.data?.map(item => item.lesson_id) || []);
-          }
+          setCompletedLessons(completedLessonsData);
         }
 
         setDataLoaded(true);
