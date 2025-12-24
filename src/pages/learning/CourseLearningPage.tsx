@@ -3025,8 +3025,7 @@ const CourseLearningPage = () => {
                 answers:quiz_answers(*)
               )
             `)
-            .in('lesson_id', lessonIds)
-            .neq('lesson_id', null); // Only lesson quizzes where lesson_id is not null
+            .in('lesson_id', lessonIds); // Only lesson quizzes (by filtering with lesson IDs)
           lessonQuizzesData = data;
           lessonQuizzesError = error;
         }
