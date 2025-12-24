@@ -3141,11 +3141,11 @@ const CourseLearningPage = () => {
               .maybeSingle()
           ]);
 
-          // Fetch completed lessons separately to avoid complex query issues
+          // Fetch completed lessons using the lesson_progress_with_user view to simplify the query
           let completedLessonsData = [];
           try {
             const { data, error } = await supabase
-              .from('lesson_progress')
+              .from('lesson_progress_with_user')
               .select('lesson_id')
               .eq('user_id', user.id)
               .eq('course_id', courseId)
