@@ -1107,7 +1107,6 @@ const CourseResultsPage = () => {
         }) || [];
 
         // Filter to keep only the highest result per course
-        const highestResultsPerCourse: ExamResult[] = [];
         const courseMap = new Map<string, ExamResult>();
 
         allTransformedResults.forEach(result => {
@@ -1341,7 +1340,6 @@ const CourseResultsPage = () => {
     const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(certificateUrl)}`;
 
     window.open(linkedInUrl, '_blank', 'width=600,height=400');
-  };
   };
 
   // Function to add certificate to LinkedIn profile
