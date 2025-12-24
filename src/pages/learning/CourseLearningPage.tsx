@@ -2990,7 +2990,7 @@ const CourseLearningPage = () => {
             )
           `)
           .in('lesson_id', lessonIds)
-          .is('lesson_id', 'not', null); // Only lesson quizzes
+          .neq('lesson_id', null); // Only lesson quizzes where lesson_id is not null
 
         if (lessonQuizzesError) {
           console.error('Error fetching lesson quizzes:', lessonQuizzesError);
@@ -3020,7 +3020,7 @@ const CourseLearningPage = () => {
             )
           `)
           .in('module_id', moduleIds)
-          .is('lesson_id', null); // Only module quizzes
+          .is('lesson_id', null); // Only module quizzes (where lesson_id is null, meaning it's a module quiz)
 
         if (moduleQuizzesError) {
           console.error('Error fetching module quizzes:', moduleQuizzesError);
