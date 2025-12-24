@@ -1786,8 +1786,12 @@ const CourseLearningPage = () => {
   const params = useParams();
   const navigate = useNavigate();
   const courseId = params.courseId || params.id;
-  
+
   const { user } = useAuth();
+
+  // Caching mechanisms for better performance
+  const quizAttemptsCacheRef = useRef<{[key: string]: any}>({});
+  const lessonProgressCacheRef = useRef<{[key: string]: boolean}>({});
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<CourseModule[]>([]);
   const [enrollment, setEnrollment] = useState<CourseEnrollment | null>(null);
@@ -2069,10 +2073,16 @@ const CourseLearningPage = () => {
       if (completedError) throw completedError;
 
       const completedLessonIds = completedData?.map(item => item.lesson_id) || [];
+
+      // Update the cache with the completed lessons
+      completedLessonIds.forEach(lessonId => {
+        lessonProgressCacheRef.current[lessonId] = true;
+      });
+
       const progressPercentage = Math.round((completedLessonIds.length / totalLessons) * 100);
 
       setCompletedLessons(completedLessonIds);
-      
+
       const { error: progressError } = await supabase
         .from('course_progress')
         .upsert({
@@ -2096,9 +2106,9 @@ const CourseLearningPage = () => {
       setProgress(progressData);
 
       // Auto-complete course when conditions are met
-      const shouldAutoComplete = !finalExam && 
-                                completedLessonIds.length === totalLessons && 
-                                totalLessons > 0 && 
+      const shouldAutoComplete = !finalExam &&
+                                completedLessonIds.length === totalLessons &&
+                                totalLessons > 0 &&
                                 !isCourseCompleted &&
                                 !completionAttempted.current;
 
@@ -2156,7 +2166,7 @@ const CourseLearningPage = () => {
 
     try {
       console.log('Loading quiz attempts for enrollment:', enrollment.id);
-      
+
       // Get all quiz attempts
       const { data: quizAttempts, error } = await supabase
         .from('quiz_attempts')
@@ -2174,14 +2184,15 @@ const CourseLearningPage = () => {
       // Group attempts by quiz_id to get the latest attempt
       const latestAttempts = new Map();
       quizAttempts?.forEach(attempt => {
+        // Only store the first (most recent) attempt for each quiz
         if (!latestAttempts.has(attempt.quiz_id)) {
           latestAttempts.set(attempt.quiz_id, attempt);
         }
       });
 
       // Update modules with quiz completion status
-      setModules(prevModules => 
-        prevModules.map(module => ({
+      setModules(prevModules => {
+        const updatedModules = prevModules.map(module => ({
           ...module,
           lessons: module.lessons.map(lesson => {
             if (lesson.quiz) {
@@ -2207,8 +2218,10 @@ const CourseLearningPage = () => {
               user_score: attempt?.score || 0
             };
           })
-        }))
-      );
+        }));
+
+        return updatedModules;
+      });
     } catch (error) {
       console.error('Error loading quiz attempts:', error);
     }
@@ -2373,15 +2386,30 @@ const CourseLearningPage = () => {
     console.log('=== TESTING QUIZ FETCHING ===');
     
     try {
-      // Test 1: Get all quizzes for this course
-      const { data: allQuizzes, error } = await supabase
+      // Test 1: Get all quizzes for this course - broken down into simpler queries
+      // First get lesson quizzes
+      const { data: lessonQuizzes, error: lessonQuizError } = await supabase
         .from('quizzes')
         .select('*, lesson:lessons(title), module:course_modules(title)')
-        .or(`lesson_id.in.(select id from lessons where module_id in (select id from course_modules where course_id = '${courseId}')),module_id.in.(select id from course_modules where course_id = '${courseId}')`);
-      
-      if (error) {
-        console.error('Error fetching all quizzes:', error);
-        return;
+        .eq('course_id', courseId)
+        .not('lesson_id', 'is', null);
+
+      // Then get module quizzes
+      const { data: moduleQuizzes, error: moduleQuizError } = await supabase
+        .from('quizzes')
+        .select('*, lesson:lessons(title), module:course_modules(title)')
+        .eq('course_id', courseId)
+        .is('lesson_id', null);
+
+      let allQuizzes = [];
+      if (!lessonQuizError && lessonQuizzes) allQuizzes = allQuizzes.concat(lessonQuizzes);
+      if (!moduleQuizError && moduleQuizzes) allQuizzes = allQuizzes.concat(moduleQuizzes);
+
+      if (lessonQuizError) {
+        console.error('Error fetching lesson quizzes:', lessonQuizError);
+      }
+      if (moduleQuizError) {
+        console.error('Error fetching module quizzes:', moduleQuizError);
       }
       
       console.log('All quizzes in course:', allQuizzes);
@@ -2427,7 +2455,7 @@ const CourseLearningPage = () => {
       }
     }
 
-    if (watchPercentage > 80 && !completedLessons.includes(selectedLesson.id)) {
+    if (watchPercentage > 80 && !completedLessons.includes(selectedLesson.id) && !lessonProgressCacheRef.current[selectedLesson.id]) {
       try {
         const { error } = await supabase
           .from('lesson_progress')
@@ -2442,6 +2470,10 @@ const CourseLearningPage = () => {
           });
 
         if (error) throw error;
+
+        // Update the cache immediately to prevent duplicate calls
+        lessonProgressCacheRef.current[selectedLesson.id] = true;
+
         await syncCourseProgress();
       } catch (error) {
         console.error('Error updating lesson progress:', error);
@@ -2980,17 +3012,23 @@ const CourseLearningPage = () => {
 
         // Fetch all quizzes for lessons in a single query
         const lessonIds = allLessonsData?.map(l => l.id) || [];
-        const { data: lessonQuizzesData, error: lessonQuizzesError } = await supabase
-          .from('quizzes')
-          .select(`
-            *,
-            questions:quiz_questions(
+        let lessonQuizzesData = [];
+        let lessonQuizzesError = null;
+
+        if (lessonIds.length > 0) {
+          const { data, error } = await supabase
+            .from('quizzes')
+            .select(`
               *,
-              answers:quiz_answers(*)
-            )
-          `)
-          .in('lesson_id', lessonIds)
-          .neq('lesson_id', null); // Only lesson quizzes where lesson_id is not null
+              questions:quiz_questions(
+                *,
+                answers:quiz_answers(*)
+              )
+            `)
+            .in('lesson_id', lessonIds);
+          lessonQuizzesData = data;
+          lessonQuizzesError = error;
+        }
 
         if (lessonQuizzesError) {
           console.error('Error fetching lesson quizzes:', lessonQuizzesError);
