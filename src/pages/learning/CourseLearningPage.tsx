@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
-import LazyVideoPlayer from '@/components/course/LazyVideoPlayer';
+import ReactPlayer from 'react-player';
 import { 
   Play, Clock, User, BookOpen, Award, Star, Users,
   MessageCircle, Target, CheckCircle, StickyNote,
@@ -945,7 +945,7 @@ const EnhancedDiscussionSection: React.FC<EnhancedDiscussionSectionProps> = ({
 };
 
 // ==================== VIDEO PLAYER WRAPPER ====================
-// Uses LazyVideoPlayer component for optimized video playback
+// Uses ReactPlayer component for direct video playback
 
 // ==================== QUIZ ITEM COMPONENT ====================
 
@@ -3473,24 +3473,43 @@ const CourseLearningPage = () => {
                             {/* Video Player */}
                             {(selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url) && (
                               <div className="space-y-6 w-full">
-                                <LazyVideoPlayer
-                                  videoUrl={selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url || ''}
-                                  thumbnail={course.thumbnail_url}
-                                  onProgress={handleVideoProgress}
-                                  onEnd={handleVideoEnd}
-                                  onError={(error) => {
-                                    console.error('Video playback error:', error);
-                                    toast.error('There was an issue loading the video. Please try again.');
-                                  }}
-                                />
-                                
+                                <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-xl">
+                                  <ReactPlayer
+                                    url={selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url || ''}
+                                    controls={true}
+                                    playing={true}
+                                    width="100%"
+                                    height="100%"
+                                    light={course.thumbnail_url}
+                                    config={{
+                                      file: {
+                                        attributes: {
+                                          controlsList: 'nodownload noremoteplayback',
+                                          disablePictureInPicture: true,
+                                          preload: 'metadata',
+                                          onContextMenu: (e: any) => e.preventDefault()
+                                        }
+                                      }
+                                    }}
+                                    onProgress={handleVideoProgress}
+                                    onEnded={handleVideoEnd}
+                                    onError={(error) => {
+                                      console.error('Video playback error:', error);
+                                      toast.error('There was an issue loading the video. Please try again.');
+                                    }}
+                                    style={{
+                                      minHeight: '400px'
+                                    }}
+                                  />
+                                </div>
+
                                 {/* Video Controls */}
                                 <div className="flex flex-wrap gap-3 w-full">
                                   <Button variant="outline" size="sm" className="border-gray-300 hover:bg-gray-100">
                                     <Bookmark className="h-4 w-4 mr-2" />
                                     Bookmark
                                   </Button>
-                                  <Button variant="outline" size="sm" className="border-gray-300 hover:bg-gray-100">
+                                  <Button variant="outline" size="sm" className="border-gray-300 hover:bg-gray-100" disabled>
                                     <Download className="h-4 w-4 mr-2" />
                                     Download
                                   </Button>
@@ -3499,7 +3518,7 @@ const CourseLearningPage = () => {
                                     Share
                                   </Button>
                                   {selectedLesson?.quiz && (
-                                    <Button 
+                                    <Button
                                       onClick={() => handleQuizStart(selectedLesson.quiz!.id, selectedLesson.id)}
                                       size="sm"
                                       className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-md hover:shadow-lg"
