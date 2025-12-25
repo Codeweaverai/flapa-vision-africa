@@ -1327,6 +1327,7 @@ const CourseResultsPage = () => {
     }
   };
 
+
   // Function to share certificate as a post to LinkedIn
   const shareToLinkedInPost = (certificate: Certificate) => {
     // Get skills for this course to include in the post
