@@ -2279,13 +2279,13 @@ const CourseLearningPage = () => {
 
           // Fetch likes count
           const { data: likesData } = await supabase
-            .from('discussion_likes')
+            .from('lesson_discussion_likes')
             .select('*')
             .eq('discussion_id', discussion.id);
 
           // Check if current user liked
           const { data: userLikeData } = await supabase
-            .from('discussion_likes')
+            .from('lesson_discussion_likes')
             .select('*')
             .eq('discussion_id', discussion.id)
             .eq('user_id', user?.id)
@@ -2796,7 +2796,7 @@ const CourseLearningPage = () => {
 
     try {
       const { data: existingLike, error: checkError } = await supabase
-        .from('discussion_likes')
+        .from('lesson_discussion_likes')
         .select('*')
         .eq('discussion_id', discussionId)
         .eq('user_id', user.id)
@@ -2807,7 +2807,7 @@ const CourseLearningPage = () => {
       if (existingLike) {
         // Unlike
         const { error } = await supabase
-          .from('discussion_likes')
+          .from('lesson_discussion_likes')
           .delete()
           .eq('id', existingLike.id);
 
@@ -2815,7 +2815,7 @@ const CourseLearningPage = () => {
       } else {
         // Like
         const { error } = await supabase
-          .from('discussion_likes')
+          .from('lesson_discussion_likes')
           .insert({
             user_id: user.id,
             discussion_id: discussionId
