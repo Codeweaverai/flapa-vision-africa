@@ -89,6 +89,8 @@ interface QuizAttempt {
   completed_at?: string;
   created_at: string;
   updated_at: string;
+  course_id?: string;  // Added for course identification
+  course_title?: string;  // Added for course identification
   quiz: {
     title: string;
     lesson_id?: string;
@@ -98,6 +100,7 @@ interface QuizAttempt {
 
 interface ExamResult {
   id: string;
+  enrollment_id: string; // Added to connect to quiz attempts
   score: number;
   percentage_score: number;
   passed: boolean;
@@ -1088,6 +1091,7 @@ const CourseResultsPage = () => {
 
           return {
             id: result.id,
+            enrollment_id: result.enrollment_id, // Include the enrollment_id to connect to quiz attempts
             score: result.score,
             percentage_score: result.percentage_score,
             passed: result.passed,
@@ -1189,6 +1193,8 @@ const CourseResultsPage = () => {
         completed_at: attempt.completed_at,
         created_at: attempt.created_at,
         updated_at: attempt.updated_at,
+        course_id: attempt.course_id,
+        course_title: attempt.course_title,
         quiz: {
           title: attempt.quiz?.title || 'Untitled Quiz',
           lesson_id: attempt.quiz?.lesson_id,
@@ -1285,29 +1291,11 @@ const CourseResultsPage = () => {
 
   // Calculate quiz performance per course by aggregating from quiz_attempts
   const getQuizPerformanceByCourse = (courseTitle: string) => {
-    // Find the exam result for this course to get the enrollment_id
-    const examResult = examResults.find(er => er.course.title === courseTitle);
-    if (!examResult) return { averageScore: 0, totalQuizzes: 0, passedQuizzes: 0 };
-
-    // Find all quiz attempts for this user that are related to this course
-    // This requires connecting quiz_attempts -> quizzes -> (lesson_id or module_id) -> course_modules -> courses
-    const courseQuizzes = quizAttempts.filter(qa => {
-      // Find the quiz associated with this attempt
-      const quiz = qa.quiz; // This is already loaded with the quiz_attempts
-
-      // Check if the quiz is associated with a lesson that belongs to this course
-      if (quiz?.lesson_id) {
-        // Need to check if this lesson_id is part of the current course
-        // For now, we'll rely on the enrollment_id connection since we have it
-        return qa.enrollment_id === examResult.enrollment_id; // Connect via enrollment
-      }
-      // Check if the quiz is associated with a module that belongs to this course
-      else if (quiz?.module_id) {
-        // Same logic - connect via enrollment
-        return qa.enrollment_id === examResult.enrollment_id;
-      }
-      return false;
-    });
+    // Find all quiz attempts that are related to this specific course
+    // We can now use the course_title that's included in each quiz attempt
+    const courseQuizzes = quizAttempts.filter(qa =>
+      qa.course_title === courseTitle
+    );
 
     if (courseQuizzes.length === 0) {
       return { averageScore: 0, totalQuizzes: 0, passedQuizzes: 0 };
