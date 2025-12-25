@@ -2735,10 +2735,12 @@ const CourseLearningPage = () => {
 
       if (error) throw error;
 
-      setNewDiscussion('');
-      toast.success('Discussion added successfully');
-      
-      // Realtime subscription will update the list
+      if (data) {
+        // Add the new discussion to the state immediately for instant UI update
+        setDiscussions(prev => [data, ...prev]);
+        setNewDiscussion('');
+        toast.success('Discussion added successfully');
+      }
     } catch (error) {
       console.error('Error adding discussion:', error);
       toast.error('Failed to add discussion. Please try again.');
@@ -2769,11 +2771,20 @@ const CourseLearningPage = () => {
         `)
         .single();
 
-      if (error) throw error;
+      if (data) {
+        // Update the parent discussion with the new reply
+        setDiscussions(prev =>
+          prev.map(discussion =>
+            discussion.id === parentId
+              ? { ...discussion, replies: [...(discussion.replies || []), data], reply_count: (discussion.reply_count || 0) + 1 }
+              : discussion
+          )
+        );
 
-      setReplyContent('');
-      setReplyingTo(null);
-      toast.success('Reply added successfully');
+        setReplyContent('');
+        setReplyingTo(null);
+        toast.success('Reply added successfully');
+      }
     } catch (error) {
       console.error('Error adding reply:', error);
       toast.error('Failed to add reply. Please try again.');
