@@ -27,6 +27,15 @@ import {
   Filter, Search, SortAsc, Pin, Flag, EyeOff
 } from 'lucide-react';
 import { toast } from 'sonner';
+import EmojiPicker, { Theme, EmojiClickData } from 'emoji-picker-react';
+import Editor from 'react-simple-code-editor';
+import Prism from 'prismjs';
+import 'prismjs/components/prism-javascript';
+import 'prismjs/components/prism-typescript';
+import 'prismjs/components/prism-python';
+import 'prismjs/components/prism-java';
+import 'prismjs/components/prism-css';
+import 'prismjs/themes/prism.css';
 import CourseReviewsTab from '@/components/course/CourseReviewsTab';
 import AddToCartButton from '@/components/cart/AddToCartButton';
 import FinalExamModal from '@/components/course/FinalExamModal';
@@ -802,35 +811,63 @@ const EnhancedDiscussionSection: React.FC<EnhancedDiscussionSectionProps> = ({
               </p>
             </div>
             
-            <Textarea
-              placeholder="What would you like to discuss?"
-              value={newDiscussion}
-              onChange={(e) => setNewDiscussion(e.target.value)}
-              rows={3}
-              className="resize-none border-gray-300 focus:border-blue-400 focus:ring-blue-300 rounded-xl"
-            />
-            
-            <div className="flex items-center justify-between mt-3">
-              <div className="flex items-center gap-2">
-                <button className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
+            <div className="relative">
+              <Textarea
+                placeholder="What would you like to discuss?"
+                value={newDiscussion}
+                onChange={(e) => setNewDiscussion(e.target.value)}
+                rows={3}
+                className="resize-none border-gray-300 focus:border-blue-400 focus:ring-blue-300 rounded-xl pr-10"
+              />
+
+              {/* Emoji Picker Button */}
+              <div className="absolute right-3 bottom-3">
+                <button
+                  type="button"
+                  className="p-1 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50"
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                >
                   <Smile className="h-5 w-5" />
                 </button>
-                <button className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
-                  <Image className="h-5 w-5" />
+
+                {/* Emoji Picker Popup */}
+                {showEmojiPicker && (
+                  <div className="absolute bottom-10 left-0 z-50">
+                    <EmojiPicker
+                      onEmojiClick={(emojiData) => {
+                        setNewDiscussion(prev => prev + emojiData.emoji);
+                        setShowEmojiPicker(false);
+                      }}
+                      theme={Theme.LIGHT}
+                      height={350}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between mt-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50"
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                >
+                  <Smile className="h-5 w-5" />
                 </button>
-                <button className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
-                  <Paperclip className="h-5 w-5" />
-                </button>
-                <button className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
+                <button
+                  type="button"
+                  className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50"
+                  onClick={() => {
+                    setShowCodeEditor(true);
+                  }}
+                >
                   <Code className="h-5 w-5" />
                 </button>
-                <button className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50">
-                  <LinkIcon className="h-5 w-5" />
-                </button>
               </div>
-              
+
               <Button
-                onClick={handleAddDiscussion}
+                onClick={() => handleAddDiscussion(newDiscussion)}
                 disabled={!newDiscussion.trim()}
                 className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 px-6 shadow-md hover:shadow-lg transition-all duration-200"
               >
@@ -838,6 +875,69 @@ const EnhancedDiscussionSection: React.FC<EnhancedDiscussionSectionProps> = ({
                 Post Discussion
               </Button>
             </div>
+
+            {/* Code Editor Modal */}
+            {showCodeEditor && (
+              <Dialog open={showCodeEditor} onOpenChange={setShowCodeEditor}>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-auto">
+                  <DialogHeader>
+                    <DialogTitle>Insert Code Snippet</DialogTitle>
+                    <DialogDescription>
+                      Add code to your discussion with syntax highlighting
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Language
+                      </label>
+                      <select
+                        value={language}
+                        onChange={(e) => setLanguage(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="javascript">JavaScript</option>
+                        <option value="typescript">TypeScript</option>
+                        <option value="python">Python</option>
+                        <option value="java">Java</option>
+                        <option value="css">CSS</option>
+                        <option value="html">HTML</option>
+                        <option value="sql">SQL</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Code
+                      </label>
+                      <Editor
+                        value={codeValue}
+                        onValueChange={setCodeValue}
+                        highlight={code => Prism.highlight(code, Prism.languages[language] || Prism.languages.javascript, language)}
+                        padding={10}
+                        className="border border-gray-300 rounded-lg p-2 min-h-[200px] max-h-[300px] overflow-auto text-sm"
+                        style={{
+                          fontFamily: '"Fira code", "Fira Mono", monospace',
+                          fontSize: 12,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setShowCodeEditor(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={() => {
+                      const codeBlock = `\`\`\`${language}\n${codeValue}\n\`\`\`\n`;
+                      setNewDiscussion(prev => prev + codeBlock);
+                      setShowCodeEditor(false);
+                    }}>
+                      Insert Code
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
         </div>
       </div>
@@ -1828,6 +1928,10 @@ const CourseLearningPage = () => {
   const [editNoteContent, setEditNoteContent] = useState('');
   const [discussions, setDiscussions] = useState<LessonDiscussion[]>([]);
   const [newDiscussion, setNewDiscussion] = useState('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showCodeEditor, setShowCodeEditor] = useState(false);
+  const [codeValue, setCodeValue] = useState('// Enter your code here\n');
+  const [language, setLanguage] = useState('javascript');
   const [discussionFilter, setDiscussionFilter] = useState('all');
   const [discussionSearch, setDiscussionSearch] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
