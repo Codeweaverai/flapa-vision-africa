@@ -33,6 +33,7 @@ import RecommendedCourses from '@/components/course/RecommendedCourses';
 import { useCart } from '@/contexts/CartContext';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import OptimizedVideoPlayer from '@/components/video/OptimizedVideoPlayer';
+import ReactPlayer from 'react-player/lazy';
 import WishlistButton from '@/components/wishlist/WishlistButton';
 
 interface Course {
@@ -435,6 +436,9 @@ const PulseLoading = () => {
   );
 };
 
+// Cache for storing course data to improve load times
+const courseCache = new Map<string, Course>();
+
 const CourseDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -500,15 +504,23 @@ const CourseDetailPage = () => {
   }, [id]);
 
   useEffect(() => {
-    if (id && authChecked) {
+    if (id && authChecked && !course) {
       fetchCourse();
     }
-  }, [id, authChecked]);
+  }, [id, authChecked, course]);
 
   const fetchCourse = async () => {
+    // Check if course data is already cached
+    if (courseCache.has(id!)) {
+      const cachedCourse = courseCache.get(id!)!;
+      setCourse(cachedCourse);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      
+
       // First get the course data to get creator_id
       const { data: courseData, error: courseError } = await supabase
         .from('courses')
@@ -665,6 +677,11 @@ const CourseDetailPage = () => {
       };
 
       setCourse(completeCourse);
+
+      // Cache the course data to improve future load times
+      if (id) {
+        courseCache.set(id, completeCourse);
+      }
 
       // Fetch creator profile with stats in background
       fetchCreatorProfile(courseData.creator_id);
@@ -961,19 +978,36 @@ const CourseDetailPage = () => {
                     </div>
                   </div>
 
-                  {/* Course Preview Video */}
+                  {/* Course Preview Video - Enhanced Mobile Responsiveness */}
                   {course.course_preview?.preview_video_url && (
-                    <div className="mb-4">
+                    <div className="mb-6">
                       <h3 className="text-lg font-semibold mb-3">Course Preview</h3>
-                      <div className="aspect-video rounded-xl overflow-hidden bg-gray-100">
-                        <OptimizedVideoPlayer
-                          url={course.course_preview.preview_video_url}
-                          poster={course.thumbnail_url}
-                          controls={true}
-                          light={course.thumbnail_url}
-                          playsinline={true}
-                          preload="metadata"
-                        />
+                      <div className="w-full max-w-4xl mx-auto">
+                        <div className="relative pb-[56.25%] h-0 rounded-xl overflow-hidden bg-gray-100 shadow-lg border border-gray-200 min-h-[200px] sm:min-h-[250px] md:min-h-[300px] lg:min-h-[350px]">
+                          <ReactPlayer
+                            url={course.course_preview.preview_video_url}
+                            poster={course.thumbnail_url}
+                            controls={true}
+                            light={course.thumbnail_url}
+                            playsinline={true}
+                            width="100%"
+                            height="100%"
+                            className="absolute top-0 left-0 w-full h-full"
+                            config={{
+                              file: {
+                                attributes: {
+                                  preload: 'metadata',
+                                  controlsList: 'nodownload noremoteplayback',
+                                  disablePictureInPicture: true,
+                                  onContextMenu: (e: any) => e.preventDefault()
+                                }
+                              }
+                            }}
+                            // Enable caching and preloading optimizations
+                            playing={false}
+                            progressInterval={1000}
+                          />
+                        </div>
                       </div>
                     </div>
                   )}
