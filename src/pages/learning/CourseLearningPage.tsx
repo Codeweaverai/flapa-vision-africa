@@ -696,6 +696,14 @@ interface EnhancedDiscussionSectionProps {
   onDelete: (discussionId: string) => void;
   currentUserId?: string;
   isLoading?: boolean;
+  showEmojiPicker?: boolean;
+  setShowEmojiPicker?: (show: boolean) => void;
+  showCodeEditor?: boolean;
+  setShowCodeEditor?: (show: boolean) => void;
+  codeValue?: string;
+  setCodeValue?: (value: string) => void;
+  language?: string;
+  setLanguage?: (lang: string) => void;
 }
 
 const EnhancedDiscussionSection: React.FC<EnhancedDiscussionSectionProps> = ({
@@ -705,7 +713,15 @@ const EnhancedDiscussionSection: React.FC<EnhancedDiscussionSectionProps> = ({
   onLike,
   onDelete,
   currentUserId,
-  isLoading = false
+  isLoading = false,
+  showEmojiPicker,
+  setShowEmojiPicker,
+  showCodeEditor,
+  setShowCodeEditor,
+  codeValue,
+  setCodeValue,
+  language,
+  setLanguage
 }) => {
   const [newDiscussion, setNewDiscussion] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
@@ -825,7 +841,7 @@ const EnhancedDiscussionSection: React.FC<EnhancedDiscussionSectionProps> = ({
                 <button
                   type="button"
                   className="p-1 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50"
-                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                  onClick={() => setShowEmojiPicker && setShowEmojiPicker(!showEmojiPicker)}
                 >
                   <Smile className="h-5 w-5" />
                 </button>
@@ -836,7 +852,7 @@ const EnhancedDiscussionSection: React.FC<EnhancedDiscussionSectionProps> = ({
                     <EmojiPicker
                       onEmojiClick={(emojiData) => {
                         setNewDiscussion(prev => prev + emojiData.emoji);
-                        setShowEmojiPicker(false);
+                        setShowEmojiPicker && setShowEmojiPicker(false);
                       }}
                       theme={Theme.LIGHT}
                       height={350}
@@ -851,23 +867,21 @@ const EnhancedDiscussionSection: React.FC<EnhancedDiscussionSectionProps> = ({
                 <button
                   type="button"
                   className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50"
-                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                  onClick={() => setShowEmojiPicker && setShowEmojiPicker(!showEmojiPicker)}
                 >
                   <Smile className="h-5 w-5" />
                 </button>
                 <button
                   type="button"
                   className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50"
-                  onClick={() => {
-                    setShowCodeEditor(true);
-                  }}
+                  onClick={() => setShowCodeEditor && setShowCodeEditor(true)}
                 >
                   <Code className="h-5 w-5" />
                 </button>
               </div>
 
               <Button
-                onClick={() => handleAddDiscussion(newDiscussion)}
+                onClick={() => onAddDiscussion(newDiscussion)}
                 disabled={!newDiscussion.trim()}
                 className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 px-6 shadow-md hover:shadow-lg transition-all duration-200"
               >
@@ -877,7 +891,7 @@ const EnhancedDiscussionSection: React.FC<EnhancedDiscussionSectionProps> = ({
             </div>
 
             {/* Code Editor Modal */}
-            {showCodeEditor && (
+            {showCodeEditor && setShowCodeEditor && (
               <Dialog open={showCodeEditor} onOpenChange={setShowCodeEditor}>
                 <DialogContent className="max-w-2xl max-h-[80vh] overflow-auto">
                   <DialogHeader>
@@ -892,8 +906,8 @@ const EnhancedDiscussionSection: React.FC<EnhancedDiscussionSectionProps> = ({
                         Language
                       </label>
                       <select
-                        value={language}
-                        onChange={(e) => setLanguage(e.target.value)}
+                        value={language || 'javascript'}
+                        onChange={(e) => setLanguage && setLanguage(e.target.value)}
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="javascript">JavaScript</option>
@@ -911,9 +925,9 @@ const EnhancedDiscussionSection: React.FC<EnhancedDiscussionSectionProps> = ({
                         Code
                       </label>
                       <Editor
-                        value={codeValue}
+                        value={codeValue || '// Enter your code here\n'}
                         onValueChange={setCodeValue}
-                        highlight={code => Prism.highlight(code, Prism.languages[language] || Prism.languages.javascript, language)}
+                        highlight={code => Prism.highlight(code, Prism.languages[language || 'javascript'] || Prism.languages.javascript, language || 'javascript')}
                         padding={10}
                         className="border border-gray-300 rounded-lg p-2 min-h-[200px] max-h-[300px] overflow-auto text-sm"
                         style={{
@@ -928,7 +942,7 @@ const EnhancedDiscussionSection: React.FC<EnhancedDiscussionSectionProps> = ({
                       Cancel
                     </Button>
                     <Button onClick={() => {
-                      const codeBlock = `\`\`\`${language}\n${codeValue}\n\`\`\`\n`;
+                      const codeBlock = `\`\`\`${language || 'javascript'}\n${codeValue || ''}\n\`\`\`\n`;
                       setNewDiscussion(prev => prev + codeBlock);
                       setShowCodeEditor(false);
                     }}>
@@ -3864,6 +3878,14 @@ const CourseLearningPage = () => {
                                         onLike={handleLikeDiscussion}
                                         onDelete={handleDeleteDiscussion}
                                         currentUserId={user?.id}
+                                        showEmojiPicker={showEmojiPicker}
+                                        setShowEmojiPicker={setShowEmojiPicker}
+                                        showCodeEditor={showCodeEditor}
+                                        setShowCodeEditor={setShowCodeEditor}
+                                        codeValue={codeValue}
+                                        setCodeValue={setCodeValue}
+                                        language={language}
+                                        setLanguage={setLanguage}
                                       />
                                     </TabsContent>
                                   </Tabs>
