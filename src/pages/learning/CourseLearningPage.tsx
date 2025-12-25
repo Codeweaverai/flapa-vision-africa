@@ -2772,7 +2772,7 @@ const CourseLearningPage = () => {
     try {
       const { data, error } = await supabase
         .from('lesson_notes')
-        .update({ 
+        .update({
           content: editNoteContent.trim(),
           updated_at: new Date().toISOString()
         })
@@ -2796,6 +2796,32 @@ const CourseLearningPage = () => {
     } catch (error) {
       console.error('Error updating note:', error);
       toast.error('Failed to update note. Please try again.');
+    }
+  };
+
+  // Function to handle bookmarking the current video position
+  const handleBookmarkCurrentPosition = async () => {
+    if (!selectedLesson || !user || !currentVideoTime) return;
+
+    try {
+      // Create a bookmark at the current video position
+      const { data, error } = await supabase
+        .from('lesson_bookmarks')
+        .insert({
+          user_id: user.id,
+          lesson_id: selectedLesson.id,
+          timestamp_seconds: Math.floor(currentVideoTime),
+          title: `Bookmark at ${Math.floor(currentVideoTime / 60)}:${String(Math.floor(currentVideoTime % 60)).padStart(2, '0')}`
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success('Bookmark added successfully!');
+    } catch (error) {
+      console.error('Error adding bookmark:', error);
+      toast.error('Failed to add bookmark. Please try again.');
     }
   };
 
@@ -3668,17 +3694,14 @@ const CourseLearningPage = () => {
 
                                 {/* Video Controls */}
                                 <div className="flex flex-wrap gap-3 w-full">
-                                  <Button variant="outline" size="sm" className="border-gray-300 hover:bg-gray-100">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-gray-300 hover:bg-gray-100"
+                                    onClick={handleBookmarkCurrentPosition}
+                                  >
                                     <Bookmark className="h-4 w-4 mr-2" />
                                     Bookmark
-                                  </Button>
-                                  <Button variant="outline" size="sm" className="border-gray-300 hover:bg-gray-100" disabled>
-                                    <Download className="h-4 w-4 mr-2" />
-                                    Download
-                                  </Button>
-                                  <Button variant="outline" size="sm" className="border-gray-300 hover:bg-gray-100">
-                                    <Share className="h-4 w-4 mr-2" />
-                                    Share
                                   </Button>
                                   {selectedLesson?.quiz && (
                                     <Button
