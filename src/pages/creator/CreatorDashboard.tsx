@@ -74,136 +74,181 @@ const CreatorDashboard = () => {
     }
   }, [user]);
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = React.useCallback(async () => {
     if (!user) return;
-    
+
     try {
       setLoading(true);
-      
-      // Load earnings from creator payments service
-      const earningsData = await fetchCreatorEarnings(user.id);
-      setEarnings(earningsData);
-      
-      // Load payment transactions
-      const transactionsResult = await fetchCreatorPaymentTransactions(user.id);
-      setTransactions(transactionsResult.transactions);
-      
-      // Load comprehensive stats
-      await loadComprehensiveStats();
+
+      // Concurrent data fetching using Promise.all for faster loading
+      const [earningsData, transactionsResult, statsData] = await Promise.allSettled([
+        // Load earnings from creator payments service
+        fetchCreatorEarnings(user.id),
+
+        // Load payment transactions
+        fetchCreatorPaymentTransactions(user.id),
+
+        // Load comprehensive stats
+        loadComprehensiveStats()
+      ]);
+
+      // Handle earnings data
+      if (earningsData.status === 'fulfilled') {
+        setEarnings(earningsData.value);
+      } else {
+        console.error('Error fetching earnings:', earningsData.reason);
+        setEarnings(null);
+      }
+
+      // Handle transactions data
+      if (transactionsResult.status === 'fulfilled') {
+        setTransactions(transactionsResult.value.transactions);
+      } else {
+        console.error('Error fetching transactions:', transactionsResult.reason);
+        setTransactions([]);
+      }
+
+      // Handle stats data
+      if (statsData.status === 'rejected') {
+        console.error('Error loading comprehensive stats:', statsData.reason);
+      }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   const loadComprehensiveStats = async () => {
     if (!user) return;
-    
+
     try {
-      // Fetch courses - simplified query
-      const { data: courses, error: coursesError } = await supabase
-        .from('courses')
-        .select('id, title')
-        .eq('creator_id', user.id)
-        .eq('is_published', true);
-      
-      if (coursesError) {
-        console.error('Error fetching courses:', coursesError);
+      // Concurrent data fetching for courses and events
+      const [coursesResult, eventsResult] = await Promise.allSettled([
+        // Fetch courses - simplified query
+        supabase
+          .from('courses')
+          .select('id, title')
+          .eq('creator_id', user.id)
+          .eq('is_published', true),
+
+        // Fetch events - simplified query
+        supabase
+          .from('events')
+          .select('id, title')
+          .eq('creator_id', user.id)
+      ]);
+
+      let courses = [];
+      let events = [];
+
+      if (coursesResult.status === 'fulfilled' && !coursesResult.value.error) {
+        courses = coursesResult.value.data || [];
+      } else {
+        console.error('Error fetching courses:', coursesResult.status === 'rejected' ? coursesResult.reason : coursesResult.value.error);
       }
 
-      // Fetch events - simplified query
-      const { data: events, error: eventsError } = await supabase
-        .from('events')
-        .select('id, title')
-        .eq('creator_id', user.id);
-      
-      if (eventsError) {
-        console.error('Error fetching events:', eventsError);
+      if (eventsResult.status === 'fulfilled' && !eventsResult.value.error) {
+        events = eventsResult.value.data || [];
+      } else {
+        console.error('Error fetching events:', eventsResult.status === 'rejected' ? eventsResult.reason : eventsResult.value.error);
       }
 
-      const totalCourses = courses?.length || 0;
-      const totalEvents = events?.length || 0;
-      const courseIds = courses?.map(c => c.id) || [];
-      const eventIds = events?.map(e => e.id) || [];
-      
-      // Get course enrollments
-      let totalEnrollments = 0;
-      let courseReviewsData: any[] = [];
-      
-      if (courseIds.length > 0) {
-        const { data: enrollments } = await supabase
+      const totalCourses = courses.length;
+      const totalEvents = events.length;
+      const courseIds = courses.map(c => c.id);
+      const eventIds = events.map(e => e.id);
+
+      // Concurrent data fetching for enrollments, bookings, and reviews
+      const [enrollmentsResult, courseReviewsResult, bookingsResult, eventReviewsResult] = await Promise.allSettled([
+        // Get course enrollments
+        courseIds.length > 0 ? supabase
           .from('course_enrollments')
           .select('id, user_id')
           .in('course_id', courseIds)
-          .eq('payment_status', 'completed');
-          
-        totalEnrollments = enrollments?.length || 0;
-        
+          .eq('payment_status', 'completed') : Promise.resolve({ data: [], error: null }),
+
         // Get course reviews
-        const { data: reviews } = await supabase
+        courseIds.length > 0 ? supabase
           .from('course_reviews')
           .select('id, rating')
-          .in('course_id', courseIds);
-          
-        courseReviewsData = reviews || [];
-      }
-      
-      // Get event bookings
-      let totalBookings = 0;
-      let eventReviewsData: any[] = [];
-      
-      if (eventIds.length > 0) {
-        const { data: bookings } = await supabase
+          .in('course_id', courseIds) : Promise.resolve({ data: [], error: null }),
+
+        // Get event bookings
+        eventIds.length > 0 ? supabase
           .from('event_bookings')
           .select('id, user_id, ticket_quantity')
           .in('event_id', eventIds)
-          .eq('payment_status', 'completed');
-        
-        totalBookings = bookings?.reduce((sum, booking) => sum + (booking.ticket_quantity || 1), 0) || 0;
-        
+          .eq('payment_status', 'completed') : Promise.resolve({ data: [], error: null }),
+
         // Get event reviews
-        const { data: reviews } = await supabase
+        eventIds.length > 0 ? supabase
           .from('event_reviews')
           .select('id, rating')
-          .in('event_id', eventIds);
-          
-        eventReviewsData = reviews || [];
-      }
-      
-      // Calculate unique students from both enrollments and bookings
-      const allEnrollments = courseIds.length > 0 ? await supabase
-        .from('course_enrollments')
-        .select('user_id')
-        .in('course_id', courseIds)
-        .eq('payment_status', 'completed') : { data: [] };
-        
-      const allBookings = eventIds.length > 0 ? await supabase
-        .from('event_bookings')
-        .select('user_id')
-        .in('event_id', eventIds)
-        .eq('payment_status', 'completed') : { data: [] };
-      
-      const uniqueStudentIds = new Set([
-        ...(allEnrollments.data?.map(e => e.user_id) || []),
-        ...(allBookings.data?.map(b => b.user_id) || [])
+          .in('event_id', eventIds) : Promise.resolve({ data: [], error: null })
       ]);
-      
+
+      let totalEnrollments = 0;
+      let courseReviewsData: any[] = [];
+      let totalBookings = 0;
+      let eventReviewsData: any[] = [];
+
+      if (enrollmentsResult.status === 'fulfilled' && !enrollmentsResult.value.error) {
+        totalEnrollments = enrollmentsResult.value.data?.length || 0;
+      }
+
+      if (courseReviewsResult.status === 'fulfilled' && !courseReviewsResult.value.error) {
+        courseReviewsData = courseReviewsResult.value.data || [];
+      }
+
+      if (bookingsResult.status === 'fulfilled' && !bookingsResult.value.error) {
+        totalBookings = bookingsResult.value.data?.reduce((sum, booking) => sum + (booking.ticket_quantity || 1), 0) || 0;
+      }
+
+      if (eventReviewsResult.status === 'fulfilled' && !eventReviewsResult.value.error) {
+        eventReviewsData = eventReviewsResult.value.data || [];
+      }
+
+      // Concurrent data fetching for unique student calculation
+      const [allEnrollmentsResult, allBookingsResult] = await Promise.allSettled([
+        // Get all course enrollments for unique student count
+        courseIds.length > 0 ? supabase
+          .from('course_enrollments')
+          .select('user_id')
+          .in('course_id', courseIds)
+          .eq('payment_status', 'completed') : Promise.resolve({ data: [] }),
+
+        // Get all event bookings for unique student count
+        eventIds.length > 0 ? supabase
+          .from('event_bookings')
+          .select('user_id')
+          .in('event_id', eventIds)
+          .eq('payment_status', 'completed') : Promise.resolve({ data: [] })
+      ]);
+
+      const allEnrollmentsData = allEnrollmentsResult.status === 'fulfilled' ? allEnrollmentsResult.value.data || [] : [];
+      const allBookingsData = allBookingsResult.status === 'fulfilled' ? allBookingsResult.value.data || [] : [];
+
+      const uniqueStudentIds = new Set([
+        ...allEnrollmentsData.map(e => e.user_id),
+        ...allBookingsData.map(b => b.user_id)
+      ]);
+
       // Calculate ratings
-      const courseRating = courseReviewsData.length > 0 
-        ? courseReviewsData.reduce((sum, r) => sum + r.rating, 0) / courseReviewsData.length 
+      const courseRating = courseReviewsData.length > 0
+        ? courseReviewsData.reduce((sum, r) => sum + r.rating, 0) / courseReviewsData.length
         : 0;
-      
-      const eventRating = eventReviewsData.length > 0 
-        ? eventReviewsData.reduce((sum, r) => sum + r.rating, 0) / eventReviewsData.length 
+
+      const eventRating = eventReviewsData.length > 0
+        ? eventReviewsData.reduce((sum, r) => sum + r.rating, 0) / eventReviewsData.length
         : 0;
-      
+
       const totalReviews = courseReviewsData.length + eventReviewsData.length;
-      const overallRating = totalReviews > 0 
+      const overallRating = totalReviews > 0
         ? (courseReviewsData.reduce((sum, r) => sum + r.rating, 0) + eventReviewsData.reduce((sum, r) => sum + r.rating, 0)) / totalReviews
         : 0;
 
-      setStats({
+      const statsResult = {
         totalCourses,
         totalEvents,
         totalStudents: uniqueStudentIds.size,
@@ -216,43 +261,62 @@ const CreatorDashboard = () => {
         eventReviews: eventReviewsData.length,
         courseRating,
         eventRating
-      });
+      };
+
+      setStats(statsResult);
+      return statsResult;
     } catch (error) {
       console.error('Error loading comprehensive stats:', error);
-      // Keep existing stats on error
+      // Return default stats on error
+      return {
+        totalCourses: 0,
+        totalEvents: 0,
+        totalStudents: 0,
+        totalReviews: 0,
+        averageRating: 0,
+        totalViews: 0,
+        totalEnrollments: 0,
+        totalBookings: 0,
+        courseReviews: 0,
+        eventReviews: 0,
+        courseRating: 0,
+        eventRating: 0
+      };
     }
   };
 
   // Process monthly revenue data from transactions
-  const monthlyRevenue = transactions.reduce((acc, transaction) => {
-    if (transaction.payment_status === 'completed') {
-      const month = new Date(transaction.created_at).toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short' 
-      });
-      acc[month] = (acc[month] || 0) + (transaction.creator_earning || 0);
-    }
-    return acc;
-  }, {} as Record<string, number>);
+  const monthlyRevenueData = React.useMemo(() => {
+    const monthlyRevenue = transactions.reduce((acc, transaction) => {
+      if (transaction.payment_status === 'completed') {
+        const month = new Date(transaction.created_at).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short'
+        });
+        acc[month] = (acc[month] || 0) + (transaction.creator_earning || 0);
+      }
+      return acc;
+    }, {} as Record<string, number>);
 
-  const monthlyRevenueData = Object.entries(monthlyRevenue).map(([month, revenue]) => ({
-    month,
-    revenue
-  }));
+    return Object.entries(monthlyRevenue).map(([month, revenue]) => ({
+      month,
+      revenue
+    }));
+  }, [transactions]);
 
   // Revenue breakdown by source
-  const revenueBySource = [
-    { 
-      name: 'Courses', 
-      value: earnings?.course_revenue || 0, 
-      color: '#8b5cf6' 
+  const revenueBySource = React.useMemo(() => [
+    {
+      name: 'Courses',
+      value: earnings?.course_revenue || 0,
+      color: '#8b5cf6'
     },
-    { 
-      name: 'Events', 
-      value: earnings?.event_revenue || 0, 
-      color: '#ff7b42' 
+    {
+      name: 'Events',
+      value: earnings?.event_revenue || 0,
+      color: '#ff7b42'
     }
-  ];
+  ], [earnings]);
 
   if (loading) {
     return (

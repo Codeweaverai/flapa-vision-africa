@@ -18,7 +18,6 @@ import { FollowersList } from '@/components/community/FollowersList';
 import { RightSidebar } from '@/components/community/RightSidebar';
 import { fetchCommunityPosts } from '@/services/communityService';
 import { useNavigate } from 'react-router-dom';
-import CommunityChatTab from '@/components/community/CommunityChatTab';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -134,9 +133,9 @@ interface PostContentProps {
   maxLength?: number;
 }
 
-const PostContent: React.FC<PostContentProps> = ({ content, maxLength = 150 }) => {
+const PostContent: React.FC<PostContentProps> = React.memo(({ content, maxLength = 150 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  
+
   const shouldTruncate = content.length > maxLength;
   const displayContent = isExpanded || !shouldTruncate ? content : content.slice(0, maxLength) + '...';
 
@@ -154,7 +153,7 @@ const PostContent: React.FC<PostContentProps> = ({ content, maxLength = 150 }) =
       )}
     </div>
   );
-};
+});
 
 const CommunityPage = () => {
   const { user } = useAuth();
@@ -182,7 +181,6 @@ const CommunityPage = () => {
   ];
 
   const lowerTabs = [
-    { id: 'chat', label: 'Ai Chat Support', icon: MessageCircle },
     { id: 'community-chat', label: 'Community Chat', icon: MessageCircle },
   ];
 
@@ -200,10 +198,11 @@ const CommunityPage = () => {
     try {
       setLoading(true);
       // Use Promise.all for parallel data fetching
-      const [postsData, messagesData, coursesEventsData] = await Promise.allSettled([
+      const [postsData, messagesData, coursesResult, eventsResult] = await Promise.allSettled([
         fetchPostsEnhanced(),
         fetchMessages(),
-        loadCoursesAndEvents()
+        supabase.from('courses').select('id, title, thumbnail_url').eq('is_published', true).limit(5),
+        supabase.from('events').select('id, title, image_url, start_time').eq('is_published', true).limit(5)
       ]);
 
       // Handle posts data
@@ -214,6 +213,16 @@ const CommunityPage = () => {
       // Handle messages data
       if (messagesData.status === 'fulfilled') {
         setMessages(messagesData.value);
+      }
+
+      // Handle courses data
+      if (coursesResult.status === 'fulfilled' && coursesResult.value.data) {
+        setCourses(coursesResult.value.data);
+      }
+
+      // Handle events data
+      if (eventsResult.status === 'fulfilled' && eventsResult.value.data) {
+        setEvents(eventsResult.value.data);
       }
 
     } catch (error) {
@@ -253,10 +262,10 @@ const CommunityPage = () => {
     };
   };
 
-  const fetchPostsEnhanced = async (): Promise<CommunityPost[]> => {
+  const fetchPostsEnhanced = React.useCallback(async (): Promise<CommunityPost[]> => {
     try {
       const postsData = await fetchCommunityPosts();
-      
+
       const postsWithDetails = await Promise.all(
         postsData.map(async (post) => {
           // Use Promise.all for parallel data fetching for each post
@@ -266,15 +275,15 @@ const CommunityPage = () => {
               .from('post_likes')
               .select('*', { count: 'exact', head: true })
               .eq('post_id', post.id),
-            
+
             // Fetch comments count
             supabase
               .from('post_comments')
               .select('*', { count: 'exact', head: true })
               .eq('post_id', post.id),
-            
+
             // Check if current user liked this post
-            user && user.id ? 
+            user && user.id ?
               supabase
                 .from('post_likes')
                 .select('id')
@@ -283,13 +292,13 @@ const CommunityPage = () => {
               : Promise.resolve({ data: null, error: null })
           ]);
 
-          const likesCount = likesData.status === 'fulfilled' && !likesData.value.error ? 
+          const likesCount = likesData.status === 'fulfilled' && !likesData.value.error ?
             likesData.value.count : 0;
-          
-          const commentsCount = commentsData.status === 'fulfilled' && !commentsData.value.error ? 
+
+          const commentsCount = commentsData.status === 'fulfilled' && !commentsData.value.error ?
             commentsData.value.count : 0;
 
-          const userLiked = userLikeData.status === 'fulfilled' && userLikeData.value.data ? 
+          const userLiked = userLikeData.status === 'fulfilled' && userLikeData.value.data ?
             userLikeData.value.data.length > 0 : false;
 
           return {
@@ -297,7 +306,7 @@ const CommunityPage = () => {
             profiles: post.profiles ? {
               id: post.profiles.id,
               full_name: post.profiles.full_name,
-              username: post.profiles.username || 'user', 
+              username: post.profiles.username || 'user',
               avatar_url: post.profiles.avatar_url || '',
               is_following: post.profiles.is_following,
               followers_count: post.profiles.followers_count,
@@ -310,16 +319,16 @@ const CommunityPage = () => {
           };
         })
       );
-      
+
       return postsWithDetails;
     } catch (error) {
       console.error('Error fetching posts:', error);
       toast.error('Failed to load community posts');
       return [];
     }
-  };
+  }, [user]);
 
-  const loadCoursesAndEvents = async () => {
+  const loadCoursesAndEvents = React.useCallback(async () => {
     try {
       const [coursesResult, eventsResult] = await Promise.all([
         supabase.from('courses').select('id, title, thumbnail_url').eq('is_published', true).limit(5),
@@ -331,9 +340,9 @@ const CommunityPage = () => {
     } catch (error) {
       console.error('Error loading courses and events:', error);
     }
-  };
+  }, []);
 
-  const fetchComments = async (postId: string) => {
+  const fetchComments = React.useCallback(async (postId: string) => {
     try {
       const { data: commentsData, error } = await supabase
         .from('post_comments')
@@ -354,14 +363,14 @@ const CommunityPage = () => {
       const commentsWithProfiles = await Promise.all(
         (commentsData || []).map(async (comment) => {
           const profile = profilesData?.find(p => p.id === comment.user_id);
-          
+
           // Fetch comment likes and user like status in parallel
           const [likesData, userLikeData] = await Promise.allSettled([
             supabase
               .from('comment_likes')
               .select('*', { count: 'exact', head: true })
               .eq('comment_id', comment.id),
-            user && user.id ? 
+            user && user.id ?
               supabase
                 .from('comment_likes')
                 .select('id')
@@ -370,10 +379,10 @@ const CommunityPage = () => {
               : Promise.resolve({ data: null, error: null })
           ]);
 
-          const likesCount = likesData.status === 'fulfilled' && !likesData.value.error ? 
+          const likesCount = likesData.status === 'fulfilled' && !likesData.value.error ?
             likesData.value.count : 0;
 
-          const userLiked = userLikeData.status === 'fulfilled' && userLikeData.value.data ? 
+          const userLiked = userLikeData.status === 'fulfilled' && userLikeData.value.data ?
             userLikeData.value.data.length > 0 : false;
 
           return {
@@ -389,9 +398,9 @@ const CommunityPage = () => {
     } catch (error) {
       console.error('Error fetching comments:', error);
     }
-  };
+  }, [user]);
 
-  const fetchMessages = async (): Promise<CommunityMessage[]> => {
+  const fetchMessages = React.useCallback(async (): Promise<CommunityMessage[]> => {
     try {
       const { data: messagesData, error: messagesError } = await supabase
         .from('community_messages')
@@ -419,14 +428,14 @@ const CommunityPage = () => {
       toast.error('Failed to load messages');
       return [];
     }
-  };
+  }, [activeChannel]);
 
-  const handlePostCreated = () => {
+  const handlePostCreated = React.useCallback(() => {
     fetchPostsEnhanced().then(posts => setPosts(posts));
     toast.success('Post created successfully!');
-  };
+  }, [fetchPostsEnhanced]);
 
-  const handleFollowChange = (userId: string, isFollowing: boolean) => {
+  const handleFollowChange = React.useCallback((userId: string, isFollowing: boolean) => {
     setPosts(prev => prev.map(post => ({
       ...post,
       profiles: post.profiles?.id === userId ? {
@@ -435,9 +444,9 @@ const CommunityPage = () => {
         followers_count: (post.profiles.followers_count || 0) + (isFollowing ? 1 : -1)
       } : post.profiles
     })));
-  };
+  }, []);
 
-  const toggleLike = async (postId: string) => {
+  const toggleLike = React.useCallback(async (postId: string) => {
     if (!user) return;
 
     try {
@@ -460,7 +469,7 @@ const CommunityPage = () => {
       }
 
       // Optimistically update UI
-      setPosts(prev => prev.map(post => 
+      setPosts(prev => prev.map(post =>
         post.id === postId ? {
           ...post,
           user_liked: !currentLike,
@@ -470,7 +479,7 @@ const CommunityPage = () => {
     } catch (error) {
       console.error('Error toggling like:', error);
     }
-  };
+  }, [user, posts]);
 
   const addComment = async (postId: string) => {
     if (!user || !newComment[postId]?.trim()) return;
@@ -669,9 +678,10 @@ const CommunityPage = () => {
               <div className="flex items-start space-x-3">
                 <div className="cursor-pointer">
                   <Avatar className="w-12 h-12 ring-2 ring-white shadow-md hover:ring-purple-200 transition-all">
-                    <AvatarImage 
-                      src={getSafeAvatarUrl(post.profiles?.avatar_url)} 
+                    <AvatarImage
+                      src={getSafeAvatarUrl(post.profiles?.avatar_url)}
                       alt={post.profiles?.full_name || 'User'}
+                      loading="lazy"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
                         target.style.display = 'none';
@@ -848,7 +858,14 @@ const CommunityPage = () => {
                   {user && (
                     <div className="flex space-x-3">
                       <Avatar className="w-9 h-9">
-                        <AvatarImage src={getSafeAvatarUrl(user.user_metadata?.avatar_url)} />
+                        <AvatarImage
+                          src={getSafeAvatarUrl(user.user_metadata?.avatar_url)}
+                          loading="lazy"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                          }}
+                        />
                         <AvatarFallback className="bg-gradient-to-br from-orange-400 to-purple-600 text-white font-semibold">
                           {getAvatarFallback(user.user_metadata?.full_name)}
                         </AvatarFallback>
@@ -896,7 +913,14 @@ const CommunityPage = () => {
                         <div key={comment.id} className="space-y-3">
                           <div className="flex space-x-3">
                             <Avatar className="w-8 h-8">
-                              <AvatarImage src={getSafeAvatarUrl(comment.profiles?.avatar_url)} />
+                              <AvatarImage
+                                src={getSafeAvatarUrl(comment.profiles?.avatar_url)}
+                                loading="lazy"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                }}
+                              />
                               <AvatarFallback className="bg-gradient-to-r from-blue-200 to-green-200">
                                 {getAvatarFallback(comment.profiles?.full_name)}
                               </AvatarFallback>
@@ -943,7 +967,14 @@ const CommunityPage = () => {
                               {replies.map(reply => (
                                 <div key={reply.id} className="flex space-x-3">
                                   <Avatar className="w-7 h-7">
-                                    <AvatarImage src={getSafeAvatarUrl(reply.profiles?.avatar_url)} />
+                                    <AvatarImage
+                                      src={getSafeAvatarUrl(reply.profiles?.avatar_url)}
+                                      loading="lazy"
+                                      onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.style.display = 'none';
+                                      }}
+                                    />
                                     <AvatarFallback className="bg-gradient-to-r from-purple-200 to-orange-200 text-xs">
                                       {getAvatarFallback(reply.profiles?.full_name)}
                                     </AvatarFallback>
@@ -1006,9 +1037,6 @@ const CommunityPage = () => {
     </div>
   );
 
-  const renderChat = () => (
-    <CommunityChatTab />
-  );
 
   const renderCommunityChat = () => (
     <Card className="bg-white/80 backdrop-blur-sm rounded-2xl border-none shadow-lg h-[600px] flex flex-col">
@@ -1024,7 +1052,14 @@ const CommunityPage = () => {
           {messages.map((message) => (
             <div key={message.id} className="flex space-x-3">
               <Avatar className="w-8 h-8">
-                <AvatarImage src={getSafeAvatarUrl(message.profiles?.avatar_url)} />
+                <AvatarImage
+                  src={getSafeAvatarUrl(message.profiles?.avatar_url)}
+                  loading="lazy"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                  }}
+                />
                 <AvatarFallback className="bg-gradient-to-r from-green-200 to-teal-200">
                   {getAvatarFallback(message.profiles?.full_name)}
                 </AvatarFallback>
@@ -1072,7 +1107,7 @@ const CommunityPage = () => {
       case 'create':
         return user ? (
           <div className="space-y-4">
-            <EnhancedPostCreation 
+            <EnhancedPostCreation
               onPostCreated={() => {
                 handlePostCreated();
                 setActiveTab('feed');
@@ -1083,8 +1118,6 @@ const CommunityPage = () => {
             />
           </div>
         ) : null;
-      case 'chat':
-        return renderChat();
       case 'community-chat':
         return renderCommunityChat();
       default:

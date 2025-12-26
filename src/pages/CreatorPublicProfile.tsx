@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -36,22 +36,22 @@ const exchangeRates: { [key: string]: number } = {
   SLL: 0.000048
 };
 
-// Currency conversion function
-const convertCurrency = async (
+// Optimized currency conversion function using useMemo
+const convertCurrency = (
   amount: number,
   fromCurrency: string,
   toCurrency: string
-): Promise<number> => {
+): number => {
   if (fromCurrency === toCurrency) {
     return amount;
   }
 
   const fromRate = exchangeRates[fromCurrency] || 1;
   const toRate = exchangeRates[toCurrency] || 1;
-  
+
   const usdAmount = amount * fromRate;
   const targetAmount = usdAmount / toRate;
-  
+
   return Number(targetAmount.toFixed(2));
 };
 
@@ -126,7 +126,7 @@ interface CampaignStats {
 }
 
 const CreatorPublicProfile: React.FC = () => {
-  const { creatorId } = useParams<{ creatorId: string }>(); 
+  const { creatorId } = useParams<{ creatorId: string }>();
   const { user } = useAuth();
   const [creator, setCreator] = useState<CreatorProfile | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -153,10 +153,10 @@ const CreatorPublicProfile: React.FC = () => {
     fetchCreatorData(creatorId);
   }, [creatorId]);
 
-  const calculateCampaignStats = async (contributions: CampaignContribution[], campaign: FundraisingCampaign): Promise<CampaignStats> => {
+  const calculateCampaignStats = (contributions: CampaignContribution[], campaign: FundraisingCampaign): CampaignStats => {
     const completedContributions = contributions.filter(c => c.status === 'completed');
     const campaignBaseCurrency = campaign.currency || 'USD';
-    
+
     let totalRaised = 0;
 
     for (const contribution of completedContributions) {
@@ -167,7 +167,7 @@ const CreatorPublicProfile: React.FC = () => {
 
       if (contributionCurrency !== campaignBaseCurrency) {
         try {
-          amountInBaseCurrency = await convertCurrency(originalAmount, contributionCurrency, campaignBaseCurrency);
+          amountInBaseCurrency = convertCurrency(originalAmount, contributionCurrency, campaignBaseCurrency);
         } catch (error) {
           console.warn(`Currency conversion failed for contribution:`, error);
           amountInBaseCurrency = originalAmount;
@@ -183,64 +183,73 @@ const CreatorPublicProfile: React.FC = () => {
     };
   };
 
-  const fetchFundraisingCampaigns = async (creatorId: string) => {
-    try {
-      const { data: campaigns, error } = await supabase
-        .from('fundraising_campaigns')
-        .select(`
-          *,
-          campaign_contributions (*)
-        `)
-        .eq('creator_id', creatorId)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      const campaignsWithStats = await Promise.all(
-        (campaigns || []).map(async (campaign) => {
-          const contributions = campaign.campaign_contributions as CampaignContribution[] || [];
-          const stats = await calculateCampaignStats(contributions, campaign);
-          
-          return {
-            ...campaign,
-            ...stats,
-            campaign_contributions: undefined
-          };
-        })
-      );
-
-      setFundraisingCampaigns(campaignsWithStats);
-    } catch (error) {
-      console.error('Error fetching fundraising campaigns:', error);
-    }
-  };
-
   const fetchCreatorData = async (id: string) => {
     try {
       setLoading(true);
       setError(null);
 
-      // Fetch creator profile
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, full_name, bio, avatar_url, username, is_creator, role')
-        .eq('id', id)
-        .maybeSingle();
+      // Concurrent data fetching using Promise.all for faster loading
+      const [profileResult, followStatsResult, coursesResult, eventsResult, campaignsResult] = await Promise.allSettled([
+        // Fetch creator profile
+        supabase
+          .from('profiles')
+          .select('id, full_name, bio, avatar_url, username, is_creator, role')
+          .eq('id', id)
+          .maybeSingle(),
 
-      if (profileError) throw profileError;
+        // Get follow stats
+        getFollowStats(id),
+
+        // Fetch courses with reviews and enrollments
+        supabase
+          .from('courses')
+          .select(`
+            *,
+            course_reviews (rating),
+            course_enrollments (id)
+          `)
+          .eq('creator_id', id)
+          .eq('is_published', true),
+
+        // Fetch events with bookings
+        supabase
+          .from('events')
+          .select(`
+            *,
+            event_bookings (id)
+          `)
+          .eq('creator_id', id),
+
+        // Fetch fundraising campaigns
+        supabase
+          .from('fundraising_campaigns')
+          .select(`
+            *,
+            campaign_contributions (*)
+          `)
+          .eq('creator_id', id)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+      ]);
+
+      // Handle profile result
+      if (profileResult.status === 'rejected' || profileResult.value.error) {
+        throw profileResult.status === 'rejected' ? profileResult.reason : profileResult.value.error;
+      }
+
+      const profile = profileResult.value.data;
       if (!profile) {
         setError('Creator profile not found');
         return;
       }
 
-      // Get follow stats and status
+      // Handle follow stats
       let followStats = { followers_count: 0, following_count: 0 };
       let isFollowing = false;
-      
-      try {
-        followStats = await getFollowStats(id);
-        
+
+      if (followStatsResult.status === 'fulfilled') {
+        followStats = followStatsResult.value;
+
         if (user) {
           const { data: followData } = await supabase
             .from('community_followers')
@@ -250,9 +259,8 @@ const CreatorPublicProfile: React.FC = () => {
             .single();
           isFollowing = !!followData;
         }
-      } catch (error) {
-        console.error('Error fetching follow stats:', error);
-        // Continue with default values if follow stats fail
+      } else {
+        console.error('Error fetching follow stats:', followStatsResult.reason);
       }
 
       setCreator({
@@ -262,24 +270,15 @@ const CreatorPublicProfile: React.FC = () => {
         is_following: isFollowing
       });
 
-      // Fetch courses with reviews and enrollments
-      const { data: coursesData, error: coursesError } = await supabase
-        .from('courses')
-        .select(`
-          *,
-          course_reviews (rating),
-          course_enrollments (id)
-        `)
-        .eq('creator_id', id)
-        .eq('is_published', true);
-
-      if (!coursesError && coursesData) {
+      // Handle courses
+      if (coursesResult.status === 'fulfilled' && coursesResult.value.data) {
+        const coursesData = coursesResult.value.data;
         const coursesWithStats = coursesData.map(course => {
           const reviews = course.course_reviews || [];
           const enrollments = course.course_enrollments || [];
-          
-          const averageRating = reviews.length > 0 
-            ? reviews.reduce((sum: number, review: any) => sum + review.rating, 0) / reviews.length 
+
+          const averageRating = reviews.length > 0
+            ? reviews.reduce((sum: number, review: any) => sum + review.rating, 0) / reviews.length
             : 0;
 
           return {
@@ -294,25 +293,31 @@ const CreatorPublicProfile: React.FC = () => {
         setCourses(coursesWithStats);
       }
 
-      // Fetch fundraising campaigns
-      await fetchFundraisingCampaigns(id);
-
-      // Fetch events with bookings
-      const { data: eventsData, error: eventsError } = await supabase
-        .from('events')
-        .select(`
-          *,
-          event_bookings (id)
-        `)
-        .eq('creator_id', id);
-
-      if (!eventsError && eventsData) {
+      // Handle events
+      if (eventsResult.status === 'fulfilled' && eventsResult.value.data) {
+        const eventsData = eventsResult.value.data;
         const eventsWithStats = eventsData.map(event => ({
           ...event,
           total_attendees: (event.event_bookings || []).length,
           event_bookings: undefined
         }));
         setEvents(eventsWithStats);
+      }
+
+      // Handle fundraising campaigns
+      if (campaignsResult.status === 'fulfilled' && campaignsResult.value.data) {
+        const campaigns = campaignsResult.value.data;
+        const campaignsWithStats = campaigns.map(campaign => {
+          const contributions = campaign.campaign_contributions as CampaignContribution[] || [];
+          const stats = calculateCampaignStats(contributions, campaign);
+
+          return {
+            ...campaign,
+            ...stats,
+            campaign_contributions: undefined
+          };
+        });
+        setFundraisingCampaigns(campaignsWithStats);
       }
 
     } catch (error) {
@@ -399,13 +404,14 @@ const CreatorPublicProfile: React.FC = () => {
     }
   };
 
-  const formatDuration = (minutes: number) => {
+  // Memoized formatting functions
+  const formatDuration = React.useCallback((minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-  };
+  }, []);
 
-  const formatEventDate = (dateString: string) => {
+  const formatEventDate = React.useCallback((dateString: string) => {
     try {
       return new Date(dateString).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -417,19 +423,19 @@ const CreatorPublicProfile: React.FC = () => {
     } catch {
       return 'Date TBD';
     }
-  };
+  }, []);
 
-  const formatDate = (dateString: string) => {
+  const formatDate = React.useCallback((dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
     });
-  };
+  }, []);
 
-  const calculateProgress = (current: number, goal: number) => {
+  const calculateProgress = React.useCallback((current: number, goal: number) => {
     return Math.min((current / goal) * 100, 100);
-  };
+  }, []);
 
   if (loading) {
     return (
@@ -508,7 +514,16 @@ const CreatorPublicProfile: React.FC = () => {
               <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
                 <div className="relative">
                   <Avatar className="w-24 h-24 border-4 border-white/20 shadow-2xl">
-                    <AvatarImage src={creator.avatar_url} alt={creator.full_name} />
+                    <AvatarImage
+                      src={creator.avatar_url}
+                      alt={creator.full_name}
+                      loading="lazy"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.onerror = null; // Prevent infinite loop
+                        target.src = `https://placehold.co/96x96/ff7b00/ffffff?text=${encodeURIComponent((creator.full_name || creator.username || 'U').substring(0, 2))}`;
+                      }}
+                    />
                     <AvatarFallback className="text-xl bg-white/20 text-white">
                       {creator.full_name?.split(' ').map(n => n[0]).join('') || creator.username?.[0] || 'U'}
                     </AvatarFallback>
@@ -649,10 +664,16 @@ const CreatorPublicProfile: React.FC = () => {
                   <Card key={course.id} className="group bg-white/80 backdrop-blur-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-1 border-0 overflow-hidden">
                     <div className="relative h-40 bg-gradient-to-br from-orange-400 to-purple-400 overflow-hidden">
                       {course.thumbnail_url ? (
-                        <img 
-                          src={course.thumbnail_url} 
+                        <img
+                          src={course.thumbnail_url}
                           alt={course.title}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                          loading="lazy"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.onerror = null; // Prevent infinite loop
+                            target.src = `https://placehold.co/400x225/ff7b00/ffffff?text=${encodeURIComponent(course.title.substring(0, 20))}`;
+                          }}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
@@ -772,10 +793,16 @@ const CreatorPublicProfile: React.FC = () => {
                     <Card key={campaign.id} className="group bg-white/80 backdrop-blur-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-1 border-0 overflow-hidden">
                       <div className="relative h-40 bg-gradient-to-br from-orange-400 to-purple-400 overflow-hidden">
                         {campaign.cover_image_url ? (
-                          <img 
-                            src={campaign.cover_image_url} 
+                          <img
+                            src={campaign.cover_image_url}
                             alt={campaign.title}
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                            loading="lazy"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.onerror = null; // Prevent infinite loop
+                              target.src = `https://placehold.co/400x225/ff7b00/ffffff?text=${encodeURIComponent(campaign.title.substring(0, 20))}`;
+                            }}
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
@@ -886,10 +913,16 @@ const CreatorPublicProfile: React.FC = () => {
                   <Card key={event.id} className="group bg-white/80 backdrop-blur-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-1 border-0 overflow-hidden">
                     <div className="relative h-40 bg-gradient-to-br from-purple-400 to-orange-400 overflow-hidden">
                       {event.image_url ? (
-                        <img 
-                          src={event.image_url} 
+                        <img
+                          src={event.image_url}
                           alt={event.title}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                          loading="lazy"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.onerror = null; // Prevent infinite loop
+                            target.src = `https://placehold.co/400x225/ff7b00/ffffff?text=${encodeURIComponent(event.title.substring(0, 20))}`;
+                          }}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">

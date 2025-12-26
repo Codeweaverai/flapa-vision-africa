@@ -35,15 +35,41 @@ const CoursesSection = () => {
   useEffect(() => {
     const fetchCourses = async () => {
       try {
-        // First, fetch courses without the complex join
-        const { data: coursesData, error: coursesError } = await supabase
-          .from('courses')
-          .select('*')
-          .eq('is_published', true)
-          .order('created_at', { ascending: false })
-          .limit(50);
+        // Concurrent data fetching using Promise.all for faster loading
+        const [coursesResult, reviewsResult, enrollmentsResult, profilesResult] = await Promise.allSettled([
+          // Fetch courses
+          supabase
+            .from('courses')
+            .select('*')
+            .eq('is_published', true)
+            .order('created_at', { ascending: false })
+            .limit(50),
 
-        if (coursesError) throw coursesError;
+          // Fetch reviews
+          supabase
+            .from('course_reviews')
+            .select('course_id, rating'),
+
+          // Fetch enrollments
+          supabase
+            .from('course_enrollments')
+            .select('course_id'),
+
+          // Fetch creator profiles
+          supabase
+            .from('profiles')
+            .select('id, username, full_name, avatar_url')
+        ]);
+
+        // Handle errors for each request
+        if (coursesResult.status === 'rejected') {
+          throw coursesResult.reason;
+        }
+
+        const coursesData = coursesResult.value.data;
+        const reviewsData = reviewsResult.status === 'fulfilled' ? reviewsResult.value.data : [];
+        const enrollmentsData = enrollmentsResult.status === 'fulfilled' ? enrollmentsResult.value.data : [];
+        const profilesData = profilesResult.status === 'fulfilled' ? profilesResult.value.data : [];
 
         if (!coursesData || coursesData.length === 0) {
           setCourses([]);
@@ -51,36 +77,36 @@ const CoursesSection = () => {
           return;
         }
 
-        // Fetch additional data separately
-        const courseIds = coursesData.map(course => course.id);
-        const creatorIds = [...new Set(coursesData.map(course => course.creator_id).filter(Boolean))];
+        // Create maps for faster lookups
+        const reviewsMap = new Map<string, any[]>();
+        reviewsData?.forEach(review => {
+          if (!reviewsMap.has(review.course_id)) {
+            reviewsMap.set(review.course_id, []);
+          }
+          reviewsMap.get(review.course_id)!.push(review);
+        });
 
-        // Fetch reviews
-        const { data: reviewsData } = await supabase
-          .from('course_reviews')
-          .select('course_id, rating')
-          .in('course_id', courseIds);
+        const enrollmentsMap = new Map<string, any[]>();
+        enrollmentsData?.forEach(enrollment => {
+          if (!enrollmentsMap.has(enrollment.course_id)) {
+            enrollmentsMap.set(enrollment.course_id, []);
+          }
+          enrollmentsMap.get(enrollment.course_id)!.push(enrollment);
+        });
 
-        // Fetch enrollments
-        const { data: enrollmentsData } = await supabase
-          .from('course_enrollments')
-          .select('course_id')
-          .in('course_id', courseIds);
-
-        // Fetch creator profiles
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('id, username, full_name, avatar_url')
-          .in('id', creatorIds);
+        const profilesMap = new Map<string, any>();
+        profilesData?.forEach(profile => {
+          profilesMap.set(profile.id, profile);
+        });
 
         // Combine all data
         const coursesWithStats = coursesData.map(course => {
-          const courseReviews = reviewsData?.filter(review => review.course_id === course.id) || [];
-          const courseEnrollments = enrollmentsData?.filter(enrollment => enrollment.course_id === course.id) || [];
-          const creatorProfile = profilesData?.find(profile => profile.id === course.creator_id);
+          const courseReviews = reviewsMap.get(course.id) || [];
+          const courseEnrollments = enrollmentsMap.get(course.id) || [];
+          const creatorProfile = profilesMap.get(course.creator_id);
 
-          const averageRating = courseReviews.length > 0 
-            ? courseReviews.reduce((sum, review) => sum + review.rating, 0) / courseReviews.length 
+          const averageRating = courseReviews.length > 0
+            ? courseReviews.reduce((sum, review) => sum + review.rating, 0) / courseReviews.length
             : 0;
 
           return {
@@ -106,13 +132,13 @@ const CoursesSection = () => {
   }, []);
 
   // Create infinite scroll effect by duplicating courses
-  const duplicatedCourses = [...courses, ...courses, ...courses];
+  const duplicatedCourses = React.useMemo(() => [...courses, ...courses, ...courses], [courses]);
 
-  const formatDuration = (minutes: number) => {
+  const formatDuration = React.useCallback((minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-  };
+  }, []);
 
   const scrollLeft = () => {
     if (scrollContainerRef.current) {
@@ -248,7 +274,7 @@ const CoursesSection = () => {
           </div>
         ) : (
           <div className="relative">
-            <div 
+            <div
               ref={scrollContainerRef}
               className="flex overflow-x-auto scrollbar-hide space-x-6 pb-6 snap-x snap-mandatory"
               style={{
@@ -257,11 +283,14 @@ const CoursesSection = () => {
               }}
             >
               {duplicatedCourses.map((course, index) => (
-                <div 
-                  key={`${course.id}-${index}`} 
+                <div
+                  key={`${course.id}-${index}`}
                   className="flex-none w-80 snap-start"
                 >
-                  <Card className="group overflow-hidden hover:shadow-2xl transition-all duration-500 bg-white/90 backdrop-blur-sm border-0 shadow-xl hover:scale-[1.02]">
+                  <Card
+                    className="group overflow-hidden hover:shadow-2xl transition-all duration-500 bg-white/90 backdrop-blur-sm border-0 shadow-xl hover:scale-[1.02]"
+                    style={{ contain: 'layout style paint' }}
+                  >
                     <div className="relative">
                       {/* Course Thumbnail */}
                       <div className="relative h-56 overflow-hidden cursor-pointer">
@@ -271,6 +300,13 @@ const CoursesSection = () => {
                               src={course.thumbnail_url}
                               alt={course.title}
                               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                              loading="lazy"
+                              decoding="async"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.onerror = null; // Prevent infinite loop
+                                target.src = `https://placehold.co/400x225/ff7b00/ffffff?text=${encodeURIComponent(course.title.substring(0, 20))}`;
+                              }}
                             />
                             {/* Orange-Purple Gradient Video Icon with Pulse Animation - Always Visible on Images */}
                             <div className="absolute inset-0 flex items-center justify-center">
@@ -303,10 +339,10 @@ const CoursesSection = () => {
                             </div>
                           </div>
                         )}
-                        
+
                         {/* Gradient Overlay */}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                        
+
                         {/* Category and Difficulty Badges */}
                         <div className="absolute top-4 left-4 right-4 flex justify-between">
                           <Badge className="bg-white/90 text-gray-700 border-white/50 backdrop-blur-sm font-medium">
@@ -327,7 +363,7 @@ const CoursesSection = () => {
 
                         {/* Wishlist Button */}
                         <div className="absolute bottom-4 right-4 z-20">
-                          <WishlistButton 
+                          <WishlistButton
                             itemId={course.id}
                             itemType="course"
                             variant="ghost"
@@ -345,13 +381,22 @@ const CoursesSection = () => {
                           <CardTitle className="text-xl font-bold text-gray-900 line-clamp-1 group-hover:text-orange-600 transition-colors duration-300 leading-tight">
                             {course.title}
                           </CardTitle>
-                          
+
                           {/* Creator with Avatar */}
                           <div className="flex items-center gap-2 text-sm text-gray-600 mt-2">
                             <Avatar className="h-6 w-6 border border-orange-200">
-                              <AvatarImage 
-                                src={course.creator_avatar || undefined} 
+                              <AvatarImage
+                                src={course.creator_avatar || undefined}
                                 alt={course.creator_name}
+                                loading="lazy"
+                                decoding="async"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.onerror = null; // Prevent infinite loop
+                                  if (target.parentElement) {
+                                    target.parentElement.style.display = 'none';
+                                  }
+                                }}
                               />
                               <AvatarFallback className="bg-gradient-to-r from-orange-400 to-purple-500 text-white text-xs font-bold">
                                 {course.creator_name?.charAt(0).toUpperCase()}
@@ -397,8 +442,8 @@ const CoursesSection = () => {
                               )}
                             </span>
                           </div>
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 font-semibold"
                             asChild
                           >

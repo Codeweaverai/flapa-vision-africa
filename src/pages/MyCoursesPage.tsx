@@ -153,53 +153,67 @@ const MyCoursesPage = () => {
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
-        .from('course_enrollments')
-        .select(`
-          id,
-          course_id,
-          enrollment_date,
-          is_completed,
-          courses:course_id (
-            id,
-            title,
-            description,
-            thumbnail_url,
-            category,
-            difficulty_level,
-            duration_minutes,
-            creator_id
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('enrollment_date', { ascending: false });
+      setLoading(true);
 
-      if (error) {
-        console.error('Error fetching enrolled courses:', error);
+      // Concurrent data fetching using Promise.all for faster loading
+      const [enrollmentsResult, progressResult] = await Promise.allSettled([
+        // Fetch enrolled courses
+        supabase
+          .from('course_enrollments')
+          .select(`
+            id,
+            course_id,
+            enrollment_date,
+            is_completed,
+            courses:course_id (
+              id,
+              title,
+              description,
+              thumbnail_url,
+              category,
+              difficulty_level,
+              duration_minutes,
+              creator_id
+            )
+          `)
+          .eq('user_id', user.id)
+          .order('enrollment_date', { ascending: false }),
+
+        // Fetch progress for all courses at once
+        supabase
+          .from('course_progress')
+          .select('course_id, progress_percentage')
+          .eq('user_id', user.id)
+      ]);
+
+      if (enrollmentsResult.status === 'rejected') {
+        console.error('Error fetching enrolled courses:', enrollmentsResult.reason);
         toast.error('Failed to load your courses');
         return;
       }
 
-      // Fetch progress for each course
-      const coursesWithProgress = await Promise.all(
-        (data || []).map(async (enrollment) => {
-          const { data: progressData } = await supabase
-            .from('course_progress')
-            .select('progress_percentage')
-            .eq('course_id', enrollment.course_id)
-            .eq('user_id', user.id)
-            .single();
+      if (progressResult.status === 'rejected') {
+        console.error('Error fetching course progress:', progressResult.reason);
+      }
 
-          return {
-            ...enrollment,
-            progress_percentage: progressData?.progress_percentage || 0
-          };
-        })
-      );
+      const enrollmentsData = enrollmentsResult.value.data || [];
+      const progressData = progressResult.status === 'fulfilled' ? progressResult.value.data || [] : [];
+
+      // Create a map of progress for faster lookups
+      const progressMap = new Map<string, number>();
+      progressData.forEach(progress => {
+        progressMap.set(progress.course_id, progress.progress_percentage);
+      });
+
+      // Combine enrollment data with progress
+      const coursesWithProgress = enrollmentsData.map(enrollment => ({
+        ...enrollment,
+        progress_percentage: progressMap.get(enrollment.course_id) || 0
+      }));
 
       setEnrolledCourses(coursesWithProgress);
 
-      // Fetch real-time stats for all courses
+      // Fetch real-time stats for all courses concurrently
       const courseIds = coursesWithProgress.map(course => course.course_id);
       await fetchCourseStats(courseIds);
 
@@ -211,33 +225,41 @@ const MyCoursesPage = () => {
     }
   };
 
-  const fetchCourseStats = async (courseIds: string[]) => {
-    const stats: Record<string, CourseStats> = {};
-    
-    for (const courseId of courseIds) {
+  const fetchCourseStats = React.useCallback(async (courseIds: string[]) => {
+    if (courseIds.length === 0) {
+      setCourseStats({});
+      return;
+    }
+
+    // Fetch all stats concurrently for better performance
+    const statsPromises = courseIds.map(async (courseId) => {
       try {
-        // Fetch reviews and ratings
-        const { data: reviews } = await supabase
-          .from('course_reviews')
-          .select('rating')
-          .eq('course_id', courseId);
+        // Fetch all required data concurrently
+        const [reviewsResult, enrollmentsResult, modulesResult] = await Promise.allSettled([
+          // Fetch reviews and ratings
+          supabase
+            .from('course_reviews')
+            .select('rating')
+            .eq('course_id', courseId),
 
-        // Fetch total enrollments
-        const { data: enrollments } = await supabase
-          .from('course_enrollments')
-          .select('id')
-          .eq('course_id', courseId);
+          // Fetch total enrollments
+          supabase
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', courseId),
 
-        // Calculate actual duration from lessons
-        const { data: modules } = await supabase
-          .from('course_modules')
-          .select(`
-            lessons (duration_minutes)
-          `)
-          .eq('course_id', courseId);
+          // Calculate actual duration from lessons
+          supabase
+            .from('course_modules')
+            .select(`
+              lessons (duration_minutes)
+            `)
+            .eq('course_id', courseId)
+        ]);
 
         let totalDuration = 0;
-        if (modules) {
+        if (modulesResult.status === 'fulfilled' && modulesResult.value.data) {
+          const modules = modulesResult.value.data;
           modules.forEach(module => {
             if (module.lessons) {
               module.lessons.forEach((lesson: any) => {
@@ -247,48 +269,69 @@ const MyCoursesPage = () => {
           });
         }
 
-        const averageRating = reviews && reviews.length > 0
-          ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
+        const averageRating = reviewsResult.status === 'fulfilled' && reviewsResult.value.data && reviewsResult.value.data.length > 0
+          ? reviewsResult.value.data.reduce((sum, review) => sum + review.rating, 0) / reviewsResult.value.data.length
           : 0;
 
-        stats[courseId] = {
-          averageRating: Math.round(averageRating * 10) / 10,
-          totalReviews: reviews?.length || 0,
-          totalStudents: enrollments?.length || 0,
-          actualDurationHours: Math.round((totalDuration / 60) * 10) / 10
-        };
+        return [
+          courseId,
+          {
+            averageRating: Math.round(averageRating * 10) / 10,
+            totalReviews: reviewsResult.status === 'fulfilled' ? reviewsResult.value.data?.length || 0 : 0,
+            totalStudents: enrollmentsResult.status === 'fulfilled' ? enrollmentsResult.value.data?.length || 0 : 0,
+            actualDurationHours: Math.round((totalDuration / 60) * 10) / 10
+          }
+        ];
       } catch (error) {
         console.error(`Error fetching stats for course ${courseId}:`, error);
-        stats[courseId] = {
-          averageRating: 0,
-          totalReviews: 0,
-          totalStudents: 0,
-          actualDurationHours: 0
-        };
+        return [
+          courseId,
+          {
+            averageRating: 0,
+            totalReviews: 0,
+            totalStudents: 0,
+            actualDurationHours: 0
+          }
+        ];
       }
-    }
-    
+    });
+
+    const statsResults = await Promise.all(statsPromises);
+
+    // Convert results to record format
+    const stats: Record<string, CourseStats> = {};
+    statsResults.forEach(([courseId, courseStats]) => {
+      stats[courseId as string] = courseStats;
+    });
+
     setCourseStats(stats);
-  };
+  }, []);
 
-  const continueCourse = (courseId: string) => {
+  const continueCourse = React.useCallback((courseId: string) => {
     navigate(`/learning/course/${courseId}`);
-  };
+  }, [navigate]);
 
-  const completedCourses = enrolledCourses.filter(enrollment => 
-    enrollment.is_completed || (enrollment.progress_percentage || 0) >= 100
-  );
-  
-  const inProgressCourses = enrolledCourses.filter(enrollment => 
-    !enrollment.is_completed && (enrollment.progress_percentage || 0) < 100
-  );
+  // Memoize filtered courses
+  const { completedCourses, inProgressCourses } = React.useMemo(() => {
+    const completed = enrolledCourses.filter(enrollment =>
+      enrollment.is_completed || (enrollment.progress_percentage || 0) >= 100
+    );
+
+    const inProgress = enrolledCourses.filter(enrollment =>
+      !enrollment.is_completed && (enrollment.progress_percentage || 0) < 100
+    );
+
+    return { completedCourses: completed, inProgressCourses: inProgress };
+  }, [enrolledCourses]);
 
   // Calculate total hours across all courses
-  const totalHours = enrolledCourses.reduce((sum, enrollment) => {
-    const stats = courseStats[enrollment.course_id];
-    const hours = stats?.actualDurationHours || Math.ceil((enrollment.courses.duration_minutes || 0) / 60);
-    return sum + hours;
-  }, 0);
+  const totalHours = React.useMemo(() => {
+    return enrolledCourses.reduce((sum, enrollment) => {
+      const stats = courseStats[enrollment.course_id];
+      const hours = stats?.actualDurationHours || Math.ceil((enrollment.courses.duration_minutes || 0) / 60);
+      return sum + hours;
+    }, 0);
+  }, [enrolledCourses, courseStats]);
 
   // Use the PulseLoading component instead of the simple spinner
   if (loading) {
@@ -409,7 +452,7 @@ interface CourseGridProps {
   onContinue: (courseId: string) => void;
 }
 
-const CourseGrid = ({ courses, courseStats, onContinue }: CourseGridProps) => {
+const CourseGrid = React.memo(({ courses, courseStats, onContinue }: CourseGridProps) => {
   if (courses.length === 0) {
     return (
       <div className="text-center py-8">
@@ -427,10 +470,10 @@ const CourseGrid = ({ courses, courseStats, onContinue }: CourseGridProps) => {
           totalStudents: 0,
           actualDurationHours: 0
         };
-        
+
         const progress = enrollment.progress_percentage || 0;
         const isCompleted = enrollment.is_completed || progress >= 100;
-        
+
         return (
           <Card key={enrollment.id} className="bg-white/90 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden group">
             <div className="relative">
@@ -439,6 +482,12 @@ const CourseGrid = ({ courses, courseStats, onContinue }: CourseGridProps) => {
                   src={enrollment.courses.thumbnail_url}
                   alt={enrollment.courses.title}
                   className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                  loading="lazy"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.onerror = null; // Prevent infinite loop
+                    target.src = `https://placehold.co/400x225/ff7b00/ffffff?text=${encodeURIComponent(enrollment.courses.title.substring(0, 20))}`;
+                  }}
                 />
               ) : (
                 <div className="w-full h-48 bg-gradient-to-r from-orange-200 to-purple-200 flex items-center justify-center group-hover:from-orange-300 group-hover:to-purple-300 transition-all duration-300">
@@ -467,7 +516,7 @@ const CourseGrid = ({ courses, courseStats, onContinue }: CourseGridProps) => {
                 </Badge>
               </div>
             </div>
-            
+
             <CardHeader className="pb-4">
               <CardTitle className="line-clamp-2 group-hover:text-orange-600 transition-colors">
                 {enrollment.courses.title}
@@ -476,7 +525,7 @@ const CourseGrid = ({ courses, courseStats, onContinue }: CourseGridProps) => {
                 {enrollment.courses.description}
               </p>
             </CardHeader>
-            
+
             <CardContent>
               <div className="space-y-4">
                 {/* Progress Bar for non-completed courses */}
@@ -488,7 +537,7 @@ const CourseGrid = ({ courses, courseStats, onContinue }: CourseGridProps) => {
                     </div>
                     <div className="relative">
                       <Progress value={progress} className="h-2 bg-gray-200" />
-                      <div 
+                      <div
                         className="absolute top-0 left-0 h-2 bg-gradient-to-r from-orange-500 to-purple-600 rounded-full transition-all duration-300"
                         style={{ width: `${progress}%` }}
                       />
@@ -501,8 +550,8 @@ const CourseGrid = ({ courses, courseStats, onContinue }: CourseGridProps) => {
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-orange-500" />
                     <span className="text-gray-600">
-                      {stats.actualDurationHours > 0 
-                        ? `${stats.actualDurationHours}h` 
+                      {stats.actualDurationHours > 0
+                        ? `${stats.actualDurationHours}h`
                         : `${Math.ceil((enrollment.courses.duration_minutes || 0) / 60)}h`
                       }
                     </span>
@@ -510,8 +559,8 @@ const CourseGrid = ({ courses, courseStats, onContinue }: CourseGridProps) => {
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-purple-500" />
                     <span className="text-gray-600">
-                      {enrollment.enrollment_date ? 
-                        new Date(enrollment.enrollment_date).toLocaleDateString() : 
+                      {enrollment.enrollment_date ?
+                        new Date(enrollment.enrollment_date).toLocaleDateString() :
                         'Recently enrolled'
                       }
                     </span>
@@ -527,9 +576,9 @@ const CourseGrid = ({ courses, courseStats, onContinue }: CourseGridProps) => {
                     <span className="text-gray-600">{stats.totalReviews} reviews</span>
                   </div>
                 </div>
-                
-                <Button 
-                  onClick={() => onContinue(enrollment.courses.id)} 
+
+                <Button
+                  onClick={() => onContinue(enrollment.courses.id)}
                   className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300"
                   variant={isCompleted ? "outline" : "default"}
                 >
@@ -552,6 +601,6 @@ const CourseGrid = ({ courses, courseStats, onContinue }: CourseGridProps) => {
       })}
     </div>
   );
-};
+});
 
 export default MyCoursesPage;

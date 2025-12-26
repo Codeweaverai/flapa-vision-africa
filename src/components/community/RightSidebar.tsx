@@ -7,12 +7,13 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient';
 import { Image, TrendingUp, Play, Calendar, MessageCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import PriceDisplay from '@/components/currency/PriceDisplay';
 
 interface MediaPost {
   id: string;
   title: string;
   content: string;
-  images?: { 
+  images?: {
     id: string;
     image_url: string;
     image_path: string;
@@ -295,7 +296,7 @@ export const RightSidebar = () => {
                       <span>Popular</span>
                     </div>
                     <p className="text-sm font-bold text-purple-600 mt-1">
-                      ${course.price.toFixed(2)}
+                      <PriceDisplay amount={course.price} originalCurrency="USD" />
                     </p>
                   </div>
                 </div>

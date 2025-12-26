@@ -190,48 +190,205 @@ const AccountPage = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       if (!user) return;
-      
+
       try {
         setLoading(true);
-        const { data, error } = await supabase
+
+        // Fetch profile first to determine if user is a creator
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single();
 
-        if (error) {
-          console.error('Error fetching profile:', error);
+        if (profileError) {
+          console.error('Error fetching profile:', profileError);
           return;
         }
 
-        if (data) {
-          setProfile({
-            id: data.id,
-            username: data.username || '',
-            full_name: data.full_name || '',
-            avatar_url: data.avatar_url || '',
-            bio: data.bio || '',
-            avatar_storage_path: data.avatar_storage_path || null,
-            is_creator: data.is_creator || false,
-            role: data.role || 'user',
-            push_notifications_enabled: data.push_notifications_enabled || false,
-            push_interests: data.push_interests || ['hello'],
-            push_last_subscribed: data.push_last_subscribed,
-            push_last_unsubscribed: data.push_last_unsubscribed,
-            beams_authenticated: data.beams_authenticated || false,
-            beams_authenticated_at: data.beams_authenticated_at
-          });
+        if (!profileData) {
+          return;
+        }
 
+        // Update profile state
+        setProfile({
+          id: profileData.id,
+          username: profileData.username || '',
+          full_name: profileData.full_name || '',
+          avatar_url: profileData.avatar_url || '',
+          bio: profileData.bio || '',
+          avatar_storage_path: profileData.avatar_storage_path || null,
+          is_creator: profileData.is_creator || false,
+          role: profileData.role || 'user',
+          push_notifications_enabled: profileData.push_notifications_enabled || false,
+          push_interests: profileData.push_interests || ['hello'],
+          push_last_subscribed: profileData.push_last_subscribed,
+          push_last_unsubscribed: profileData.push_last_unsubscribed,
+          beams_authenticated: profileData.beams_authenticated || false,
+          beams_authenticated_at: profileData.beams_authenticated_at
+        });
+
+        // Concurrent data fetching for stats and preferences
+        const [userStatsResult, creatorStatsResult, preferencesResult] = await Promise.allSettled([
           // Fetch user stats (courses enrolled and events booked)
-          await fetchUserStats(user.id);
+          (async () => {
+            const [coursesEnrolledResult, eventsBookedResult] = await Promise.allSettled([
+              supabase
+                .from('course_enrollments')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', user.id),
+              supabase
+                .from('event_bookings')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', user.id)
+            ]);
+
+            return {
+              courses_enrolled: coursesEnrolledResult.status === 'fulfilled' ? coursesEnrolledResult.value.count || 0 : 0,
+              events_booked: eventsBookedResult.status === 'fulfilled' ? eventsBookedResult.value.count || 0 : 0
+            };
+          })(),
 
           // Fetch creator stats if user is a creator
-          if (data.is_creator) {
-            await fetchCreatorStats(data.id);
-          }
+          (async () => {
+            if (profileData.is_creator) {
+              const [coursesResult, eventsResult, courseIdsResult] = await Promise.allSettled([
+                supabase
+                  .from('courses')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('creator_id', user.id),
+                supabase
+                  .from('events')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('creator_id', user.id),
+                supabase
+                  .from('courses')
+                  .select('id')
+                  .eq('creator_id', user.id)
+              ]);
+
+              if (courseIdsResult.status === 'fulfilled' && courseIdsResult.value.data) {
+                const courseIds = courseIdsResult.value.data.map(c => c.id);
+                const { data: enrollmentsData } = await supabase
+                  .from('course_enrollments')
+                  .select('user_id')
+                  .in('course_id', courseIds);
+
+                const uniqueStudents = new Set(enrollmentsData?.map(e => e.user_id)).size;
+
+                return {
+                  courses_created: coursesResult.status === 'fulfilled' ? coursesResult.value.count || 0 : 0,
+                  events_created: eventsResult.status === 'fulfilled' ? eventsResult.value.count || 0 : 0,
+                  total_students: uniqueStudents || 0,
+                  total_earnings: 0
+                };
+              }
+            }
+            return {
+              courses_created: 0,
+              events_created: 0,
+              total_students: 0,
+              total_earnings: 0
+            };
+          })(),
 
           // Fetch user preferences
-          await fetchUserPreferences(data.id);
+          (async () => {
+            const [languageResult, currencyResult] = await Promise.allSettled([
+              supabase
+                .from('user_language_preferences')
+                .select('*')
+                .eq('user_id', user.id)
+                .single(),
+              supabase
+                .from('user_currency_preferences')
+                .select('*')
+                .eq('user_id', user.id)
+                .single()
+            ]);
+
+            // Handle language preference
+            let languagePref = null;
+            if (languageResult.status === 'fulfilled' && languageResult.value.data) {
+              languagePref = languageResult.value.data;
+            } else if (languageResult.status === 'rejected' && languageResult.reason.code !== 'PGRST116') {
+              console.error('Error fetching language preference:', languageResult.reason);
+            }
+
+            // Handle currency preference
+            let currencyPref = null;
+            if (currencyResult.status === 'fulfilled' && currencyResult.value.data) {
+              currencyPref = currencyResult.value.data;
+            } else if (currencyResult.status === 'rejected' && currencyResult.reason.code !== 'PGRST116') {
+              console.error('Error fetching currency preference:', currencyResult.reason);
+            }
+
+            // Create default preferences if they don't exist
+            if (!languagePref) {
+              const { data: newLanguagePref } = await supabase
+                .from('user_language_preferences')
+                .insert({
+                  user_id: user.id,
+                  language_code: 'en'
+                })
+                .select()
+                .single();
+              languagePref = newLanguagePref;
+            }
+
+            if (!currencyPref) {
+              const { data: newCurrencyPref } = await supabase
+                .from('user_currency_preferences')
+                .insert({
+                  user_id: user.id,
+                  default_currency: 'USD'
+                })
+                .select()
+                .single();
+              currencyPref = newCurrencyPref;
+            }
+
+            return {
+              language: languagePref,
+              currency: currencyPref
+            };
+          })()
+        ]);
+
+        // Handle user stats result
+        if (userStatsResult.status === 'fulfilled') {
+          setUserStats(userStatsResult.value);
+        } else {
+          console.error('Error fetching user stats:', userStatsResult.reason);
+          setUserStats({ courses_enrolled: 0, events_booked: 0 });
+        }
+
+        // Handle creator stats result
+        if (creatorStatsResult.status === 'fulfilled') {
+          setCreatorStats(creatorStatsResult.value);
+        } else {
+          console.error('Error fetching creator stats:', creatorStatsResult.reason);
+          setCreatorStats({
+            courses_created: 0,
+            events_created: 0,
+            total_students: 0,
+            total_earnings: 0
+          });
+        }
+
+        // Handle preferences result
+        if (preferencesResult.status === 'fulfilled') {
+          const { language, currency } = preferencesResult.value;
+
+          if (language) {
+            setLanguagePreference(language);
+          }
+
+          if (currency) {
+            setCurrencyPreference(currency);
+          }
+        } else {
+          console.error('Error fetching user preferences:', preferencesResult.reason);
         }
       } catch (error) {
         console.error('Error:', error);
@@ -369,12 +526,12 @@ const AccountPage = () => {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setProfile((prev) => ({ ...prev, [name]: value }));
-  };
+  }, []);
 
-  const handleSave = async () => {
+  const handleSave = React.useCallback(async () => {
     if (!user) return;
 
     setSaving(true);
@@ -397,9 +554,9 @@ const AccountPage = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [user, profile.username, profile.full_name, profile.bio]);
 
-  const handleSavePreferences = async () => {
+  const handleSavePreferences = React.useCallback(async () => {
     if (!user) return;
 
     setSavingPreferences(true);
@@ -422,15 +579,15 @@ const AccountPage = () => {
     } finally {
       setSavingPreferences(false);
     }
-  };
+  }, [user, languagePreference.language_code]);
 
-  const handlePushNotificationToggle = async () => {
+  const handlePushNotificationToggle = React.useCallback(async () => {
     if (!user) return;
 
     setNotificationLoading(true);
     try {
       const action = profile.push_notifications_enabled ? 'unsubscribe' : 'subscribe';
-      
+
       if (!('Notification' in window)) {
         toast.error('Browser not supported');
         return;
@@ -456,7 +613,7 @@ const AccountPage = () => {
             let tokenSuccess = false;
             try {
               const { data: tokenData, error: tokenError } = await supabase.functions.invoke('beams-generate-token');
-              
+
               if (!tokenError && tokenData?.token) {
                 beamsToken = tokenData.token;
                 await beamsClient.setUserId(user.id, beamsToken);
@@ -469,13 +626,13 @@ const AccountPage = () => {
 
             // Start Beams (with or without authentication)
             await beamsClient.start();
-            
+
             // Subscribe to interests
             await beamsClient.addDeviceInterest('hello');
             await beamsClient.addDeviceInterest(`user_${user.id}`);
-            
+
             deviceId = await beamsClient.getDeviceId();
-            
+
             console.log('✅ Pusher Beams subscribed', {
               deviceId,
               authenticated: tokenSuccess
@@ -497,13 +654,13 @@ const AccountPage = () => {
           const beamsClient = new window.PusherPushNotifications.Client({
             instanceId: '572e383b-e0d2-4eff-86ac-d066550451e0',
           });
-          
+
           try {
             deviceId = await beamsClient.getDeviceId();
           } catch (error) {
             console.log('Could not get device ID for unsubscribe');
           }
-          
+
           await beamsClient.stop();
           console.log('✅ Pusher Beams unsubscribed', { deviceId });
         }
@@ -548,11 +705,11 @@ const AccountPage = () => {
     } finally {
       setNotificationLoading(false);
     }
-  };
-  
-  const handleProfilePictureUpload = async (url: string, path: string) => {
+  }, [user, profile.push_notifications_enabled]);
+
+  const handleProfilePictureUpload = React.useCallback(async (url: string, path: string) => {
     if (!user) return;
-    
+
     try {
       const { error } = await supabase
         .from('profiles')
@@ -564,24 +721,24 @@ const AccountPage = () => {
         .eq('id', user.id);
 
       if (error) throw error;
-      
+
       // Update local state
       setProfile(prev => ({
         ...prev,
         avatar_url: url,
         avatar_storage_path: path
       }));
-      
+
       toast.success('Profile picture updated successfully');
     } catch (error) {
       console.error('Error updating profile picture:', error);
       toast.error('Failed to update profile picture');
     }
-  };
+  }, [user]);
 
-  const handleEnableCreatorMode = async () => {
+  const handleEnableCreatorMode = React.useCallback(async () => {
     if (!user) return;
-    
+
     setEnablingCreator(true);
     try {
       const { error } = await supabase
@@ -594,13 +751,13 @@ const AccountPage = () => {
         .eq('id', user.id);
 
       if (error) throw error;
-      
+
       // Update local state
       setProfile(prev => ({
         ...prev,
         is_creator: true
       }));
-      
+
       toast.success('Your Creator Dashboard has been Enabled');
     } catch (error) {
       console.error('Error enabling creator mode:', error);
@@ -608,13 +765,13 @@ const AccountPage = () => {
     } finally {
       setEnablingCreator(false);
     }
-  };
+  }, [user]);
 
-  const handleCreatorDashboardClick = () => {
+  const handleCreatorDashboardClick = React.useCallback(() => {
     navigate('/creator/dashboard');
-  };
+  }, [navigate]);
 
-  const getInitials = (name: string) => {
+  const getInitials = React.useCallback((name: string) => {
     return name
       ? name
           .split(' ')
@@ -623,7 +780,7 @@ const AccountPage = () => {
           .toUpperCase()
           .substring(0, 2)
       : 'U';
-  };
+  }, []);
 
   if (!user) {
     return <Navigate to="/auth" replace />;
@@ -656,7 +813,15 @@ const AccountPage = () => {
                   <div className="flex flex-col items-center text-center space-y-4">
                     <div className="relative">
                       <Avatar className="h-24 w-24 ring-4 ring-white/80 shadow-2xl">
-                        <AvatarImage src={profile.avatar_url} />
+                        <AvatarImage
+                          src={profile.avatar_url}
+                          loading="lazy"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.onerror = null; // Prevent infinite loop
+                            target.src = `https://placehold.co/96x96/ff7b00/ffffff?text=${encodeURIComponent(getInitials(profile.full_name))}`;
+                          }}
+                        />
                         <AvatarFallback className="bg-gradient-to-r from-orange-500 to-purple-600 text-white text-xl font-bold">
                           {getInitials(profile.full_name)}
                         </AvatarFallback>
@@ -723,11 +888,11 @@ const AccountPage = () => {
                       </Button>
                     );
                   })}
-                  
+
                   {/* Public Profile Link for Creators */}
                   {profile.is_creator && (
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="w-full justify-start h-12 bg-gradient-to-r from-orange-50 to-purple-50 border-purple-200 text-gray-700 hover:text-purple-600 transition-all duration-300 shadow-sm group mt-4"
                       asChild
                     >
@@ -1102,7 +1267,15 @@ const AccountPage = () => {
                       <div className="space-y-6">
                         <div className="flex items-center gap-4 p-4 bg-white/50 rounded-xl shadow-sm">
                           <Avatar className="h-14 w-14 ring-2 ring-white/80 shadow-lg">
-                            <AvatarImage src={profile.avatar_url} />
+                            <AvatarImage
+                              src={profile.avatar_url}
+                              loading="lazy"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.onerror = null; // Prevent infinite loop
+                                target.src = `https://placehold.co/56x56/ff7b00/ffffff?text=${encodeURIComponent(getInitials(profile.full_name))}`;
+                              }}
+                            />
                             <AvatarFallback className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">
                               {getInitials(profile.full_name)}
                             </AvatarFallback>
