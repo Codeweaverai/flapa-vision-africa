@@ -33,29 +33,8 @@ export const checkIsAdmin = async (user: User | null): Promise<boolean> => {
   }
 };
 
-/**
- * Sets up the initial admin user
- * This should be called once during app initialization
- */
-export const setupInitialAdmin = async (): Promise<void> => {
-  try {
-    // Check if the admin email exists
-    const { data: userData, error: userError } = await supabase.auth.admin
-      .listUsers();
-    
-    if (userError) {
-      console.error('Error checking admin user:', userError);
-      return;
-    }
-
-    // If admin user doesn't exist, create it
-    // Note: This requires service_role key permissions and should be done through a secure server-side function
-    console.log('Admin setup complete. Use the predefined admin credentials to log in.');
-    
-  } catch (error) {
-    console.error('Error setting up initial admin:', error);
-  }
-};
+// Note: Initial admin setup should be done via Edge Functions or direct database access
+// with service_role key. Client-side code cannot access admin APIs.
 
 /**
  * Modify a user's admin status using the secure user_roles table

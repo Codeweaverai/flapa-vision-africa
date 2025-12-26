@@ -297,24 +297,20 @@ async function updatePaymentFromPaymentIntent(paymentIntent: any, status: string
 
 export const getStripeUserInfo = async (userId: string) => {
   try {
-    // Get the user profile data
+    // Get the user profile data including email (stored in profiles table)
     const { data: userData, error: userError } = await supabase
       .from('profiles')
-      .select('id, full_name, username')
+      .select('id, full_name, username, email')
       .eq('id', userId)
       .single();
       
     if (userError) throw userError;
     
-    // Get the user email from auth.users table separately
-    const { data: authUserData, error: authError } = await supabase.auth.admin.getUserById(userId);
-    
-    if (authError) throw authError;
-    
-    // Combine the data
+    // Use profile data - email should be stored in profiles table
+    // Note: Admin API calls require service_role key and won't work client-side
     return {
       id: userData?.id || userId,
-      email: authUserData?.user?.email || 'no-email@example.com',
+      email: userData?.email || 'no-email@example.com',
       username: userData?.username || 'user',
       full_name: userData?.full_name || 'Anonymous User'
     };
