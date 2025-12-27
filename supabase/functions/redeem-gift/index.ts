@@ -41,7 +41,19 @@ const handler = async (req: Request): Promise<Response> => {
 
     const { giftCode, action }: RedeemGiftRequest = await req.json();
 
-    // Fetch gift details
+    // Validate gift code format to prevent enumeration attacks
+    const giftCodePattern = /^GIFT-[A-Z0-9]{8}$/;
+    if (!giftCode || !giftCodePattern.test(giftCode.toUpperCase())) {
+      return new Response(JSON.stringify({
+        success: false,
+        message: 'Invalid gift code format'
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
+    // Fetch gift details using service role (bypasses RLS)
     const { data: gift, error: giftError } = await supabaseAdmin
       .from('gifts')
       .select('*')
@@ -49,9 +61,26 @@ const handler = async (req: Request): Promise<Response> => {
       .single();
 
     if (giftError || !gift) {
+      // Return generic error to prevent code enumeration
       return new Response(JSON.stringify({
         success: false,
-        message: 'Invalid gift code'
+        message: 'Invalid or expired gift code'
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
+    // SECURITY: Verify the authenticated user's email matches the recipient email
+    // This prevents attackers from claiming gifts intended for others
+    const userEmail = user.email?.toLowerCase();
+    const recipientEmail = gift.recipient_email?.toLowerCase();
+    
+    if (!userEmail || !recipientEmail || userEmail !== recipientEmail) {
+      console.log(`Gift claim attempt denied: user email ${userEmail} does not match recipient ${recipientEmail}`);
+      return new Response(JSON.stringify({
+        success: false,
+        message: 'This gift was sent to a different email address. Please sign in with the correct account.'
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
@@ -98,9 +127,21 @@ const handler = async (req: Request): Promise<Response> => {
         itemDetails = data;
       }
 
+      // Only return safe fields - exclude gift_code from response since user already has it
       return new Response(JSON.stringify({
         success: true,
-        gift: { ...gift, item_details: itemDetails }
+        gift: {
+          id: gift.id,
+          gift_code: giftCode.toUpperCase(), // Return the code they provided, not from DB
+          item_type: gift.item_type,
+          item_id: gift.item_id,
+          sender_name: gift.sender_name,
+          recipient_name: gift.recipient_name,
+          personal_message: gift.personal_message,
+          status: gift.status,
+          expires_at: gift.expires_at,
+          item_details: itemDetails
+        }
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
