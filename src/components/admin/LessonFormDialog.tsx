@@ -107,7 +107,7 @@ const LessonFormDialog = ({
 
       if (publicUrlData?.publicUrl) {
         setVideoUrl(publicUrlData.publicUrl);
-        toast.success('Video uploaded successfully to Supabase storage');
+        toast.success('Video uploaded successfully');
       } else {
         throw new Error('Could not get public URL for the uploaded video');
       }
