@@ -1913,6 +1913,7 @@ const CourseLearningPage = () => {
   const [quizPassed, setQuizPassed] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState<CourseLesson | null>(null);
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [resumeLesson, setResumeLesson] = useState<CourseLesson | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -1946,6 +1947,9 @@ const CourseLearningPage = () => {
   // Completion state guards
   const completionInProgress = useRef(false);
   const completionAttempted = useRef(false);
+
+  // Avoid a race where auth initializes after the first data load (common on slower/mobile devices)
+  const lastLoadedUserIdRef = useRef<string | null>(null);
 
   // ==================== DEBUG LOGGING ====================
   useEffect(() => {
@@ -2653,6 +2657,7 @@ const CourseLearningPage = () => {
     setShowNextLessonDialog(false);
     setNextLesson(null);
     setCurrentLessonProgress(0);
+    setIsVideoPlaying(false);
 
     // Load lesson-specific data
     await loadLessonData(lesson.id);
@@ -3085,7 +3090,8 @@ const CourseLearningPage = () => {
 
   useEffect(() => {
     const loadData = async () => {
-      if (!courseId || dataLoaded) {
+      const currentUserId = user?.id ?? null;
+      if (!courseId || (dataLoaded && lastLoadedUserIdRef.current === currentUserId)) {
         setLoading(false);
         return;
       }
@@ -3311,6 +3317,7 @@ const CourseLearningPage = () => {
           setCompletedLessons(completedLessonsData);
         }
 
+        lastLoadedUserIdRef.current = user?.id ?? null;
         setDataLoaded(true);
 
         // Run test - commented out to prevent additional API calls
@@ -3666,44 +3673,49 @@ const CourseLearningPage = () => {
                                 <div className="relative w-full bg-black rounded-xl sm:rounded-2xl overflow-hidden shadow-lg sm:shadow-xl">
                                   {/* Aspect ratio wrapper - pure CSS approach for reliable mobile rendering */}
                                   <div className="relative w-full aspect-video">
-                                    <ReactPlayer
-                                      url={selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url || ''}
-                                      controls={true}
-                                      playing={false}
-                                      playsinline={true}
-                                      width="100%"
-                                      height="100%"
-                                      light={course.thumbnail_url}
-                                      config={{
-                                        file: {
-                                          attributes: {
-                                            controlsList: 'nodownload noremoteplayback',
-                                            disablePictureInPicture: true,
-                                            preload: 'auto',
-                                            playsInline: true,
-                                            'webkit-playsinline': 'true'
+                                    <div className="absolute inset-0">
+                                      <ReactPlayer
+                                        url={selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url || ''}
+                                        controls={true}
+                                        playing={isVideoPlaying}
+                                        playsinline={true}
+                                        width="100%"
+                                        height="100%"
+                                        light={course.thumbnail_url}
+                                        onClickPreview={() => setIsVideoPlaying(true)}
+                                        onPlay={() => setIsVideoPlaying(true)}
+                                        onPause={() => setIsVideoPlaying(false)}
+                                        config={{
+                                          file: {
+                                            attributes: {
+                                              controlsList: 'nodownload noremoteplayback',
+                                              disablePictureInPicture: true,
+                                              preload: 'auto',
+                                              playsInline: true,
+                                              'webkit-playsinline': 'true'
+                                            },
+                                            forceVideo: true
                                           },
-                                          forceVideo: true
-                                        },
-                                        youtube: {
-                                          playerVars: {
-                                            playsinline: 1,
-                                            modestbranding: 1
+                                          youtube: {
+                                            playerVars: {
+                                              playsinline: 1,
+                                              modestbranding: 1
+                                            }
+                                          },
+                                          vimeo: {
+                                            playerOptions: {
+                                              playsinline: true
+                                            }
                                           }
-                                        },
-                                        vimeo: {
-                                          playerOptions: {
-                                            playsinline: true
-                                          }
-                                        }
-                                      }}
-                                      onProgress={handleVideoProgress}
-                                      onEnded={handleVideoEnd}
-                                      onError={(error) => {
-                                        console.error('Video playback error:', error);
-                                        toast.error('There was an issue loading the video. Please try again.');
-                                      }}
-                                    />
+                                        }}
+                                        onProgress={handleVideoProgress}
+                                        onEnded={handleVideoEnd}
+                                        onError={(error) => {
+                                          console.error('Video playback error:', error);
+                                          toast.error('There was an issue loading the video. Please try again.');
+                                        }}
+                                      />
+                                    </div>
                                   </div>
                                 </div>
 
