@@ -38,6 +38,8 @@ const LessonFormDialog = ({
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [uploadingMaterials, setUploadingMaterials] = useState(false);
   const [materialUrls, setMaterialUrls] = useState<string[]>([]);
+  const [videoUploadProgress, setVideoUploadProgress] = useState<number | null>(null);
+  const [materialUploadProgress, setMaterialUploadProgress] = useState<number | null>(null);
 
   useEffect(() => {
     if (editingLesson) {
@@ -76,44 +78,93 @@ const LessonFormDialog = ({
     }
 
     setUploadingVideo(true);
-    
+    setVideoUploadProgress(0);
+
     try {
-      const { uploadFileWithFallback } = await import('@/services/wasabiService');
-      
-      const result = await uploadFileWithFallback(file, 'video');
-      
-      if (result.success && result.url) {
-        setVideoUrl(result.url);
-        const storageType = result.storage;
-        toast.success(`Video uploaded successfully via ${storageType === 'wasabi' ? 'Wasabi' : 'Supabase fallback'}`);
+      // Upload directly to Supabase storage with progress tracking
+      const bucketName = 'course-videos';
+      const fileName = `${Date.now()}-${file.name}`;
+
+      const { data, error } = await supabase.storage
+        .from(bucketName)
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false,
+          onProgress: (progressEvent) => {
+            const progress = Math.round((progressEvent.loaded / progressEvent.total) * 100);
+            setVideoUploadProgress(progress);
+          }
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      // Get public URL for the uploaded file
+      const { data: publicUrlData } = supabase.storage
+        .from(bucketName)
+        .getPublicUrl(fileName);
+
+      if (publicUrlData?.publicUrl) {
+        setVideoUrl(publicUrlData.publicUrl);
+        toast.success('Video uploaded successfully to Supabase storage');
       } else {
-        throw new Error(result.error || 'Upload failed');
+        throw new Error('Could not get public URL for the uploaded video');
       }
     } catch (error) {
       console.error('Error uploading video:', error);
       toast.error('Failed to upload video');
     } finally {
       setUploadingVideo(false);
+      setVideoUploadProgress(null);
     }
   };
+
 
   const handleMaterialUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     setUploadingMaterials(true);
-    
+    setMaterialUploadProgress(0);
+
     try {
-      const { uploadFileWithFallback } = await import('@/services/wasabiService');
-      
-      const uploadPromises = Array.from(files).map(async (file) => {
-        const result = await uploadFileWithFallback(file, 'material');
-        
-        if (result.success && result.url) {
-          return result.url;
-        } else {
-          throw new Error(`Failed to upload ${file.name}: ${result.error}`);
-        }
+      // Upload directly to Supabase storage with progress tracking
+      const bucketName = 'course-materials';
+      const uploadPromises = Array.from(files).map(async (file, index) => {
+        const fileName = `${Date.now()}-${file.name}`;
+
+        return new Promise<string>((resolve, reject) => {
+          const uploadPromise = supabase.storage
+            .from(bucketName)
+            .upload(fileName, file, {
+              cacheControl: '3600',
+              upsert: false,
+              onProgress: (progressEvent) => {
+                // Calculate overall progress based on number of files
+                const singleFileProgress = (progressEvent.loaded / progressEvent.total) * 100;
+                const overallProgress = ((index * 100) + singleFileProgress) / files.length;
+                setMaterialUploadProgress(Math.round(overallProgress));
+              }
+            });
+
+          uploadPromise.then(({ data, error }) => {
+            if (error) {
+              reject(new Error(`Failed to upload ${file.name}: ${error.message}`));
+            } else {
+              // Get public URL for the uploaded file
+              const { data: publicUrlData } = supabase.storage
+                .from(bucketName)
+                .getPublicUrl(fileName);
+
+              if (publicUrlData?.publicUrl) {
+                resolve(publicUrlData.publicUrl);
+              } else {
+                reject(new Error(`Could not get public URL for ${file.name}`));
+              }
+            }
+          });
+        });
       });
 
       const uploadedUrls = await Promise.all(uploadPromises);
@@ -124,6 +175,7 @@ const LessonFormDialog = ({
       toast.error('Failed to upload some materials');
     } finally {
       setUploadingMaterials(false);
+      setMaterialUploadProgress(null);
     }
   };
 
@@ -131,20 +183,42 @@ const LessonFormDialog = ({
     setMaterialUrls(prev => prev.filter(url => url !== urlToRemove));
   };
 
+  const calculateNextOrderIndex = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('lessons')
+        .select('order_index')
+        .eq('module_id', moduleId)
+        .order('order_index', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      const maxOrderIndex = data && data.length > 0 ? data[0].order_index : -1;
+      // Set the next available order index
+      // If no lessons exist in the module, start with 0, otherwise increment
+      return maxOrderIndex + 1;
+    } catch (error) {
+      console.error('Error calculating next order index:', error);
+      // Default to 0 if there's an error
+      return 0;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!title.trim()) {
       toast.error("Lesson title is required");
       return;
     }
-    
+
     setIsSubmitting(true);
-    
+
     try {
       let lessonData;
       const lessonContent = content ? JSON.parse(content) : {};
-      
+
       if (editingLesson) {
         lessonData = await updateLesson(editingLesson.id, {
           title,
@@ -154,9 +228,11 @@ const LessonFormDialog = ({
           content: lessonContent,
           materials_urls: materialUrls
         });
-        
+
         toast.success("Lesson updated successfully");
       } else {
+        // Calculate the next order index for new lessons
+        const nextOrderIndex = await calculateNextOrderIndex();
         lessonData = await createLesson({
           module_id: moduleId,
           title,
@@ -165,12 +241,12 @@ const LessonFormDialog = ({
           video_url: videoUrl || null,
           content: lessonContent,
           materials_urls: materialUrls,
-          order_index: 0,
+          order_index: nextOrderIndex,
         });
-        
+
         toast.success("Lesson created successfully");
       }
-      
+
       if (lessonData) {
         onLessonSaved(lessonData);
         onOpenChange(false);
@@ -193,272 +269,303 @@ const LessonFormDialog = ({
     </Button>
   );
 
-  const GradientIcon = () => (
-    <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-2 rounded-lg">
-      <BookOpen className="h-5 w-5 text-white" />
-    </div>
-  );
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto bg-gradient-to-br from-white to-gray-50/50 border-0 shadow-2xl">
-        <DialogHeader className="space-y-4">
-          <div className="flex items-center space-x-3">
-            <GradientIcon />
-            <DialogTitle className="bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent text-2xl font-bold">
-              {editingLesson ? "Edit Lesson" : "Create New Lesson"}
-            </DialogTitle>
-          </div>
-          <DialogDescription className="text-lg text-gray-600">
-            {editingLesson 
-              ? "Update the details of this lesson" 
-              : "Add a new lesson to your module"
-            }
-          </DialogDescription>
-        </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Basic Information Card */}
-          <Card className="border-l-4 border-l-orange-500 shadow-sm">
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="title" className="text-sm font-semibold text-gray-700">
-                    Lesson Title <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="title"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Enter an engaging lesson title..."
-                    className="border-gray-300 focus:border-orange-500 focus:ring-orange-500"
-                    required
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="description" className="text-sm font-semibold text-gray-700">
-                    Description (Optional)
-                  </Label>
-                  <Textarea
-                    id="description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Describe what students will learn in this lesson..."
-                    rows={2}
-                    className="border-gray-300 focus:border-orange-500 focus:ring-orange-500"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="contentType" className="text-sm font-semibold text-gray-700">
-                    Content Type
-                  </Label>
-                  <Select 
-                    value={contentType} 
-                    onValueChange={setContentType}
-                  >
-                    <SelectTrigger id="contentType" className="border-gray-300 focus:border-orange-500 focus:ring-orange-500">
-                      <SelectValue placeholder="Select content type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="video" className="flex items-center">
-                        <Video className="h-4 w-4 mr-2" />
-                        Video
-                      </SelectItem>
-                      <SelectItem value="text" className="flex items-center">
-                        <FileText className="h-4 w-4 mr-2" />
-                        Text
-                      </SelectItem>
-                      <SelectItem value="mixed" className="flex items-center">
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        Mixed Content
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+          <DialogHeader className="space-y-4">
+            <div className="flex items-center space-x-3">
+              <div className="bg-gradient-to-r from-orange-500 to-purple-600 p-2 rounded-lg">
+                <BookOpen className="h-5 w-5 text-white" />
               </div>
-            </CardContent>
-          </Card>
-          
-          {/* Content Section */}
-          {(contentType === "video" || contentType === "mixed") && (
+              <DialogTitle className="bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent text-2xl font-bold">
+                {editingLesson ? "Edit Lesson" : "Create New Lesson"}
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-lg text-gray-600">
+              {editingLesson
+                ? "Update the details of this lesson"
+                : "Add a new lesson to your module"
+              }
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Basic Information Card */}
+            <Card className="border-l-4 border-l-orange-500 shadow-sm">
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="title" className="text-sm font-semibold text-gray-700">
+                      Lesson Title <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="title"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="Enter an engaging lesson title..."
+                      className="border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="description" className="text-sm font-semibold text-gray-700">
+                      Description (Optional)
+                    </Label>
+                    <Textarea
+                      id="description"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Describe what students will learn in this lesson..."
+                      rows={2}
+                      className="border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="contentType" className="text-sm font-semibold text-gray-700">
+                      Content Type
+                    </Label>
+                    <Select
+                      value={contentType}
+                      onValueChange={setContentType}
+                    >
+                      <SelectTrigger id="contentType" className="border-gray-300 focus:border-orange-500 focus:ring-orange-500">
+                        <SelectValue placeholder="Select content type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="video" className="flex items-center">
+                          <Video className="h-4 w-4 mr-2 text-orange-500" />
+                          Video
+                        </SelectItem>
+                        <SelectItem value="text" className="flex items-center">
+                          <FileText className="h-4 w-4 mr-2 text-purple-500" />
+                          Text Content
+                        </SelectItem>
+                        <SelectItem value="mixed" className="flex items-center">
+                          <Sparkles className="h-4 w-4 mr-2 text-blue-500" />
+                          Mixed Content
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Video Section */}
+            {(contentType === "video" || contentType === "mixed") && (
+              <Card className="border border-gray-200 shadow-sm">
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-4">
+                        <Input
+                          type="file"
+                          accept="video/*"
+                          onChange={handleVideoUpload}
+                          disabled={uploadingVideo}
+                          className="hidden"
+                          id="video-upload"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => document.getElementById('video-upload')?.click()}
+                          disabled={uploadingVideo}
+                          className="border-orange-200 text-orange-600 hover:bg-orange-50"
+                        >
+                          {uploadingVideo ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Uploading Video...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="mr-2 h-4 w-4" />
+                              Upload Video
+                            </>
+                          )}
+                        </Button>
+                        {videoUrl && (
+                          <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200">
+                            <File className="h-3 w-3 mr-1" />
+                            Video uploaded
+                          </Badge>
+                        )}
+                      </div>
+
+                      {uploadingVideo && videoUploadProgress !== null && (
+                        <div className="w-full bg-gray-200 rounded-full h-2.5">
+                          <div
+                            className="bg-orange-600 h-2.5 rounded-full transition-all duration-300 ease-in-out"
+                            style={{ width: `${videoUploadProgress}%` }}
+                          ></div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Video Player */}
+                    {videoUrl && (
+                      <div className="mt-4">
+                        <Label className="text-sm font-semibold text-gray-700 block mb-2">Preview Video</Label>
+                        <div className="aspect-video bg-black rounded-lg overflow-hidden border border-gray-300">
+                          <video
+                            src={videoUrl}
+                            controls
+                            className="w-full h-full object-contain"
+                            controlsList="nodownload"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <p className="text-xs text-gray-500 mt-2">
+                      Supported formats: MP4, MOV, AVI. Max size: 500MB
+                    </p>
+
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Text Content Section */}
+            {(contentType === "text" || contentType === "mixed") && (
+              <Card className="border border-gray-200 shadow-sm">
+                <CardContent className="p-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="content" className="text-sm font-semibold text-gray-700 flex items-center">
+                      <FileText className="h-4 w-4 mr-2 text-purple-500" />
+                      Lesson Content (JSON)
+                    </Label>
+                    <Textarea
+                      id="content"
+                      value={content}
+                      onChange={(e) => setContent(e.target.value)}
+                      placeholder='{"blocks": [{"text": "Lesson content here"}]}'
+                      rows={5}
+                      className="border-gray-300 focus:border-purple-500 focus:ring-purple-500 font-mono text-sm"
+                    />
+                    <p className="text-xs text-gray-500">
+                      Enter lesson content as JSON. For advanced editing options, use a structured editor.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Materials Section */}
             <Card className="border border-gray-200 shadow-sm">
               <CardContent className="p-6">
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold text-gray-700 flex items-center">
-                    <Video className="h-4 w-4 mr-2 text-orange-500" />
-                    Course Video
+                    <File className="h-4 w-4 mr-2 text-blue-500" />
+                    Course Materials & Assignments
                   </Label>
-                  <div className="flex items-center gap-4">
-                    <Input
-                      type="file"
-                      accept="video/*"
-                      onChange={handleVideoUpload}
-                      disabled={uploadingVideo}
-                      className="hidden"
-                      id="video-upload"
-                    />
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={() => document.getElementById('video-upload')?.click()}
-                      disabled={uploadingVideo}
-                      className="border-orange-200 text-orange-600 hover:bg-orange-50"
-                    >
-                      {uploadingVideo ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Uploading Video...
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="mr-2 h-4 w-4" />
-                          Upload Video
-                        </>
-                      )}
-                    </Button>
-                    {videoUrl && (
-                      <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200">
-                        <File className="h-3 w-3 mr-1" />
-                        Video uploaded
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Supported formats: MP4, MOV, AVI. Max size: 500MB
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-          
-          {/* Text Content Section */}
-          {(contentType === "text" || contentType === "mixed") && (
-            <Card className="border border-gray-200 shadow-sm">
-              <CardContent className="p-6">
-                <div className="space-y-2">
-                  <Label htmlFor="content" className="text-sm font-semibold text-gray-700 flex items-center">
-                    <FileText className="h-4 w-4 mr-2 text-purple-500" />
-                    Lesson Content (JSON)
-                  </Label>
-                  <Textarea
-                    id="content"
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    placeholder='{"blocks": [{"text": "Lesson content here"}]}'
-                    rows={5}
-                    className="border-gray-300 focus:border-purple-500 focus:ring-purple-500 font-mono text-sm"
-                  />
-                  <p className="text-xs text-gray-500">
-                    Enter lesson content as JSON. For advanced editing options, use a structured editor.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Materials Section */}
-          <Card className="border border-gray-200 shadow-sm">
-            <CardContent className="p-6">
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-700 flex items-center">
-                  <File className="h-4 w-4 mr-2 text-blue-500" />
-                  Course Materials & Assignments
-                </Label>
-                <div className="flex items-center gap-4">
-                  <Input
-                    type="file"
-                    multiple
-                    accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.zip"
-                    onChange={handleMaterialUpload}
-                    disabled={uploadingMaterials}
-                    className="hidden"
-                    id="materials-upload"
-                  />
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => document.getElementById('materials-upload')?.click()}
-                    disabled={uploadingMaterials}
-                    className="border-blue-200 text-blue-600 hover:bg-blue-50"
-                  >
-                    {uploadingMaterials ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Uploading Materials...
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="mr-2 h-4 w-4" />
-                        Upload Materials
-                      </>
-                    )}
-                  </Button>
-                </div>
-                
-                {materialUrls.length > 0 && (
-                  <div className="space-y-2 mt-4">
-                    <Label className="text-sm font-medium text-gray-700">Uploaded Materials:</Label>
-                    <div className="space-y-2">
-                      {materialUrls.map((url, index) => (
-                        <div key={index} className="flex items-center justify-between bg-gradient-to-r from-gray-50 to-gray-100 p-3 rounded-lg border border-gray-200">
-                          <div className="flex items-center space-x-2">
-                            <File className="h-4 w-4 text-gray-500" />
-                            <span className="text-sm text-gray-700">
-                              Material {index + 1}
-                            </span>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeMaterial(url)}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-4">
+                      <Input
+                        type="file"
+                        multiple
+                        accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.zip"
+                        onChange={handleMaterialUpload}
+                        disabled={uploadingMaterials}
+                        className="hidden"
+                        id="materials-upload"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => document.getElementById('materials-upload')?.click()}
+                        disabled={uploadingMaterials}
+                        className="border-blue-200 text-blue-600 hover:bg-blue-50"
+                      >
+                        {uploadingMaterials ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Uploading Materials...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="mr-2 h-4 w-4" />
+                            Upload Materials
+                          </>
+                        )}
+                      </Button>
                     </div>
+
+                    {uploadingMaterials && materialUploadProgress !== null && (
+                      <div className="w-full bg-gray-200 rounded-full h-2.5">
+                        <div
+                          className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-in-out"
+                          style={{ width: `${materialUploadProgress}%` }}
+                        ></div>
+                      </div>
+                    )}
                   </div>
+
+                  {materialUrls.length > 0 && (
+                    <div className="space-y-2 mt-4">
+                      <Label className="text-sm font-medium text-gray-700">Uploaded Materials:</Label>
+                      <div className="space-y-2">
+                        {materialUrls.map((url, index) => (
+                          <div key={index} className="flex items-center justify-between bg-gradient-to-r from-gray-50 to-gray-100 p-3 rounded-lg border border-gray-200">
+                            <div className="flex items-center space-x-2">
+                              <File className="h-4 w-4 text-gray-500" />
+                              <span className="text-sm text-gray-700">
+                                Material {index + 1}
+                              </span>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeMaterial(url)}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <DialogFooter className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 pt-4 border-t border-gray-200">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={isSubmitting || uploadingVideo || uploadingMaterials}
+                className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </Button>
+              <GradientButton
+                type="submit"
+                disabled={isSubmitting || uploadingVideo || uploadingMaterials}
+                className="flex-1"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    {editingLesson ? 'Updating Lesson...' : 'Creating Lesson...'}
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    {editingLesson ? 'Update Lesson' : 'Create Lesson'}
+                  </>
                 )}
-              </div>
-            </CardContent>
-          </Card>
-          
-          <DialogFooter className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 pt-4 border-t border-gray-200">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => onOpenChange(false)}
-              disabled={isSubmitting}
-              className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50"
-            >
-              Cancel
-            </Button>
-            <GradientButton 
-              type="submit" 
-              disabled={isSubmitting || uploadingVideo || uploadingMaterials}
-              className="flex-1"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  {editingLesson ? 'Updating Lesson...' : 'Creating Lesson...'}
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  {editingLesson ? 'Update Lesson' : 'Create Lesson'}
-                </>
-              )}
-            </GradientButton>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
+              </GradientButton>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    );
 };
 
 export default LessonFormDialog;
