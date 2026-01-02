@@ -3661,35 +3661,42 @@ const CourseLearningPage = () => {
 
                             {/* Video Player */}
                             {(selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url) && (
-                              <div className="space-y-6 w-full">
-                                <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-xl">
-                                  <ReactPlayer
-                                    url={selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url || ''}
-                                    controls={true}
-                                    playing={true}
-                                    width="100%"
-                                    height="100%"
-                                    light={course.thumbnail_url}
-                                    config={{
-                                      file: {
-                                        attributes: {
-                                          controlsList: 'nodownload noremoteplayback',
-                                          disablePictureInPicture: true,
-                                          preload: 'metadata',
-                                          onContextMenu: (e: any) => e.preventDefault()
-                                        }
-                                      }
-                                    }}
-                                    onProgress={handleVideoProgress}
-                                    onEnded={handleVideoEnd}
-                                    onError={(error) => {
-                                      console.error('Video playback error:', error);
-                                      toast.error('There was an issue loading the video. Please try again.');
-                                    }}
-                                    style={{
-                                      minHeight: '400px'
-                                    }}
-                                  />
+                              <div className="space-y-4 sm:space-y-6 w-full">
+                                {/* Responsive video container - optimized for mobile, tablet, and desktop */}
+                                <div className="relative w-full bg-black rounded-xl sm:rounded-2xl overflow-hidden shadow-lg sm:shadow-xl">
+                                  {/* Aspect ratio wrapper with responsive minimum heights */}
+                                  <div className="relative w-full" style={{ 
+                                    paddingBottom: '56.25%', // 16:9 aspect ratio
+                                    minHeight: 'clamp(200px, 50vw, 480px)' // Responsive min-height: 200px on mobile, scales up to 480px on desktop
+                                  }}>
+                                    <div className="absolute inset-0">
+                                      <ReactPlayer
+                                        url={selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url || ''}
+                                        controls={true}
+                                        playing={true}
+                                        width="100%"
+                                        height="100%"
+                                        light={course.thumbnail_url}
+                                        config={{
+                                          file: {
+                                            attributes: {
+                                              controlsList: 'nodownload noremoteplayback',
+                                              disablePictureInPicture: true,
+                                              preload: 'metadata',
+                                              onContextMenu: (e: any) => e.preventDefault(),
+                                              playsInline: true // Better mobile experience
+                                            }
+                                          }
+                                        }}
+                                        onProgress={handleVideoProgress}
+                                        onEnded={handleVideoEnd}
+                                        onError={(error) => {
+                                          console.error('Video playback error:', error);
+                                          toast.error('There was an issue loading the video. Please try again.');
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
                                 </div>
 
                                 {/* Video Controls */}
