@@ -24,14 +24,15 @@ export const transcribeLessonVideo = async (lessonId: string, videoUrl: string):
     // Update lesson status to processing
     const { error: updateError } = await supabase
       .from('lessons')
-      .update({ 
+      .update({
         transcription_status: 'processing',
         transcription_updated_at: new Date().toISOString()
       })
       .eq('id', lessonId);
 
     if (updateError) {
-      throw new Error(`Failed to update lesson status: ${updateError.message}`);
+      console.error('Error updating lesson status:', updateError);
+      // Continue with transcription even if status update fails
     }
 
     // Call Supabase Edge Function
@@ -40,20 +41,39 @@ export const transcribeLessonVideo = async (lessonId: string, videoUrl: string):
     });
 
     if (error) {
-      throw new Error(`Transcription failed: ${error.message}`);
+      console.error('Edge function error:', error);
+
+      // Update lesson status to failed
+      await supabase
+        .from('lessons')
+        .update({
+          transcription_status: 'failed',
+          transcription_updated_at: new Date().toISOString()
+        })
+        .eq('id', lessonId)
+        .catch(err => console.error('Error updating status to failed:', err));
+
+      return {
+        success: false,
+        error: `Transcription failed: ${error.message}`
+      };
     }
 
     if (!data.success) {
       // Update lesson status to failed
       await supabase
         .from('lessons')
-        .update({ 
+        .update({
           transcription_status: 'failed',
           transcription_updated_at: new Date().toISOString()
         })
-        .eq('id', lessonId);
-      
-      throw new Error(data.error || 'Transcription failed');
+        .eq('id', lessonId)
+        .catch(err => console.error('Error updating status to failed:', err));
+
+      return {
+        success: false,
+        error: data.error || 'Transcription failed'
+      };
     }
 
     return {
@@ -63,16 +83,17 @@ export const transcribeLessonVideo = async (lessonId: string, videoUrl: string):
     };
   } catch (error: any) {
     console.error('Transcription service error:', error);
-    
+
     // Update lesson status to failed
     await supabase
       .from('lessons')
-      .update({ 
+      .update({
         transcription_status: 'failed',
         transcription_updated_at: new Date().toISOString()
       })
-      .eq('id', lessonId);
-    
+      .eq('id', lessonId)
+      .catch(err => console.error('Error updating status to failed:', err));
+
     return {
       success: false,
       error: error.message || 'Failed to transcribe video'

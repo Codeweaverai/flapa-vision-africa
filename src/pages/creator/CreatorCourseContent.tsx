@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import CreatorLayout from '@/components/creator/CreatorLayout';
@@ -6,16 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Book, ArrowLeft, Plus, GraduationCap, Edit, Trash2, Eye, 
-  FileText, PlayCircle, Clock, CheckCircle, XCircle 
+import {
+  Book, ArrowLeft, Plus, GraduationCap, Edit, Trash2, Eye,
+  FileText, PlayCircle, Clock, CheckCircle, XCircle
 } from 'lucide-react';
-import { 
-  Course, 
-  CourseModule, 
-  Lesson, 
-  deleteModule, 
-  deleteLesson, 
+import {
+  Course,
+  CourseModule,
+  Lesson,
+  deleteModule,
+  deleteLesson,
   fetchCourseWithModulesAndLessons,
   updateModuleOrder
 } from '@/services/courseService';
@@ -64,7 +64,7 @@ const CreatorCourseContent = () => {
   const [quizDialogOpen, setQuizDialogOpen] = useState(false);
   const [quizEditDialogOpen, setQuizEditDialogOpen] = useState(false);
   const [finalExamDialogOpen, setFinalExamDialogOpen] = useState(false);
-  
+
   // Selected items for editing
   const [editingModule, setEditingModule] = useState<CourseModule | null>(null);
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
@@ -79,73 +79,77 @@ const CreatorCourseContent = () => {
       return;
     }
 
+    let isMounted = true;
+
     const loadCourseData = async () => {
       setLoading(true);
       try {
         const courseData = await fetchCourseWithModulesAndLessons(id);
-        if (courseData) {
+        if (isMounted && courseData) {
           setCourse(courseData);
           setModules(courseData.modules || []);
           await loadFinalExam(id);
-          await loadAllQuizzes(courseData.modules || []);
-        } else {
+
+          // Load quizzes for all lessons in all modules
+          const quizMap: {[key: string]: Quiz[]} = {};
+
+          for (const module of courseData.modules || []) {
+            for (const lesson of module.lessons || []) {
+              const { data: quizData, error } = await supabase
+                .from('quizzes')
+                .select('*')
+                .eq('lesson_id', lesson.id);
+
+              if (error) {
+                console.error('Error loading quizzes:', error);
+                continue;
+              }
+
+              if (quizData && quizData.length > 0) {
+                // Get question count for each quiz
+                const quizzesWithCounts = await Promise.all(
+                  quizData.map(async (quiz) => {
+                    const { count } = await supabase
+                      .from('quiz_questions')
+                      .select('*', { count: 'exact', head: true })
+                      .eq('quiz_id', quiz.id);
+
+                    return {
+                      ...quiz,
+                      question_count: count || 0
+                    };
+                  })
+                );
+
+                quizMap[lesson.id] = quizzesWithCounts;
+              }
+            }
+          }
+
+          setQuizzes(quizMap);
+        } else if (isMounted) {
           toast.error('Course not found');
           navigate('/creator/courses');
         }
       } catch (error) {
-        console.error('Error loading course content:', error);
-        toast.error('Failed to load course content');
+        if (isMounted) {
+          console.error('Error loading course content:', error);
+          toast.error('Failed to load course content');
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     loadCourseData();
+
+    // Cleanup function to handle unmounting
+    return () => {
+      isMounted = false;
+    };
   }, [id, navigate]);
-
-  const loadAllQuizzes = async (modules: CourseModule[]) => {
-    try {
-      const quizMap: {[key: string]: Quiz[]} = {};
-      
-      // Load quizzes for each lesson
-      for (const module of modules) {
-        for (const lesson of module.lessons || []) {
-          const { data: quizData, error } = await supabase
-            .from('quizzes')
-            .select('*')
-            .eq('lesson_id', lesson.id);
-
-          if (error) {
-            console.error('Error loading quizzes:', error);
-            continue;
-          }
-
-          if (quizData && quizData.length > 0) {
-            // Get question count for each quiz
-            const quizzesWithCounts = await Promise.all(
-              quizData.map(async (quiz) => {
-                const { count } = await supabase
-                  .from('quiz_questions')
-                  .select('*', { count: 'exact', head: true })
-                  .eq('quiz_id', quiz.id);
-
-                return {
-                  ...quiz,
-                  question_count: count || 0
-                };
-              })
-            );
-
-            quizMap[lesson.id] = quizzesWithCounts;
-          }
-        }
-      }
-
-      setQuizzes(quizMap);
-    } catch (error) {
-      console.error('Error loading quizzes:', error);
-    }
-  };
 
   const loadFinalExam = async (courseId: string) => {
     try {
@@ -176,6 +180,7 @@ const CreatorCourseContent = () => {
     }
   };
 
+
   // Module handlers
   const handleAddModule = () => {
     setEditingModule(null);
@@ -196,6 +201,7 @@ const CreatorCourseContent = () => {
       setModules(prevModules => [...prevModules, moduleData]);
     }
     setModuleDialogOpen(false);
+    setEditingModule(null);
   };
 
   const handleDeleteModule = async (moduleId: string) => {
@@ -246,6 +252,8 @@ const CreatorCourseContent = () => {
       })
     );
     setLessonDialogOpen(false);
+    setEditingLesson(null);
+    setSelectedModuleId(null);
   };
 
   const handleDeleteLesson = async (lessonId: string) => {
@@ -281,15 +289,37 @@ const CreatorCourseContent = () => {
     setQuizDialogOpen(true);
   };
 
-  const handleQuizSaved = () => {
-    if (id) {
-      fetchCourseWithModulesAndLessons(id).then(courseData => {
-        if (courseData) {
-          setCourse(courseData);
-          setModules(courseData.modules || []);
-          loadAllQuizzes(courseData.modules || []);
-        }
-      });
+  const handleQuizSaved = async () => {
+    // Reload quizzes for the specific lesson
+    if (selectedLessonId) {
+      const { data: quizData, error } = await supabase
+        .from('quizzes')
+        .select('*')
+        .eq('lesson_id', selectedLessonId);
+
+      if (error) {
+        console.error('Error loading quizzes:', error);
+      } else if (quizData) {
+        // Get question count for each quiz
+        const quizzesWithCounts = await Promise.all(
+          quizData.map(async (quiz) => {
+            const { count } = await supabase
+              .from('quiz_questions')
+              .select('*', { count: 'exact', head: true })
+              .eq('quiz_id', quiz.id);
+
+            return {
+              ...quiz,
+              question_count: count || 0
+            };
+          })
+        );
+
+        setQuizzes(prev => ({
+          ...prev,
+          [selectedLessonId]: quizzesWithCounts
+        }));
+      }
     }
     setQuizDialogOpen(false);
   };
@@ -299,15 +329,37 @@ const CreatorCourseContent = () => {
     setQuizEditDialogOpen(true);
   };
 
-  const handleQuizUpdated = () => {
-    if (id) {
-      fetchCourseWithModulesAndLessons(id).then(courseData => {
-        if (courseData) {
-          setCourse(courseData);
-          setModules(courseData.modules || []);
-          loadAllQuizzes(courseData.modules || []);
-        }
-      });
+  const handleQuizUpdated = async () => {
+    // Reload quizzes for the lesson that was updated
+    if (editingQuiz) {
+      const { data: quizData, error } = await supabase
+        .from('quizzes')
+        .select('*')
+        .eq('lesson_id', editingQuiz.lesson_id);
+
+      if (error) {
+        console.error('Error loading quizzes:', error);
+      } else if (quizData) {
+        // Get question count for each quiz
+        const quizzesWithCounts = await Promise.all(
+          quizData.map(async (quiz) => {
+            const { count } = await supabase
+              .from('quiz_questions')
+              .select('*', { count: 'exact', head: true })
+              .eq('quiz_id', quiz.id);
+
+            return {
+              ...quiz,
+              question_count: count || 0
+            };
+          })
+        );
+
+        setQuizzes(prev => ({
+          ...prev,
+          [editingQuiz.lesson_id]: quizzesWithCounts
+        }));
+      }
     }
     setQuizEditDialogOpen(false);
     setEditingQuiz(null);
@@ -327,10 +379,13 @@ const CreatorCourseContent = () => {
       if (error) throw error;
 
       // Remove quiz from state
-      setQuizzes(prev => ({
-        ...prev,
-        [lessonId]: prev[lessonId].filter(q => q.id !== quizId)
-      }));
+      setQuizzes(prev => {
+        const updated = { ...prev };
+        if (updated[lessonId]) {
+          updated[lessonId] = updated[lessonId].filter(q => q.id !== quizId);
+        }
+        return updated;
+      });
 
       toast.success('Quiz deleted successfully');
     } catch (error) {
@@ -401,7 +456,7 @@ const CreatorCourseContent = () => {
   };
 
   // Enhanced Module Component with Modern Design
-  const EnhancedModuleCard = ({ module, moduleIndex }: { module: CourseModule, moduleIndex: number }) => {
+  const EnhancedModuleCard = React.memo(({ module, moduleIndex }: { module: CourseModule, moduleIndex: number }) => {
     return (
       <Card key={module.id} className="border-l-4 border-l-orange-500 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-r from-white to-gray-50/50">
         <CardHeader className="pb-4">
@@ -463,12 +518,11 @@ const CreatorCourseContent = () => {
           {module.lessons && module.lessons.length > 0 ? (
             <div className="space-y-4 ml-11">
               {module.lessons.map((lesson, lessonIndex) => (
-                <LessonCard 
-                  key={lesson.id} 
-                  lesson={lesson} 
+                <LessonCard
+                  key={lesson.id}
+                  lesson={lesson}
                   lessonIndex={lessonIndex}
                   moduleId={module.id}
-                  quizzes={quizzes[lesson.id] || []}
                 />
               ))}
             </div>
@@ -488,15 +542,16 @@ const CreatorCourseContent = () => {
         </CardContent>
       </Card>
     );
-  };
+  });
 
   // Lesson Card Component
-  const LessonCard = ({ lesson, lessonIndex, moduleId, quizzes }: { 
-    lesson: Lesson; 
-    lessonIndex: number; 
+  const LessonCard = React.memo(({ lesson, lessonIndex, moduleId }: {
+    lesson: Lesson;
+    lessonIndex: number;
     moduleId: string;
-    quizzes: Quiz[];
   }) => {
+    const lessonQuizzes = quizzes[lesson.id] || [];
+
     return (
       <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow bg-white">
         <CardContent className="p-6">
@@ -506,22 +561,24 @@ const CreatorCourseContent = () => {
                 <div className="bg-gray-100 text-gray-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
                   {lessonIndex + 1}
                 </div>
-                <h4 className="font-semibold text-gray-800">{lesson.title}</h4>
+                <h4 className="font-semibold text-gray-800">
+                  {lesson.title}
+                </h4>
               </div>
               {lesson.description && (
                 <p className="text-sm text-gray-600 ml-9">{lesson.description}</p>
               )}
               <div className="flex items-center space-x-3 mt-2 ml-9">
                 <Badge variant="outline" className={`${
-                  lesson.content_type === 'video' 
+                  lesson.content_type === 'video'
                     ? 'bg-blue-50 text-blue-700 border-blue-200'
                     : 'bg-green-50 text-green-700 border-green-200'
                 }`}>
                   {lesson.content_type}
                 </Badge>
-                {quizzes.length > 0 && (
+                {lessonQuizzes.length > 0 && (
                   <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
-                    {quizzes.length} Quiz{quizzes.length !== 1 ? 'zes' : ''}
+                    {lessonQuizzes.length} Quiz{lessonQuizzes.length !== 1 ? 'zes' : ''}
                   </Badge>
                 )}
               </div>
@@ -554,26 +611,32 @@ const CreatorCourseContent = () => {
               </Button>
             </div>
           </div>
-          
-          {/* Quizzes Section */}
-          {quizzes.length > 0 && (
+
+          {/* Quizzes Section - Always show if quizzes exist */}
+          {lessonQuizzes.length > 0 && (
             <div className="ml-9 mt-4 space-y-3">
-              <h5 className="text-sm font-medium text-gray-700 mb-2">Quizzes:</h5>
-              {quizzes.map((quiz) => (
-                <QuizCard 
-                  key={quiz.id} 
-                  quiz={quiz} 
+              <h5 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                Quizzes:
+                <span className="ml-2 text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">
+                  {lessonQuizzes.length} {lessonQuizzes.length !== 1 ? 'quizzes' : 'quiz'}
+                </span>
+              </h5>
+
+              {lessonQuizzes.map((quiz) => (
+                <QuizCard
+                  key={quiz.id}
+                  quiz={quiz}
                   lessonId={lesson.id}
                 />
               ))}
             </div>
           )}
-          
+
           {/* Lesson Transcript Manager for video lessons */}
           {lesson.content_type === 'video' && lesson.video_url && (
             <div className="ml-9 mt-4">
-              <LessonTranscriptManager 
-                lessonId={lesson.id} 
+              <LessonTranscriptManager
+                lessonId={lesson.id}
                 lessonTitle={lesson.title}
               />
             </div>
@@ -581,10 +644,10 @@ const CreatorCourseContent = () => {
         </CardContent>
       </Card>
     );
-  };
+  });
 
   // Quiz Card Component
-  const QuizCard = ({ quiz, lessonId }: { quiz: Quiz; lessonId: string }) => {
+  const QuizCard = React.memo(({ quiz, lessonId }: { quiz: Quiz; lessonId: string }) => {
     return (
       <Card className="bg-gradient-to-r from-orange-50 to-purple-50 border border-orange-200">
         <CardContent className="p-4">
@@ -634,7 +697,7 @@ const CreatorCourseContent = () => {
         </CardContent>
       </Card>
     );
-  };
+  });
 
   if (loading) {
     return (

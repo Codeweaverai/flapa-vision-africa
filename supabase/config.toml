@@ -10,11 +10,8 @@ max_rows = 1000
 
 [auth]
 enabled = true
-port = 54324
-external_url = "http://localhost:54324"
 jwt_expiry = 3600
-refresh_token_rotation_enabled = true
-secure_password_change_enabled = true
+enable_refresh_token_rotation = true
 enable_manual_linking = false
 
 [auth.email]
@@ -28,27 +25,9 @@ enable_confirmations = false
 
 [storage]
 enabled = true
-port = 54325
 file_size_limit = "50MiB"
-file_expiry_duration = "1h"
-
-[edge_functions]
-enabled = true
-port = 54322
-
-[functions.newsletter-cron]
-verify_jwt = false
-
-[functions.send-newsletter-now]
-verify_jwt = false
-
-[functions.unsubscribe-newsletter]
-verify_jwt = false
-
-[functions.get-newsletter-recipients]
-verify_jwt = false
 
 [db]
-port = 54322
+port = 54323
 shadow_port = 54320
 major_version = 15

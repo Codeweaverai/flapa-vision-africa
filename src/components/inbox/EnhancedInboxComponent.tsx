@@ -106,14 +106,15 @@ const EnhancedInboxComponent: React.FC = () => {
     if (user) {
       initializeOnlineStatus();
       fetchMessages();
-      setupRealtimeSubscriptions();
-    }
+      const cleanup = setupRealtimeSubscriptions();
 
-    return () => {
-      if (user) {
-        handleUserOffline();
-      }
-    };
+      return () => {
+        cleanup();
+        if (user) {
+          handleUserOffline();
+        }
+      };
+    }
   }, [user]);
 
   const initializeOnlineStatus = async () => {
@@ -220,6 +221,21 @@ const EnhancedInboxComponent: React.FC = () => {
   const setupRealtimeSubscriptions = () => {
     if (!user) return;
 
+    // Debounced function to prevent excessive updates
+    let fetchTimeout: NodeJS.Timeout | null = null;
+
+    const debouncedFetchMessages = () => {
+      if (fetchTimeout) {
+        clearTimeout(fetchTimeout);
+      }
+      fetchTimeout = setTimeout(() => {
+        fetchMessages();
+        if (selectedConversation) {
+          loadConversationMessages(selectedConversation);
+        }
+      }, 100); // 100ms debounce
+    };
+
     // Messages subscription
     const messagesChannel = supabase
       .channel('inbox_messages')
@@ -228,12 +244,7 @@ const EnhancedInboxComponent: React.FC = () => {
         schema: 'public',
         table: 'inbox_messages',
         filter: `recipient_id=eq.${user.id}`
-      }, () => {
-        fetchMessages();
-        if (selectedConversation) {
-          loadConversationMessages(selectedConversation);
-        }
-      })
+      }, debouncedFetchMessages)
       .subscribe();
 
     // Online status subscription
@@ -252,7 +263,7 @@ const EnhancedInboxComponent: React.FC = () => {
         });
 
         // Refresh conversations to update online status
-        fetchMessages();
+        debouncedFetchMessages();
       })
       .subscribe();
 
@@ -274,6 +285,9 @@ const EnhancedInboxComponent: React.FC = () => {
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
+      if (fetchTimeout) {
+        clearTimeout(fetchTimeout);
+      }
       supabase.removeChannel(messagesChannel);
       supabase.removeChannel(statusChannel);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -287,7 +301,7 @@ const EnhancedInboxComponent: React.FC = () => {
     try {
       setLoadingMessages(true);
       setLoadingProgress(0);
-      
+
       // Simulate loading progress
       const progressInterval = setInterval(() => {
         setLoadingProgress(prev => {
@@ -299,14 +313,31 @@ const EnhancedInboxComponent: React.FC = () => {
         });
       }, 100);
 
-      const { data, error } = await supabase
-        .from('inbox_messages')
-        .select('*')
-        .eq('recipient_id', user.id)
-        .order('created_at', { ascending: false });
+      // Concurrent data fetching for better performance
+      const [messagesResult, profilesResult] = await Promise.allSettled([
+        // Fetch messages
+        supabase
+          .from('inbox_messages')
+          .select('*')
+          .eq('recipient_id', user.id)
+          .order('created_at', { ascending: false }),
 
-      if (error) {
-        console.error('Error fetching messages:', error);
+        // Fetch user profiles concurrently
+        supabase
+          .from('profiles')
+          .select('id, username, full_name, avatar_url, is_creator, role')
+      ]);
+
+      if (messagesResult.status === 'rejected') {
+        console.error('Error fetching messages:', messagesResult.reason);
+        clearInterval(progressInterval);
+        setLoadingMessages(false);
+        return;
+      }
+
+      const { data: messagesData, error: messagesError } = messagesResult.value;
+      if (messagesError) {
+        console.error('Error fetching messages:', messagesError);
         clearInterval(progressInterval);
         setLoadingMessages(false);
         return;
@@ -316,8 +347,8 @@ const EnhancedInboxComponent: React.FC = () => {
 
       // Group messages into conversations
       const conversationMap = new Map<string, Conversation>();
-      
-      for (const message of data || []) {
+
+      for (const message of messagesData || []) {
         let conversationKey: string;
         let isSpecialType = false;
 
@@ -367,41 +398,42 @@ const EnhancedInboxComponent: React.FC = () => {
       }
 
       const conversationList = Array.from(conversationMap.values());
-      
+
       // Load user profiles for regular conversations
       const userIds = conversationList
         .filter(c => !c.is_broadcast && !c.is_support && !c.is_system)
         .map(c => c.user_id);
-      
-      if (userIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, username, full_name, avatar_url, is_creator, role')
-          .in('id', userIds);
 
-        conversationList.forEach(conv => {
-          if (!conv.is_broadcast && !conv.is_support && !conv.is_system) {
-            const profile = profiles?.find(p => p.id === conv.user_id);
-            if (profile) {
-              conv.user_profile = profile;
-              // Update online status from the status map
-              const userStatus = onlineStatus.get(conv.user_id);
-              conv.is_online = userStatus?.is_online || false;
+      if (userIds.length > 0 && profilesResult.status === 'fulfilled') {
+        const { data: profilesData, error: profilesError } = profilesResult.value;
+
+        if (profilesError) {
+          console.error('Error fetching profiles:', profilesError);
+        } else {
+          conversationList.forEach(conv => {
+            if (!conv.is_broadcast && !conv.is_support && !conv.is_system) {
+              const profile = profilesData?.find(p => p.id === conv.user_id);
+              if (profile) {
+                conv.user_profile = profile;
+                // Update online status from the status map
+                const userStatus = onlineStatus.get(conv.user_id);
+                conv.is_online = userStatus?.is_online || false;
+              }
             }
-          }
-        });
+          });
+        }
       }
 
       setLoadingProgress(100);
 
       // Sort by last message time
-      conversationList.sort((a, b) => 
+      conversationList.sort((a, b) =>
         new Date(b.last_message_time).getTime() - new Date(a.last_message_time).getTime()
       );
 
       setConversations(conversationList);
-      setMessages(data || []);
-      
+      setMessages(messagesData || []);
+
       // Complete loading after a short delay
       setTimeout(() => {
         setLoadingMessages(false);
@@ -418,7 +450,7 @@ const EnhancedInboxComponent: React.FC = () => {
 
     try {
       let query;
-      
+
       if (conversationId === 'broadcast_messages') {
         query = supabase
           .from('inbox_messages')
@@ -451,7 +483,7 @@ const EnhancedInboxComponent: React.FC = () => {
         return;
       }
 
-      // Load sender profiles
+      // Load sender profiles with concurrent requests
       const messagesWithProfiles = await Promise.all(
         (data || []).map(async (message) => {
           if (!message.sender_id) {
@@ -474,16 +506,16 @@ const EnhancedInboxComponent: React.FC = () => {
       setConversationMessages(messagesWithProfiles);
 
       // Mark unread messages as read
-      const unreadMessages = data?.filter(m => 
+      const unreadMessages = data?.filter(m =>
         !m.is_read && m.recipient_id === user.id
       );
-      
+
       if (unreadMessages && unreadMessages.length > 0) {
         await supabase
           .from('inbox_messages')
           .update({ is_read: true })
           .in('id', unreadMessages.map(m => m.id));
-        
+
         fetchMessages(); // Refresh conversations
       }
     } catch (error) {
@@ -499,7 +531,7 @@ const EnhancedInboxComponent: React.FC = () => {
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-      
+
       const { error: uploadError } = await supabase.storage
         .from('inbox-files')
         .upload(fileName, file);
@@ -533,8 +565,8 @@ const EnhancedInboxComponent: React.FC = () => {
     if (!user || !selectedConversation) return;
 
     try {
-      const recipientId = selectedConversation === 'broadcast_messages' || selectedConversation === 'admin_support' 
-        ? selectedConversation 
+      const recipientId = selectedConversation === 'broadcast_messages' || selectedConversation === 'admin_support'
+        ? selectedConversation
         : selectedConversation;
 
       const { error } = await supabase
@@ -703,17 +735,17 @@ const EnhancedInboxComponent: React.FC = () => {
 
   const getAvatarUrl = (avatarUrl?: string) => {
     if (!avatarUrl) return undefined;
-    
+
     // If it's already a full URL, return it
     if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) {
       return avatarUrl;
     }
-    
+
     // If it's a storage path, construct the public URL
     const { data } = supabase.storage
       .from('profile-pictures')
       .getPublicUrl(avatarUrl);
-    
+
     return data.publicUrl;
   };
 
@@ -721,7 +753,7 @@ const EnhancedInboxComponent: React.FC = () => {
     if (conversation.is_broadcast) return 'System Messages';
     if (conversation.is_support) return 'Support Chat';
     if (conversation.is_system) return 'Automated Notifications';
-    
+
     const status = onlineStatus.get(conversation.user_id);
     if (status?.is_online) {
       return 'Online';
@@ -735,17 +767,23 @@ const EnhancedInboxComponent: React.FC = () => {
     if (!message.file_url) return null;
 
     const isImage = message.file_type?.startsWith('image/');
-    
+
     return (
       <div className={`mt-2 p-2 rounded-lg max-w-xs ${
         message.sender_id === user?.id ? 'bg-orange-100' : 'bg-purple-100'
       }`}>
         {isImage ? (
           <div className="space-y-2">
-            <img 
-              src={message.file_url} 
-              alt={message.file_name || 'Image'} 
+            <img
+              src={message.file_url}
+              alt={message.file_name || 'Image'}
               className="rounded max-w-full h-auto max-h-48 object-cover"
+              loading="lazy"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.onerror = null; // Prevent infinite loop
+                target.src = `https://placehold.co/400x225/ff7b00/ffffff?text=${encodeURIComponent(message.file_name?.substring(0, 20) || 'File')}`;
+              }}
             />
             <div className={`flex items-center gap-2 text-sm ${
               message.sender_id === user?.id ? 'text-orange-700' : 'text-purple-700'

@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Upload, File, X, Sparkles, Loader2, BookOpen, Video, FileText, MessageSquare, Captions } from "lucide-react";
+import { Upload, File, X, Sparkles, Loader2, BookOpen, Video, FileText, MessageSquare, Captions, Copy } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from '@/integrations/supabase/client';
@@ -20,7 +20,6 @@ export interface LessonFormDialogProps {
   moduleId: string;
   onLessonSaved: (lesson: Lesson) => void;
   editingLesson?: Lesson | null;
-  courseId?: string;
 }
 
 const LessonFormDialog = ({
@@ -28,8 +27,7 @@ const LessonFormDialog = ({
   onOpenChange,
   moduleId,
   onLessonSaved,
-  editingLesson,
-  courseId
+  editingLesson
 }: LessonFormDialogProps) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -45,6 +43,7 @@ const LessonFormDialog = ({
   const [transcriptSegments, setTranscriptSegments] = useState<any[]>([]);
   const [loadingTranscript, setLoadingTranscript] = useState(false);
   const [hasTranscript, setHasTranscript] = useState(false);
+  const [transcriptionStatus, setTranscriptionStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (editingLesson) {
@@ -54,15 +53,67 @@ const LessonFormDialog = ({
       setVideoUrl(editingLesson.video_url || "");
       setContent(JSON.stringify(editingLesson.content) !== '{}' ? JSON.stringify(editingLesson.content) : "");
       setMaterialUrls(editingLesson.materials_urls || []);
-      
+
       // Check if lesson has transcript
       if (editingLesson.id) {
         checkTranscriptExists(editingLesson.id);
+        // Also check transcription status from the lessons table
+        checkTranscriptionStatus(editingLesson.id);
       }
     } else {
       resetForm();
+      // For new lessons, calculate the next order index is done when creating the lesson
     }
   }, [editingLesson, open]);
+
+  const calculateNextOrderIndex = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('lessons')
+        .select('order_index')
+        .eq('module_id', moduleId)
+        .order('order_index', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      const maxOrderIndex = data && data.length > 0 ? data[0].order_index : -1;
+      // Set the next available order index
+      // If no lessons exist in the module, start with 0, otherwise increment
+      return maxOrderIndex + 1;
+    } catch (error) {
+      console.error('Error calculating next order index:', error);
+      // Default to 0 if there's an error
+      return 0;
+    }
+  };
+
+  const checkTranscriptionStatus = async (lessonId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('lessons')
+        .select('transcription_status')
+        .eq('id', lessonId)
+        .single();
+
+      if (error) throw error;
+
+      if (data && data.transcription_status) {
+        // Update both the transcription status and hasTranscript state
+        setTranscriptionStatus(data.transcription_status);
+
+        // If transcription status is 'completed', we can assume transcript exists
+        if (data.transcription_status === 'completed') {
+          setHasTranscript(true);
+        } else if (data.transcription_status === 'pending' || data.transcription_status === 'processing') {
+          setHasTranscript(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking transcription status:', error);
+      // Don't update states if there's an error, keep existing state
+    }
+  };
 
   const checkTranscriptExists = async (lessonId: string) => {
     try {
@@ -117,9 +168,11 @@ const LessonFormDialog = ({
       
       if (result.success && result.url) {
         setVideoUrl(result.url);
+        setTranscriptionStatus('pending'); // Reset transcription status when new video is uploaded
+        setHasTranscript(false);
         const storageType = result.storage;
-        toast.success(`Video uploaded successfully via ${storageType === 'wasabi' ? 'Wasabi' : 'skillpulse'}`);
-        
+        toast.success(`Video uploaded successfully to Supabase storage`);
+
         // Auto-enable transcript generation for new uploads
         if (!editingLesson) {
           toast.info('Ready to generate transcript for this video', {
@@ -152,21 +205,53 @@ const LessonFormDialog = ({
     }
 
     setTranscribing(true);
-    
+
     try {
+      // Update the lesson transcription status to 'processing'
+      const { error: updateError } = await supabase
+        .from('lessons')
+        .update({
+          transcription_status: 'processing',
+          transcription_updated_at: new Date().toISOString()
+        })
+        .eq('id', editingLesson.id);
+
+      if (updateError) {
+        console.error('Error updating transcription status:', updateError);
+      } else {
+        // Update local state to reflect the processing status
+        setTranscriptionStatus('processing');
+      }
+
       toast.info('Starting video transcription...', {
         id: 'transcript-start',
         duration: 3000,
       });
 
       const result = await transcribeLessonVideo(editingLesson.id, videoUrl);
-      
+
       if (result.success) {
         toast.success(`Transcription completed! Generated ${result.segmentCount} segments.`, {
           duration: 5000,
         });
         setHasTranscript(true);
-        
+
+        // Update the lesson transcription status to 'completed'
+        const { error: updateSuccessError } = await supabase
+          .from('lessons')
+          .update({
+            transcription_status: 'completed',
+            transcription_updated_at: new Date().toISOString()
+          })
+          .eq('id', editingLesson.id);
+
+        if (updateSuccessError) {
+          console.error('Error updating transcription status:', updateSuccessError);
+        } else {
+          // Update local state to reflect the completed status
+          setTranscriptionStatus('completed');
+        }
+
         // Show option to view transcript
         toast('Transcript ready!', {
           description: 'Your video transcript has been generated.',
@@ -179,10 +264,44 @@ const LessonFormDialog = ({
         toast.error(`Transcription failed: ${result.error}`, {
           duration: 5000,
         });
+
+        // Update the lesson transcription status to 'failed'
+        const { error: updateFailError } = await supabase
+          .from('lessons')
+          .update({
+            transcription_status: 'failed',
+            transcription_updated_at: new Date().toISOString()
+          })
+          .eq('id', editingLesson.id);
+
+        if (updateFailError) {
+          console.error('Error updating transcription status:', updateFailError);
+        } else {
+          // Update local state to reflect the failed status
+          setTranscriptionStatus('failed');
+        }
       }
     } catch (error: any) {
       console.error('Error in transcription process:', error);
       toast.error('Failed to transcribe video. Please try again later.');
+
+      // Update the lesson transcription status to 'failed'
+      if (editingLesson?.id) {
+        const { error: updateCatchError } = await supabase
+          .from('lessons')
+          .update({
+            transcription_status: 'failed',
+            transcription_updated_at: new Date().toISOString()
+          })
+          .eq('id', editingLesson.id);
+
+        if (updateCatchError) {
+          console.error('Error updating transcription status:', updateCatchError);
+        } else {
+          // Update local state to reflect the failed status
+          setTranscriptionStatus('failed');
+        }
+      }
     } finally {
       setTranscribing(false);
     }
@@ -259,7 +378,7 @@ const LessonFormDialog = ({
     try {
       let lessonData;
       const lessonContent = content ? JSON.parse(content) : {};
-      
+
       if (editingLesson) {
         lessonData = await updateLesson(editingLesson.id, {
           title,
@@ -269,9 +388,39 @@ const LessonFormDialog = ({
           content: lessonContent,
           materials_urls: materialUrls
         });
-        
+
+        // Update transcription status if video URL changed
+        if (videoUrl && editingLesson.video_url !== videoUrl) {
+          const { error: updateTranscriptError } = await supabase
+            .from('lessons')
+            .update({
+              transcription_status: 'pending',
+              transcription_updated_at: new Date().toISOString()
+            })
+            .eq('id', editingLesson.id);
+
+          if (updateTranscriptError) {
+            console.error('Error updating transcription status:', updateTranscriptError);
+          }
+        } else if (!videoUrl) {
+          // If video was removed, reset transcription status
+          const { error: resetTranscriptError } = await supabase
+            .from('lessons')
+            .update({
+              transcription_status: null,
+              transcription_updated_at: new Date().toISOString()
+            })
+            .eq('id', editingLesson.id);
+
+          if (resetTranscriptError) {
+            console.error('Error resetting transcription status:', resetTranscriptError);
+          }
+        }
+
         toast.success("Lesson updated successfully");
       } else {
+        // Calculate the next order index for new lessons
+        const nextOrderIndex = await calculateNextOrderIndex();
         lessonData = await createLesson({
           module_id: moduleId,
           title,
@@ -280,12 +429,27 @@ const LessonFormDialog = ({
           video_url: videoUrl || null,
           content: lessonContent,
           materials_urls: materialUrls,
-          order_index: 0,
+          order_index: nextOrderIndex,
         });
-        
+
+        // Initialize transcription status for the new lesson if it has a video
+        if (videoUrl) {
+          const { error: initTranscriptError } = await supabase
+            .from('lessons')
+            .update({
+              transcription_status: 'pending',
+              transcription_updated_at: new Date().toISOString()
+            })
+            .eq('id', lessonData.id);
+
+          if (initTranscriptError) {
+            console.error('Error initializing transcription status:', initTranscriptError);
+          }
+        }
+
         toast.success("Lesson created successfully");
       }
-      
+
       if (lessonData) {
         onLessonSaved(lessonData);
         onOpenChange(false);
@@ -415,9 +579,9 @@ const LessonFormDialog = ({
                         className="hidden"
                         id="video-upload"
                       />
-                      <Button 
-                        type="button" 
-                        variant="outline" 
+                      <Button
+                        type="button"
+                        variant="outline"
                         onClick={() => document.getElementById('video-upload')?.click()}
                         disabled={uploadingVideo}
                         className="border-orange-200 text-orange-600 hover:bg-orange-50"
@@ -441,6 +605,21 @@ const LessonFormDialog = ({
                         </Badge>
                       )}
                     </div>
+
+                    {/* Video Player */}
+                    {videoUrl && (
+                      <div className="mt-4">
+                        <Label className="text-sm font-semibold text-gray-700 block mb-2">Preview Video</Label>
+                        <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                          <video
+                            src={videoUrl}
+                            controls
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                      </div>
+                    )}
+
                     <p className="text-xs text-gray-500 mt-2">
                       Supported formats: MP4, MOV, AVI. Max size: 500MB
                     </p>
@@ -452,6 +631,29 @@ const LessonFormDialog = ({
                           <Captions className="h-4 w-4 mr-2 text-blue-500" />
                           Video Transcription
                         </Label>
+
+                        {/* Transcription Status Indicator */}
+                        {transcriptionStatus && (
+                          <div className="mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium">
+                                Status:{' '}
+                                <span className={
+                                  transcriptionStatus === 'completed' ? 'text-green-600' :
+                                  transcriptionStatus === 'processing' ? 'text-blue-600' :
+                                  transcriptionStatus === 'failed' ? 'text-red-600' :
+                                  'text-gray-600'
+                                }>
+                                  {transcriptionStatus.charAt(0).toUpperCase() + transcriptionStatus.slice(1)}
+                                </span>
+                              </span>
+                              {transcriptionStatus === 'processing' && (
+                                <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                              )}
+                            </div>
+                          </div>
+                        )}
+
                         <div className="flex flex-wrap gap-2">
                           <Button
                             type="button"
@@ -473,7 +675,7 @@ const LessonFormDialog = ({
                               </>
                             )}
                           </Button>
-                          
+
                           <Button
                             type="button"
                             variant="outline"
@@ -485,7 +687,7 @@ const LessonFormDialog = ({
                             <MessageSquare className="h-3 w-3 mr-1" />
                             View Transcript
                           </Button>
-                          
+
                           {hasTranscript && (
                             <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                               Transcript Available
@@ -756,7 +958,7 @@ const formatTime = (seconds: number) => {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-  
+
   if (hours > 0) {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }

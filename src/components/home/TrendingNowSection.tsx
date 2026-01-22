@@ -55,6 +55,7 @@ const TrendingNowSection = () => {
   const [trendingContent, setTrendingContent] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchTrendingContent = async () => {
@@ -224,6 +225,29 @@ const TrendingNowSection = () => {
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      scrollLeft();
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      scrollRight();
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+      }
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTo({
+          left: scrollContainerRef.current.scrollWidth - scrollContainerRef.current.clientWidth,
+          behavior: 'smooth'
+        });
+      }
+    }
+  };
+
   const renderStarRating = (rating: number) => {
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 >= 0.5;
@@ -347,9 +371,11 @@ const TrendingNowSection = () => {
           </div>
         ) : (
           <div className="relative">
-            <div 
+            <div
               ref={scrollContainerRef}
               className="flex overflow-x-auto scrollbar-hide space-x-6 pb-6 snap-x snap-mandatory"
+              tabIndex={0}
+              onKeyDown={handleKeyDown}
               style={{
                 scrollbarWidth: 'none',
                 msOverflowStyle: 'none'
@@ -488,20 +514,37 @@ const TrendingNowSection = () => {
                           {item.type === 'course' ? (
                             <>
                               {/* Course Reviews */}
-                              {item.total_reviews && item.total_reviews > 0 && (
+                              {item.type === 'course' && item.total_reviews && item.total_reviews > 0 ? (
                                 <div className="flex items-center justify-between">
                                   {renderStarRating(item.average_rating || 0)}
                                   <span className="text-xs text-gray-500 font-medium">
                                     {item.total_reviews} review{item.total_reviews !== 1 ? 's' : ''}
                                   </span>
                                 </div>
-                              )}
+                              ) : item.type === 'course' ? (
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-1">
+                                    <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs px-2 py-1 rounded-full font-medium">
+                                      New
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : null}
 
                               {/* Students Count */}
-                              <div className="flex items-center text-sm text-gray-600">
-                                <Users className="h-4 w-4 mr-2 text-orange-500 flex-shrink-0" />
-                                <span className="font-medium">{item.total_students || 0} students enrolled</span>
-                              </div>
+                              {item.type === 'course' ? (
+                                item.total_students && item.total_students > 0 ? (
+                                  <div className="flex items-center text-sm text-gray-600">
+                                    <Users className="h-4 w-4 mr-2 text-orange-500 flex-shrink-0" />
+                                    <span className="font-medium">{item.total_students} students enrolled</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center text-sm text-gray-600">
+                                    <Users className="h-4 w-4 mr-2 text-orange-500 flex-shrink-0" />
+                                    <span className="font-medium">On Demand</span>
+                                  </div>
+                                )
+                              ) : null}
                             </>
                           ) : (
                             <>

@@ -3,14 +3,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { DollarSign, Users, BookOpen, Calendar, TrendingUp, Eye, Download, MessageSquare, Star } from 'lucide-react';
+import { DollarSign, Users, BookOpen, Calendar, TrendingUp, Eye, Download, MessageSquare, Star, Lightbulb } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { 
-  fetchCreatorEarnings, 
-  fetchCreatorPaymentTransactions 
+import {
+  fetchCreatorEarnings,
+  fetchCreatorPaymentTransactions
 } from '@/services/creatorPaymentService';
-import { 
-  calculateCreatorEarningsFromOrders 
+import {
+  calculateCreatorEarningsFromOrders
 } from '@/services/creatorEarningsService';
 import CreatorLayout from '@/components/creator/CreatorLayout';
 import EnhancedWithdrawDialog from '@/components/creator/EnhancedWithdrawDialog';
@@ -18,6 +18,7 @@ import PriceDisplay from '@/components/currency/PriceDisplay';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { supabase } from '@/lib/supabaseClient';
 import CreatorFloatingAI from '@/components/creator/CreatorFloatingAI';
+import Joyride, { CallBackProps, STATUS, Step } from 'react-joyride';
 
 interface DashboardStats {
   totalCourses: number;
@@ -67,6 +68,120 @@ const CreatorDashboard = () => {
   });
   const [loading, setLoading] = useState(true);
   const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
+
+  // State for the guided tour
+  const [runTour, setRunTour] = useState(false);
+  const [tourCompleted, setTourCompleted] = useState(false);
+
+  // Check if user has completed the tour before
+  useEffect(() => {
+    const hasCompletedTour = localStorage.getItem('creatorDashboardTourCompleted');
+    if (!hasCompletedTour) {
+      setRunTour(true);
+    }
+  }, []);
+
+  // Tour steps configuration
+  const tourSteps: Step[] = [
+    {
+      target: 'body',
+      placement: 'center',
+      title: 'Welcome to Your Creator Dashboard!',
+      content: 'This guided tour will help you explore all the features available to manage your courses, events, and earnings.',
+      disableBeacon: true,
+    },
+    {
+      target: '.quick-actions-section',
+      title: 'Quick Actions',
+      content: 'Start creating content quickly with our AI-powered tools or create a course from scratch using these buttons.',
+      disableBeacon: true,
+    },
+    {
+      target: '.dashboard-header',
+      title: 'Dashboard Overview',
+      content: 'This is your central hub for managing your courses, events, and earnings. The quick actions below let you manage attendees or withdraw funds.',
+      disableBeacon: true,
+    },
+    {
+      target: '.total-earnings-card',
+      title: 'Total Earnings',
+      content: 'Track your lifetime earnings from all courses and events here. This includes all payments received after platform fees.',
+      disableBeacon: true,
+    },
+    {
+      target: '.available-balance-card',
+      title: 'Available Balance',
+      content: 'This shows funds available for withdrawal. Click the "Withdraw Funds" button when you reach the minimum threshold.',
+      disableBeacon: true,
+    },
+    {
+      target: '.total-students-card',
+      title: 'Total Students',
+      content: 'Monitor the number of students who have enrolled in your courses or booked your events. This includes both course enrollments and event bookings.',
+      disableBeacon: true,
+    },
+    {
+      target: '.overall-rating-card',
+      title: 'Overall Rating',
+      content: 'Keep track of your average rating based on student reviews. This helps you understand how your content is perceived.',
+      disableBeacon: true,
+    },
+    {
+      target: '.content-stats-grid',
+      title: 'Content Statistics',
+      content: 'Detailed breakdown of your courses, events, and revenue sources. See how many courses and events you have published.',
+      disableBeacon: true,
+    },
+    {
+      target: '.revenue-charts',
+      title: 'Revenue Visualization',
+      content: 'Visualize your monthly earnings and see how much comes from courses versus events. These charts help you understand your revenue trends.',
+      disableBeacon: true,
+    },
+    {
+      target: '.financial-summary',
+      title: 'Financial Summary',
+      content: 'Detailed breakdown of your total earnings, available balance, pending balance, and platform fees. This gives you a complete picture of your finances.',
+      disableBeacon: true,
+    },
+    {
+      target: '.manage-attendees-btn',
+      title: 'Manage Attendees',
+      content: 'Quick access to manage attendees for your events. Track who has registered and manage their attendance.',
+      disableBeacon: true,
+    },
+    {
+      target: '.withdraw-funds-btn',
+      title: 'Withdraw Funds',
+      content: 'Initiate fund withdrawals when you have sufficient balance. You can withdraw once you meet the minimum threshold.',
+      disableBeacon: true,
+    },
+  ];
+
+  // Handle tour callback
+  const handleJoyrideCallback = (data: CallBackProps) => {
+    const { status } = data;
+    const finishedStatuses = [STATUS.FINISHED, STATUS.SKIPPED];
+
+    if (finishedStatuses.includes(status)) {
+      setRunTour(false);
+      setTourCompleted(true);
+      localStorage.setItem('creatorDashboardTourCompleted', 'true');
+    }
+  };
+
+  // Listen for start tour event
+  useEffect(() => {
+    const handleStartTour = () => {
+      setRunTour(true);
+    };
+
+    window.addEventListener('startCreatorTour', handleStartTour);
+
+    return () => {
+      window.removeEventListener('startCreatorTour', handleStartTour);
+    };
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -334,9 +449,50 @@ const CreatorDashboard = () => {
   return (
     <CreatorLayout>
       <div className="min-h-screen bg-gradient-to-br from-orange-100 via-purple-100 to-orange-200">
+        {/* Joyride Tour Component */}
+        <Joyride
+          steps={tourSteps}
+          run={runTour}
+          callback={handleJoyrideCallback}
+          continuous
+          showProgress
+          showSkipButton
+          hideCloseButton
+          disableOverlayClose
+          disableCloseOnEsc
+          spotlightPadding={8}
+          styles={{
+            options: {
+              primaryColor: '#f97316', // orange-500
+              secondaryColor: '#8b5cf6', // purple-500
+              zIndex: 10000,
+            },
+            buttonNext: {
+              backgroundColor: '#f97316', // orange-500
+              color: 'white',
+              borderRadius: '0.5rem',
+              padding: '0.5rem 1rem',
+            },
+            buttonBack: {
+              color: '#4b5563', // gray-600
+            },
+            buttonSkip: {
+              color: '#ef4444', // red-500
+            },
+            tooltip: {
+              borderRadius: '1rem',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            },
+            beacon: {
+              borderRadius: '9999px',
+              boxShadow: '0 0 0 10px rgba(249, 115, 22, 0.4), 0 0 0 20px rgba(139, 92, 246, 0.3)',
+            },
+          }}
+        />
+
         <div className="space-y-4 p-4 sm:space-y-6 sm:p-6">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start gap-4 dashboard-header">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold mb-2">Creator Dashboard</h1>
               <p className="text-muted-foreground text-sm sm:text-base">Welcome back! Here's your performance overview.</p>
@@ -345,7 +501,7 @@ const CreatorDashboard = () => {
               <Button
                 onClick={() => window.location.href = '/creator/attendees'}
                 variant="outline"
-                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 w-full sm:w-auto"
+                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white border-0 w-full sm:w-auto manage-attendees-btn"
               >
                 <Users className="h-4 w-4 mr-2" />
                 <span className="whitespace-nowrap">Manage Attendees</span>
@@ -353,7 +509,7 @@ const CreatorDashboard = () => {
               <Button
                 onClick={() => setIsWithdrawDialogOpen(true)}
                 disabled={!earnings?.available_balance || earnings.available_balance < 5}
-                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 w-full sm:w-auto"
+                className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 w-full sm:w-auto withdraw-funds-btn"
               >
                 <DollarSign className="h-4 w-4 mr-2" />
                 <span className="whitespace-nowrap">Withdraw Funds</span>
@@ -363,7 +519,7 @@ const CreatorDashboard = () => {
 
           {/* Enhanced Key Metrics */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <Card className={`min-h-[120px] ${cardColors[0].bg} border ${cardColors[0].border}`}>
+            <Card className={`min-h-[120px] ${cardColors[0].bg} border ${cardColors[0].border} total-earnings-card`}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
                 <DollarSign className="h-4 w-4 text-purple-600" />
@@ -377,8 +533,8 @@ const CreatorDashboard = () => {
                 </p>
               </CardContent>
             </Card>
-            
-            <Card className={`min-h-[120px] ${cardColors[1].bg} border ${cardColors[1].border}`}>
+
+            <Card className={`min-h-[120px] ${cardColors[1].bg} border ${cardColors[1].border} available-balance-card`}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Available Balance</CardTitle>
                 <TrendingUp className="h-4 w-4 text-blue-600" />
@@ -392,8 +548,8 @@ const CreatorDashboard = () => {
                 </p>
               </CardContent>
             </Card>
-            
-            <Card className={`min-h-[120px] ${cardColors[2].bg} border ${cardColors[2].border}`}>
+
+            <Card className={`min-h-[120px] ${cardColors[2].bg} border ${cardColors[2].border} total-students-card`}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Students</CardTitle>
                 <Users className="h-4 w-4 text-emerald-600" />
@@ -405,8 +561,8 @@ const CreatorDashboard = () => {
                 </p>
               </CardContent>
             </Card>
-            
-            <Card className={`min-h-[120px] ${cardColors[3].bg} border ${cardColors[3].border}`}>
+
+            <Card className={`min-h-[120px] ${cardColors[3].bg} border ${cardColors[3].border} overall-rating-card`}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Overall Rating</CardTitle>
                 <Star className="h-4 w-4 text-amber-600" />
@@ -421,7 +577,7 @@ const CreatorDashboard = () => {
           </div>
 
           {/* Content Statistics */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 content-stats-grid">
             <Card className={`min-h-[120px] ${cardColors[4].bg} border ${cardColors[4].border}`}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Courses</CardTitle>
@@ -434,7 +590,7 @@ const CreatorDashboard = () => {
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card className={`min-h-[120px] ${cardColors[5].bg} border ${cardColors[5].border}`}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Events</CardTitle>
@@ -447,7 +603,7 @@ const CreatorDashboard = () => {
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card className={`min-h-[120px] ${cardColors[6].bg} border ${cardColors[6].border}`}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Course Revenue</CardTitle>
@@ -462,7 +618,7 @@ const CreatorDashboard = () => {
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card className={`min-h-[120px] ${cardColors[7].bg} border ${cardColors[7].border}`}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Event Revenue</CardTitle>
@@ -480,7 +636,7 @@ const CreatorDashboard = () => {
           </div>
 
           {/* Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 revenue-charts">
             {/* Revenue Overview */}
             <Card className="bg-white/90 backdrop-blur-sm">
               <CardHeader>
@@ -492,17 +648,17 @@ const CreatorDashboard = () => {
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={monthlyRevenueData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis 
-                        dataKey="month" 
+                      <XAxis
+                        dataKey="month"
                         tick={{ fontSize: 12 }}
                         tickMargin={10}
                       />
-                      <YAxis 
+                      <YAxis
                         tick={{ fontSize: 12 }}
                         tickMargin={10}
                         tickFormatter={(value) => `$${value}`}
                       />
-                      <Tooltip 
+                      <Tooltip
                         formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Earnings']}
                         labelFormatter={(label) => `Month: ${label}`}
                         contentStyle={{
@@ -512,10 +668,10 @@ const CreatorDashboard = () => {
                           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                         }}
                       />
-                      <Line 
-                        type="monotone" 
-                        dataKey="revenue" 
-                        stroke="#8b5cf6" 
+                      <Line
+                        type="monotone"
+                        dataKey="revenue"
+                        stroke="#8b5cf6"
                         strokeWidth={2}
                         dot={{ fill: '#8b5cf6', strokeWidth: 2, r: 4 }}
                         activeDot={{ r: 6, stroke: '#7c3aed', strokeWidth: 2 }}
@@ -551,7 +707,7 @@ const CreatorDashboard = () => {
                           <Cell key={`cell-${index}`} fill={entry.color} stroke="#fff" strokeWidth={1} />
                         ))}
                       </Pie>
-                      <Tooltip 
+                      <Tooltip
                         formatter={(value: any) => `$${Number(value).toFixed(2)}`}
                         contentStyle={{
                           background: 'rgba(255, 255, 255, 0.95)',
@@ -578,7 +734,7 @@ const CreatorDashboard = () => {
           </div>
 
           {/* Financial Summary */}
-          <Card className="bg-white/90 backdrop-blur-sm">
+          <Card className="bg-white/90 backdrop-blur-sm financial-summary">
             <CardHeader>
               <CardTitle>Financial Summary</CardTitle>
               <CardDescription>Detailed breakdown of your earnings</CardDescription>

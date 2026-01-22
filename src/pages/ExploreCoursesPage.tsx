@@ -616,20 +616,35 @@ const ExploreCoursesPage = () => {
                           </p>
 
                           {/* Course Reviews */}
-                          {course.total_reviews && course.total_reviews > 0 && (
+                          {course.total_reviews && course.total_reviews > 0 ? (
                             <div className="flex items-center justify-between">
                               {renderStarRating(course.average_rating || 0)}
                               <span className="text-xs text-gray-500 font-medium">
                                 {course.total_reviews} review{course.total_reviews !== 1 ? 's' : ''}
                               </span>
                             </div>
+                          ) : (
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1">
+                                <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs px-2 py-1 rounded-full font-medium">
+                                  New
+                                </div>
+                              </div>
+                            </div>
                           )}
 
                           {/* Students Count */}
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Users className="h-4 w-4 mr-2 text-orange-500 flex-shrink-0" />
-                            <span className="font-medium">{course.total_students || 0} students enrolled</span>
-                          </div>
+                          {course.total_students && course.total_students > 0 ? (
+                            <div className="flex items-center text-sm text-gray-600">
+                              <Users className="h-4 w-4 mr-2 text-orange-500 flex-shrink-0" />
+                              <span className="font-medium">{course.total_students} students enrolled</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center text-sm text-gray-600">
+                              <Users className="h-4 w-4 mr-2 text-orange-500 flex-shrink-0" />
+                              <span className="font-medium">On Demand</span>
+                            </div>
+                          )}
                         </CardContent>
 
                         <CardContent className="flex justify-between items-center pt-4 border-t border-gray-100">

@@ -89,12 +89,43 @@ const CoursePreviewPage = () => {
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCreator, setIsCreator] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   useEffect(() => {
     if (id && user) {
       fetchCourse();
     }
   }, [id, user]);
+
+  const publishCourse = async () => {
+    if (!course) return;
+
+    try {
+      setPublishing(true);
+
+      const { error } = await supabase
+        .from('courses')
+        .update({ is_published: true })
+        .eq('id', course.id);
+
+      if (error) {
+        throw error;
+      }
+
+      // Update local state
+      setCourse({ ...course, is_published: true });
+
+      toast.success('Course published successfully!');
+
+      // Optionally refresh the course data
+      fetchCourse();
+    } catch (error) {
+      console.error('Error publishing course:', error);
+      toast.error('Failed to publish course. Please try again.');
+    } finally {
+      setPublishing(false);
+    }
+  };
 
   const fetchCourse = async () => {
     try {
@@ -316,10 +347,18 @@ const CoursePreviewPage = () => {
               </Button>
               {!course.is_published && (
                 <Button
-                  onClick={() => navigate(`/creator/courses/${course.id}/publish`)}
+                  onClick={publishCourse}
                   className="bg-green-600 hover:bg-green-700"
+                  disabled={publishing}
                 >
-                  Publish Now
+                  {publishing ? (
+                    <>
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                      Publishing...
+                    </>
+                  ) : (
+                    'Publish Now'
+                  )}
                 </Button>
               )}
             </div>

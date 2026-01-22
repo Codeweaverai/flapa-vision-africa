@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Rocket, BookOpen, Calendar, Users, BarChart, Settings, DollarSign, Building2, Activity, Bot } from 'lucide-react';
+import { Rocket, BookOpen, Calendar, Users, BarChart, Settings, DollarSign, Building2, Activity, Bot, Lightbulb } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -97,11 +97,6 @@ const CreatorLayout = ({ children, title }: CreatorLayoutProps) => {
       icon: <Calendar className="h-5 w-5" />
     },
     {
-      label: 'Creator Fundraising',
-      href: '/creator/fundraising',
-      icon: <DollarSign className="h-5 w-5" />
-    },
-    {
       label: 'Creator Settings',
       href: '/creator/settings',
       icon: <Settings className="h-5 w-5" />
@@ -143,7 +138,7 @@ const CreatorLayout = ({ children, title }: CreatorLayoutProps) => {
                 </div>
                 
                 {/* Quick Actions */}
-                <div className="mb-4 space-y-2">
+                <div className="mb-4 space-y-2 quick-actions-section">
                   <Button
                     onClick={() => navigate('/creator/courses/create-with-ai')}
                     className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl"
@@ -169,8 +164,8 @@ const CreatorLayout = ({ children, title }: CreatorLayoutProps) => {
                         variant="ghost"
                         className={cn(
                           "w-full justify-start transition-all duration-200",
-                          isActive 
-                            ? "bg-gradient-to-r from-orange-50 to-purple-50 border border-orange-200 text-gray-900 font-medium shadow-sm" 
+                          isActive
+                            ? "bg-gradient-to-r from-orange-50 to-purple-50 border border-orange-200 text-gray-900 font-medium shadow-sm"
                             : "hover:bg-gradient-to-r hover:from-orange-50/50 hover:to-purple-50/50"
                         )}
                         asChild
@@ -184,6 +179,22 @@ const CreatorLayout = ({ children, title }: CreatorLayoutProps) => {
                       </Button>
                     );
                   })}
+                  {/* Tour Button - Only show on dashboard */}
+                  {location.pathname === '/creator/dashboard' && (
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start transition-all duration-200 hover:bg-gradient-to-r hover:from-orange-50/50 hover:to-purple-50/50"
+                      onClick={() => {
+                        // Dispatch custom event to trigger tour
+                        window.dispatchEvent(new CustomEvent('startCreatorTour'));
+                      }}
+                    >
+                      <GradientIcon isActive={false}>
+                        <Lightbulb className="h-4 w-4" />
+                      </GradientIcon>
+                      Start Tour
+                    </Button>
+                  )}
                 </nav>
                 
                 <div className="mt-8 pt-4 border-t border-gray-200">

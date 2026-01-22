@@ -33,7 +33,7 @@ import RecommendedCourses from '@/components/course/RecommendedCourses';
 import { useCart } from '@/contexts/CartContext';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import OptimizedVideoPlayer from '@/components/video/OptimizedVideoPlayer';
-import ReactPlayer from 'react-player/lazy';
+import ReactPlayer from 'react-player';
 import WishlistButton from '@/components/wishlist/WishlistButton';
 
 interface Course {
