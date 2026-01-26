@@ -108,11 +108,18 @@ const OptimizedVideoPlayer: React.FC<OptimizedVideoPlayerProps> = memo(({
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 3;
 
+  // Validate URL and determine video type
+  const isValidUrl = url &&
+                     typeof url === 'string' &&
+                     url.trim() !== '' &&
+                     url !== 'null' &&
+                     url.startsWith('http');
+
   // Detect mobile device and browser capabilities
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
   const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-  const videoType = getVideoType(url);
+  const videoType = isValidUrl ? getVideoType(url) : 'unknown';
 
   // Preconnect to CDNs on mount
   useEffect(() => {
@@ -354,11 +361,29 @@ const OptimizedVideoPlayer: React.FC<OptimizedVideoPlayerProps> = memo(({
     }
   };
 
+  // Handle invalid URL case
+  if (!isValidUrl) {
+    return (
+      <div
+        ref={containerRef}
+        className={cn(
+          "relative aspect-video bg-gray-900 rounded-xl overflow-hidden flex items-center justify-center",
+          className
+        )}
+      >
+        <div className="text-center text-white p-4">
+          <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 text-gray-400" />
+          <p className="text-sm">No video available</p>
+        </div>
+      </div>
+    );
+  }
+
   // Light mode preview with optimized loading
   if (showLightPreview && light) {
     const previewImage = typeof light === 'string' ? light : poster;
     return (
-      <div 
+      <div
         ref={containerRef}
         className={cn(
           "relative aspect-video bg-gray-900 rounded-xl overflow-hidden cursor-pointer group",
@@ -371,9 +396,9 @@ const OptimizedVideoPlayer: React.FC<OptimizedVideoPlayerProps> = memo(({
         onKeyDown={(e) => e.key === 'Enter' && handleClickPreview()}
       >
         {previewImage && (
-          <img 
-            src={previewImage} 
-            alt="Video preview" 
+          <img
+            src={previewImage}
+            alt="Video preview"
             className="w-full h-full object-cover"
             loading="eager"
             decoding="async"
@@ -392,7 +417,7 @@ const OptimizedVideoPlayer: React.FC<OptimizedVideoPlayerProps> = memo(({
   // Error state with retry
   if (hasError) {
     return (
-      <div 
+      <div
         ref={containerRef}
         className={cn(
           "relative aspect-video bg-gray-900 rounded-xl overflow-hidden flex items-center justify-center",
@@ -402,7 +427,7 @@ const OptimizedVideoPlayer: React.FC<OptimizedVideoPlayerProps> = memo(({
         <div className="text-center text-white p-4 max-w-sm">
           <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 text-red-400" />
           <p className="text-sm mb-4">{errorMessage}</p>
-          <button 
+          <button
             onClick={handleRetry}
             className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm transition-colors"
           >
@@ -415,7 +440,7 @@ const OptimizedVideoPlayer: React.FC<OptimizedVideoPlayerProps> = memo(({
   }
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className={cn(
         "relative aspect-video bg-gray-900 rounded-xl overflow-hidden",
@@ -455,7 +480,7 @@ const OptimizedVideoPlayer: React.FC<OptimizedVideoPlayerProps> = memo(({
             onBufferEnd={handleBufferEnd}
             onProgress={onProgress}
             onEnded={onEnded}
-            style={{ 
+            style={{
               borderRadius: '12px',
               position: 'absolute',
               top: 0,
@@ -471,9 +496,9 @@ const OptimizedVideoPlayer: React.FC<OptimizedVideoPlayerProps> = memo(({
       {!isVisible && (
         <div className="absolute inset-0 flex items-center justify-center">
           {poster ? (
-            <img 
-              src={poster} 
-              alt="Video poster" 
+            <img
+              src={poster}
+              alt="Video poster"
               className="w-full h-full object-cover"
               loading="lazy"
             />

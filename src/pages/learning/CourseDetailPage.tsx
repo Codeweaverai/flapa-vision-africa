@@ -33,7 +33,6 @@ import RecommendedCourses from '@/components/course/RecommendedCourses';
 import { useCart } from '@/contexts/CartContext';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import OptimizedVideoPlayer from '@/components/video/OptimizedVideoPlayer';
-import ReactPlayer from 'react-player';
 import WishlistButton from '@/components/wishlist/WishlistButton';
 
 interface Course {
@@ -623,9 +622,29 @@ const CourseDetailPage = () => {
           bio: null
         };
 
-      // Process preview data
-      const previewData = previewResult.status === 'fulfilled' && !previewResult.value.error ? 
-        previewResult.value.data : undefined;
+      // Process preview data with URL sanitization
+      let previewData = undefined;
+      if (previewResult.status === 'fulfilled' && !previewResult.value.error && previewResult.value.data) {
+        const rawPreviewData = previewResult.value.data;
+
+        // Sanitize the preview video URL to prevent malformed URLs
+        let sanitizedPreviewVideoUrl = rawPreviewData.preview_video_url;
+        if (sanitizedPreviewVideoUrl &&
+            typeof sanitizedPreviewVideoUrl === 'string' &&
+            sanitizedPreviewVideoUrl.trim() !== '' &&
+            sanitizedPreviewVideoUrl !== 'null' &&
+            sanitizedPreviewVideoUrl.startsWith('http')) {
+          // URL looks valid, keep it as is
+        } else {
+          // Invalid URL, set to undefined
+          sanitizedPreviewVideoUrl = undefined;
+        }
+
+        previewData = {
+          ...rawPreviewData,
+          preview_video_url: sanitizedPreviewVideoUrl
+        };
+      }
 
       // Process modules data
       const modulesData = modulesResult.status === 'fulfilled' && !modulesResult.value.error ? 
@@ -978,39 +997,52 @@ const CourseDetailPage = () => {
                     </div>
                   </div>
 
-                  {/* Course Preview Video - Enhanced Mobile Responsiveness */}
-                  {course.course_preview?.preview_video_url && (
-                    <div className="mb-6">
-                      <h3 className="text-lg font-semibold mb-3">Course Preview</h3>
-                      <div className="w-full max-w-4xl mx-auto">
-                        <div className="relative pb-[56.25%] h-0 rounded-xl overflow-hidden bg-gray-100 shadow-lg border border-gray-200 min-h-[200px] sm:min-h-[250px] md:min-h-[300px] lg:min-h-[350px]">
-                          <ReactPlayer
-                            url={course.course_preview.preview_video_url}
-                            poster={course.thumbnail_url}
-                            controls={true}
-                            light={course.thumbnail_url}
-                            playsinline={true}
-                            width="100%"
-                            height="100%"
-                            className="absolute top-0 left-0 w-full h-full"
-                            config={{
-                              file: {
-                                attributes: {
-                                  preload: 'metadata',
-                                  controlsList: 'nodownload noremoteplayback',
-                                  disablePictureInPicture: true,
-                                  onContextMenu: (e: any) => e.preventDefault()
-                                }
-                              }
-                            }}
-                            // Enable caching and preloading optimizations
-                            playing={false}
-                            progressInterval={1000}
+                  {/* Course Video Preview - Using HTML5 video element like CoursePreviewDialog */}
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold mb-3">Course Preview</h3>
+                    <div className="relative h-96 md:h-[500px] bg-black rounded-xl overflow-hidden">
+                      {course.course_preview?.preview_video_url &&
+                       typeof course.course_preview.preview_video_url === 'string' &&
+                       course.course_preview.preview_video_url.trim() !== '' &&
+                       course.course_preview.preview_video_url !== 'null' &&
+                       course.course_preview.preview_video_url.startsWith('http') ? (
+                        <div className="w-full h-full">
+                          <video
+                            src={course.course_preview.preview_video_url}
+                            controls
+                            className="w-full h-full object-contain"
+                            controlsList="nodownload noremoteplayback"
+                            disablePictureInPicture
+                            onContextMenu={(e: React.MouseEvent) => e.preventDefault()}
+                            onError={(error) => console.error('HTML5 video error:', error)}
                           />
                         </div>
-                      </div>
+                      ) : course.thumbnail_url ? (
+                        <div className="relative w-full h-full flex items-center justify-center">
+                          <img
+                            src={course.thumbnail_url}
+                            alt={course.title}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                            <Button
+                              size="lg"
+                              className="bg-white/90 text-purple-600 hover:bg-white rounded-full h-16 w-16 p-0"
+                            >
+                              <Play className="h-8 w-8" />
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <div className="text-white text-center">
+                            <BookOpen className="h-16 w-16 mx-auto mb-4 opacity-80" />
+                            <h3 className="text-xl font-semibold">Course Preview</h3>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </CardContent>
               </Card>
 

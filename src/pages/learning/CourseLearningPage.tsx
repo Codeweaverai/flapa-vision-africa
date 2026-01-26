@@ -12,7 +12,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
-import ReactPlayer from 'react-player';
 import { 
   Play, Clock, User, BookOpen, Award, Star, Users,
   MessageCircle, Target, CheckCircle, StickyNote,
@@ -3674,47 +3673,41 @@ const CourseLearningPage = () => {
                                   {/* Aspect ratio wrapper - pure CSS approach for reliable mobile rendering */}
                                   <div className="relative w-full aspect-video">
                                     <div className="absolute inset-0">
-                                      <ReactPlayer
-                                        url={selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url || ''}
-                                        controls={true}
-                                        playing={isVideoPlaying}
-                                        playsinline={true}
-                                        width="100%"
-                                        height="100%"
-                                        light={course.thumbnail_url}
-                                        onClickPreview={() => setIsVideoPlaying(true)}
-                                        onPlay={() => setIsVideoPlaying(true)}
-                                        onPause={() => setIsVideoPlaying(false)}
-                                        config={{
-                                          file: {
-                                            attributes: {
-                                              controlsList: 'nodownload noremoteplayback',
-                                              disablePictureInPicture: true,
-                                              preload: 'auto',
-                                              playsInline: true,
-                                              'webkit-playsinline': 'true'
-                                            },
-                                            forceVideo: true
-                                          },
-                                          youtube: {
-                                            playerVars: {
-                                              playsinline: 1,
-                                              modestbranding: 1
-                                            }
-                                          },
-                                          vimeo: {
-                                            playerOptions: {
-                                              playsinline: true
-                                            }
-                                          }
-                                        }}
-                                        onProgress={handleVideoProgress}
-                                        onEnded={handleVideoEnd}
-                                        onError={(error) => {
-                                          console.error('Video playback error:', error);
-                                          toast.error('There was an issue loading the video. Please try again.');
-                                        }}
-                                      />
+                                      {(!isVideoPlaying && course.thumbnail_url) ? (
+                                        <div
+                                          className="w-full h-full cursor-pointer relative"
+                                          onClick={() => setIsVideoPlaying(true)}
+                                        >
+                                          <img
+                                            src={course.thumbnail_url}
+                                            alt="Video thumbnail"
+                                            className="w-full h-full object-cover"
+                                          />
+                                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                                            <div className="bg-white/90 rounded-full p-4">
+                                              <Play className="h-12 w-12 text-purple-600 ml-1" />
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <video
+                                          src={selectedLesson?.video_url || modules[0]?.lessons[0]?.video_url || ''}
+                                          controls
+                                          className="w-full h-full object-contain"
+                                          controlsList="nodownload noremoteplayback"
+                                          disablePictureInPicture
+                                          preload="auto"
+                                          playsInline
+                                          onPlay={() => setIsVideoPlaying(true)}
+                                          onPause={() => setIsVideoPlaying(false)}
+                                          onTimeUpdate={handleVideoProgress}
+                                          onEnded={handleVideoEnd}
+                                          onError={(error) => {
+                                            console.error('Video playback error:', error);
+                                            toast.error('There was an issue loading the video. Please try again.');
+                                          }}
+                                        />
+                                      )}
                                     </div>
                                   </div>
                                 </div>
