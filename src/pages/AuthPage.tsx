@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Navigate, Link, useSearchParams } from 'react-router-dom';
+import { Navigate, Link, useSearchParams, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -258,6 +258,12 @@ const AuthPageContent = () => {
     if (!loading && user && !otpRequired && authSuccess) {
       const invitationToken = sessionStorage.getItem('invitation_token');
 
+      // Check for state-based redirect (from components like FreeEventRegistration)
+      if (location.state?.redirectTo) {
+        navigate(location.state.redirectTo);
+        return;
+      }
+
       if (redirectParam === 'accept-invite' && invitationToken) {
         navigate(`/accept-invite?token=${invitationToken}`);
         return;
@@ -265,7 +271,7 @@ const AuthPageContent = () => {
 
       navigate('/account');
     }
-  }, [user, loading, redirectParam, navigate, otpRequired, authSuccess]);
+  }, [user, loading, redirectParam, navigate, otpRequired, authSuccess, location.state]);
 
   const handleSignIn = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -691,7 +697,11 @@ const AuthPageContent = () => {
 const AuthPage = () => {
   const { user, loading, otpRequired } = useAuth();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const redirectParam = searchParams.get('redirect');
+
+  // Check for state-based redirect (from components like FreeEventRegistration)
+  const stateBasedRedirect = location.state?.redirectTo;
 
   // Show loading while OTP is being processed
   if (user && otpRequired) {
@@ -709,8 +719,15 @@ const AuthPage = () => {
   }
 
   // Redirect if already authenticated and no OTP required
-  if (!loading && user && !otpRequired && !redirectParam) {
-    return <Navigate to="/account" />;
+  if (!loading && user && !otpRequired) {
+    // Prioritize state-based redirect over URL param redirect
+    if (stateBasedRedirect) {
+      return <Navigate to={stateBasedRedirect} />;
+    } else if (redirectParam) {
+      return <Navigate to={redirectParam} />;
+    } else {
+      return <Navigate to="/account" />;
+    }
   }
 
   if (loading) {

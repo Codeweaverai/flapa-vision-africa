@@ -13,6 +13,8 @@ interface AuthContextType {
   setOtpRequired: (required: boolean) => void;
   verificationType: 'login' | 'registration' | 'inactive' | null;
   completeOTPVerification: () => Promise<void>;
+  redirectAfterOTP: string | null;
+  setRedirectAfterOTP: (url: string | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,6 +26,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [otpRequired, setOtpRequired] = useState(false);
   const [verificationType, setVerificationType] = useState<'login' | 'registration' | 'inactive' | null>(null);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [redirectAfterOTP, setRedirectAfterOTP] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -123,8 +126,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const completeOTPVerification = async () => {
     console.log('OTP verification completed');
+    // Store the redirect URL before clearing states
+    const redirectUrl = redirectAfterOTP;
+
     setOtpRequired(false);
     setVerificationType(null);
+    setRedirectAfterOTP(null);
+
+    // If there's a redirect URL, handle it here
+    if (redirectUrl) {
+      window.location.href = redirectUrl;
+    }
   };
 
   const signIn = async (email: string, password: string) => {
@@ -208,7 +220,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     otpRequired,
     setOtpRequired,
     verificationType,
-    completeOTPVerification
+    completeOTPVerification,
+    redirectAfterOTP,
+    setRedirectAfterOTP
   };
 
   return (

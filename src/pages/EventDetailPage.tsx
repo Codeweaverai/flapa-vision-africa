@@ -44,6 +44,7 @@ import { toast } from 'sonner';
 import PriceDisplay from '@/components/currency/PriceDisplay';
 import { CurrencyCode } from '@/constants/currencies';
 import WishlistButton from '@/components/wishlist/WishlistButton';
+import ReactMarkdown from 'react-markdown';
 
 interface Event {
   id: string;
@@ -351,11 +352,15 @@ const EventDetailPage = () => {
     }
   };
 
+  const { setRedirectAfterOTP } = useAuth(); // Add this to get the setter
+
   const handleAddToCart = (ticketId: string, quantity: number) => {
     // Check if user is logged in
     if (!user) {
       toast.error("Please sign in to purchase tickets");
-      navigate("/auth");
+      // Set the redirect URL in the auth context before navigating
+      setRedirectAfterOTP(`/event-detail/${id}`);
+      navigate("/auth", { state: { redirectTo: `/event-detail/${id}` } });
       return;
     }
 
@@ -599,8 +604,24 @@ const EventDetailPage = () => {
                   </TabsList>
                   
                   <TabsContent value="description" className="p-6">
-                    <div className="prose max-w-none">
-                      <p className="text-gray-700 leading-relaxed">{event.description}</p>
+                    <div className="prose max-w-none prose-lg prose-headings:text-gray-900 prose-p:text-gray-700 prose-a:text-orange-600 prose-strong:text-gray-900 prose-em:text-gray-700">
+                      <ReactMarkdown
+                        components={{
+                          h1: ({node, ...props}) => <h1 className="text-2xl font-bold mt-6 mb-4" {...props} />,
+                          h2: ({node, ...props}) => <h2 className="text-xl font-bold mt-5 mb-3" {...props} />,
+                          h3: ({node, ...props}) => <h3 className="text-lg font-bold mt-4 mb-2" {...props} />,
+                          p: ({node, ...props}) => <p className="text-gray-700 leading-relaxed mb-4" {...props} />,
+                          ul: ({node, ...props}) => <ul className="list-disc list-inside mb-4 pl-4" {...props} />,
+                          ol: ({node, ...props}) => <ol className="list-decimal list-inside mb-4 pl-4" {...props} />,
+                          li: ({node, ...props}) => <li className="mb-1" {...props} />,
+                          strong: ({node, ...props}) => <strong className="font-semibold text-gray-900" {...props} />,
+                          em: ({node, ...props}) => <em className="italic text-gray-700" {...props} />,
+                          a: ({node, ...props}) => <a className="text-orange-600 underline hover:text-orange-700" {...props} />,
+                          blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-orange-500 pl-4 italic text-gray-600 my-4" {...props} />,
+                        }}
+                      >
+                        {event.description}
+                      </ReactMarkdown>
                     </div>
                   </TabsContent>
 

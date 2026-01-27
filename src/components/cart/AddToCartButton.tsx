@@ -30,13 +30,20 @@ const AddToCartButton: React.FC<AddToCartButtonProps> = ({
   disabled
 }) => {
   const { addToCart } = useCart();
-  const { user } = useAuth();
+  const { user, setRedirectAfterOTP } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
   const handleAddToCart = async () => {
     if (!user) {
-      navigate('/auth', { state: { redirectTo: window.location.pathname } });
+      // Set the redirect URL in the auth context before navigating
+      if (eventId) {
+        setRedirectAfterOTP(`/event-detail/${eventId}`);
+        navigate('/auth', { state: { redirectTo: `/event-detail/${eventId}` } });
+      } else {
+        setRedirectAfterOTP(window.location.pathname);
+        navigate('/auth', { state: { redirectTo: window.location.pathname } });
+      }
       return;
     }
 

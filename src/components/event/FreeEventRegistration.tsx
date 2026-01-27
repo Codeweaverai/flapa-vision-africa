@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { Loader2, CheckCircle, Calendar, Ticket } from 'lucide-react';
 
 interface FreeEventRegistrationProps {
@@ -19,11 +20,12 @@ interface FreeEventRegistrationProps {
   onRegistrationSuccess?: (bookingData: any) => void;
 }
 
-const FreeEventRegistration: React.FC<FreeEventRegistrationProps> = ({ 
-  event, 
-  onRegistrationSuccess 
+const FreeEventRegistration: React.FC<FreeEventRegistrationProps> = ({
+  event,
+  onRegistrationSuccess
 }) => {
-  const { user } = useAuth();
+  const { user, setRedirectAfterOTP } = useAuth();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
   const [checkingRegistration, setCheckingRegistration] = useState(true);
@@ -109,7 +111,9 @@ const FreeEventRegistration: React.FC<FreeEventRegistrationProps> = ({
 
   const handleFreeRegistration = async () => {
     if (!user) {
-      toast.error("Please sign in to register for this event");
+      // Set the redirect URL in the auth context before navigating
+      setRedirectAfterOTP(`/event-detail/${event.id}`);
+      navigate('/auth', { state: { redirectTo: `/event-detail/${event.id}` } });
       return;
     }
 
@@ -196,7 +200,7 @@ const FreeEventRegistration: React.FC<FreeEventRegistrationProps> = ({
 
       setIsRegistered(true);
       toast.success("🎉 Successfully registered! Your free ticket has been generated.");
-      
+
       if (onRegistrationSuccess) {
         onRegistrationSuccess({
           booking,
@@ -207,7 +211,7 @@ const FreeEventRegistration: React.FC<FreeEventRegistrationProps> = ({
 
     } catch (error: any) {
       console.error('Registration error:', error);
-      
+
       if (error.message?.includes('duplicate key') || error.code === '23505') {
         toast.error("You are already registered for this event");
         await checkExistingRegistration();
@@ -221,10 +225,10 @@ const FreeEventRegistration: React.FC<FreeEventRegistrationProps> = ({
 
   const addToGoogleCalendar = () => {
     if (!event) return;
-    
+
     const startDate = new Date(event.start_time);
     const endDate = new Date(event.end_time);
-    
+
     const formatDateForGoogle = (date: Date) => {
       return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
     };
@@ -256,7 +260,7 @@ const FreeEventRegistration: React.FC<FreeEventRegistrationProps> = ({
           Your free ticket has been generated and is ready to use.
         </p>
         <div className="space-y-2">
-          <Button 
+          <Button
             asChild
             className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white"
           >
@@ -265,7 +269,7 @@ const FreeEventRegistration: React.FC<FreeEventRegistrationProps> = ({
               View My Ticket
             </a>
           </Button>
-          <Button 
+          <Button
             variant="outline"
             className="w-full border-orange-300 text-orange-700 hover:bg-orange-50"
             onClick={addToGoogleCalendar}
@@ -286,7 +290,7 @@ const FreeEventRegistration: React.FC<FreeEventRegistrationProps> = ({
           Register for this event and get your free ticket instantly
         </p>
       </div>
-      
+
       <Button
         onClick={handleFreeRegistration}
         disabled={isLoading}
@@ -305,7 +309,7 @@ const FreeEventRegistration: React.FC<FreeEventRegistrationProps> = ({
           </>
         )}
       </Button>
-      
+
       <div className="text-xs text-gray-500 text-center">
         No payment required. Your ticket will be generated immediately.
       </div>
