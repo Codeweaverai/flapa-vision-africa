@@ -506,7 +506,7 @@ const EventDetailPage = () => {
               <Card className="shadow-2xl rounded-2xl overflow-hidden">
                 <CardContent className="p-0">
                   {event.image_url && (
-                    <div className="h-[500px] bg-gray-200 rounded-t-2xl overflow-hidden">
+                    <div className="h-64 sm:h-80 md:h-96 lg:h-[500px] bg-gray-200 rounded-t-2xl overflow-hidden">
                       <img
                         src={event.image_url}
                         alt={event.title}
@@ -521,28 +521,28 @@ const EventDetailPage = () => {
                       {event.is_free && <Badge className="bg-green-500">Free</Badge>}
                     </div>
                     
-                    <h1 className="text-3xl font-bold text-gray-900 mb-4">{event.title}</h1>
-                    
+                    <h1 className="text-3xl font-bold text-orange-500 mb-4">{event.title}</h1>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                       <div className="flex items-center gap-2">
-                        <Calendar className="h-5 w-5" style={event.online_meeting_link ? { color: 'rgb(192, 132, 252)' } : { color: 'rgb(75, 85, 99)' }} />
+                        <Calendar className="h-5 w-5 text-gray-600" />
                         <div>
-                          <p className="font-bold" style={event.online_meeting_link ? { color: 'rgb(126, 34, 206)' /* dark purple */, fontSize: '1.1em' } : { color: 'rgb(75, 85, 99)' }}>
+                          <p className="text-sm font-normal text-gray-900">
                             {format(new Date(event.start_time), 'PPP')}
                           </p>
-                          <p className="text-base font-bold" style={event.online_meeting_link ? { color: 'rgb(126, 34, 206)' /* dark purple */, fontSize: '1.1em' } : { color: 'rgb(75, 85, 99)' }}>
+                          <p className="text-sm font-normal text-gray-900">
                             {format(new Date(event.start_time), 'p')} - {format(new Date(event.end_time), 'p')}
                           </p>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center gap-2">
                         {event.online_meeting_link ? (
                           <>
-                            <Globe className="h-5 w-5" style={{ color: 'rgb(192, 132, 252)' }} /> {/* purple-500 */}
+                            <Globe className="h-5 w-5 text-gray-600" />
                             <div>
-                              <p className="font-bold" style={{ color: 'rgb(126, 34, 206)' /* dark purple */, fontSize: '1.1em' }}>Event Type</p>
-                              <p className="text-base font-bold" style={{ color: 'rgb(126, 34, 206)' /* dark purple */, fontSize: '1.1em' }}>Online Event</p>
+                              <p className="text-sm font-normal text-gray-900">Event Type</p>
+                              <p className="text-sm font-normal text-gray-900">Online Event</p>
                             </div>
                           </>
                         ) : (
