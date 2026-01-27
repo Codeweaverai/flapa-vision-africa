@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import EventReviewsTab from '@/components/event/EventReviewsTab';
 import FreeEventRegistration from '@/components/event/FreeEventRegistration'; // Import the new component
+import { fetchCreatorStats } from '@/services/courseService';
 import {
   Calendar,
   MapPin,
@@ -224,6 +225,7 @@ const EventDetailPage = () => {
   const [recommendedEvents, setRecommendedEvents] = useState<SimpleEvent[]>([]);
   const [averageRating, setAverageRating] = useState(0);
   const [totalReviews, setTotalReviews] = useState(0);
+  const [creatorStats, setCreatorStats] = useState<any>(null);
 
   useEffect(() => {
     if (id) {
@@ -268,6 +270,16 @@ const EventDetailPage = () => {
           .single();
 
         setCreator(creatorData);
+
+        // Load creator stats
+        if (creatorData) {
+          try {
+            const stats = await fetchCreatorStats(eventData.creator_id);
+            setCreatorStats(stats);
+          } catch (error) {
+            console.error('Error loading creator stats:', error);
+          }
+        }
       }
 
       // Check if user is registered
@@ -1122,11 +1134,30 @@ const EventDetailPage = () => {
                       </Avatar>
                       <div className="flex-1">
                         <h4 className="font-semibold text-lg">{creator.full_name}</h4>
-                        {creator.bio && (
-                          <p className="text-gray-600 text-sm mt-1">{creator.bio}</p>
-                        )}
                       </div>
                     </div>
+
+                    {/* Creator Stats */}
+                    {creatorStats && (
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="bg-orange-50 p-3 rounded-lg text-center">
+                          <p className="text-2xl font-bold text-orange-600">{creatorStats.totalCourses}</p>
+                          <p className="text-xs text-gray-600">Courses</p>
+                        </div>
+                        <div className="bg-purple-50 p-3 rounded-lg text-center">
+                          <p className="text-2xl font-bold text-purple-600">{creatorStats.totalEvents}</p>
+                          <p className="text-xs text-gray-600">Events</p>
+                        </div>
+                        <div className="bg-blue-50 p-3 rounded-lg text-center">
+                          <p className="text-2xl font-bold text-blue-600">{creatorStats.totalReviews}</p>
+                          <p className="text-xs text-gray-600">Reviews</p>
+                        </div>
+                        <div className="bg-green-50 p-3 rounded-lg text-center">
+                          <p className="text-2xl font-bold text-green-600">{creatorStats.averageRating.toFixed(1)} ⭐</p>
+                          <p className="text-xs text-gray-600">Avg Rating</p>
+                        </div>
+                      </div>
+                    )}
 
                     <Button
                       onClick={() => navigate(`/creator/profile/${creator.id}`)}

@@ -700,3 +700,72 @@ export async function deleteCourseReview(reviewId: string): Promise<boolean> {
   if (error) throw error;
   return true;
 }
+
+// Function to fetch creator stats (courses, events, and average ratings)
+export async function fetchCreatorStats(creatorId: string): Promise<any> {
+  // Get all published courses by creator
+  const { data: courses, error: coursesError } = await supabase
+    .from('courses')
+    .select('id')
+    .eq('creator_id', creatorId)
+    .eq('is_published', true);
+
+  if (coursesError) throw coursesError;
+
+  // Get all published events by creator
+  const { data: events, error: eventsError } = await supabase
+    .from('events')
+    .select('id')
+    .eq('creator_id', creatorId)
+    .eq('is_published', true);
+
+  if (eventsError) throw eventsError;
+
+  const courseIds = courses?.map(c => c.id) || [];
+  const eventIds = events?.map(e => e.id) || [];
+
+  // Get all reviews for creator's courses
+  let courseReviews: any[] = [];
+  if (courseIds.length > 0) {
+    const { data: courseReviewsData, error: courseReviewsError } = await supabase
+      .from('course_reviews')
+      .select('rating')
+      .in('course_id', courseIds);
+
+    if (courseReviewsError) throw courseReviewsError;
+    courseReviews = courseReviewsData || [];
+  }
+
+  // Get all reviews for creator's events
+  let eventReviews: any[] = [];
+  if (eventIds.length > 0) {
+    const { data: eventReviewsData, error: eventReviewsError } = await supabase
+      .from('event_reviews')
+      .select('rating')
+      .in('event_id', eventIds);
+
+    if (eventReviewsError) throw eventReviewsError;
+    eventReviews = eventReviewsData || [];
+  }
+
+  // Calculate averages
+  const totalCourses = courses?.length || 0;
+  const totalEvents = events?.length || 0;
+  const totalCourseReviews = courseReviews.length;
+  const totalEventReviews = eventReviews.length;
+
+  const totalReviews = totalCourseReviews + totalEventReviews;
+  const averageRating = totalReviews > 0
+    ? ((courseReviews.reduce((sum, review) => sum + review.rating, 0) +
+        eventReviews.reduce((sum, review) => sum + review.rating, 0)) / totalReviews)
+    : 0;
+
+  return {
+    totalCourses,
+    totalEvents,
+    totalCourseReviews,
+    totalEventReviews,
+    totalReviews,
+    averageRating: Math.round(averageRating * 10) / 10 // Round to 1 decimal
+  };
+}
