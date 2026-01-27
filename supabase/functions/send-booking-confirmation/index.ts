@@ -211,7 +211,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send the email
     const emailResponse = await resend.emails.send({
-      from: "SkillPulse Events <events@skillpulse.cloud>",
+      from: "SkillPulse <noreply@skillpulse.cloud>",
       to: [attendeeEmail],
       subject: `🎉 Your booking for "${event.title}" is confirmed!`,
       html,
