@@ -12,11 +12,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import EventReviewsTab from '@/components/event/EventReviewsTab';
 import FreeEventRegistration from '@/components/event/FreeEventRegistration'; // Import the new component
-import { 
-  Calendar, 
-  MapPin, 
-  Clock, 
-  Users, 
+import {
+  Calendar,
+  MapPin,
+  Clock,
+  Users,
   Ticket,
   Share2,
   Heart,
@@ -35,7 +35,9 @@ import {
   Mic,
   Music,
   Palette,
-  Users2
+  Users2,
+  Globe,
+  Phone
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -397,8 +399,14 @@ const EventDetailPage = () => {
     googleCalendarUrl.searchParams.set('action', 'TEMPLATE');
     googleCalendarUrl.searchParams.set('text', event.title);
     googleCalendarUrl.searchParams.set('dates', `${formatDateForGoogle(startDate)}/${formatDateForGoogle(endDate)}`);
-    googleCalendarUrl.searchParams.set('details', `Event: ${event.title}\n\nLocation: ${event.location || 'TBD'}`);
-    googleCalendarUrl.searchParams.set('location', event.location || '');
+
+    // Determine location text based on event type
+    const locationText = event.online_meeting_link
+      ? 'Online Event'
+      : event.location || 'TBD';
+
+    googleCalendarUrl.searchParams.set('details', `Event: ${event.title}\n\n${event.online_meeting_link ? 'Type: Online Event' : 'Location:'} ${locationText}`);
+    googleCalendarUrl.searchParams.set('location', locationText);
 
     window.open(googleCalendarUrl.toString(), '_blank');
   };
@@ -454,7 +462,7 @@ const EventDetailPage = () => {
     return (
       <Layout>
         <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center">
-          <Card className="max-w-md text-center">
+          <Card className="max-w-md text-center shadow-2xl rounded-2xl">
             <CardContent className="pt-6">
               <h2 className="text-xl font-semibold mb-4">Event Not Found</h2>
               <p className="text-gray-600 mb-4">The event you're looking for doesn't exist.</p>
@@ -490,10 +498,10 @@ const EventDetailPage = () => {
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
               {/* Event Header - Increased image height */}
-              <Card className="shadow-lg">
+              <Card className="shadow-2xl rounded-2xl overflow-hidden">
                 <CardContent className="p-0">
                   {event.image_url && (
-                    <div className="h-96 bg-gray-200 rounded-t-lg overflow-hidden">
+                    <div className="h-[500px] bg-gray-200 rounded-t-2xl overflow-hidden">
                       <img
                         src={event.image_url}
                         alt={event.title}
@@ -511,22 +519,36 @@ const EventDetailPage = () => {
                     <h1 className="text-3xl font-bold text-gray-900 mb-4">{event.title}</h1>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <Calendar className="h-5 w-5" />
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-5 w-5" style={event.online_meeting_link ? { color: 'rgb(192, 132, 252)' } : { color: 'rgb(75, 85, 99)' }} />
                         <div>
-                          <p className="font-medium">{format(new Date(event.start_time), 'PPP')}</p>
-                          <p className="text-sm">
+                          <p className="font-bold" style={event.online_meeting_link ? { color: 'rgb(126, 34, 206)' /* dark purple */, fontSize: '1.1em' } : { color: 'rgb(75, 85, 99)' }}>
+                            {format(new Date(event.start_time), 'PPP')}
+                          </p>
+                          <p className="text-base font-bold" style={event.online_meeting_link ? { color: 'rgb(126, 34, 206)' /* dark purple */, fontSize: '1.1em' } : { color: 'rgb(75, 85, 99)' }}>
                             {format(new Date(event.start_time), 'p')} - {format(new Date(event.end_time), 'p')}
                           </p>
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <MapPin className="h-5 w-5" />
-                        <div>
-                          <p className="font-medium">Location</p>
-                          <p className="text-sm">{event.location}</p>
-                        </div>
+                      <div className="flex items-center gap-2">
+                        {event.online_meeting_link ? (
+                          <>
+                            <Globe className="h-5 w-5" style={{ color: 'rgb(192, 132, 252)' }} /> {/* purple-500 */}
+                            <div>
+                              <p className="font-bold" style={{ color: 'rgb(126, 34, 206)' /* dark purple */, fontSize: '1.1em' }}>Event Type</p>
+                              <p className="text-base font-bold" style={{ color: 'rgb(126, 34, 206)' /* dark purple */, fontSize: '1.1em' }}>Online Event</p>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <MapPin className="h-5 w-5 text-gray-600" />
+                            <div>
+                              <p className="font-medium text-gray-600">Location</p>
+                              <p className="text-sm text-gray-600">{event.location}</p>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
 
@@ -554,9 +576,9 @@ const EventDetailPage = () => {
               </Card>
 
               {/* Add to Google Calendar */}
-              <Card className="shadow-lg">
+              <Card className="shadow-2xl rounded-2xl">
                 <CardContent className="p-6">
-                  <Button 
+                  <Button
                     onClick={addToGoogleCalendar}
                     className="w-full bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700"
                   >
@@ -567,7 +589,7 @@ const EventDetailPage = () => {
               </Card>
 
               {/* Functional Tabs */}
-              <Card className="shadow-lg">
+              <Card className="shadow-2xl rounded-2xl">
                 <Tabs defaultValue="description" className="w-full">
                   <TabsList className="grid w-full grid-cols-4 bg-gradient-to-r from-orange-100 to-purple-100">
                     <TabsTrigger value="description">Description</TabsTrigger>
@@ -752,7 +774,7 @@ const EventDetailPage = () => {
 
               {/* Creator Card */}
               {creator && (
-                <Card className="shadow-lg">
+                <Card className="shadow-2xl rounded-2xl">
                   <CardHeader>
                     <CardTitle>Event Creator</CardTitle>
                   </CardHeader>
@@ -778,7 +800,7 @@ const EventDetailPage = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => shareOnSocial('facebook')}
-                        className="flex-1"
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
                       >
                         <Facebook className="h-4 w-4" />
                       </Button>
@@ -786,7 +808,7 @@ const EventDetailPage = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => shareOnSocial('instagram')}
-                        className="flex-1"
+                        className="flex-1 bg-gradient-to-r from-purple-500 via-pink-500 to-yellow-500 text-white border-transparent"
                       >
                         <Instagram className="h-4 w-4" />
                       </Button>
@@ -794,7 +816,7 @@ const EventDetailPage = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => shareOnSocial('linkedin')}
-                        className="flex-1"
+                        className="flex-1 bg-blue-700 hover:bg-blue-800 text-white border-blue-700"
                       >
                         <Linkedin className="h-4 w-4" />
                       </Button>
@@ -802,9 +824,9 @@ const EventDetailPage = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => shareOnSocial('whatsapp')}
-                        className="flex-1"
+                        className="flex-1 bg-green-500 hover:bg-green-600 text-white border-green-500"
                       >
-                        <MessageSquare className="h-4 w-4" />
+                        <MessageCircle className="h-4 w-4" />
                       </Button>
                     </div>
 
@@ -821,7 +843,7 @@ const EventDetailPage = () => {
 
               {/* Improved Recommended Events - Only upcoming events */}
               {recommendedEvents.length > 0 && (
-                <Card className="shadow-lg">
+                <Card className="shadow-2xl rounded-2xl">
                   <CardHeader>
                     <CardTitle className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-purple-600 bg-clip-text text-transparent">
                       Recommended Events
@@ -879,14 +901,18 @@ const EventDetailPage = () => {
                             </div>
 
                             {/* Bottom overlay content */}
-                            <div className="absolute bottom-3 left-3 right-3 text-white">
-                              <div className="flex items-center gap-2 text-xs mb-1">
-                                <Calendar className="h-3 w-3" />
-                                <span className="font-medium">{format(new Date(recEvent.start_time), 'MMM d, yyyy')}</span>
+                            <div className="absolute bottom-3 left-3 right-3" style={recEvent.online_meeting_link ? { color: 'white' } : { color: 'white' }}>
+                              <div className="flex items-center gap-2 text-sm font-bold">
+                                <Calendar className="h-3 w-3" style={recEvent.online_meeting_link ? { color: 'rgb(255, 255, 255)' } : { color: 'rgb(255, 255, 255)' }} />
+                                <span className="font-bold" style={recEvent.online_meeting_link ? { color: 'rgb(126, 34, 206)' /* dark purple */, fontSize: '1.1em' } : {}}>
+                                  {format(new Date(recEvent.start_time), 'MMM d, yyyy')}
+                                </span>
                               </div>
-                              <div className="flex items-center gap-2 text-xs">
-                                <Clock className="h-3 w-3" />
-                                <span>{format(new Date(recEvent.start_time), 'h:mm a')}</span>
+                              <div className="flex items-center gap-2 text-sm font-bold">
+                                <Clock className="h-3 w-3" style={recEvent.online_meeting_link ? { color: 'rgb(255, 255, 255)' } : { color: 'rgb(255, 255, 255)' }} />
+                                <span style={recEvent.online_meeting_link ? { color: 'rgb(126, 34, 206)' /* dark purple */, fontSize: '1.1em' } : {}}>
+                                  {format(new Date(recEvent.start_time), 'h:mm a')}
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -903,11 +929,17 @@ const EventDetailPage = () => {
                             
                             <div className="space-y-2 mb-4">
                               {recEvent.location && (
-                                <div className="flex items-center gap-2 text-gray-600">
-                                  <div className="w-6 h-6 bg-blue-50 rounded-full flex items-center justify-center">
-                                    <MapPin className="h-3 w-3 text-blue-600" />
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 bg-purple-50 rounded-full flex items-center justify-center">
+                                    {recEvent.online_meeting_link ? (
+                                      <Globe className="h-3 w-3" style={{ color: 'rgb(192, 132, 252)' }} />
+                                    ) : (
+                                      <MapPin className="h-3 w-3 text-blue-600" />
+                                    )}
                                   </div>
-                                  <span className="text-xs line-clamp-1 flex-1">{recEvent.location}</span>
+                                  <span className="text-sm font-bold line-clamp-1 flex-1" style={recEvent.online_meeting_link ? { color: 'rgb(126, 34, 206)' /* dark purple */, fontSize: '1.1em' } : {}}>
+                                    {recEvent.online_meeting_link ? 'Online Event' : recEvent.location}
+                                  </span>
                                 </div>
                               )}
                               {recEvent.capacity && (
@@ -938,7 +970,7 @@ const EventDetailPage = () => {
             {/* Sidebar */}
             <div className="space-y-6">
               {/* Registration Card */}
-              <Card className="shadow-lg">
+              <Card className="shadow-2xl rounded-2xl">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Ticket className="h-5 w-5" />
@@ -1016,7 +1048,7 @@ const EventDetailPage = () => {
               </Card>
 
               {/* Event Stats */}
-              <Card className="shadow-lg">
+              <Card className="shadow-2xl rounded-2xl">
                 <CardHeader>
                   <CardTitle>Event Details</CardTitle>
                 </CardHeader>
@@ -1039,7 +1071,7 @@ const EventDetailPage = () => {
               </Card>
 
               {/* Wishlist Button Only - Removed Gift Card buttons */}
-              <Card className="shadow-lg">
+              <Card className="shadow-2xl rounded-2xl">
                 <CardContent className="p-6">
                   <WishlistButton
                     itemId={event.id}
@@ -1055,7 +1087,7 @@ const EventDetailPage = () => {
 
               {/* Creator Profile Card */}
               {creator && (
-                <Card className="shadow-lg">
+                <Card className="shadow-2xl rounded-2xl">
                   <CardHeader>
                     <CardTitle>Event Creator</CardTitle>
                   </CardHeader>

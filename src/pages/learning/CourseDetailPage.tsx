@@ -1000,7 +1000,7 @@ const CourseDetailPage = () => {
                   {/* Course Video Preview - Using HTML5 video element like CoursePreviewDialog */}
                   <div className="mb-6">
                     <h3 className="text-lg font-semibold mb-3">Course Preview</h3>
-                    <div className="relative h-96 md:h-[500px] bg-black rounded-xl overflow-hidden">
+                    <div className="relative h-[400px] md:h-[500px] bg-black rounded-xl overflow-hidden">
                       {course.course_preview?.preview_video_url &&
                        typeof course.course_preview.preview_video_url === 'string' &&
                        course.course_preview.preview_video_url.trim() !== '' &&

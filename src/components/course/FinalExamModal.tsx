@@ -13,8 +13,9 @@ import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Clock, CheckCircle, XCircle, Award, AlertCircle } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, Award, AlertCircle, Download, Calendar } from 'lucide-react';
 import FinalExamResultsModal from './FinalExamResultsModal';
+import CertificateDisplay from '@/components/certificate/CertificateDisplay';
 
 interface Question {
   id: string;
@@ -65,6 +66,9 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
   const [loading, setLoading] = useState(true);
   const [showResultsModal, setShowResultsModal] = useState(false);
   const [examResult, setExamResult] = useState(null);
+  const [showCertificateModal, setShowCertificateModal] = useState(false);
+  const [certificateData, setCertificateData] = useState<any>(null);
+  const [courseSkills, setCourseSkills] = useState<Record<string, any>>({});
 
   useEffect(() => {
     if (isOpen && exam) {
@@ -342,8 +346,10 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
             .eq('enrollment_id', enrollmentId)
             .maybeSingle();
 
+          let certificateInfo = null;
+
           if (!existingCert) {
-            const { error: certError } = await supabase
+            const { data: newCert, error: certError } = await supabase
               .from('certificates')
               .insert({
                 user_id: user.id,
@@ -351,39 +357,72 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
                 course_id: exam.course_id,
                 issue_date: new Date().toISOString(),
                 verification_code: `CERT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-              });
+              })
+              .select()
+              .single();
 
             if (certError) {
               console.error('Error generating certificate:', certError);
             } else {
-              console.log('Certificate generated successfully!');
+              console.log('Certificate generated successfully!', newCert);
+              certificateInfo = newCert;
             }
+          } else {
+            certificateInfo = existingCert;
+          }
+
+          // Fetch course skills to display on certificate
+          const { data: skillsData, error: skillsError } = await supabase
+            .from('course_skill_outcomes')
+            .select('*')
+            .eq('course_id', exam.course_id)
+            .order('order_index', { ascending: true });
+
+          if (!skillsError && skillsData) {
+            const skillsByCourse: Record<string, any> = {};
+            skillsByCourse[exam.course_id] = skillsData;
+            setCourseSkills(skillsByCourse);
+
+            // Prepare certificate data
+            const certData = {
+              id: certificateInfo.id,
+              verification_code: certificateInfo.verification_code,
+              issue_date: certificateInfo.issue_date,
+              course_title: exam.title,
+              creator_id: exam.course_id, // This will be updated when we fetch course creator
+              course_id: exam.course_id
+            };
+
+            setCertificateData(certData);
+
+            // Show certificate modal instead of or in addition to results modal
+            setShowCertificateModal(true);
           }
         } catch (certError) {
           console.error('Certificate generation failed:', certError);
         }
+      } else {
+        // Prepare result data for the modal (for failed exams)
+        const resultData = {
+          passed: examPassed,
+          examScore: finalScore,
+          quizScores: [],
+          finalGrade: finalScore,
+          courseName: exam.title,
+          studentName: user.email || 'Student',
+          enrollmentId: enrollmentId,
+          onRetake: () => {
+            setShowResultsModal(false);
+            setCurrentQuestionIndex(0);
+            setAnswers([]);
+            fetchExamQuestions();
+          }
+        };
+
+        // Show results modal
+        setExamResult(resultData);
+        setShowResultsModal(true);
       }
-
-      // Prepare result data for the modal
-      const resultData = {
-        passed: examPassed,
-        examScore: finalScore,
-        quizScores: [],
-        finalGrade: finalScore,
-        courseName: exam.title,
-        studentName: user.email || 'Student',
-        enrollmentId: enrollmentId,
-        onRetake: () => {
-          setShowResultsModal(false);
-          setCurrentQuestionIndex(0);
-          setAnswers([]);
-          fetchExamQuestions();
-        }
-      };
-
-      // Show results modal
-      setExamResult(resultData);
-      setShowResultsModal(true);
 
       // Call onComplete callback
       onComplete({
@@ -431,6 +470,46 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
     setShowResultsModal(false);
     setExamResult(null);
     onClose();
+  };
+
+  const handleCloseCertificate = () => {
+    setShowCertificateModal(false);
+    setCertificateData(null);
+    onClose();
+  };
+
+  // Function to share certificate as a post to LinkedIn
+  const shareToLinkedInPost = (certificate: any) => {
+    // Get skills for this course to include in the post
+    const skills = certificate.course_id ? (courseSkills[certificate.course_id] || []) : [];
+    const skillNames = skills.slice(0, 5).map((skill: any) => skill.skill_name).join(', '); // Limit to first 5 skills
+
+    // Create share URL for LinkedIn with a congratulatory message
+    const certificateUrl = `https://skillpulse.cloud/verify?code=${certificate.verification_code}`;
+    const shareText = `🎓 Just completed ${certificate.course_title} with SkillPulse Innovations Limited! 🌟 Achieved professional development in ${skillNames || 'various skills'} and earned my certification. So proud of this milestone! 🚀 #LearningJourney #Achievement #Certification #ProfessionalDevelopment #SkillPulse`;
+
+    // LinkedIn doesn't allow pre-populating text in shares anymore for privacy reasons
+    // We'll use the official share URL that opens the share composer with the URL pre-filled
+    const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(certificateUrl)}`;
+
+    window.open(linkedInUrl, '_blank', 'width=600,height=400');
+  };
+
+  // Function to add certificate to LinkedIn profile
+  const addToLinkedInProfile = (certificate: any) => {
+    // Get skills for this course to include in the profile
+    const skills = certificate.course_id ? (courseSkills[certificate.course_id] || []) : [];
+    const skillNames = skills.slice(0, 5).map((skill: any) => skill.skill_name).join(', '); // Limit to first 5 skills
+
+    // Extract year from issue date
+    const issueDate = new Date(certificate.issue_date);
+    const year = issueDate.getFullYear();
+    const month = issueDate.getMonth() + 1; // Month is 0-indexed
+
+    // Create the LinkedIn add to profile URL with course details and skills
+    const profileUrl = `https://www.linkedin.com/profile/add?startTask=CERTIFICATION_NAME&name=${encodeURIComponent(certificate.course_title)}&organizationId=1337&organizationName=${encodeURIComponent('SkillPulse Innovations Limited')}&issueYear=${year}&issueMonth=${month}&certUrl=${encodeURIComponent(`https://skillpulse.cloud/verify?code=${certificate.verification_code}`)}&certId=${certificate.verification_code}`;
+
+    window.open(profileUrl, '_blank', 'width=800,height=600');
   };
 
   if (loading) {
@@ -589,6 +668,51 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
           enrollmentId={examResult.enrollmentId}
           onRetake={examResult.onRetake}
         />
+      )}
+
+      {/* Certificate Modal - Show when exam is passed and certificate is generated */}
+      {showCertificateModal && certificateData && (
+        <Dialog open={showCertificateModal} onOpenChange={setShowCertificateModal}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+            <DialogHeader>
+              <DialogTitle>Congratulations! You've Earned a Certificate</DialogTitle>
+              <DialogDescription>
+                Your achievement has been recognized. View and share your certificate below.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <CertificateDisplay
+                certificate={certificateData}
+                courseSkills={courseSkills}
+                showActions={true}
+              />
+              <div className="flex justify-center gap-4 mt-4">
+                <Button
+                  onClick={() => shareToLinkedInPost(certificateData)}
+                  size="sm"
+                  variant="outline"
+                  className="border-blue-300 text-blue-700 hover:bg-blue-50 hover:border-blue-400"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                  </svg>
+                  Share Post
+                </Button>
+                <Button
+                  onClick={() => addToLinkedInProfile(certificateData)}
+                  size="sm"
+                  variant="outline"
+                  className="border-blue-500 bg-blue-500 text-white hover:bg-blue-600 hover:border-blue-600"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.414v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                  </svg>
+                  Add to Profile
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </>
   );
