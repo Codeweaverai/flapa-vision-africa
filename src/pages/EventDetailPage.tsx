@@ -679,10 +679,20 @@ const EventDetailPage = () => {
 
                                 {speaker && (
                                   <div className="flex items-center gap-3 mb-3">
-                                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-white bg-opacity-20 backdrop-blur-sm">
-                                      <span className="text-white font-bold text-sm">
-                                        {speaker.name.charAt(0)}
-                                      </span>
+                                    <div className="relative">
+                                      {speaker.image_url ? (
+                                        <img
+                                          src={speaker.image_url}
+                                          alt={speaker.name}
+                                          className="w-10 h-10 rounded-full border-2 border-white border-opacity-30 object-cover"
+                                        />
+                                      ) : (
+                                        <div className="w-10 h-10 rounded-full bg-white bg-opacity-20 backdrop-blur-sm flex items-center justify-center">
+                                          <span className="text-white font-bold text-sm">
+                                            {speaker.name.charAt(0)}
+                                          </span>
+                                        </div>
+                                      )}
                                     </div>
                                     <div>
                                       <p className="text-white font-medium">{speaker.name}</p>
