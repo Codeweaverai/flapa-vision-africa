@@ -640,56 +640,81 @@ const EventDetailPage = () => {
                   <TabsContent value="agenda" className="p-6">
                     {event.event_agenda && event.event_agenda.length > 0 ? (
                       <div className="space-y-4">
-                        {event.event_agenda.map((item) => {
+                        {event.event_agenda.map((item, index) => {
                           // Find speaker for this agenda item
                           const speaker = event.keynote_speakers?.find(s => s.id === item.speaker_id);
                           const roleInfo = speaker ? getRoleInfo(speaker.role) : null;
-                          
+
                           return (
-                            <div key={item.id} className="bg-gradient-to-r from-orange-50 to-purple-50 p-6 rounded-lg border hover:shadow-md transition-shadow">
-                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-3">
-                                <div className="flex items-center gap-2">
-                                  <Clock className="h-4 w-4 text-orange-600" />
-                                  <span className="text-sm font-medium text-orange-700">
-                                    {format(new Date(item.start_time), 'h:mm a')} - {format(new Date(item.end_time), 'h:mm a')}
-                                  </span>
+                            <div
+                              key={item.id}
+                              className="bg-gradient-to-r from-orange-500 to-purple-600 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+                            >
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-white bg-opacity-20 backdrop-blur-sm">
+                                    <Clock className="h-5 w-5 text-white" />
+                                  </div>
+                                  <div>
+                                    <span className="block text-sm font-medium text-white text-opacity-90">
+                                      {format(new Date(item.start_time), 'h:mm a')} - {format(new Date(item.end_time), 'h:mm a')}
+                                    </span>
+                                    <span className="block text-xs text-white text-opacity-70">
+                                      {format(new Date(item.start_time), 'MMM d')}
+                                    </span>
+                                  </div>
                                 </div>
                                 {roleInfo && speaker && (
-                                  <Badge className={`${roleInfo.color} text-xs`}>
-                                    <span className="mr-1">{roleInfo.icon}</span>
-                                    {roleInfo.label}
-                                  </Badge>
+                                  <div className="flex-shrink-0">
+                                    <Badge className={`${roleInfo.color} text-xs px-3 py-1 bg-white bg-opacity-20 backdrop-blur-sm text-white border border-white border-opacity-30`}>
+                                      <span className="mr-1">{roleInfo.icon}</span>
+                                      {roleInfo.label}
+                                    </Badge>
+                                  </div>
                                 )}
                               </div>
-                              <h4 className="font-semibold text-gray-900 text-lg mb-2">{item.title}</h4>
-                              {speaker && (
-                                <div className="flex items-center gap-2 mb-2">
-                                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
-                                    {speaker.name.charAt(0)}
+
+                              <div className="ml-5 pl-6 border-l-2 border-white border-opacity-30">
+                                <h4 className="font-bold text-xl text-white mb-3">{item.title}</h4>
+
+                                {speaker && (
+                                  <div className="flex items-center gap-3 mb-3">
+                                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-white bg-opacity-20 backdrop-blur-sm">
+                                      <span className="text-white font-bold text-sm">
+                                        {speaker.name.charAt(0)}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <p className="text-white font-medium">{speaker.name}</p>
+                                      {speaker.title && (
+                                        <p className="text-white text-opacity-80 text-sm">{speaker.title}</p>
+                                      )}
+                                    </div>
                                   </div>
-                                  <span className="text-sm text-gray-700 font-medium">{speaker.name}</span>
-                                  {speaker.title && (
-                                    <span className="text-sm text-gray-500">• {speaker.title}</span>
-                                  )}
-                                </div>
-                              )}
-                              {item.description && (
-                                <p className="text-sm text-gray-600 mt-2">{item.description}</p>
-                              )}
-                              {item.location && item.location !== 'Main Stage' && (
-                                <div className="flex items-center gap-1 mt-2 text-xs text-gray-500">
-                                  <MapPin className="h-3 w-3" />
-                                  {item.location}
-                                </div>
-                              )}
+                                )}
+
+                                {item.description && (
+                                  <p className="text-white text-opacity-90 mb-3">{item.description}</p>
+                                )}
+
+                                {item.location && item.location !== 'Main Stage' && (
+                                  <div className="flex items-center gap-2 text-sm text-white text-opacity-80">
+                                    <MapPin className="h-4 w-4" />
+                                    <span>{item.location}</span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
                       </div>
                     ) : (
-                      <div className="text-center text-gray-500 py-8">
-                        <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                        <p>No agenda available yet</p>
+                      <div className="text-center py-12 bg-gradient-to-r from-orange-50 to-purple-50 rounded-2xl">
+                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 mb-4">
+                          <Calendar className="h-8 w-8 text-white" />
+                        </div>
+                        <h3 className="text-xl font-semibold text-gray-800 mb-2">No Agenda Available</h3>
+                        <p className="text-gray-600">Check back later for updates on the event schedule.</p>
                       </div>
                     )}
                   </TabsContent>
