@@ -1,4 +1,3 @@
-
 project_id = "rxqoczksnddbxcdwobnw"
 
 [api]
@@ -31,3 +30,6 @@ file_size_limit = "50MiB"
 port = 54323
 shadow_port = 54320
 major_version = 15
+
+[functions.send-booking-confirmation]
+verify_jwt = false
