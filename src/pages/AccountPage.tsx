@@ -135,7 +135,7 @@ const QUICK_LINKS = [
 ];
 
 const AccountPage = () => {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { currentCurrency, formatPrice } = useCurrency();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -956,6 +956,17 @@ const AccountPage = () => {
                       {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'Recently'}
                     </span>
                   </div>
+
+                  <Button
+                    onClick={() => {
+                      if (window.confirm('Are you sure you want to log out?')) {
+                        signOut();
+                      }
+                    }}
+                    className="w-full mt-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg"
+                  >
+                    Logout
+                  </Button>
                 </CardContent>
               </Card>
             </div>
