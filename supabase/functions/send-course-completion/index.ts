@@ -4,7 +4,7 @@ import { Resend } from "npm:resend@2.0.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import React from 'npm:react@18.3.1';
 import { renderAsync } from 'npm:@react-email/components@0.0.22';
-import { CourseEnrollmentEmail } from './_templates/course-enrollment.tsx';
+import { CourseCompletionEmail } from './_templates/course-completion.tsx';
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -20,11 +20,23 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const payload = await req.json();
-    console.log("Received course enrollment webhook payload:", JSON.stringify(payload));
+    console.log("Received course completion webhook payload:", JSON.stringify(payload));
 
     // Handle webhook payload structure
     const record = payload.record || payload;
-    
+    const oldRecord = payload.old_record;
+
+    // Only process if is_completed changed from false to true
+    if (oldRecord && !oldRecord.is_completed && record.is_completed) {
+      console.log("Course completed! Processing email...");
+    } else if (!record.is_completed) {
+      console.log("Course not completed yet, skipping email");
+      return new Response(JSON.stringify({ message: "Course not completed, skipping" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -70,29 +82,41 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
+    // Check for certificate
+    const { data: certificateData } = await supabase
+      .from("certificates")
+      .select("verification_code")
+      .eq("enrollment_id", record.id)
+      .single();
+
+    const certificateUrl = certificateData 
+      ? `https://skillpulse.cloud/certificate/${certificateData.verification_code}`
+      : undefined;
+
     const studentEmail = userData.user.email;
     const studentName = profileData?.full_name || userData.user.user_metadata?.full_name || "Student";
 
-    console.log(`Sending enrollment email to: ${studentEmail} for course: ${courseData.title}`);
+    console.log(`Sending completion email to: ${studentEmail} for course: ${courseData.title}`);
 
     const html = await renderAsync(
-      React.createElement(CourseEnrollmentEmail, {
+      React.createElement(CourseCompletionEmail, {
         studentName,
         courseTitle: courseData.title,
         courseId: record.course_id,
-        instructorName,
-        enrollmentDate: record.enrollment_date || new Date().toISOString()
+        completionDate: record.completion_date || new Date().toISOString(),
+        certificateUrl,
+        instructorName
       })
     );
 
     const emailResponse = await resend.emails.send({
       from: "SkillPulse <noreply@skillpulse.cloud>",
       to: [studentEmail],
-      subject: `Welcome to "${courseData.title}" - Let's Start Learning! 📚`,
+      subject: `🎉 Congratulations! You've completed "${courseData.title}"`,
       html,
     });
 
-    console.log("Course enrollment email sent successfully:", emailResponse);
+    console.log("Course completion email sent successfully:", emailResponse);
 
     return new Response(JSON.stringify(emailResponse), {
       status: 200,
@@ -102,7 +126,7 @@ const handler = async (req: Request): Promise<Response> => {
       },
     });
   } catch (error: any) {
-    console.error("Error in send-course-enrollment function:", error);
+    console.error("Error in send-course-completion function:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {
