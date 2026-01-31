@@ -24,6 +24,7 @@ interface CourseEnrollmentEmailProps {
 export const CourseEnrollmentEmail = ({
   studentName,
   courseTitle,
+  courseId,
   instructorName,
   enrollmentDate
 }: CourseEnrollmentEmailProps) => (
