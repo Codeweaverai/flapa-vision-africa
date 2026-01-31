@@ -33,3 +33,9 @@ major_version = 15
 
 [functions.send-booking-confirmation]
 verify_jwt = false
+
+[functions.send-course-enrollment]
+verify_jwt = false
+
+[functions.send-course-completion]
+verify_jwt = false
