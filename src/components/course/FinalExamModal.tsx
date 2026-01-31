@@ -50,10 +50,10 @@ interface FinalExamModalProps {
   onComplete: (result: any) => void;
 }
 
-const FinalExamModal: React.FC<FinalExamModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  exam, 
+const FinalExamModal: React.FC<FinalExamModalProps> = ({
+  isOpen,
+  onClose,
+  exam,
   enrollmentId,
   onComplete
 }) => {
@@ -69,13 +69,36 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
   const [showCertificateModal, setShowCertificateModal] = useState(false);
   const [certificateData, setCertificateData] = useState<any>(null);
   const [courseSkills, setCourseSkills] = useState<Record<string, any>>({});
+  const [userProfile, setUserProfile] = useState<any>(null);
 
   useEffect(() => {
     if (isOpen && exam) {
+      fetchUserProfile();
       fetchExamQuestions();
       setTimeLeft(exam.time_limit_minutes * 60);
     }
   }, [isOpen, exam]);
+
+  const fetchUserProfile = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        return;
+      }
+
+      setUserProfile(data);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
 
   useEffect(() => {
     if (timeLeft > 0 && isOpen) {
@@ -409,7 +432,7 @@ const FinalExamModal: React.FC<FinalExamModalProps> = ({
           quizScores: [],
           finalGrade: finalScore,
           courseName: exam.title,
-          studentName: user.email || 'Student',
+          studentName: userProfile?.full_name || user.email || 'Student',
           enrollmentId: enrollmentId,
           onRetake: () => {
             setShowResultsModal(false);

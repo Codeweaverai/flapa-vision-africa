@@ -42,6 +42,7 @@ const CertificateDisplay: React.FC<CertificateDisplayProps> = ({
   const certificateRef = useRef<HTMLDivElement>(null);
   const [creatorName, setCreatorName] = useState('SkillPulse Instructor');
   const [creatorInitials, setCreatorInitials] = useState('SI');
+  const [studentName, setStudentName] = useState('Student');
 
   useEffect(() => {
     const fetchCreatorData = async () => {
@@ -51,8 +52,17 @@ const CertificateDisplay: React.FC<CertificateDisplayProps> = ({
         setCreatorInitials(getInitials(name));
       }
     };
+
+    const fetchStudentName = async () => {
+      if (user) {
+        const name = await fetchUserName(user.id);
+        setStudentName(name);
+      }
+    };
+
     fetchCreatorData();
-  }, [certificate.creator_id]);
+    fetchStudentName();
+  }, [certificate.creator_id, user]);
 
   const fetchCreatorName = async (creatorId: string) => {
     try {
@@ -82,6 +92,26 @@ const CertificateDisplay: React.FC<CertificateDisplayProps> = ({
       .join('')
       .toUpperCase()
       .slice(0, 2);
+  };
+
+  const fetchUserName = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching user name:', error);
+        return 'Student';
+      }
+
+      return data?.full_name || 'Student';
+    } catch (error) {
+      console.error('Error fetching user name:', error);
+      return 'Student';
+    }
   };
 
   const handlePrint = useReactToPrint({
@@ -244,7 +274,7 @@ const CertificateDisplay: React.FC<CertificateDisplayProps> = ({
           <h1 className="certificate-title">CERTIFICATE OF COMPLETION</h1>
           <p className="subtitle">This certificate is awarded to</p>
 
-          <div className="recipient-name">{user?.user_metadata?.full_name || 'Student'}</div>
+          <div className="recipient-name">{studentName}</div>
 
           <p className="message">
             has successfully completed the course requirements and demonstrated proficiency in the following skills:
